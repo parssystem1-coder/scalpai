@@ -5,9 +5,10 @@ import {
   RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer,
 } from 'recharts';
 import { toast } from 'sonner';
-import type { Analysis, Client, ClinicalAnalysisResult } from '../../db';
+import type { Analysis, Client, ClinicalAnalysisResult, OfflineAnalysisResult } from '../../db';
 import DiagnosisResultGrid from '../../components/DiagnosisResultGrid';
 import MetricPercentBar from '../../components/MetricPercentBar';
+import ImageQualityWarning from '../../components/ImageQualityWarning';
 import { resolveObservations, lesionDisplayLabel } from '../../lib/diagnosisCatalog';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { useLang, useT } from '../../i18n';
@@ -259,6 +260,17 @@ export default function ResultsTab({
           <span>{t('heuristicFilledHint')}</span>
         </div>
       )}
+      {isOfflineSource && (
+        <ImageQualityWarning quality={(result as OfflineAnalysisResult).imageQuality} />
+      )}
+      {isOfflineSource && (result as OfflineAnalysisResult).engine !== 'model' && (
+        <div className="flex items-start gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-sm text-sky-100/85">
+          <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-sky-400" />
+          <span>{t('heuristicExperimentalNote')}</span>
+        </div>
+      )}
+
+
 
       {/* ۲. هدر نتیجه */}
       <div className="rounded-2xl bg-white/5 border border-white/10 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4 justify-between">

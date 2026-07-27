@@ -51,6 +51,22 @@ check('shared/scalp-constants.json ساختار درست دارد', () => {
   for (const [k, v] of Object.entries(shared.FEATURE_SCALE)) {
     assert.ok(Number.isFinite(v), `FEATURE_SCALE.${k} عدد نیست`);
   }
+  assert.ok(
+    shared.COLOR_NORMALIZATION && typeof shared.COLOR_NORMALIZATION === 'object',
+    'COLOR_NORMALIZATION نیست (فاز ۱)',
+  );
+  for (const [k, v] of Object.entries(shared.COLOR_NORMALIZATION)) {
+    if (k === '_comment') continue;
+    assert.ok(Number.isFinite(v), `COLOR_NORMALIZATION.${k} عدد نیست`);
+  }
+  assert.ok(
+    shared.IMAGE_QUALITY_THRESHOLDS && typeof shared.IMAGE_QUALITY_THRESHOLDS === 'object',
+    'IMAGE_QUALITY_THRESHOLDS نیست (فاز ۱)',
+  );
+  for (const [k, v] of Object.entries(shared.IMAGE_QUALITY_THRESHOLDS)) {
+    if (k === '_comment') continue;
+    assert.ok(Number.isFinite(v), `IMAGE_QUALITY_THRESHOLDS.${k} عدد نیست`);
+  }
 });
 
 // ── ۲) TypeScript از فایل مشترک می‌خواند، نه مقدار هاردکد ───────────────
@@ -66,6 +82,14 @@ check('heuristicConstants.ts از فایل مشترک import می‌کند', () 
   assert.ok(
     /GRID_SIZE[^=]*=\s*sharedConstants\.GRID_SIZE/.test(tsSrc),
     'GRID_SIZE باید از فایل مشترک بیاید',
+  );
+  assert.ok(
+    /COLOR_NORMALIZATION\s*=\s*sharedConstants\.COLOR_NORMALIZATION/.test(tsSrc),
+    'COLOR_NORMALIZATION باید از فایل مشترک بیاید (فاز ۱)',
+  );
+  assert.ok(
+    /IMAGE_QUALITY_THRESHOLDS\s*=\s*sharedConstants\.IMAGE_QUALITY_THRESHOLDS/.test(tsSrc),
+    'IMAGE_QUALITY_THRESHOLDS باید از فایل مشترک بیاید (فاز ۱)',
   );
 });
 
@@ -89,6 +113,18 @@ check('analyze.py ضرایب را از SCALE می‌خواند (نه عدد ثا
   assert.ok(
     /SCALE = _CONSTANTS\['FEATURE_SCALE'\]/.test(pySrc),
     'SCALE باید از فایل مشترک خوانده شود',
+  );
+  assert.ok(
+    /COLOR_NORM = _CONSTANTS\.get\('COLOR_NORMALIZATION'/.test(pySrc),
+    'COLOR_NORM باید از فایل مشترک خوانده شود (فاز ۱)',
+  );
+  assert.ok(
+    /QUALITY_THRESHOLDS = _CONSTANTS\.get\('IMAGE_QUALITY_THRESHOLDS'/.test(pySrc),
+    'QUALITY_THRESHOLDS باید از فایل مشترک خوانده شود (فاز ۱)',
+  );
+  assert.ok(
+    /def apply_color_normalization\(/.test(pySrc) && /def assess_image_quality\(/.test(pySrc),
+    'apply_color_normalization/assess_image_quality باید در analyze.py پیاده‌سازی شده باشند (فاز ۱)',
   );
 });
 
@@ -118,7 +154,34 @@ check('کلیدهای fallback در analyze.py با فایل مشترک یکی �
   assert.strictEqual(mismatched.length, 0, `مقدار fallback ناهمگام: ${mismatched.join(', ')}`);
 });
 
+// ── ۴ب) کلیدهای fallback فاز ۱ (رنگ/کیفیت) هم با فایل مشترک یکی هستند ────
+check('fallback فاز ۱ (COLOR_NORMALIZATION/IMAGE_QUALITY_THRESHOLDS) در analyze.py هم‌راستاست', () => {
+  const checkBlock = (marker, sharedObj, label) => {
+    const start = pySrc.indexOf(marker);
+    assert.ok(start > -1, `بلوک fallback '${marker}' پیدا نشد`);
+    const blockEnd = pySrc.indexOf('}', start);
+    const block = pySrc.slice(start, blockEnd);
+    const fallbackKeys = [...block.matchAll(/'([A-Za-z]+)':/g)].map((m) => m[1]);
+    const sharedKeys = Object.keys(sharedObj).filter((k) => k !== '_comment');
+    const missing = sharedKeys.filter((k) => !fallbackKeys.includes(k));
+    const extra = fallbackKeys.filter((k) => !sharedKeys.includes(k));
+    assert.strictEqual(missing.length, 0, `${label}: در fallback پایتون نیست: ${missing.join(', ')}`);
+    assert.strictEqual(extra.length, 0, `${label}: در fallback پایتون اضافه است: ${extra.join(', ')}`);
+    const mismatched = [];
+    for (const key of sharedKeys) {
+      const m = block.match(new RegExp(`'${key}':\\s*([0-9.]+)`));
+      if (m && Number(m[1]) !== sharedObj[key]) {
+        mismatched.push(`${key} (py=${m[1]} vs shared=${sharedObj[key]})`);
+      }
+    }
+    assert.strictEqual(mismatched.length, 0, `${label}: مقدار fallback ناهمگام: ${mismatched.join(', ')}`);
+  };
+  checkBlock("'COLOR_NORMALIZATION': {", shared.COLOR_NORMALIZATION, 'COLOR_NORMALIZATION');
+  checkBlock("'IMAGE_QUALITY_THRESHOLDS': {", shared.IMAGE_QUALITY_THRESHOLDS, 'IMAGE_QUALITY_THRESHOLDS');
+});
+
 // ── ۵) فایل مشترک به نسخهٔ نصب‌شده هم می‌رسد ────────────────────────────
+
 check('shared در extraResources هست (نسخهٔ بسته‌بندی‌شده)', () => {
   const builder = JSON.parse(read('electron-builder.json'));
   const resources = builder.extraResources || [];

@@ -65,6 +65,11 @@ export const offlineDict = {
     fa: 'این شاخص‌ها تخمینی و مبتنی بر تحلیل هوش مصنوعی هستند، نه تشخیص بالینی قطعی.',
     en: 'These indicators are AI-based estimates, not a definitive clinical diagnosis.',
   },
+  heuristicExperimentalNote: {
+    fa: 'موتور تحلیل آفلاین بر پایهٔ آستانه‌های تجربی و غیرکالیبره‌شدهٔ بالینی روی رنگ/بافت پیکسل کار می‌کند — دقتش را نباید معادل تشخیص پزشکی یا دستگاه تریکوسکوپ دانست.',
+    en: 'The offline engine relies on experimental, non clinically-calibrated pixel color/texture thresholds — its accuracy should not be treated as equivalent to a medical diagnosis or trichoscope device.',
+  },
+
   screeningDisclaimer: {
     fa: 'پیشنهاد غربالگری خودکار — غیرتشخیصی. جایگزین معاینهٔ متخصص نیست.',
     en: 'Automated screening suggestion — non-diagnostic. Not a substitute for specialist examination.',

@@ -67,12 +67,103 @@ def _load_shared_constants():
             'pigmentationFromRaw': 2.2, 'hairThicknessEdgeFactor': 40,
             'minHairArea': 0.04,
         },
+        'COLOR_NORMALIZATION': {
+            'targetGrayBrightness': 140, 'whiteBalanceGainMin': 0.7,
+            'whiteBalanceGainMax': 1.4, 'exposureGainMin': 0.6,
+            'exposureGainMax': 1.8,
+        },
+        'IMAGE_QUALITY_THRESHOLDS': {
+            'blurVarianceMin': 60, 'exposureDarkMean': 40,
+            'exposureBrightMean': 235, 'lowContrastStdMin': 15,
+        },
     }
 
 
 _CONSTANTS = _load_shared_constants()
 GRID_SIZE = _CONSTANTS['GRID_SIZE']
 SCALE = _CONSTANTS['FEATURE_SCALE']
+COLOR_NORM = _CONSTANTS.get('COLOR_NORMALIZATION', {
+    'targetGrayBrightness': 140, 'whiteBalanceGainMin': 0.7,
+    'whiteBalanceGainMax': 1.4, 'exposureGainMin': 0.6, 'exposureGainMax': 1.8,
+})
+QUALITY_THRESHOLDS = _CONSTANTS.get('IMAGE_QUALITY_THRESHOLDS', {
+    'blurVarianceMin': 60, 'exposureDarkMean': 40,
+    'exposureBrightMean': 235, 'lowContrastStdMin': 15,
+})
+
+
+def assess_image_quality(gray: 'np.ndarray') -> dict:
+    """
+    فاز ۱ — معادل دقیق src/lib/scalpFeatures.ts::assessImageQuality.
+    روی تصویر خاکستریِ خام (قبل از نرمال‌سازی رنگ) محاسبه می‌شود.
+    """
+    q = QUALITY_THRESHOLDS
+    mean_brightness = float(np.mean(gray))
+    brightness_std = float(np.std(gray))
+
+    laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+    blur_variance = float(np.var(laplacian))
+
+    is_blurry = blur_variance < q['blurVarianceMin']
+    is_too_dark = mean_brightness < q['exposureDarkMean']
+    is_too_bright = mean_brightness > q['exposureBrightMean']
+    is_low_contrast = brightness_std < q['lowContrastStdMin']
+
+    return {
+        'blurVariance': blur_variance,
+        'meanBrightness': mean_brightness,
+        'brightnessStd': brightness_std,
+        'isBlurry': is_blurry,
+        'isTooDark': is_too_dark,
+        'isTooBright': is_too_bright,
+        'isLowContrast': is_low_contrast,
+        'hasIssue': bool(is_blurry or is_too_dark or is_too_bright or is_low_contrast),
+    }
+
+
+def apply_color_normalization(img: 'np.ndarray') -> 'np.ndarray':
+    """
+    فاز ۱ — معادل دقیق src/lib/scalpFeatures.ts::applyColorNormalization
+    (gray-world white balance + تعدیل نوردهی سراسری). ورودی/خروجی BGR uint8.
+    """
+    c = COLOR_NORM
+    b, g, r = cv2.split(img.astype(np.float64))
+    mean_b, mean_g, mean_r = float(np.mean(b)) or 1.0, float(np.mean(g)) or 1.0, float(np.mean(r)) or 1.0
+    gray_mean = (mean_r + mean_g + mean_b) / 3.0 or 1.0
+
+    def clamp_gain(gain):
+        return max(c['whiteBalanceGainMin'], min(c['whiteBalanceGainMax'], gain))
+
+    gain_r = clamp_gain(gray_mean / mean_r)
+    gain_g = clamp_gain(gray_mean / mean_g)
+    gain_b = clamp_gain(gray_mean / mean_b)
+
+    exposure_gain = max(
+        c['exposureGainMin'],
+        min(c['exposureGainMax'], c['targetGrayBrightness'] / gray_mean),
+    )
+
+    r = np.clip(r * gain_r * exposure_gain, 0, 255)
+    g = np.clip(g * gain_g * exposure_gain, 0, 255)
+    b = np.clip(b * gain_b * exposure_gain, 0, 255)
+    # np.round (نه astype ساده) تا رفتار گرد کردن دقیقاً با تخصیص به
+    # Uint8ClampedArray در JS (round-to-nearest، نه truncate) یکی باشد —
+    # وگرنه رنگ نرمال‌شدهٔ دو موتور می‌تواند ±۱ واحد در هر پیکسل فرق کند.
+    return cv2.merge([np.round(b), np.round(g), np.round(r)]).astype(np.uint8)
+
+
+
+def adaptive_grid_dims(width: int, height: int) -> tuple:
+    """
+    فاز ۱ — معادل دقیق src/lib/scalpFeatures.ts::computeAdaptiveGridDims.
+    شبکهٔ تطبیقی بر اساس نسبت ابعاد، با مساحت کل نزدیک GRID_SIZE×GRID_SIZE.
+    """
+    target_cells = GRID_SIZE * GRID_SIZE
+    aspect = (width / height) if (width > 0 and height > 0) else 1.0
+    cols = max(2, round((target_cells * aspect) ** 0.5))
+    rows = max(2, round(target_cells / cols))
+    cols = max(2, round(target_cells / rows))
+    return cols, rows
 
 
 def analyze(image_path: str, lang: str = 'fa') -> dict:
@@ -86,6 +177,14 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
     if scale < 1.0:
         img = cv2.resize(img, (int(w * scale), int(h * scale)))
         h, w = img.shape[:2]
+
+    # کیفیت تصویر روی خاکستریِ خام (قبل از نرمال‌سازی رنگ) سنجیده می‌شود —
+    # همان تصویری که کاربر واقعاً گرفته، نه نسخهٔ کالیبره‌شده.
+    raw_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    image_quality = assess_image_quality(raw_gray)
+
+    # نرمال‌سازی نور/رنگ قبل از استخراج فیچر — دقیقاً هم‌تراز با موتور مرورگر
+    img = apply_color_normalization(img)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -113,16 +212,17 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
     dark_mask = gray < 60
     hair_coverage = float(np.mean(dark_mask))
 
-    # شاخص‌های ناحیه‌ای (شبکهٔ GRID_SIZE x GRID_SIZE): لکه‌ای بودن پوشش مو و
+    # شاخص‌های ناحیه‌ای (شبکهٔ تطبیقی cols×rows): لکه‌ای بودن پوشش مو و
     # ناهمگونی رنگدانه/روشنایی بین نواحی مختلف تصویر
-    cell_h = max(1, h // GRID_SIZE)
-    cell_w = max(1, w // GRID_SIZE)
+    grid_cols, grid_rows = adaptive_grid_dims(w, h)
+    cell_h = max(1, h // grid_rows)
+    cell_w = max(1, w // grid_cols)
     cell_coverages = []
     cell_brightnesses = []
-    for gy in range(GRID_SIZE):
-        for gx in range(GRID_SIZE):
-            y0, y1 = gy * cell_h, min(h, (gy + 1) * cell_h) if gy < GRID_SIZE - 1 else h
-            x0, x1 = gx * cell_w, min(w, (gx + 1) * cell_w) if gx < GRID_SIZE - 1 else w
+    for gy in range(grid_rows):
+        for gx in range(grid_cols):
+            y0, y1 = gy * cell_h, min(h, (gy + 1) * cell_h) if gy < grid_rows - 1 else h
+            x0, x1 = gx * cell_w, min(w, (gx + 1) * cell_w) if gx < grid_cols - 1 else w
             if y1 <= y0 or x1 <= x0:
                 continue
             cell_gray = gray[y0:y1, x0:x1]
@@ -133,6 +233,7 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
 
     patchiness_raw = float(np.std(cell_coverages)) if len(cell_coverages) > 1 else 0.0
     pigmentation_raw = float(np.std(cell_brightnesses)) if len(cell_brightnesses) > 1 else 0.0
+
 
     def clamp_score(v, scale=100):
         return int(max(0, min(100, round(v * scale))))
@@ -317,7 +418,9 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
         'chartData': chart_data,
         'annotatedImageBase64': annotated_b64,
         'engine': 'python',
+        'imageQuality': image_quality,
     }
+
 
 
 if __name__ == '__main__':
