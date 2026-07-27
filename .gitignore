@@ -20,6 +20,17 @@ __pycache__/
 .venv/
 venv/
 
+# خروجی PyInstaller — فایل اجرایی ~۲۰۰ مگابایتی آنالایزر و پوشهٔ کار آن.
+# با `pnpm build:python:win` بازتولید می‌شود و هرگز نباید کامیت شود.
+python/dist/
+python/build/
+.venv-analyzer-build/
+
+# قفل مدیر بستهٔ رقیب — این پروژه فقط از pnpm استفاده می‌کند (packageManager
+# در package.json). وجود همزمان دو قفل باعث واگرایی نسخه‌ها می‌شود.
+package-lock.json
+yarn.lock
+
 # محیط و اسرار — هرگز کامیت نشوند
 .env
 .env.*

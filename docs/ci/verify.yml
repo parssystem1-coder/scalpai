@@ -1,0 +1,67 @@
+name: Verify
+
+# چرا این workflow: پروژه از قبل اسکریپت `pnpm verify` را داشت (تایپ‌چک، لینت،
+# تست‌ها، قرارداد دیتابیس و همگامی ضرایب مشترک) ولی هیچ‌جا خودکار اجرا نمی‌شد.
+# مهم‌ترین‌شان check-shared-constants است: اگر ضرایب موتور Python و موتور
+# مرورگر از هم فاصله بگیرند، یک تصویر دو نتیجهٔ متفاوت می‌دهد — بی‌صدا.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --ignore-scripts چون better-sqlite3 نسخهٔ ۱۳ روی N-API است و باینری
+      # آمادهٔ linux-x64 را همراه خود دارد؛ کامپایل مجدد فقط CI را کند می‌کند.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Unit tests
+        run: pnpm run test
+
+      - name: Database contract tests
+        run: pnpm run test:db
+
+      - name: Shared constants parity
+        run: pnpm run test:constants
+
+      - name: Production build
+        run: pnpm run build
+
+# ---------------------------------------------------------------------------
+# نحوهٔ فعال‌سازی این workflow
+# ---------------------------------------------------------------------------
+# این فایل عمداً در docs/ci/ قرار گرفته، نه در .github/workflows/.
+# دلیلش محدودیت دسترسی است: عاملی که این کامیت را ساخت مجوز `workflows` نداشت
+# و GitHub اجازهٔ push فایل workflow را نداد.
+#
+# برای فعال کردن CI، این دو دستور را اجرا کنید:
+#
+#     mkdir -p .github/workflows
+#     git mv docs/ci/verify.yml .github/workflows/verify.yml
+#     git commit -m "ci: enable verify workflow"
+#     git push
+#
+# از آن به بعد هر push و هر pull request به‌صورت خودکار بررسی می‌شود.
