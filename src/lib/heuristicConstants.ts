@@ -28,6 +28,27 @@ export const HEURISTIC_FEATURE_SCALE = sharedConstants.FEATURE_SCALE satisfies {
   minHairArea: number;
 };
 
+/**
+ * فاز ۱ — پارامترهای نرمال‌سازی نور/رنگ (gray-world white balance + تعدیل
+ * نوردهی سراسری) قبل از استخراج فیچر خام. باید با python/analyze.py هم‌تراز
+ * بماند — scripts/check-shared-constants.cjs همگام بودن را بررسی می‌کند.
+ */
+export const COLOR_NORMALIZATION = sharedConstants.COLOR_NORMALIZATION satisfies {
+  targetGrayBrightness: number;
+  whiteBalanceGainMin: number;
+  whiteBalanceGainMax: number;
+  exposureGainMin: number;
+  exposureGainMax: number;
+};
+
+/** آستانه‌های تشخیص کیفیت پایین تصویر ورودی (تار/نور نامناسب/کم‌کنتراست) */
+export const IMAGE_QUALITY_THRESHOLDS = sharedConstants.IMAGE_QUALITY_THRESHOLDS satisfies {
+  blurVarianceMin: number;
+  exposureDarkMean: number;
+  exposureBrightMean: number;
+  lowContrastStdMin: number;
+};
+
 /** آستانه‌های پیشنهاد متنی بر اساس متریک خام */
 export const HEURISTIC_METRIC_RECOMMEND = {
   whiteFlakeDandruff: 0.08,

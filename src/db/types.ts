@@ -209,6 +209,20 @@ export interface OfflineAnalysisResult {
    * چون موتور شناسهٔ کاتالوگ برنگردانده است.
    */
   observationsFilledFromHeuristic?: boolean;
+  /**
+   * فاز ۱ — ارزیابی کیفیت تصویر ورودی خام (تار/کم‌نور/پرنور/کم‌کنتراست).
+   * فقط هشدار برای کاربر است؛ تحلیل را مسدود نمی‌کند.
+   */
+  imageQuality?: {
+    blurVariance: number;
+    meanBrightness: number;
+    brightnessStd: number;
+    isBlurry: boolean;
+    isTooDark: boolean;
+    isTooBright: boolean;
+    isLowContrast: boolean;
+    hasIssue: boolean;
+  };
   /** Context actually used to interpret this image during analysis. */
   acquisitionContext?: import('../lib/analysisAcquisitionContext').AnalysisAcquisitionContext;
   /** Snapshot پرسشنامه لینک‌شده به این تحلیل آفلاین */
@@ -218,6 +232,7 @@ export interface OfflineAnalysisResult {
    */
   questionnaireInterpretation?: import('../lib/questionnaireOfflineInterpretation').QuestionnaireInterpretation;
 }
+
 
 /** شکل مشترک نتایج AI / آفلاین برای UI گزارش */
 export type ClinicalAnalysisResult = AIAnalysisResult | OfflineAnalysisResult;

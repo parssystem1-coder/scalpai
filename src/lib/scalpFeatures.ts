@@ -20,13 +20,20 @@ import {
   HEURISTIC_FEATURE_SCALE,
   HEURISTIC_METRIC_RECOMMEND,
   HEURISTIC_SCORE_RECOMMEND,
+  COLOR_NORMALIZATION,
+  IMAGE_QUALITY_THRESHOLDS,
 } from './heuristicConstants';
 import { overlayLesionBoxes, findHotspotSquares } from './lesionVisualization';
 
 // نسخهٔ فرمول استخراج فیچر — هر بار که فرمول یا تعداد/ترتیب فیچرها عوض شد،
 // این را افزایش بده. مدل‌های آموزش‌دیده با نسخهٔ قدیمی باید دوباره آموزش ببینند.
 // v3: خروجی مدل شامل برچسب‌های تشخیص کلینیکی (observations) هم شد.
-export const FEATURE_VERSION = 'v3.1-observation-catalog';
+// v3.2 (فاز ۱): قبل از استخراج فیچر یک نرمال‌سازی نور/رنگ (gray-world white
+// balance + تعدیل نوردهی سراسری) و یک شبکهٔ تطبیقی (بر اساس نسبت ابعاد
+// تصویر به‌جای شبکهٔ ثابت مربعی) اضافه شد. چون توزیع مقادیر فیچرهای خام
+// واقعاً تغییر کرده (نه فقط برچسب نسخه)، این نسخه عمداً در LEGACY_FEATURE_VERSIONS
+// قرار نمی‌گیرد — نمونه‌های آموزشی قدیمی باید دوباره تحلیل/برچسب‌گذاری شوند.
+export const FEATURE_VERSION = 'v3.2-normalized-adaptive-grid';
 export const LEGACY_FEATURE_VERSIONS = ['v3'] as const;
 
 // GRID_SIZE از shared/scalp-constants.json می‌آید (مشترک با python/analyze.py)
@@ -93,6 +100,135 @@ export interface ScalpHeuristicScores {
   hairThickness: number;  // ضخامت نسبی تار مو (تخمینی — عدد بالاتر یعنی تارهای درشت‌تر)
 }
 
+/**
+ * فاز ۱ — ارزیابی کیفیت تصویر ورودی، محاسبه‌شده روی پیکسل‌های خام (قبل از
+ * نرمال‌سازی رنگ). هدف: هشدار به کاربر وقتی عکس آن‌قدر تار/کم‌نور/پرنور یا
+ * کم‌کنتراست است که نتیجهٔ تحلیل عملاً بی‌معنی می‌شود — بدون مسدودکردن
+ * کامل تحلیل (تصمیم نهایی با کاربر است).
+ */
+export interface ImageQualityAssessment {
+  /** واریانس لاپلاسین سادهٔ گرادیان — پایین یعنی تصویر تار است */
+  blurVariance: number;
+  /** میانگین روشنایی خام (۰-۲۵۵) قبل از نرمال‌سازی */
+  meanBrightness: number;
+  /** انحراف‌معیار روشنایی خام — پایین یعنی تصویر کم‌کنتراست/صاف است */
+  brightnessStd: number;
+  isBlurry: boolean;
+  isTooDark: boolean;
+  isTooBright: boolean;
+  isLowContrast: boolean;
+  /** هر مشکلی که واقعاً شناسایی شده باشد */
+  hasIssue: boolean;
+}
+
+export function assessImageQuality(data: Uint8ClampedArray, width: number, height: number): ImageQualityAssessment {
+  const q = IMAGE_QUALITY_THRESHOLDS;
+
+  // خاکستری‌سازی کامل تصویر (نه نمونه‌برداری‌شده) — ابعاد بعد از resize در
+  // extractImageFeatures حداکثر ۶۴۰ پیکسل است، پس این یک پیمایش کامل ارزان
+  // (کمتر از نیم‌میلیون پیکسل) است و دقت بیشتری نسبت به نمونه‌برداری می‌دهد.
+  const gray = new Float64Array(width * height);
+  for (let p = 0; p < width * height; p++) {
+    const idx = p * 4;
+    gray[p] = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+  }
+
+  let sum = 0;
+  let sumSq = 0;
+  for (let i = 0; i < gray.length; i++) {
+    sum += gray[i];
+    sumSq += gray[i] * gray[i];
+  }
+  const n = gray.length || 1;
+  const meanBrightness = sum / n;
+  const brightnessStd = Math.sqrt(Math.max(0, sumSq / n - meanBrightness * meanBrightness));
+
+  // لاپلاسین گسسته با هستهٔ ۴-همسایه (همان هستهٔ پیش‌فرض ksize=1 در
+  // cv2.Laplacian که python/analyze.py استفاده می‌کند) — معیار کلاسیک
+  // «واریانس لاپلاسین» برای تشخیص تاری تصویر.
+  let lapSum = 0;
+  let lapSumSq = 0;
+  let lapCount = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const lap = 4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - width] - gray[i + width];
+      lapSum += lap;
+      lapSumSq += lap * lap;
+      lapCount++;
+    }
+  }
+  const lapN = lapCount || 1;
+  const lapMean = lapSum / lapN;
+  const blurVariance = Math.max(0, lapSumSq / lapN - lapMean * lapMean);
+
+  const isBlurry = blurVariance < q.blurVarianceMin;
+  const isTooDark = meanBrightness < q.exposureDarkMean;
+  const isTooBright = meanBrightness > q.exposureBrightMean;
+  const isLowContrast = brightnessStd < q.lowContrastStdMin;
+
+  return {
+    blurVariance,
+    meanBrightness,
+    brightnessStd,
+    isBlurry,
+    isTooDark,
+    isTooBright,
+    isLowContrast,
+    hasIssue: isBlurry || isTooDark || isTooBright || isLowContrast,
+  };
+
+}
+
+
+/**
+ * نرمال‌سازی نور/رنگ سادهٔ gray-world: هر کانال رنگی طوری مقیاس می‌شود که
+ * میانگینش به میانگین کلی نزدیک شود (کاهش انحراف تعادل سفیدی/دمای رنگ)، و
+ * سپس یک تعدیل نوردهی سراسری اعمال می‌شود تا میانگین روشنایی به یک مقدار
+ * هدف ثابت نزدیک شود (کاهش حساسیت به فلاش/نور محیط تاریک یا روشن).
+ * این تابع یک بافر RGBA *جدید* برمی‌گرداند — ورودی دست‌نخورده می‌ماند (canvas
+ * اصلی برای رسم overlay بدون تغییر لازم است).
+ *
+ * هشدار مهاجرت: این فرمول باید دقیقاً با تابع معادل در python/analyze.py
+ * هم‌تراز بماند (بازتولید دستی، مثل بقیهٔ فرمول‌های این فایل).
+ */
+export function applyColorNormalization(data: Uint8ClampedArray): Uint8ClampedArray {
+  const c = COLOR_NORMALIZATION;
+  let sumR = 0, sumG = 0, sumB = 0;
+  const pixelCount = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    sumR += data[i];
+    sumG += data[i + 1];
+    sumB += data[i + 2];
+  }
+  const meanR = sumR / pixelCount || 1;
+  const meanG = sumG / pixelCount || 1;
+  const meanB = sumB / pixelCount || 1;
+  const grayMean = (meanR + meanG + meanB) / 3 || 1;
+
+  const clampGain = (g: number) => Math.max(c.whiteBalanceGainMin, Math.min(c.whiteBalanceGainMax, g));
+  const gainR = clampGain(grayMean / meanR);
+  const gainG = clampGain(grayMean / meanG);
+  const gainB = clampGain(grayMean / meanB);
+
+  // تعدیل نوردهی سراسری: بعد از white-balance، میانگین خاکستری را به سمت
+  // یک روشنایی هدف ثابت می‌کشد — نه کاملاً برابر (برای جلوگیری از تقویت
+  // نویز روی عکس‌های خیلی تاریک)، بلکه با یک بهرهٔ محدود.
+  const exposureGain = Math.max(
+    c.exposureGainMin,
+    Math.min(c.exposureGainMax, c.targetGrayBrightness / grayMean),
+  );
+
+  const out = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    out[i] = data[i] * gainR * exposureGain;
+    out[i + 1] = data[i + 1] * gainG * exposureGain;
+    out[i + 2] = data[i + 2] * gainB * exposureGain;
+    out[i + 3] = data[i + 3];
+  }
+  return out;
+}
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -102,6 +238,25 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     img.src = url;
   });
 }
+
+/**
+ * اندازهٔ شبکهٔ تطبیقی برای شاخص‌های ناحیه‌ای (patchiness/pigmentation).
+ * به‌جای شبکهٔ ثابت مربعی GRID_SIZE×GRID_SIZE، تعداد ستون/ردیف را متناسب با
+ * نسبت ابعاد واقعی تصویر تنظیم می‌کند تا خانه‌های شبکه روی عکس‌های خیلی
+ * کشیده (پرتره/وایدشات) هم تقریباً مربعی و معنادار بمانند. مساحت کل شبکه
+ * (تعداد خانه‌ها) نزدیک GRID_SIZE×GRID_SIZE نگه داشته می‌شود تا مقیاس
+ * آماری (انحراف‌معیار) با نسخهٔ قبلی/Python قابل مقایسه بماند.
+ */
+export function computeAdaptiveGridDims(width: number, height: number): { cols: number; rows: number } {
+  const targetCells = GRID_SIZE * GRID_SIZE;
+  const aspect = width > 0 && height > 0 ? width / height : 1;
+  let cols = Math.max(2, Math.round(Math.sqrt(targetCells * aspect)));
+  const rows = Math.max(2, Math.round(targetCells / cols));
+  // اصلاح رفت‌وبرگشتی برای نزدیک ماندن ضرب نهایی به targetCells
+  cols = Math.max(2, Math.round(targetCells / rows));
+  return { cols, rows };
+}
+
 
 function computeRawMetrics(data: Uint8ClampedArray, width: number, height: number): ScalpRawMetrics {
   let totalR = 0, totalG = 0, totalB = 0;
@@ -115,7 +270,8 @@ function computeRawMetrics(data: Uint8ClampedArray, width: number, height: numbe
   const step = 4;
   const sampleCount = Math.floor(data.length / (4 * step));
 
-  const cellCount = GRID_SIZE * GRID_SIZE;
+  const { cols: gridCols, rows: gridRows } = computeAdaptiveGridDims(width, height);
+  const cellCount = gridCols * gridRows;
   const cellHairCount = new Array(cellCount).fill(0);
   const cellPixelCount = new Array(cellCount).fill(0);
   const cellBrightnessSum = new Array(cellCount).fill(0);
@@ -153,9 +309,9 @@ function computeRawMetrics(data: Uint8ClampedArray, width: number, height: numbe
     const x = pixelIndex % width;
     const y = Math.floor(pixelIndex / width);
     if (y < height) {
-      const cellX = Math.min(GRID_SIZE - 1, Math.floor((x / width) * GRID_SIZE));
-      const cellY = Math.min(GRID_SIZE - 1, Math.floor((y / height) * GRID_SIZE));
-      const cellIdx = cellY * GRID_SIZE + cellX;
+      const cellX = Math.min(gridCols - 1, Math.floor((x / width) * gridCols));
+      const cellY = Math.min(gridRows - 1, Math.floor((y / height) * gridRows));
+      const cellIdx = cellY * gridCols + cellX;
       cellPixelCount[cellIdx]++;
       cellBrightnessSum[cellIdx] += brightness;
       if (isDark) cellHairCount[cellIdx]++;
@@ -205,12 +361,15 @@ export interface ExtractedImageFeatures {
   width: number;
   height: number;
   canvas: HTMLCanvasElement;
+  /** ارزیابی کیفیت تصویر خام (قبل از نرمال‌سازی رنگ) — برای هشدار در UI */
+  imageQuality: ImageQualityAssessment;
 }
 
 /**
- * تصویر را از URL/DataURL بارگذاری، به سایز استاندارد ۶۴۰ می‌رساند و فیچرهای
- * خام پیکسلی را استخراج می‌کند. canvas خروجی برای رسم overlay در فراخوان
- * نگه داشته می‌شود تا محاسبات دوباره تکرار نشود.
+ * تصویر را از URL/DataURL بارگذاری، به سایز استاندارد ۶۴۰ می‌رساند، کیفیت
+ * ورودی را روی پیکسل خام می‌سنجد، سپس یک نسخهٔ نرمال‌شدهٔ نور/رنگ برای
+ * استخراج فیچر می‌سازد (canvas اصلی/نمایشی دست‌نخورده می‌ماند تا overlay و
+ * نمایش به کاربر رنگ واقعی عکس را نشان دهد).
  */
 export async function extractImageFeatures(imageUrl: string): Promise<ExtractedImageFeatures> {
   const img = await loadImage(imageUrl);
@@ -227,10 +386,13 @@ export async function extractImageFeatures(imageUrl: string): Promise<ExtractedI
 
   ctx.drawImage(img, 0, 0, width, height);
   const imageData = ctx.getImageData(0, 0, width, height);
-  const metrics = computeRawMetrics(imageData.data, width, height);
+  const imageQuality = assessImageQuality(imageData.data, width, height);
+  const normalizedData = applyColorNormalization(imageData.data);
+  const metrics = computeRawMetrics(normalizedData, width, height);
 
-  return { metrics, width, height, canvas };
+  return { metrics, width, height, canvas, imageQuality };
 }
+
 
 /** تبدیل فیچرهای خام به بردار عددی نرمال‌شده (ورودی مدل محلی) */
 export function featureVectorToArray(metrics: ScalpRawMetrics): number[] {
@@ -364,6 +526,8 @@ export interface ComposedOfflineResult {
   annotatedImageBase64: string;
   engine: 'browser' | 'model';
   observationsFilledFromHeuristic: boolean;
+  /** فاز ۱ — ارزیابی کیفیت تصویر ورودی خام (تار/نور/کنتراست)، برای هشدار در UI */
+  imageQuality?: ImageQualityAssessment;
 }
 
 /**
@@ -379,7 +543,8 @@ export function composeOfflineResult(
   patternLabel?: string,
   observationsOverride?: ObservationId[],
 ): ComposedOfflineResult {
-  const { metrics, width, height, canvas } = extracted;
+  const { metrics, width, height, canvas, imageQuality } = extracted;
+
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
   const resolvedObs = resolveObservations(observationsOverride, scores);
@@ -480,5 +645,7 @@ export function composeOfflineResult(
     annotatedImageBase64: canvas.toDataURL('image/png'),
     engine,
     observationsFilledFromHeuristic: resolvedObs.filledFromHeuristic,
+    imageQuality,
   };
 }
+

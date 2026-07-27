@@ -2,8 +2,9 @@
  * گروه‌بندی و تجمیع تحلیل‌های چندعکسی یک جلسه/مراجعه.
  */
 import { buildLesionSummary } from './lesionSummary';
-import type { Analysis, ClinicalAnalysisResult, GalleryItem, Session } from '../db';
+import type { Analysis, ClinicalAnalysisResult, GalleryItem, OfflineAnalysisResult, Session } from '../db';
 import { mergeObservationIds } from './diagnosisCatalog';
+
 
 export type ResultSource = 'ai' | 'offline';
 
@@ -198,6 +199,14 @@ export function aggregateVisitResults(
   const filledHeuristic = results.some(r => r.observationsFilledFromHeuristic);
   const latest = results[results.length - 1];
 
+  // imageQuality فقط روی OfflineAnalysisResult تعریف شده؛ برای نمای تجمیعی
+  // چندعکسی، بدترین ارزیابی (اگر هر کدام مشکل داشت) را نگه می‌داریم تا
+  // هشدار کیفیت تصویر در UI گم نشود.
+  const qualityCandidates = results
+    .map(r => (r as { imageQuality?: OfflineAnalysisResult['imageQuality'] }).imageQuality)
+    .filter((q): q is NonNullable<OfflineAnalysisResult['imageQuality']> => !!q);
+  const imageQuality = qualityCandidates.find(q => q.hasIssue) ?? qualityCandidates[0];
+
   return {
     lesions,
     lesionSummary,
@@ -222,8 +231,10 @@ export function aggregateVisitResults(
     acquisitionContext: latest.acquisitionContext,
     questionnaireContext: latest.questionnaireContext,
     questionnaireInterpretation: latest.questionnaireInterpretation,
+    ...(imageQuality ? { imageQuality } : {}),
   };
 }
+
 
 /** یک رکورد نماینده برای هر جلسه با نتیجهٔ تجمیعی (برای روند/آرشیو) */
 export function buildVisitLevelHistory(

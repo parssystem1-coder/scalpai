@@ -82,7 +82,18 @@ export const offlineAnalysisResultSchema = z.object({
   })).optional(),
   annotatedImageBase64: z.string().optional(),
   engine: z.enum(['python', 'browser', 'model']).optional(),
+  imageQuality: z.object({
+    blurVariance: z.number(),
+    meanBrightness: z.number(),
+    brightnessStd: z.number(),
+    isBlurry: z.boolean(),
+    isTooDark: z.boolean(),
+    isTooBright: z.boolean(),
+    isLowContrast: z.boolean(),
+    hasIssue: z.boolean(),
+  }).optional(),
 });
+
 
 type Lesion = { type: string; confidence: number; bbox: number[]; category?: 'condition' | 'trichoscopy'; evidenceLevel?: 'observed' | 'possible' | 'requires_confirmation' };
 
@@ -237,5 +248,7 @@ export function parseOfflineAnalysisResult(raw: unknown, confidenceThreshold = 0
     chartData: parsed.chartData?.map(c => ({ label: c.label ?? '', value: c.value ?? 0 })),
     annotatedImageBase64: parsed.annotatedImageBase64,
     engine: parsed.engine,
+    imageQuality: parsed.imageQuality,
   };
 }
+

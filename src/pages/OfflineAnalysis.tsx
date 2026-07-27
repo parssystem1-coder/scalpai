@@ -87,7 +87,9 @@ export default function OfflineAnalysis() {
           zoom={s.zoom}
           onZoom={s.setZoom}
           resultAnnotatedUrl={s.result?.annotatedImageBase64}
+          imageQuality={s.result?.imageQuality}
           showEndVisit={Boolean(s.selectedClient && s.activeVisitSession && !s.isReadOnly)}
+
           endingVisit={s.endingVisit}
           onEndVisit={s.endVisit}
         />

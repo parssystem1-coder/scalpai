@@ -74,5 +74,20 @@
     "pruritusRedness": 20,
     "pruritusDandruff": 15,
     "defaultHairThickness": 50
+  },
+  "COLOR_NORMALIZATION": {
+    "_comment": "فاز ۱ — نرمال‌سازی نور/رنگ قبل از استخراج فیچر (gray-world white balance + تعدیل نوردهی سراسری). هدف: کاهش حساسیت امتیازها به دمای رنگ نور و نوردهی دوربین بین عکس‌های مختلف.",
+    "targetGrayBrightness": 140,
+    "whiteBalanceGainMin": 0.7,
+    "whiteBalanceGainMax": 1.4,
+    "exposureGainMin": 0.6,
+    "exposureGainMax": 1.8
+  },
+  "IMAGE_QUALITY_THRESHOLDS": {
+    "_comment": "آستانه‌های تشخیص کیفیت پایین تصویر ورودی (تار/بیش‌نور/کم‌نور/کم‌کنتراست) — محاسبه‌شده روی پیکسل‌های خام قبل از نرمال‌سازی رنگ. blurVarianceMin بر مبنای واریانس لاپلاسین کامل‌رزولوشن (۰-۲۵۵) کالیبره شده، نه یک پروکسی نمونه‌برداری‌شده.",
+    "blurVarianceMin": 60,
+    "exposureDarkMean": 40,
+    "exposureBrightMean": 235,
+    "lowContrastStdMin": 15
   }
 }

@@ -1,9 +1,10 @@
 import { Cpu, Search, Loader, AlertCircle, ZoomIn, ZoomOut } from 'lucide-react';
-import type { GalleryItem } from '../../db';
+import type { GalleryItem, OfflineAnalysisResult } from '../../db';
 import { useLang, useT } from '../../i18n';
 import AnalysisGalleryPicker from '../../components/AnalysisGalleryPicker';
 import AIAnalysisOverlay from '../../components/AIAnalysisOverlay';
 import EndVisitButton from '../../components/EndVisitButton';
+import ImageQualityWarning from '../../components/ImageQualityWarning';
 import type { AnalysisAgeRef } from '../../lib/galleryPhotoAge';
 import { offlineDict } from './strings';
 
@@ -23,6 +24,7 @@ interface Props {
   zoom: number;
   onZoom: React.Dispatch<React.SetStateAction<number>>;
   resultAnnotatedUrl?: string | null;
+  imageQuality?: OfflineAnalysisResult['imageQuality'] | null;
   showEndVisit?: boolean;
   endingVisit?: boolean;
   onEndVisit?: () => void | Promise<void>;
@@ -31,9 +33,10 @@ interface Props {
 export default function AnalysisTab({
   searchQuery, onSearchChange, filteredClients, selectedClient, onSelectClient,
   clientGallery, analysesForSelectedClient, selectedImage, onSelectImage, analyzing, onAnalyze, error,
-  zoom, onZoom, resultAnnotatedUrl,
+  zoom, onZoom, resultAnnotatedUrl, imageQuality,
   showEndVisit, endingVisit, onEndVisit,
 }: Props) {
+
   const t = useT(offlineDict);
   const { isRtl } = useLang();
 
@@ -121,7 +124,10 @@ export default function AnalysisTab({
             <p>{error}</p>
           </div>
         )}
+
+        <ImageQualityWarning quality={imageQuality} compact />
       </div>
+
 
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-4 h-[clamp(380px,56vh,520px)] flex flex-col overflow-hidden">
         {selectedImage ? (
