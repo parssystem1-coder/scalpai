@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output — با `pnpm build` بازتولید می‌شود و نباید کامیت شود.
+# کامیت کردن dist باعث می‌شد نسخهٔ کهنه اجرا شود و هر build یک diff عظیم بسازد.
+dist/
+dist-electron/
+release/
+build/output/
+
+# کش ابزارها
+.vite/
+.turbo/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# محیط و اسرار — هرگز کامیت نشوند
+.env
+.env.*
+!.env.example
+
+# سیستم‌عامل و ویرایشگر
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# لاگ‌ها
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# دادهٔ محلی برنامه (اگر کسی در ریشه تست کرد)
+*.db
+*.db-wal
+*.db-shm
+scalpai-data.json*
+FETCH_HEAD
