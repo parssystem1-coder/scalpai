@@ -1,0 +1,114 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.scalpai.app",
+  "productName": "ScalpAI",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "npmRebuild": false,
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "shared/**/*",
+    "public/**/*",
+    "!node_modules/**/*",
+    "node_modules/better-sqlite3/**/*"
+  ],
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**/*"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "extraResources": [
+    {
+      "from": "python",
+      "to": "python",
+      "filter": [
+        "**/*"
+      ]
+    },
+    {
+      "from": "shared",
+      "to": "shared",
+      "filter": [
+        "scalp-constants.json"
+      ]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "build/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "deleteAppDataOnUninstall": false,
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "installerHeaderIcon": "build/icon.ico",
+    "installerSidebar": "build/installerSidebar.bmp",
+    "uninstallerSidebar": "build/installerSidebar.bmp",
+    "installerHeader": "build/installerHeader.bmp",
+    "include": "build/installer.nsh",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "ScalpAI",
+    "menuCategory": "ScalpAI",
+    "runAfterFinish": true,
+    "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+  },
+  "portable": {
+    "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "x64",
+          "arm64"
+        ]
+      }
+    ],
+    "icon": "build/icon.icns",
+    "category": "public.app-category.medical",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "deb",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "build/icons",
+    "category": "Medical",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "publish": null
+}
