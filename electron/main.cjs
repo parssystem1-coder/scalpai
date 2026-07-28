@@ -3,6 +3,8 @@
  * نسخه بهینه شده با پشتیبانی از پروکسی و ماژولار بودن
  */
 
+const { logger } = require('./logger.cjs');
+
 const { app, BrowserWindow, ipcMain, dialog, shell, session, safeStorage, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -32,7 +34,7 @@ try {
   Database = require('better-sqlite3');
 } catch (e) {
   dbLoadError = e;
-  console.error('Failed to load better-sqlite3. The native module is likely missing or was built for the wrong Node/Electron ABI. Run "npm install" (which now rebuilds it for Electron automatically) or "npx electron-rebuild -f -w better-sqlite3".', e);
+  logger.error('Failed to load better-sqlite3. The native module is likely missing or was built for the wrong Node/Electron ABI. Run "npm install" (which now rebuilds it for Electron automatically) or "npx electron-rebuild -f -w better-sqlite3".', e);
 }
 
 let mainWindow;
@@ -70,6 +72,16 @@ if (!gotSingleInstanceLock) {
 const userDataPath = app.getPath('userData');
 const dbPath = path.join(userDataPath, 'scalpai.db');
 
+// فاز ۰.۴ — لاگ فایل‌محور با چرخش (logs/main.log + ۵ آرشیو) تا خرابی در
+// کلینیک قابل ردیابی باشد؛ console هم همچنان فعال می‌ماند.
+logger.setLogDir(path.join(userDataPath, 'logs'));
+process.on('uncaughtException', (error) => {
+  logger.error('uncaughtException:', error);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandledRejection:', reason);
+});
+
 /**
  * تنظیم پروکسی برای session
  * @param {string} proxyUrl - آدرس پروکسی (مثلاً http://127.0.0.1:10808)
@@ -78,7 +90,7 @@ async function setProxy(proxyUrl) {
   if (!proxyUrl || proxyUrl.trim() === '') {
     // غیرفعال کردن پروکسی
     await session.defaultSession.setProxy({ mode: 'direct' });
-    console.log('Proxy disabled - using direct connection');
+    logger.info('Proxy disabled - using direct connection');
     return { success: true, mode: 'direct' };
   }
 
@@ -91,10 +103,10 @@ async function setProxy(proxyUrl) {
     };
 
     await session.defaultSession.setProxy(proxyConfig);
-    console.log('Proxy configured:', proxyUrl);
+    logger.info('Proxy configured:', proxyUrl);
     return { success: true, mode: 'proxy', url: proxyUrl };
   } catch (error) {
-    console.error('Failed to set proxy:', error);
+    logger.error('Failed to set proxy:', error);
     return { success: false, error: error.message };
   }
 }
@@ -203,7 +215,7 @@ function readJsonFallbackData(jsonPath) {
       ) || !!parsed?.settings?.username;
     return hasData ? parsed : null;
   } catch (error) {
-    console.warn('Could not read JSON fallback file:', error);
+    logger.warn('Could not read JSON fallback file:', error);
     return null;
   }
 }
@@ -264,7 +276,7 @@ async function migrateJsonFallbackIntoSqlite() {
         });
       }
     } catch (error) {
-      console.warn('Could not show fallback conflict notice:', error);
+      logger.warn('Could not show fallback conflict notice:', error);
     }
     return;
   }
@@ -289,7 +301,7 @@ async function migrateJsonFallbackIntoSqlite() {
     // فایل JSON بازنشسته می‌شود تا مهاجرت دوباره تکرار نشود؛ حذف نمی‌کنیم که
     // در صورت نیاز قابل بازگردانی باشد.
     fs.renameSync(jsonPath, `${jsonPath}.migrated-${Date.now()}`);
-    console.log('JSON fallback data migrated into SQLite');
+    logger.info('JSON fallback data migrated into SQLite');
     dialog.showMessageBox(null, {
       type: 'info',
       title: 'انتقال داده / Data migrated',
@@ -297,7 +309,7 @@ async function migrateJsonFallbackIntoSqlite() {
         'داده‌هایی که در حالت ذخیره‌سازی جایگزین (JSON) ثبت شده بودند، با موفقیت به دیتابیس اصلی (SQLite) منتقل شدند.',
     });
   } catch (error) {
-    console.error('JSON fallback migration failed:', error);
+    logger.error('JSON fallback migration failed:', error);
     dialog.showMessageBox(null, {
       type: 'warning',
       title: 'انتقال داده ناموفق / Migration failed',
@@ -309,11 +321,54 @@ async function migrateJsonFallbackIntoSqlite() {
 }
 
 /**
+ * فاز ۰.۳ — سلامت‌سنجی دوره‌ای دیتابیس.
+ * `PRAGMA integrity_check` کل پایگاه را می‌خواند؛ با دیتابیس‌های بزرگ
+ * چند ثانیه طول می‌کشد، پس فقط هفته‌ای یک‌بار اجرا می‌شود (نشانگر زمانی در
+ * فایل کنار دیتابیس). نتیجهٔ ناموفق به‌جای کرش خاموش در آینده، همین‌جا با
+ * پیام واضح فارسی گزارش می‌شود تا دادهٔ خراب قبل از بدتر شدن شناسایی شود.
+ * @param {import('better-sqlite3').Database} database
+ */
+function runPeriodicIntegrityCheck(database) {
+  const markerPath = path.join(userDataPath, '.last-integrity-check');
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  let lastRun = 0;
+  try {
+    lastRun = Number(fs.readFileSync(markerPath, 'utf-8')) || 0;
+  } catch { /* نشانگر نیست = اولین اجرا */ }
+  if (Date.now() - lastRun < WEEK_MS) return;
+
+  try {
+    const startedAt = Date.now();
+    const rows = database.prepare('PRAGMA integrity_check').all();
+    const ok = rows.length === 1
+      && String(rows[0]?.integrity_check || '').toLowerCase() === 'ok';
+    try {
+      fs.writeFileSync(markerPath, String(Date.now()));
+    } catch { /* نشانگر نوشته نشد مشکلی نیست */ }
+    logger.info(`integrity_check finished in ${Date.now() - startedAt}ms: ${ok ? 'ok' : 'FAILED'}`);
+    if (!ok) {
+      logger.error('Database integrity_check FAILED:', rows);
+      dialog.showMessageBox(null, {
+        type: 'error',
+        title: 'خطای سلامت دیتابیس / Database integrity error',
+        message:
+          'دیتابیس برنامه (scalpai.db) در بررسی سلامت سالم تشخیص داده نشد. ' +
+          'ممکن است بخشی از داده‌ها آسیب دیده باشد.\n\n' +
+          'توصیه: قبل از ادامه، از آخرین نسخهٔ پشتیبان بازیابی کنید یا پشتیبان تازه‌ای بگیرید. ' +
+          'جزئیات در فایل لاگ برنامه ثبت شد.',
+      });
+    }
+  } catch (error) {
+    logger.warn('Integrity check could not run:', error);
+  }
+}
+
+/**
  * راه‌اندازی دیتابیس
  */
 async function initDatabase() {
   if (!Database) {
-    console.warn('better-sqlite3 unavailable, falling back to JSON file storage:', dbLoadError && dbLoadError.message);
+    logger.warn('better-sqlite3 unavailable, falling back to JSON file storage:', dbLoadError && dbLoadError.message);
     dbHandlers = createJsonDbHandlers(userDataPath, safeStorage);
     offlineHandlers = createOfflineHandlers();
     dialog.showMessageBox(null, {
@@ -337,8 +392,19 @@ async function initDatabase() {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
 
+    // فاز ۰.۳ — جمع‌کردن فایل WAL در هر راه‌اندازی: بدون checkpoint دوره‌ای،
+    // روی اپ‌هایی که ماه‌ها باز می‌مانند فایل -wal بزرگ و بزرگ‌تر می‌شود.
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (checkpointError) {
+      logger.warn('WAL checkpoint failed:', checkpointError);
+    }
+
     createBaseTables(db);
     runMigrations(db);
+
+    // سلامت‌سنجی دوره‌ای (هفته‌ای یک‌بار) — بعد از migration تا روی اسکیمای نهایی اجرا شود
+    runPeriodicIntegrityCheck(db);
 
     // تنظیمات پیش‌فرض
     const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('settings');
@@ -358,10 +424,10 @@ async function initDatabase() {
     // اگر قبلاً در حالت جایگزین (JSON) داده ثبت شده، به SQLite منتقل می‌شود
     await migrateJsonFallbackIntoSqlite();
 
-    console.log('Database initialized at:', dbPath);
+    logger.info('Database initialized at:', dbPath);
     return db;
   } catch (error) {
-    console.error('Database initialization error, falling back to JSON file storage:', error);
+    logger.error('Database initialization error, falling back to JSON file storage:', error);
     dbHandlers = createJsonDbHandlers(userDataPath, safeStorage);
     offlineHandlers = createOfflineHandlers();
     dialog.showMessageBox(null, {
@@ -390,7 +456,7 @@ async function readSettingsViaHandlers() {
     const result = await dbHandlers.handleDbQuery('getSettings', {});
     if (result && typeof result === 'object' && !result.error) return result;
   } catch (error) {
-    console.error('Error reading settings:', error);
+    logger.error('Error reading settings:', error);
   }
   return {};
 }
@@ -427,7 +493,7 @@ function setupIpcHandlers() {
         });
         if (saved && saved.error) throw new Error(saved.error);
       } catch (e) {
-        console.error('Error saving proxy settings:', e);
+        logger.error('Error saving proxy settings:', e);
         return { ...result, persisted: false, error: e.message };
       }
     }
@@ -539,6 +605,71 @@ function setupIpcHandlers() {
       return { success: true, content };
     } catch (error) {
       return { error: error.message };
+    }
+  });
+
+  // =============== Backup Package v3 (فاز ۰.۵) ===============
+  // بکاپ پوشه‌ای استریمی: کاربر پوشهٔ مقصد را انتخاب می‌کند و main مستقیماً
+  // در آن بستهٔ <name>/data.json + media/ می‌سازد — بدون عبور صدها مگابایت از
+  // IPC و بدون ساخت رشتهٔ JSON غول‌پیکر در حافظه.
+  ipcMain.handle('backup:export', async (_event, params) => {
+    if (!dbHandlers) return { success: false, error: 'Database not initialized' };
+    const preferredDir = typeof params?.defaultPath === 'string' && params.defaultPath.trim()
+      ? params.defaultPath
+      : app.getPath('documents');
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'پوشهٔ ذخیرهٔ نسخهٔ پشتیبان را انتخاب کنید / Choose backup folder',
+      defaultPath: preferredDir,
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (canceled || !filePaths?.[0]) return { success: false, canceled: true };
+
+    const baseDir = filePaths[0];
+    try {
+      const result = await dbHandlers.handleDbQuery('exportBackupPackage', { baseDir });
+      if (result?.error && String(result.error).startsWith('Unknown method')) {
+        // حالت جایگزین (JSON): بستهٔ فایلی ندارد — همان بکاپ کلاسیک در همان پوشه نوشته می‌شود
+        const classic = await dbHandlers.handleDbQuery('exportData', {});
+        if (typeof classic !== 'string') return { success: false, error: 'Export failed' };
+        const fileName = `scalpai-backup-${new Date().toISOString().split('T')[0]}.json`;
+        const targetPath = path.join(baseDir, fileName);
+        fs.writeFileSync(targetPath, classic);
+        return { success: true, filePath: targetPath, legacy: true };
+      }
+      if (result?.error) throw new Error(result.error);
+      logger.info('Backup package created at:', result.path);
+      return { success: true, filePath: result.path };
+    } catch (error) {
+      logger.error('Backup export failed:', error);
+      return { success: false, error: error.message || String(error) };
+    }
+  });
+
+  // بازیابی خودکار هر دو فرمت: بستهٔ پوشه‌ای v3 (data.json + media/) یا JSON کلاسیک v2
+  ipcMain.handle('backup:import', async () => {
+    if (!dbHandlers) return { success: false, error: 'Database not initialized' };
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'فایل بکاپ (data.json داخل پوشهٔ بکاپ، یا فایل JSON قدیمی) / Choose backup file',
+      filters: [{ name: 'ScalpAI Backup', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (canceled || !filePaths?.[0]) return { success: false, canceled: true };
+
+    const chosenFile = filePaths[0];
+    try {
+      const isPackage = path.basename(chosenFile) === 'data.json'
+        && fs.existsSync(path.join(path.dirname(chosenFile), 'media'));
+      const result = isPackage
+        ? await dbHandlers.handleDbQuery('importDataPackage', { dataJsonPath: chosenFile })
+        : await dbHandlers.handleDbQuery('importData', { jsonData: fs.readFileSync(chosenFile, 'utf-8') });
+      if (result?.error && String(result.error).startsWith('Unknown method')) {
+        return { success: false, error: 'این نوع بکاپ در حالت ذخیره‌سازی فعلی پشتیبانی نمی‌شود.' };
+      }
+      if (result?.error) throw new Error(result.error);
+      return { success: true, packageImport: isPackage };
+    } catch (error) {
+      logger.error('Backup import failed:', error);
+      return { success: false, error: error.message || String(error) };
     }
   });
 
@@ -854,7 +985,7 @@ function setupIpcHandlers() {
       const result = await dbHandlers.handleDbQuery('getSettings', {});
       if (result && typeof result === 'object' && !result.error) settings = result;
     } catch (e) {
-      console.warn('Could not read AI settings:', e);
+      logger.warn('Could not read AI settings:', e);
     }
     return {
       apiKey,
@@ -936,7 +1067,7 @@ app.whenReady().then(async () => {
       allowDirectory(settings.backupPath);
     }
   } catch (e) {
-    console.warn('Could not restore backup path allowlist:', e);
+    logger.warn('Could not restore backup path allowlist:', e);
   }
   await loadProxySettings();
   createWindow();

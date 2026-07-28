@@ -28,6 +28,10 @@ interface ElectronAPI {
     saveFile: (filePath: string, data: string) => Promise<{ success?: boolean; error?: string }>;
     readFile: (filePath: string) => Promise<{ success?: boolean; content?: string; error?: string }>;
   };
+  backup?: {
+    exportPackage: (params?: { defaultPath?: string }) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; legacy?: boolean; error?: string }>;
+    importAuto: () => Promise<{ success: boolean; packageImport?: boolean; canceled?: boolean; error?: string }>;
+  };
   auth?: {
     createSession: (username: string, password: string) => Promise<{ success: boolean; token?: string; username?: string; error?: string }>;
     validateSession: (token: string) => Promise<{ valid: boolean; username?: string }>;
@@ -507,6 +511,29 @@ export const safeStorageUtils = {
   async isAvailable(): Promise<boolean> {
     if (!isElectron) return false;
     return await window.electronAPI!.safeStorage.isAvailable();
+  },
+};
+
+// Export Backup Package utilities (فاز ۰.۵) — بکاپ پوشه‌ای استریمی در دسکتاپ.
+// دیالوگ انتخاب پوشه/فایل و کل انتقال فایل در main انجام می‌شود؛ در نسخهٔ وب
+// همچنان مسیر کلاسیک exportData (JSON تکی) فعال است.
+export const backupUtils = {
+  isElectron,
+
+  /** ایجاد بستهٔ بکاپ v3؛ مسیر بسته یا پیغام لغو/خطا برمی‌گردد */
+  async exportPackage(defaultPath?: string): Promise<{ success: boolean; filePath?: string; canceled?: boolean; legacy?: boolean; error?: string }> {
+    if (!isElectron || !window.electronAPI?.backup) {
+      return { success: false, error: 'Package backup is only available on desktop' };
+    }
+    return window.electronAPI.backup.exportPackage(defaultPath ? { defaultPath } : undefined);
+  },
+
+  /** بازیابی خودکار: بستهٔ v3 (data.json داخل پوشه) یا JSON کلاسیک v2 */
+  async importAuto(): Promise<{ success: boolean; packageImport?: boolean; canceled?: boolean; error?: string }> {
+    if (!isElectron || !window.electronAPI?.backup) {
+      return { success: false, error: 'Package backup is only available on desktop' };
+    }
+    return window.electronAPI.backup.importAuto();
   },
 };
 

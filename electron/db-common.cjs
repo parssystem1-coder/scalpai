@@ -6,6 +6,8 @@
  * حقیقت برای آن منطق است.
  */
 
+const { logger } = require('./logger.cjs');
+
 const crypto = require('crypto');
 
 const BACKUP_FORMAT = 'scalpai-backup';
@@ -239,7 +241,7 @@ function createValueCrypto(safeStorage) {
       try {
         return 'encrypted:' + safeStorage.encryptString(value).toString('base64');
       } catch (error) {
-        console.error('Encryption error:', error);
+        logger.error('Encryption error:', error);
         return value;
       }
     },
@@ -250,7 +252,7 @@ function createValueCrypto(safeStorage) {
       } catch (error) {
         // شکست رمزگشایی (مثلاً انتقال فایل به دستگاه دیگر) نباید ciphertext را
         // به‌عنوان مقدار واقعی برگرداند — null یعنی «کلید در دسترس نیست».
-        console.error('Decryption error:', error);
+        logger.error('Decryption error:', error);
         return null;
       }
     },

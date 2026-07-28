@@ -378,6 +378,8 @@ export interface LocalModelMetadata {
   history?: LocalModelVersionInfo[];
   /** آخرین آزمایش مقایسه‌ای v4 در برابر تصویر-فقط */
   v4Experiment?: LocalModelV4Experiment;
+  /** فاز ۰.۱ — نتیجهٔ آخرین گیت champion/challenger هنگام جایگزینی مدل */
+  championGate?: import('../lib/localModel').ChampionGateResult;
 }
 
 export interface Settings {

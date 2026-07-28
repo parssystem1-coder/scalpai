@@ -78,9 +78,14 @@ export interface LocalModelSplitSummary {
 export interface LocalModelTrainOptions {
   /** Seed for reproducible client/sample splitting. */
   seed?: number;
+  /**
+   * فاز ۰.۱ — override دستی گیت champion/challenger: کاربر در پنل «مدل فعلی
+   * حفظ شد» می‌تواند صراحتاً بگوید با وجود افت کیفیت، مدل جدید جایگزین شود.
+   */
+  force?: boolean;
 }
 
-function stableTrainingSeed(samples: TrainingSample[]): number {
+export function stableTrainingSeed(samples: TrainingSample[]): number {
   let hash = 2166136261;
   const source = [...samples]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -251,7 +256,7 @@ function sampleToXY(sample: TrainingSample, mode: FeatureMode): { x: number[]; y
   return { x, y: [...scoreY, ...obsY] };
 }
 
-function computeNorm(xs: number[][]): { means: number[]; stds: number[] } {
+export function computeNorm(xs: number[][]): { means: number[]; stds: number[] } {
   if (xs.length === 0) return { means: [], stds: [] };
   const dim = xs[0].length;
   const means = new Array(dim).fill(0);
@@ -275,11 +280,11 @@ function computeNorm(xs: number[][]): { means: number[]; stds: number[] } {
   return { means, stds };
 }
 
-function applyNorm(x: number[], means: number[], stds: number[]): number[] {
+export function applyNorm(x: number[], means: number[], stds: number[]): number[] {
   return x.map((v, i) => (v - (means[i] ?? 0)) / (stds[i] ?? 1));
 }
 
-function shuffleInPlace<T>(arr: T[], seed = Date.now()): T[] {
+export function shuffleInPlace<T>(arr: T[], seed = Date.now()): T[] {
   let s = seed % 2147483647;
   if (s <= 0) s += 2147483646;
   const rand = () => {
@@ -298,7 +303,7 @@ function shuffleInPlace<T>(arr: T[], seed = Date.now()): T[] {
  * با مشتری کم (مثلاً ۱ کلینیک تک‌کاربره) تضمین می‌کند train خالی نباشد —
  * قبلاً nVal=max(1,…) همهٔ نمونه‌ها را به val می‌فرستاد و fit کرش می‌کرد.
  */
-function splitByClient(
+export function splitByClient(
   samples: TrainingSample[],
   valRatio: number,
   holdoutRatio: number,
@@ -390,7 +395,7 @@ function splitByClient(
   };
 }
 
-function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
+export function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
   const out: TrainingSample[] = [];
   for (const s of samples) {
     out.push(s);
@@ -399,7 +404,7 @@ function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
   return out;
 }
 
-function maeScores(yTrue: number[][], yPred: number[][]): number {
+export function maeScores(yTrue: number[][], yPred: number[][]): number {
   if (!yTrue.length) return 0;
   let sum = 0;
   let n = 0;
@@ -412,7 +417,7 @@ function maeScores(yTrue: number[][], yPred: number[][]): number {
   return n ? (sum / n) * 100 : 0; // به مقیاس ۰–۱۰۰
 }
 
-function obsF1(yTrue: number[][], yPred: number[][], thr = OBS_THRESHOLD): number {
+export function obsF1(yTrue: number[][], yPred: number[][], thr = OBS_THRESHOLD): number {
   let tp = 0, fp = 0, fn = 0;
   for (let i = 0; i < yTrue.length; i++) {
     for (let k = SCORE_COUNT; k < OUTPUT_SIZE; k++) {
@@ -443,6 +448,26 @@ async function predictRows(
     rows.push(data.slice(i * OUTPUT_SIZE, (i + 1) * OUTPUT_SIZE));
   }
   return rows;
+}
+
+const fmtMetric = (v?: number, digits = 2) =>
+  (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—');
+
+/**
+ * ارزیابی یک مدل روی مجموعهٔ نمونهٔ دلخواه — برای گیت champion/challenger (فاز ۰.۱).
+ * norm همان نرمال‌سازیِ آموزشِ همان مدل است (نه challenger).
+ */
+async function evaluateModelOnSamples(
+  model: tf.LayersModel,
+  mode: FeatureMode,
+  samples: TrainingSample[],
+  norm: { means: number[]; stds: number[] } | null,
+): Promise<{ mae: number; obsF1: number }> {
+  const rows = samples.map(s => sampleToXY(s, mode));
+  const xs = rows.map(r => norm ? applyNorm(r.x, norm.means, norm.stds) : r.x);
+  const preds = await predictRows(model, xs);
+  const ys = rows.map(r => r.y);
+  return { mae: maeScores(ys, preds), obsF1: obsF1(ys, preds) };
 }
 
 interface FitMetrics {
@@ -568,21 +593,74 @@ async function fitOnSplit(
   }
 }
 
+// =============== قاعدهٔ champion/challenger (فاز ۰.۱) ===============
+export interface ChampionMetrics {
+  mae?: number;
+  obsF1?: number;
+}
+
+export interface ChampionMargins {
+  mae: number;
+  f1: number;
+}
+
+export const DEFAULT_CHAMPION_MARGINS: ChampionMargins = {
+  mae: V4_MAE_MARGIN,
+  f1: V4_F1_MARGIN,
+};
+
+/** خروجی گیت کیفیت جایگزینی مدل (فاز ۰.۱) */
+export interface ChampionGateResult {
+  /** آیا incumbent قابل ارزیابی بود (اولین مدل = false)؟ */
+  attempted: boolean;
+  /** آیا challenger جایگزین مدل فعلی شد؟ */
+  replaced: boolean;
+  /** مجموعه‌ای که هر دو مدل روی آن مقایسه شدند */
+  comparisonSet: 'holdout' | 'validation' | 'none';
+  reason: string;
+  incumbentMae?: number;
+  incumbentObsF1?: number;
+  challengerMae?: number;
+  challengerObsF1?: number;
+  /** کاربر صراحتاً با وجود افت کیفیت جایگزینی را تأیید کرد */
+  forcedByUser?: boolean;
+}
+
+/**
+ * قاعدهٔ champion/challenger: challenger فقط وقتی جایگزین champion می‌شود که
+ * (MAE بهتر با F1ِ بدترنشده) یا (F1 بهتر با MAEِ بدترنشده) باشد. حاشیهٔ نویز
+ * جلو ارتقای تصادفی را می‌گیرد؛ حکم «مساوی» یعنی عدم‌برتری → عدم‌جایگزینی
+ * (جهت محافظه‌کارانه: در شک، مدل فعلی ماندگار است).
+ */
+export function isChallengerBetter(
+  challenger: ChampionMetrics,
+  incumbent: ChampionMetrics,
+  margins: ChampionMargins = DEFAULT_CHAMPION_MARGINS,
+): boolean {
+  if (
+    typeof challenger.mae !== 'number' || typeof incumbent.mae !== 'number'
+    || !Number.isFinite(challenger.mae) || !Number.isFinite(incumbent.mae)
+  ) {
+    return false;
+  }
+  const cF1 = challenger.obsF1 ?? 0;
+  const iF1 = incumbent.obsF1 ?? 0;
+  const maeBetter = challenger.mae < incumbent.mae - margins.mae;
+  const f1NotWorse = cF1 + margins.f1 >= iF1;
+  const f1Better = cF1 > iF1 + margins.f1;
+  const maeNotWorse = challenger.mae <= incumbent.mae + margins.mae;
+  return (maeBetter && f1NotWorse) || (f1Better && maeNotWorse);
+}
+
 /** v4 فقط اگر MAE بهتر شود و F1 بدتر نشود — یا F1 بهتر شود و MAE بدتر نشود */
 function v4BeatsImageOnly(
   imageOnly: { holdoutMae?: number; holdoutObsF1?: number },
   v4: { holdoutMae?: number; holdoutObsF1?: number },
 ): boolean {
-  if (typeof imageOnly.holdoutMae !== 'number' || typeof v4.holdoutMae !== 'number') {
-    return false;
-  }
-  const imageF1 = imageOnly.holdoutObsF1 ?? 0;
-  const v4F1 = v4.holdoutObsF1 ?? 0;
-  const maeBetter = v4.holdoutMae < imageOnly.holdoutMae - V4_MAE_MARGIN;
-  const f1NotWorse = v4F1 + V4_F1_MARGIN >= imageF1;
-  const f1Better = v4F1 > imageF1 + V4_F1_MARGIN;
-  const maeNotWorse = v4.holdoutMae <= imageOnly.holdoutMae + V4_MAE_MARGIN;
-  return (maeBetter && f1NotWorse) || (f1Better && maeNotWorse);
+  return isChallengerBetter(
+    { mae: v4.holdoutMae, obsF1: v4.holdoutObsF1 },
+    { mae: imageOnly.holdoutMae, obsF1: imageOnly.holdoutObsF1 },
+  );
 }
 
 export interface TrainResult {
@@ -606,6 +684,11 @@ export interface TrainResult {
   seed: number;
   datasetHash: string;
   evaluation: LocalModelSplitSummary;
+  /**
+   * فاز ۰.۱ — نتیجهٔ گیت champion/challenger: اگر `replaced:false` باشد، وزن‌های
+   * جدید آموزش داده شده‌اند ولی عمداً ذخیره نشده‌اند و مدل فعلی ماندگار است.
+   */
+  championGate: ChampionGateResult;
   v4Experiment: {
     attempted: boolean;
     promoted: boolean;
@@ -662,6 +745,13 @@ export async function trainLocalModel(
 
   const gate = assessQuestionnaireV4Gate(samples);
   const splitSeed = options.seed ?? stableTrainingSeed(pool);
+
+  // ——— فاز ۰.۱: incumbent (مدل فعلی) پیش از هر آموزش گرفته می‌شود تا در پایان
+  // روی همان مجموعهٔ ارزیابیِ challenger با آن مقایسه شود. ———
+  const incumbentModel = options.force ? null : await loadLocalModel();
+  const incumbentFeatureVersion = incumbentModel ? getCachedModelFeatureVersion() : null;
+  const incumbentNorm = incumbentModel ? getCachedFeatureNorm() : null;
+
   // همیشه ابتدا مدل تصویر-فقط روی کل استخر واجد شرایط آموزش داده می‌شود
   const fullSplit = splitByClient(pool, VAL_CLIENT_RATIO, HOLDOUT_CLIENT_RATIO, splitSeed);
   const v3Full = await fitOnSplit(
@@ -672,6 +762,9 @@ export async function trainLocalModel(
     onEpoch,
   );
   let selectedEvaluation = fullSplit.summary;
+  // نمونه‌های ارزیابی challenger — برای مقایسهٔ عادلانه با incumbent (فاز ۰.۱)
+  let evalHoldoutSamples: TrainingSample[] = fullSplit.holdout;
+  let evalValidationSamples: TrainingSample[] = fullSplit.val;
 
   let active = v3Full;
   let featureVersion = FEATURE_VERSION;
@@ -725,6 +818,8 @@ export async function trainLocalModel(
           try { imageOnlyExp.model.dispose(); } catch { /* ignore */ }
           active = v4Exp;
           selectedEvaluation = qSplit.summary;
+          evalHoldoutSamples = qSplit.holdout;
+          evalValidationSamples = qSplit.val;
           featureVersion = FEATURE_VERSION_WITH_QUESTIONNAIRE;
           imageOnlyExp = null;
           v4Exp = null;
@@ -742,6 +837,111 @@ export async function trainLocalModel(
         v4Experiment.reason = `آزمایش v4 ناموفق بود؛ مدل تصویر-فقط نگه داشته شد. (${(err as Error).message})`;
       }
     }
+  }
+
+  // =============== گیت champion/challenger (فاز ۰.۱) ===============
+  // مدل فعلی (incumbent) روی *همان* مجموعه‌ای ارزیابی می‌شود که challenger
+  // ساخته شده؛ فقط در صورت برتری challenger جایگزینش می‌گردد. بدون این گیت،
+  // هر «آموزش» وزن‌های قبلی را بی‌قید بازنویسی می‌کرد — حتی با نتیجهٔ بدتر.
+  // جهت سوگیری آگاهانه محافظه‌کارانه است: incumbent ممکن است بخشی از این
+  // نمونه‌ها را در آموزش قبلی دیده باشد (خوش‌بینانه‌تر ارزیابی می‌شود)، پس
+  // بار اثبات برتری همیشه روی دوش challenger است.
+  let championGate: ChampionGateResult;
+  if (options.force) {
+    championGate = {
+      attempted: true,
+      replaced: true,
+      comparisonSet: 'none',
+      forcedByUser: true,
+      reason: 'جایگزینی اجباری با تأیید کاربر — گیت کیفیت آگاهانه عبور داده شد.',
+    };
+  } else if (!incumbentModel) {
+    championGate = {
+      attempted: false,
+      replaced: true,
+      comparisonSet: 'none',
+      reason: 'مدل قبلی وجود نداشت؛ مدل جدید مستقیماً ذخیره شد.',
+    };
+  } else {
+    const comparisonSet: ChampionGateResult['comparisonSet'] = evalHoldoutSamples.length > 0
+      ? 'holdout'
+      : (evalValidationSamples.length > 0 ? 'validation' : 'none');
+
+    if (comparisonSet === 'none') {
+      championGate = {
+        attempted: true,
+        replaced: true,
+        comparisonSet,
+        reason: 'مجموعهٔ ارزیابی (holdout/validation) خالی بود؛ گیت غیرفعال شد و مدل جدید ذخیره شد.',
+      };
+    } else {
+      const comparisonLabel = comparisonSet === 'holdout' ? 'هولداوت' : 'ولیدیشن';
+      const challengerCmp = comparisonSet === 'holdout'
+        ? { mae: active.metrics.holdoutMae, obsF1: active.metrics.holdoutObsF1 }
+        : { mae: active.metrics.valMaeScores, obsF1: active.metrics.valObsF1 };
+      const incumbentCmp = await evaluateModelOnSamples(
+        incumbentModel,
+        incumbentFeatureVersion === FEATURE_VERSION_WITH_QUESTIONNAIRE ? 'v4' : 'v3',
+        comparisonSet === 'holdout' ? evalHoldoutSamples : evalValidationSamples,
+        incumbentNorm,
+      );
+
+      if (isChallengerBetter(challengerCmp, incumbentCmp)) {
+        championGate = {
+          attempted: true,
+          replaced: true,
+          comparisonSet,
+          incumbentMae: incumbentCmp.mae,
+          incumbentObsF1: incumbentCmp.obsF1,
+          challengerMae: challengerCmp.mae,
+          challengerObsF1: challengerCmp.obsF1,
+          reason: `مدل جدید روی ${comparisonLabel} بهتر بود و جایگزین مدل قبلی شد.`,
+        };
+      } else {
+        championGate = {
+          attempted: true,
+          replaced: false,
+          comparisonSet,
+          incumbentMae: incumbentCmp.mae,
+          incumbentObsF1: incumbentCmp.obsF1,
+          challengerMae: challengerCmp.mae,
+          challengerObsF1: challengerCmp.obsF1,
+          reason:
+            `مدل جدید روی ${comparisonLabel} بهتر از مدل فعلی نبود ` +
+            `(MAE ${fmtMetric(challengerCmp.mae)} در برابر ${fmtMetric(incumbentCmp.mae)}؛ ` +
+            `F1 ${fmtMetric(challengerCmp.obsF1, 3)} در برابر ${fmtMetric(incumbentCmp.obsF1, 3)})؛ مدل فعلی حفظ شد.`,
+        };
+      }
+    }
+  }
+
+  if (!championGate.replaced) {
+    // challenger دور ریخته می‌شود؛ وزن‌ها و نرمال‌سازیِ incumbent دست‌نخورده می‌ماند
+    // (cachedModel همان مدل فعلی است و نباید dispose یا جایگزین شود).
+    try { active.model.dispose(); } catch { /* ignore */ }
+    return {
+      loss: active.metrics.loss,
+      valLoss: active.metrics.valLoss,
+      epochs: active.metrics.epochs,
+      sampleCount: pool.length,
+      sampleCountBySource: bySource,
+      maeScores: active.metrics.maeScores,
+      valMaeScores: active.metrics.valMaeScores,
+      obsF1: active.metrics.obsF1,
+      valObsF1: active.metrics.valObsF1,
+      holdoutMae: active.metrics.holdoutMae,
+      holdoutObsF1: active.metrics.holdoutObsF1,
+      featureMeans: active.norm.means,
+      featureStds: active.norm.stds,
+      architecture: MODEL_ARCHITECTURE,
+      trainedIds: pool.map(s => s.id),
+      featureVersion,
+      seed: splitSeed,
+      datasetHash: stableTrainingSeed(pool).toString(16),
+      evaluation: selectedEvaluation,
+      championGate,
+      v4Experiment,
+    };
   }
 
   try {
@@ -778,6 +978,7 @@ export async function trainLocalModel(
     seed: splitSeed,
     datasetHash: stableTrainingSeed(pool).toString(16),
     evaluation: selectedEvaluation,
+    championGate,
     v4Experiment,
   };
 }

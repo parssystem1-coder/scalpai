@@ -5,6 +5,8 @@
  * نگه داشته می‌شود و migrationها به‌ترتیب اجرا می‌شوند.
  */
 
+const { logger } = require('./logger.cjs');
+
 /** آخرین نسخهٔ اسکیما پس از اعمال همهٔ migrationها */
 const SCHEMA_VERSION = 8;
 
@@ -281,7 +283,7 @@ function runMigrations(db) {
     });
     tx();
     current = migration.version;
-    console.log(`Schema migrated to version ${migration.version}`);
+    logger.info(`Schema migrated to version ${migration.version}`);
   }
   if (current < SCHEMA_VERSION) {
     // اگر migration تعریف‌نشده‌ای مانده، حداقل نسخه را هم‌تراز کن

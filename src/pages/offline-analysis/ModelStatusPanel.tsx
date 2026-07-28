@@ -1,5 +1,6 @@
-import { Brain, Loader, Sparkles, Trash2 } from 'lucide-react';
+import { Brain, Loader, ShieldAlert, Sparkles, Trash2 } from 'lucide-react';
 import type { LocalModelMetadata, TrainingSample } from '../../db';
+import type { TrainResult } from '../../lib/localModel';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { FEATURE_VERSION } from '../../lib/scalpFeatures';
 import {
@@ -33,7 +34,12 @@ interface Props {
   trainProgress: { epoch: number; loss?: number; val_loss?: number } | null;
   trainError: string;
   useLocalModel: boolean;
+  /** فاز ۰.۱ — آموزشی که گیت کیفیت آن را رد کرده (مدل فعلی حفظ شده) */
+  gateRejection: TrainResult | null;
   onTrain: () => void;
+  /** override دستی: با وجود افت کیفیت، مدل جدید جایگزین شود */
+  onForceReplace: () => void;
+  onDismissGate: () => void;
   onDeleteModel: () => void;
   onToggleLocalModel: (checked: boolean) => void;
 }
@@ -46,7 +52,8 @@ export default function ModelStatusPanel({
   trainingSamples, samplesBySource, untrainedSamplesCount,
   eligibleCount, approvedAiCount, pendingAiCount,
   modelMetadata, modelHasWeights, training, trainProgress, trainError, useLocalModel,
-  onTrain, onDeleteModel, onToggleLocalModel,
+  gateRejection,
+  onTrain, onForceReplace, onDismissGate, onDeleteModel, onToggleLocalModel,
 }: Props) {
   const t = useT(offlineDict);
   const pick = usePick();
@@ -113,6 +120,55 @@ export default function ModelStatusPanel({
 
       <p className="text-xs opacity-60 mb-4">{t('trainProgressHint')}</p>
 
+      {/* فاز ۰.۱ — گیت champion/challenger: اگر مدل جدید بهتر نشد، مدل فعلی
+          ماندگار می‌شود و کاربر با دیدن اعداد مقایسه تصمیم می‌گیرد */}
+      {gateRejection?.championGate && !gateRejection.championGate.replaced && (
+        <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 mb-4 text-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldAlert size={16} className="text-amber-300" />
+            <p className="font-semibold text-amber-300">
+              {pick(
+                'مدل فعلی حفظ شد — مدل جدید بهتر تشخیص داده نشد',
+                'Current model kept — the new model did not win',
+              )}
+            </p>
+          </div>
+          <p className="text-xs opacity-80 mb-2">{gateRejection.championGate.reason}</p>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+            <div className="rounded-lg bg-white/5 px-3 py-2">
+              <p className="opacity-60 mb-0.5">{pick('مدل فعلی', 'Current model')}</p>
+              <p>MAE: {fmt(gateRejection.championGate.incumbentMae, 2)} · F1: {fmt(gateRejection.championGate.incumbentObsF1, 3)}</p>
+            </div>
+            <div className="rounded-lg bg-white/5 px-3 py-2">
+              <p className="opacity-60 mb-0.5">{pick('مدل جدید', 'New model')}</p>
+              <p>MAE: {fmt(gateRejection.championGate.challengerMae, 2)} · F1: {fmt(gateRejection.championGate.challengerObsF1, 3)}</p>
+            </div>
+          </div>
+          <p className="text-xs opacity-60 mb-3">
+            {pick(
+              'وزن‌های جدید ذخیره نشده‌اند. اگر مطمئنید (مثلاً دیتاست کاملاً تازه است)، می‌توانید عمداً جایگزین کنید.',
+              'New weights were not saved. If you are sure (e.g. a completely fresh dataset), you can deliberately replace.',
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onForceReplace}
+              disabled={training}
+              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-medium disabled:opacity-40"
+            >
+              {pick('با وجود افت، جایگزین کن', 'Replace despite regression')}
+            </button>
+            <button
+              onClick={onDismissGate}
+              disabled={training}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs disabled:opacity-40"
+            >
+              {pick('انصراف — مدل فعلی بماند', 'Dismiss — keep current model')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {modelMetadata && (
         <div className="text-sm opacity-80 mb-4 space-y-1.5 rounded-xl bg-white/5 p-4">
           <p>
@@ -176,6 +232,15 @@ export default function ModelStatusPanel({
           {modelMetadata.v4Experiment && (
             <p className={modelMetadata.v4Experiment.promoted ? 'text-emerald-300' : 'opacity-80'}>
               {t('v4Experiment')}: {modelMetadata.v4Experiment.reason}
+            </p>
+          )}
+          {/* فاز ۰.۱ — ردپای گیت کیفیت: آخرین جایگزینی چطور و با چه اعدادی انجام شد */}
+          {modelMetadata.championGate && modelMetadata.championGate.replaced && (
+            <p className={modelMetadata.championGate.forcedByUser ? 'text-amber-300' : 'text-emerald-300'}>
+              {pick('گیت کیفیت', 'Quality gate')}: {modelMetadata.championGate.reason}
+              {modelMetadata.championGate.comparisonSet !== 'none'
+                && typeof modelMetadata.championGate.incumbentMae === 'number'
+                && ` (MAE ${fmt(modelMetadata.championGate.incumbentMae, 2)} ← ${fmt(modelMetadata.championGate.challengerMae, 2)})`}
             </p>
           )}
           {!isUsableModelVersion(modelMetadata.featureVersion) && (

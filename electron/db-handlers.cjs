@@ -4,6 +4,8 @@
  * منطق مشترک با نسخهٔ fallback (JSON) در db-common.cjs نگهداری می‌شود.
  */
 
+const { logger } = require('./logger.cjs');
+
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -29,6 +31,15 @@ const {
   SYSTEM_TRAINING_POOL_CLIENT_ID,
   ensureSystemTrainingPoolClientSqlite,
 } = require('./db-common.cjs');
+const {
+  packageDirName,
+  copyFileStreaming,
+  parseBackupPackage,
+  createPackageEnvelope,
+  extractAnnotatedImage,
+  readAsBase64DataUrl,
+  MEDIA_DIR_NAME,
+} = require('./backup-package.cjs');
 
 /**
  * ایجاد هندلرهای دیتابیس
@@ -76,6 +87,38 @@ function createDbHandlers(db, userDataPath, safeStorage) {
   }
 
   /**
+   * نام فایل امن برای رکورد در بستهٔ بکاپ (شناسه‌ها به‌جز کاراکتر امن پاک‌سازی می‌شوند)
+   * @param {string} id
+   */
+  function safeFileBase(id) {
+    return String(id || 'item').replace(/[^a-zA-Z0-9-_]/g, '_');
+  }
+
+  /**
+   * کپی یک فایل رسانه از مسیر موجود (مثلاً داخل بستهٔ بکاپ v3) به پوشهٔ images.
+   * همان قواعد saveImageToFile: دفاع در برابر path traversal از طریق clientId
+   * و نام فایل یکتا. استریم‌محور: مناسب ویدیوهای بزرگ.
+   * @param {string} srcPath
+   * @param {string} clientId
+   * @param {string} extension
+   * @returns {string} مسیر فایل ذخیره‌شده
+   */
+  function saveMediaFileFromPath(srcPath, clientId, extension) {
+    const clientImagesPath = path.resolve(imagesPath, String(clientId || ''));
+    if (!clientImagesPath.startsWith(imagesPath + path.sep)) {
+      throw new Error('Invalid client id for media storage');
+    }
+    if (!fs.existsSync(clientImagesPath)) {
+      fs.mkdirSync(clientImagesPath, { recursive: true });
+    }
+    const ext = String(extension || 'bin').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin';
+    const uniqueFilename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const filePath = path.join(clientImagesPath, uniqueFilename);
+    fs.copyFileSync(srcPath, filePath);
+    return filePath;
+  }
+
+  /**
    * خواندن تصویر/ویدیو از فایل سیستم و تبدیل به data URL
    * @param {string} filePath
    * @returns {string|null}
@@ -88,7 +131,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
         return `data:${mimeType};base64,${data.toString('base64')}`;
       }
     } catch (error) {
-      console.error('Error reading media file:', error);
+      logger.error('Error reading media file:', error);
     }
     return null;
   }
@@ -117,7 +160,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
       db.prepare('UPDATE gallery SET thumbnail = ? WHERE id = ?').run(thumb, row.id);
       return thumb;
     } catch (error) {
-      console.error('Thumbnail generation failed:', error);
+      logger.error('Thumbnail generation failed:', error);
       return null;
     }
   }
@@ -154,9 +197,150 @@ function createDbHandlers(db, userDataPath, safeStorage) {
         fs.unlinkSync(filePath);
       }
     } catch (error) {
-      console.error('Error deleting media file:', error);
+      logger.error('Error deleting media file:', error);
     }
   }
+
+  /**
+   * هستهٔ مشترک مهاجرت بکاپ (فاز ۰.۵): importData (v2) و importDataPackage (v3)
+   * فقط در «ساخت ردیف‌های گالری» فرق می‌کنند؛ تراکنش/تنظیمات/پاکسازی فایل
+   * اینجاست. prepareGallery داخل try صدا زده می‌شود تا خطای کپی فایل هم
+   * منجر به پاکسازی createdFiles شود.
+   * @param {object} data — payload بکاپ
+   * @param {(createdFiles: string[]) => Array} prepareGallery — سازندهٔ ردیف‌های گالری آماده (filePath جدید)
+   */
+  function dropOrphanRows(rows, label, clientIds) {
+    const kept = (rows || []).filter(r => clientIds.has(r.clientId));
+    const dropped = (rows || []).length - kept.length;
+    if (dropped > 0) logger.warn(`importData: dropped ${dropped} orphan ${label} row(s) referencing missing clients`);
+    return kept;
+  }
+
+  function executeImport(data, prepareGallery) {
+    const previousGallery = db.prepare('SELECT filePath FROM gallery WHERE filePath IS NOT NULL').all();
+    const createdFiles = [];
+    const clientIds = new Set((data.clients || []).map(c => c.id));
+    try {
+      const importedGallery = prepareGallery(createdFiles);
+      const sessionRows = dropOrphanRows(data.sessions, 'sessions', clientIds);
+      const analysisRowsToImport = dropOrphanRows(data.analyses, 'analyses', clientIds);
+      const questionnaireRowsToImport = dropOrphanRows(data.questionnaireRevisions, 'questionnaire_revisions', clientIds);
+      const currentSettingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('settings');
+      const currentSettings = currentSettingsRow ? JSON.parse(currentSettingsRow.value) : {};
+      const importedSettings = sanitizeSettingsForBackup(data.settings || {});
+      const settingsToStore = {
+        ...currentSettings,
+        ...importedSettings,
+        password: currentSettings.password,
+        passwordHash: currentSettings.passwordHash,
+        aiApiKey: currentSettings.aiApiKey,
+      };
+
+      const importTransaction = db.transaction(() => {
+        db.exec('DELETE FROM analyses; DELETE FROM questionnaire_revisions; DELETE FROM sessions; DELETE FROM gallery; DELETE FROM clients; DELETE FROM trichologists; DELETE FROM training_samples;');
+        db.prepare('DELETE FROM settings WHERE key = ?').run('localModelMetadata');
+
+        for (const client of data.clients || []) {
+          db.prepare(`
+            INSERT INTO clients (id, firstName, lastName, phone, email, gender, birthDate, notes, isSystemRecord, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            client.id, client.firstName, client.lastName, client.phone, client.email,
+            client.gender, client.birthDate, client.notes,
+            client.isSystemRecord ? 1 : (client.id === SYSTEM_TRAINING_POOL_CLIENT_ID ? 1 : 0),
+            client.createdAt, client.updatedAt,
+          );
+        }
+        // بکاپ ممکن است از نسخهٔ قدیمی‌تر (بدون ردیف سیستمی) باشد؛ بعد از
+        // پاکسازی و بازسازی کامل جدول clients، وجود آن دوباره تضمین می‌شود.
+        ensureSystemTrainingPoolClientSqlite(db);
+        for (const item of importedGallery) {
+          db.prepare(`
+            INSERT INTO gallery (id, clientId, type, url, thumbnail, filename, metadata, filePath, trainingPoolStatus, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            item.id, item.clientId, item.type, item.url, item.thumbnail, item.filename,
+            JSON.stringify(parseStoredJson(item.metadata, {})), item.filePath,
+            item.clientId === SYSTEM_TRAINING_POOL_CLIENT_ID ? (item.trainingPoolStatus || 'active') : null,
+            item.createdAt,
+          );
+        }
+        for (const session of sessionRows) {
+          db.prepare(`
+            INSERT INTO sessions (id, clientId, trichologistId, date, time, status, notes, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            session.id, session.clientId, session.trichologistId, session.date,
+            session.time, session.status, session.notes, session.createdAt,
+          );
+        }
+        for (const tri of data.trichologists || []) {
+          db.prepare(`
+            INSERT INTO trichologists (id, name, specialty, phone, email, description, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            tri.id, tri.name, tri.specialty, tri.phone, tri.email, tri.description, tri.active ? 1 : 0,
+          );
+        }
+        for (const revision of questionnaireRowsToImport) {
+          db.prepare(`
+            INSERT INTO questionnaire_revisions (id, clientId, sessionId, status, valuesJson, changedFieldsJson, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            revision.id || crypto.randomUUID(), revision.clientId, revision.sessionId,
+            revision.status === 'final' ? 'final' : 'draft',
+            JSON.stringify(parseStoredJson(revision.values, {})),
+            JSON.stringify(parseStoredJson(revision.changedFields, [])),
+            revision.createdAt || new Date().toISOString(),
+            revision.updatedAt || new Date().toISOString(),
+          );
+        }
+        for (const analysis of analysisRowsToImport) {
+          db.prepare(`INSERT INTO analyses (id, clientId, sessionId, trichologistId, type, galleryItemId, medicalQuestionnaire, observations, recommendations, treatmentPlan, aiResults, offlineResults, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            analysis.id, analysis.clientId, analysis.sessionId || null, analysis.trichologistId, analysis.type, analysis.galleryItemId,
+            JSON.stringify(parseStoredJson(analysis.medicalQuestionnaire, {})),
+            JSON.stringify(parseStoredJson(analysis.observations, [])),
+            analysis.recommendations, analysis.treatmentPlan,
+            JSON.stringify(parseStoredJson(analysis.aiResults, null)),
+            JSON.stringify(parseStoredJson(analysis.offlineResults, null)),
+            analysis.createdAt, analysis.updatedAt
+          );
+        }
+        for (const sample of data.trainingSamples || []) {
+          // approvedForTraining/featureVersion هم باید round-trip شوند؛
+          // برای بکاپ‌های قدیمی بدون این فیلدها، همان قاعدهٔ addTrainingSample
+          // اعمال می‌شود (نمونهٔ خبره = تأییدشده).
+          const approved = sample.approvedForTraining != null
+            ? (sample.approvedForTraining ? 1 : 0)
+            : (sample.labelSource === 'expert' ? 1 : 0);
+          db.prepare(`
+            INSERT INTO training_samples (id, clientId, galleryItemId, imageThumbnail, features, label, labelSource, confidence, usedInTraining, modelVersionTrainedWith, createdAt, approvedForTraining, featureVersion, questionnaireFeatures)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            sample.id, sample.clientId || null, sample.galleryItemId || null, sample.imageThumbnail || null,
+            JSON.stringify(parseStoredJson(sample.features, {})), JSON.stringify(parseStoredJson(sample.label, {})), sample.labelSource || null,
+            sample.confidence ?? null, sample.usedInTraining ? 1 : 0, sample.modelVersionTrainedWith ?? null,
+            sample.createdAt || new Date().toISOString(),
+            approved, sample.featureVersion || null,
+            sample.questionnaireFeatures != null ? JSON.stringify(sample.questionnaireFeatures) : null,
+          );
+        }
+        if (data.localModelMetadata) {
+          db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('localModelMetadata', JSON.stringify(data.localModelMetadata));
+        }
+        db.prepare(`
+          INSERT INTO settings (key, value) VALUES ('settings', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        `).run(JSON.stringify(settingsToStore));
+      });
+      importTransaction();
+    } catch (error) {
+      for (const filePath of createdFiles) deleteImageFile(filePath);
+      throw error;
+    }
+    for (const item of previousGallery) deleteImageFile(item.filePath);
+    return { success: true };
+  };
 
   function mapQuestionnaireRevisionRow(row) {
     return {
@@ -763,148 +947,185 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             return JSON.stringify(createBackupEnvelope(data), null, 2);
           }
 
+          // =============== بکاپ نسخهٔ ۳: بستهٔ پوشه‌ای استریمی (فاز ۰.۵) ===============
+          /**
+           * exportData کلاسیک (v2) همهٔ رسانه را base64 داخل یک رشتهٔ JSON
+           * یک‌باره در حافظهٔ main می‌ساخت — با دادهٔ واقعی کلینیک (صدها عکس
+           * چندمگابایتی + ویدیو) تضمین‌شده به کرش می‌انجامد. این مسیر رسانه را
+           * به‌صورت فایل خام در media/ با کپی استریمی می‌نویسد و data.json فقط
+           * فرادادهٔ سبک است. خروجی JSON کلاسیک (exportData) برای سازگاری عقب‌رو
+           * و نسخهٔ وب دست‌نخورده می‌ماند.
+           */
+          case 'exportBackupPackage': {
+            const baseDir = params.baseDir;
+            if (!baseDir || typeof baseDir !== 'string' || !fs.existsSync(baseDir)) {
+              return { error: 'Backup directory does not exist' };
+            }
+            const pkgDir = path.join(baseDir, packageDirName());
+            const mediaDir = path.join(pkgDir, MEDIA_DIR_NAME);
+            try {
+              fs.mkdirSync(mediaDir, { recursive: true });
+
+              // — گالری: فایل رسانهٔ روی دیسک → کپی استریمی به media/<id>.<ext>
+              const packageGallery = [];
+              for (const item of db.prepare('SELECT * FROM gallery').all()) {
+                const { filePath, ...portable } = item;
+                let mediaFile = null;
+                if (filePath && fs.existsSync(filePath)) {
+                  const ext = path.extname(filePath).slice(1) || 'bin';
+                  mediaFile = `${MEDIA_DIR_NAME}/${safeFileBase(item.id)}.${ext}`;
+                  await copyFileStreaming(filePath, path.join(mediaDir, `${safeFileBase(item.id)}.${ext}`));
+                }
+                // thumbnail هم یک کش base64 (حجم کم ولی با صدها ردیف انباشته
+                // می‌شود) — آن هم فایل جدا می‌شود تا data.json واقعاً سبک بماند.
+                // برای ویدیوها thumbnail بازتولید خودکار ندارد، پس حذفش نمی‌کنیم.
+                let thumbnailRef = null;
+                const parsedThumb = item.thumbnail ? parseDataUrl(item.thumbnail) : null;
+                if (parsedThumb) {
+                  const thumbName = `thumb-gallery-${safeFileBase(item.id)}.${parsedThumb.extension}`;
+                  fs.writeFileSync(path.join(mediaDir, thumbName), Buffer.from(parsedThumb.base64, 'base64'));
+                  thumbnailRef = `${MEDIA_DIR_NAME}/${thumbName}`;
+                }
+                packageGallery.push({
+                  ...portable,
+                  metadata: parseStoredJson(item.metadata, {}),
+                  // محتوای legacyِ بدون فایل (data URL در url) همچنان inline می‌ماند
+                  url: item.url?.startsWith('data:') ? item.url : null,
+                  thumbnail: thumbnailRef ? null : item.thumbnail,
+                  mediaFile,
+                  thumbnailRef,
+                });
+              }
+
+              // — تحلیل‌ها: تصویر annotate‌شدهٔ base64 → فایل PNG مستقل در media/
+              const packageAnalyses = db.prepare('SELECT * FROM analyses').all().map(row => ({
+                ...row,
+                medicalQuestionnaire: parseStoredJson(row.medicalQuestionnaire, {}),
+                observations: parseStoredJson(row.observations, []),
+                aiResults: parseStoredJson(row.aiResults, null),
+                offlineResults: parseStoredJson(row.offlineResults, null),
+              })).map((analysis) => {
+                const aiExtract = extractAnnotatedImage(analysis.aiResults, `analysis-${safeFileBase(analysis.id)}-ai`);
+                if (aiExtract.buffer) {
+                  fs.writeFileSync(path.join(mediaDir, aiExtract.mediaFileName), aiExtract.buffer);
+                }
+                const offlineExtract = extractAnnotatedImage(analysis.offlineResults, `analysis-${safeFileBase(analysis.id)}-offline`);
+                if (offlineExtract.buffer) {
+                  fs.writeFileSync(path.join(mediaDir, offlineExtract.mediaFileName), offlineExtract.buffer);
+                }
+                return { ...analysis, aiResults: aiExtract.result, offlineResults: offlineExtract.result };
+              });
+
+              // — نمونه‌های آموزشی: thumbnail → فایل مستقل در media/
+              const packageSamples = db.prepare('SELECT * FROM training_samples').all().map(r => ({
+                ...r,
+                features: parseStoredJson(r.features, {}),
+                label: parseStoredJson(r.label, {}),
+                questionnaireFeatures: parseStoredJson(r.questionnaireFeatures, undefined),
+                usedInTraining: !!r.usedInTraining,
+              })).map((sample) => {
+                const parsedThumb = sample.imageThumbnail ? parseDataUrl(sample.imageThumbnail) : null;
+                if (!parsedThumb) return sample;
+                const fileName = `thumb-${safeFileBase(sample.id)}.${parsedThumb.extension}`;
+                const { imageThumbnail, ...rest } = sample;
+                fs.writeFileSync(
+                  path.join(mediaDir, fileName),
+                  Buffer.from(parsedThumb.base64, 'base64'),
+                );
+                return { ...rest, thumbnailRef: `${MEDIA_DIR_NAME}/${fileName}` };
+              });
+
+              const rawSettings = JSON.parse(db.prepare('SELECT value FROM settings WHERE key = ?').get('settings')?.value || '{}');
+              const modelMetadataRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('localModelMetadata');
+              const data = {
+                clients: db.prepare('SELECT * FROM clients').all(),
+                gallery: packageGallery,
+                sessions: db.prepare('SELECT * FROM sessions').all(),
+                trichologists: db.prepare('SELECT * FROM trichologists').all(),
+                analyses: packageAnalyses,
+                settings: sanitizeSettingsForBackup(rawSettings),
+                trainingSamples: packageSamples,
+                localModelMetadata: modelMetadataRow ? JSON.parse(modelMetadataRow.value) : null,
+                questionnaireRevisions: db.prepare('SELECT * FROM questionnaire_revisions').all().map(mapQuestionnaireRevisionRow),
+              };
+              fs.writeFileSync(
+                path.join(pkgDir, 'data.json'),
+                JSON.stringify(createPackageEnvelope(data), null, 2),
+              );
+              return { path: pkgDir, name: path.basename(pkgDir) };
+            } catch (error) {
+              // بستهٔ نیمه‌تمام نباید به‌اشتباه «بکاپ کامل» تلقی شود — در خطا پاک می‌شود
+              try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch { /* ignore */ }
+              throw error;
+            }
+          }
+
           case 'importData': {
             const data = parseBackupPayload(params.jsonData);
-            const previousGallery = db.prepare('SELECT filePath FROM gallery WHERE filePath IS NOT NULL').all();
-            const createdFiles = [];
-            try {
-              // با فعال بودن PRAGMA foreign_keys، ردیف‌های یتیم (ارجاع به مشتری
-              // ناموجود در بکاپ — از دیتابیس‌های قدیمی بدون FK) کل تراکنش را fail
-              // می‌کردند؛ این ردیف‌ها را با هشدار کنار می‌گذاریم.
-              const clientIds = new Set((data.clients || []).map(c => c.id));
-              const dropOrphans = (rows, label) => {
-                const kept = (rows || []).filter(r => clientIds.has(r.clientId));
-                const dropped = (rows || []).length - kept.length;
-                if (dropped > 0) console.warn(`importData: dropped ${dropped} orphan ${label} row(s) referencing missing clients`);
-                return kept;
-              };
-              const galleryRows = dropOrphans(data.gallery, 'gallery');
-              const sessionRows = dropOrphans(data.sessions, 'sessions');
-              const analysisRowsToImport = dropOrphans(data.analyses, 'analyses');
-              const questionnaireRowsToImport = dropOrphans(data.questionnaireRevisions, 'questionnaire_revisions');
-
-              const importedGallery = galleryRows.map(item => {
+            const clientIds = new Set((data.clients || []).map(c => c.id));
+            return executeImport(data, (createdFiles) => {
+              return dropOrphanRows(data.gallery, 'gallery', clientIds).map(item => {
                 const imageData = item.imageData || (item.url?.startsWith('data:') ? item.url : null);
                 if (!imageData) return { ...item, filePath: null };
                 const filePath = saveImageToFile(imageData, item.clientId);
                 createdFiles.push(filePath);
                 return { ...item, url: `file://${filePath}`, filePath };
               });
-              const currentSettingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('settings');
-              const currentSettings = currentSettingsRow ? JSON.parse(currentSettingsRow.value) : {};
-              const importedSettings = sanitizeSettingsForBackup(data.settings || {});
-              const settingsToStore = {
-                ...currentSettings,
-                ...importedSettings,
-                password: currentSettings.password,
-                passwordHash: currentSettings.passwordHash,
-                aiApiKey: currentSettings.aiApiKey,
+            });
+          }
+
+          // =============== واردکردن بستهٔ پوشه‌ای v3 (فاز ۰.۵) ===============
+          // رسانه از media/ با کپی استریمی (نه base64 در حافظه) به images برمی‌گردد.
+          case 'importDataPackage': {
+            const pkg = parseBackupPackage(params.dataJsonPath);
+            const data = pkg.data;
+            const clientIds = new Set((data.clients || []).map(c => c.id));
+
+            // تصاویر annotate‌شده و thumbnailها از media به ستون TEXT (data URL)
+            // برمی‌گردند — همان فرمتی که بقیهٔ برنامه انتظار دارد. mime از
+            // پسوند واقعی فایل گرفته می‌شود تا jpeg/png هر دو درست برگردند.
+            const readMediaAsDataUrl = (ref) => {
+              const src = pkg.resolveMedia(ref);
+              return readAsBase64DataUrl(src, mimeForExtension(path.extname(src).slice(1)));
+            };
+            const restoreAnnotated = (resultObj) => {
+              if (!resultObj || typeof resultObj !== 'object' || !resultObj.annotatedImageRef) return resultObj;
+              const { annotatedImageRef, ...rest } = resultObj;
+              return {
+                ...rest,
+                annotatedImageBase64: readMediaAsDataUrl(annotatedImageRef),
               };
-
-              const importTransaction = db.transaction(() => {
-                db.exec('DELETE FROM analyses; DELETE FROM questionnaire_revisions; DELETE FROM sessions; DELETE FROM gallery; DELETE FROM clients; DELETE FROM trichologists; DELETE FROM training_samples;');
-                db.prepare('DELETE FROM settings WHERE key = ?').run('localModelMetadata');
-
-                for (const client of data.clients || []) {
-                  db.prepare(`
-                    INSERT INTO clients (id, firstName, lastName, phone, email, gender, birthDate, notes, isSystemRecord, createdAt, updatedAt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    client.id, client.firstName, client.lastName, client.phone, client.email,
-                    client.gender, client.birthDate, client.notes,
-                    client.isSystemRecord ? 1 : (client.id === SYSTEM_TRAINING_POOL_CLIENT_ID ? 1 : 0),
-                    client.createdAt, client.updatedAt,
-                  );
-                }
-                // بکاپ ممکن است از نسخهٔ قدیمی‌تر (بدون ردیف سیستمی) باشد؛ بعد از
-                // پاکسازی و بازسازی کامل جدول clients، وجود آن دوباره تضمین می‌شود.
-                ensureSystemTrainingPoolClientSqlite(db);
-                for (const item of importedGallery) {
-                  db.prepare(`
-                    INSERT INTO gallery (id, clientId, type, url, thumbnail, filename, metadata, filePath, trainingPoolStatus, createdAt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    item.id, item.clientId, item.type, item.url, item.thumbnail, item.filename,
-                    JSON.stringify(parseStoredJson(item.metadata, {})), item.filePath,
-                    item.clientId === SYSTEM_TRAINING_POOL_CLIENT_ID ? (item.trainingPoolStatus || 'active') : null,
-                    item.createdAt,
-                  );
-                }
-                for (const session of sessionRows) {
-                  db.prepare(`
-                    INSERT INTO sessions (id, clientId, trichologistId, date, time, status, notes, createdAt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    session.id, session.clientId, session.trichologistId, session.date,
-                    session.time, session.status, session.notes, session.createdAt,
-                  );
-                }
-                for (const tri of data.trichologists || []) {
-                  db.prepare(`
-                    INSERT INTO trichologists (id, name, specialty, phone, email, description, active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    tri.id, tri.name, tri.specialty, tri.phone, tri.email, tri.description, tri.active ? 1 : 0,
-                  );
-                }
-                for (const revision of questionnaireRowsToImport) {
-                  db.prepare(`
-                    INSERT INTO questionnaire_revisions (id, clientId, sessionId, status, valuesJson, changedFieldsJson, createdAt, updatedAt)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    revision.id || crypto.randomUUID(), revision.clientId, revision.sessionId,
-                    revision.status === 'final' ? 'final' : 'draft',
-                    JSON.stringify(parseStoredJson(revision.values, {})),
-                    JSON.stringify(parseStoredJson(revision.changedFields, [])),
-                    revision.createdAt || new Date().toISOString(),
-                    revision.updatedAt || new Date().toISOString(),
-                  );
-                }
-                for (const analysis of analysisRowsToImport) {
-                  db.prepare(`INSERT INTO analyses (id, clientId, sessionId, trichologistId, type, galleryItemId, medicalQuestionnaire, observations, recommendations, treatmentPlan, aiResults, offlineResults, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-                    analysis.id, analysis.clientId, analysis.sessionId || null, analysis.trichologistId, analysis.type, analysis.galleryItemId,
-                    JSON.stringify(parseStoredJson(analysis.medicalQuestionnaire, {})),
-                    JSON.stringify(parseStoredJson(analysis.observations, [])),
-                    analysis.recommendations, analysis.treatmentPlan,
-                    JSON.stringify(parseStoredJson(analysis.aiResults, null)),
-                    JSON.stringify(parseStoredJson(analysis.offlineResults, null)),
-                    analysis.createdAt, analysis.updatedAt
-                  );
-                }
-                for (const sample of data.trainingSamples || []) {
-                  // approvedForTraining/featureVersion هم باید round-trip شوند؛
-                  // برای بکاپ‌های قدیمی بدون این فیلدها، همان قاعدهٔ addTrainingSample
-                  // اعمال می‌شود (نمونهٔ خبره = تأییدشده).
-                  const approved = sample.approvedForTraining != null
-                    ? (sample.approvedForTraining ? 1 : 0)
-                    : (sample.labelSource === 'expert' ? 1 : 0);
-                  db.prepare(`
-                    INSERT INTO training_samples (id, clientId, galleryItemId, imageThumbnail, features, label, labelSource, confidence, usedInTraining, modelVersionTrainedWith, createdAt, approvedForTraining, featureVersion, questionnaireFeatures)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                  `).run(
-                    sample.id, sample.clientId || null, sample.galleryItemId || null, sample.imageThumbnail || null,
-                    JSON.stringify(parseStoredJson(sample.features, {})), JSON.stringify(parseStoredJson(sample.label, {})), sample.labelSource || null,
-                    sample.confidence ?? null, sample.usedInTraining ? 1 : 0, sample.modelVersionTrainedWith ?? null,
-                    sample.createdAt || new Date().toISOString(),
-                    approved, sample.featureVersion || null,
-                    sample.questionnaireFeatures != null ? JSON.stringify(sample.questionnaireFeatures) : null,
-                  );
-                }
-                if (data.localModelMetadata) {
-                  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('localModelMetadata', JSON.stringify(data.localModelMetadata));
-                }
-                db.prepare(`
-                  INSERT INTO settings (key, value) VALUES ('settings', ?)
-                  ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                `).run(JSON.stringify(settingsToStore));
-              });
-              importTransaction();
-            } catch (error) {
-              for (const filePath of createdFiles) deleteImageFile(filePath);
-              throw error;
+            };
+            if (Array.isArray(data.analyses)) {
+              data.analyses = data.analyses.map(analysis => ({
+                ...analysis,
+                aiResults: restoreAnnotated(analysis.aiResults),
+                offlineResults: restoreAnnotated(analysis.offlineResults),
+              }));
             }
-            for (const item of previousGallery) deleteImageFile(item.filePath);
-            return { success: true };
+            if (Array.isArray(data.trainingSamples)) {
+              data.trainingSamples = data.trainingSamples.map(sample => {
+                if (!sample.thumbnailRef) return sample;
+                const { thumbnailRef, ...rest } = sample;
+                return {
+                  ...rest,
+                  imageThumbnail: readMediaAsDataUrl(thumbnailRef),
+                };
+              });
+            }
+
+            return executeImport(data, (createdFiles) => {
+              return dropOrphanRows(data.gallery, 'gallery', clientIds).map(item => {
+                const { mediaFile, thumbnailRef, ...rest } = item;
+                const thumbnail = thumbnailRef ? readMediaAsDataUrl(thumbnailRef) : (rest.thumbnail ?? null);
+                if (!mediaFile) return { ...rest, thumbnail, filePath: null };
+                const src = pkg.resolveMedia(mediaFile);
+                const ext = path.extname(mediaFile).slice(1) || 'bin';
+                const filePath = saveMediaFileFromPath(src, item.clientId, ext);
+                createdFiles.push(filePath);
+                return { ...rest, thumbnail, url: `file://${filePath}`, filePath };
+              });
+            });
           }
 
           // =============== یادگیری ماشین محلی (Training Samples) ===============
@@ -1079,7 +1300,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             return { error: 'Unknown method: ' + method };
         }
       } catch (error) {
-        console.error('Database error:', error);
+        logger.error('Database error:', error);
         return { error: error.message };
       }
     },

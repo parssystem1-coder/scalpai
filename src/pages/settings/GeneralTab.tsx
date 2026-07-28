@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Globe, Palette, Database, Download, Upload, FolderOpen, Sparkles, Bot } from 'lucide-react';
 import { useSettingsStore } from '../../store';
-import { electronUtils } from '../../db';
+import { electronUtils, backupUtils } from '../../db';
 import { useT, usePick } from '../../i18n';
 import { settingsDict } from './strings';
 import type { Notify } from './types';
@@ -91,6 +91,21 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
   };
 
   const handleExport = async () => {
+    // فاز ۰.۵ — دسکتاپ: بستهٔ پوشه‌ای استریمی (v3). همه‌چیز (دیالوگ + کپی فایل‌ها)
+    // در main انجام می‌شود — دیگر صدها مگابایت از IPC رد نمی‌شود.
+    if (electronUtils.isElectron) {
+      try {
+        const result = await backupUtils.exportPackage(settings.backupPath || undefined);
+        if (result.canceled) return;
+        if (!result.success) throw new Error(result.error || 'Backup failed');
+        notify('success', pick(`بکاپ ذخیره شد: ${result.filePath}`, `Backup saved: ${result.filePath}`));
+      } catch (error) {
+        console.error('Error exporting backup package:', error);
+        notify('error', pick('ذخیرهٔ بکاپ ناموفق بود', 'Backup failed'));
+      }
+      return;
+    }
+
     const data = await exportData();
     const fileName = `scalpai-backup-${new Date().toISOString().split('T')[0]}.json`;
 
@@ -160,19 +175,16 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
     reader.readAsText(file);
   };
 
-  // Electron: بازیابی از پوشه بکاپ (خواندن در main)
+  // Electron: بازیابی از بکاپ — فاز ۰.۵: انتخاب خودکار فرمت (بستهٔ v3 یا JSON کلاسیک v2)
+  // و انتقال فایل‌ها کاملاً در main انجام می‌شود (بدون عبور محتوا از IPC)
   const handleImportFromBackupPath = async () => {
     if (!electronUtils.isElectron) return;
     try {
-      const content = await electronUtils.openAndReadFile({
-        defaultPath: settings.backupPath || undefined,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (content) {
-        await importData(content);
-        alert(t('restoreSuccess'));
-        window.location.reload();
-      }
+      const result = await backupUtils.importAuto();
+      if (result.canceled) return;
+      if (!result.success) throw new Error(result.error || 'Import failed');
+      alert(t('restoreSuccess'));
+      window.location.reload();
     } catch (error) {
       console.error('Error importing from backup path:', error);
       alert(t('restoreError'));

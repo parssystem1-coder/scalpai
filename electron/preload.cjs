@@ -31,6 +31,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
   },
 
+  // =============== Backup Package v3 (فاز ۰.۵) ===============
+  // بکاپ/بازیابی پوشه‌ای استریمی — انتخاب پوشه/فایل با دیالوگ در main انجام می‌شود
+  backup: {
+    exportPackage: (params) => ipcRenderer.invoke('backup:export', params),
+    importAuto: () => ipcRenderer.invoke('backup:import'),
+  },
+
   // =============== App ===============
   app: {
     getPath: (name) => ipcRenderer.invoke('app:getPath', name),

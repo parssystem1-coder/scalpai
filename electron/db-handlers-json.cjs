@@ -11,6 +11,8 @@
  * که در دسترس است استفاده کند.
  */
 
+const { logger } = require('./logger.cjs');
+
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -64,7 +66,7 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
         save();
       }
     } catch (error) {
-      console.error('Failed to read scalpai-data.json, starting with empty data:', error);
+      logger.error('Failed to read scalpai-data.json, starting with empty data:', error);
       data = emptyData();
     }
     // Idempotent: صرف‌نظر از این‌که فایل قبلاً وجود داشته یا تازه ساخته شده،
@@ -633,7 +635,7 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
             return { error: 'Unknown method: ' + method };
         }
       } catch (error) {
-        console.error('JSON database error:', error);
+        logger.error('JSON database error:', error);
         return { error: error.message };
       }
       });

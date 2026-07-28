@@ -7,6 +7,7 @@ import { WifiOff, Users, Image as ImageIcon, Images, Check } from 'lucide-react'
 import { useAnalysesStore, useClientsStore, useGalleryStore, useSettingsStore, useTrainingSamplesStore } from '../../store';
 import { electronUtils, resolveGalleryItemUrl } from '../../db';
 import type { GalleryItem, LocalModelVersionInfo, TrainingSample, TrainingSampleLabel } from '../../db';
+import type { TrainResult } from '../../lib/localModel';
 import { extractImageFeatures, heuristicScoresFromMetrics, FEATURE_VERSION, LEGACY_FEATURE_VERSIONS } from '../../lib/scalpFeatures';
 import { FEATURE_VERSION_WITH_QUESTIONNAIRE } from '../../lib/questionnaireMlFeatures';
 import { normalizeObservationIds, observationsFromScores } from '../../lib/diagnosisCatalog';
@@ -110,6 +111,10 @@ export default function LearningTab() {
   const [training, setTraining] = useState(false);
   const [trainProgress, setTrainProgress] = useState<{ epoch: number; loss?: number; val_loss?: number } | null>(null);
   const [trainError, setTrainError] = useState('');
+  // فاز ۰.۱ — نتیجهٔ آموزشی‌ای که گیت champion/challenger آن را رد کرد
+  // (مدل جدید بهتر از مدل فعلی نبود). با خروجی کامل TrainResult تا اعداد
+  // مقایسه در پنل نمایش داده شود و کاربر بتواند عمداً override کند.
+  const [gateRejection, setGateRejection] = useState<TrainResult | null>(null);
   const expertPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -278,7 +283,7 @@ export default function LearningTab() {
     }));
   };
 
-  const handleTrainModel = async () => {
+  const handleTrainModel = async (force = false) => {
     setTraining(true);
     setTrainError('');
     setTrainProgress(null);
@@ -290,7 +295,15 @@ export default function LearningTab() {
           loss: logs.loss,
           val_loss: logs.val_loss,
         });
-      });
+      }, { force });
+
+      // فاز ۰.۱ — گیت champion/challenger: مدل جدید بهتر نشد → چیزی ذخیره/بازنویسی
+      // نمی‌شود. نتیجهٔ مقایسه به پنل می‌رود تا کاربر تصمیم بگیرد (override اختیاری).
+      if (trainResult.championGate && !trainResult.championGate.replaced) {
+        setGateRejection(trainResult);
+        return;
+      }
+      setGateRejection(null);
 
       const nextVersion = (modelMetadata?.version || 0) + 1;
       const prevHistory: LocalModelVersionInfo[] = modelMetadata
@@ -342,6 +355,7 @@ export default function LearningTab() {
         featureStds: trainResult.featureStds,
         history: prevHistory,
         v4Experiment: trainResult.v4Experiment,
+        championGate: trainResult.championGate,
       });
       await markSamplesUsed(trainResult.trainedIds, nextVersion);
       setModelHasWeights(true);
@@ -382,7 +396,10 @@ export default function LearningTab() {
         trainProgress={trainProgress}
         trainError={trainError}
         useLocalModel={!!settings.useLocalModel}
-        onTrain={handleTrainModel}
+        gateRejection={gateRejection}
+        onTrain={() => handleTrainModel(false)}
+        onForceReplace={() => handleTrainModel(true)}
+        onDismissGate={() => setGateRejection(null)}
         onDeleteModel={handleDeleteModel}
         onToggleLocalModel={checked => updateSettings({ useLocalModel: checked })}
       />}
