@@ -9,6 +9,18 @@ dist-electron/
 release/
 build/output/
 
+# دارایی‌های نصب‌کننده که از روی public/icon.png تولید می‌شوند.
+# با `pnpm run build:assets` (و خودکار در prebuild و CI) بازساخته می‌شوند.
+# کامیت نمی‌شوند تا آیکون یک منبع حقیقت واحد داشته باشد و باینری‌های
+# غیرقابل‌diff مخزن را سنگین نکنند.
+# استثنا: build/installer.nsh عمداً کامیت می‌شود چون محتوای دست‌نویس دارد
+# و از روی تصویر تولید نمی‌شود.
+build/icon.ico
+build/icon.icns
+build/icons/
+build/installerHeader.bmp
+build/installerSidebar.bmp
+
 # کش ابزارها
 .vite/
 .turbo/
