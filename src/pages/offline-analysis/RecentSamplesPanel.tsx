@@ -10,18 +10,29 @@ interface Props {
   onToggleApproval: (id: string, approved: boolean) => void;
   onEdit: (sample: TrainingSample) => void;
   editingSampleId?: string | null;
+  isRtl?: boolean;
 }
 
 export default function RecentSamplesPanel({
-  samples, onDelete, onToggleApproval, onEdit, editingSampleId,
+  samples, onDelete, onToggleApproval, onEdit, editingSampleId, isRtl = true,
 }: Props) {
   const t = useT(offlineDict);
 
   if (samples.length === 0) return null;
 
+  const getSourceLabel = (source: string) => {
+    if (source === 'expert') {
+      return isRtl ? 'تحلیل تریکولوژیست' : 'Trichologist';
+    }
+    if (source === 'online_ai') {
+      return isRtl ? 'آنلاین' : 'Online';
+    }
+    return isRtl ? 'آفلاین' : 'Offline';
+  };
+
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-      <h3 className="font-semibold mb-4">{t('recentSamples')}</h3>
+      <h3 className="font-semibold mb-4">{isRtl ? 'نمونه‌های آموزشی اخیر در این صندوق' : 'Recent Training Samples'}</h3>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {samples.slice(0, 40).map(s => {
           const isAi = s.labelSource === 'online_ai';
@@ -44,11 +55,7 @@ export default function RecentSamplesPanel({
                         : 'bg-white/10 text-white/60'
                   }`}
                 >
-                  {s.labelSource === 'expert'
-                    ? t('sourceExpert')
-                    : isAi
-                      ? 'AI'
-                      : t('sourceHeuristic')}
+                  {getSourceLabel(s.labelSource)}
                 </span>
                 {isAi && (
                   <span className={`text-xs ${approved ? 'text-emerald-400' : 'text-yellow-400'}`}>

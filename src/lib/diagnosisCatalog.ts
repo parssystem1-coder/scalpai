@@ -203,14 +203,14 @@ export function mergeObservationIds(...lists: Array<string[] | ObservationId[] |
   return out;
 }
 
-/** متن پرامپت AI — لیست شناسه‌ها و برچسب‌های دو زبانه */
+/** متن پرامپت AI — لیست شناسه‌ها و برچسب‌های فشرده جهت کاهش هزینه توکن پرامپت */
 export function observationCatalogPromptBlock(): string {
   return observationGroups
     .map(g => {
       const items = observationsInGroup(g.id)
-        .map(o => `  - "${o.id}" (${o.fa} / ${o.en})`)
+        .map(o => `  - "${o.id}"`)
         .join('\n');
-      return `${g.en} / ${g.fa}:\n${items}`;
+      return `${g.en}:\n${items}`;
     })
     .join('\n');
 }

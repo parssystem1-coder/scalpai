@@ -92,39 +92,24 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
 
   const handleExport = async () => {
     const data = await exportData();
-    const fileName = `scalpai-backup-${new Date().toISOString().split('T')[0]}.json`;
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+    let fileName = `scalpai-backup-${dateStr}-${timeStr}.json`;
+    let isZip = false;
+    let zipBase64 = '';
 
-    // Electron با مسیر بکاپ ذخیره‌شده
-    if (electronUtils.isElectron && settings.backupPath) {
-      try {
-        const filePath = `${settings.backupPath}/${fileName}`;
-        const saved = await electronUtils.saveFileToPath(filePath, data);
-        if (!saved) throw new Error('Backup save failed');
-        notify('success', pick(`فایل در ${filePath} ذخیره شد`, `File saved to ${filePath}`));
-        return;
-      } catch (error) {
-        console.error('Error saving to Electron path:', error);
-      }
+    if (typeof data === 'string' && data.startsWith('scalpai-backup:v3:base64:')) {
+      fileName = `scalpai-backup-${dateStr}-${timeStr}.zip`;
+      isZip = true;
+      zipBase64 = data.split('scalpai-backup:v3:base64:')[1];
     }
 
-    // وب با پوشهٔ انتخاب‌شده از File System Access API
-    if (backupDirHandle) {
-      try {
-        const fileHandle = await backupDirHandle.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(data);
-        await writable.close();
-        notify('success', pick(`فایل در پوشه ${backupDirHandle.name} ذخیره شد`, `File saved to ${backupDirHandle.name}`));
-        return;
-      } catch (error) {
-        console.error('Error saving to directory:', error);
-      }
-    }
-
-    // Electron بدون مسیر: دیالوگ ذخیره (نوشتن در main)
+    // Electron: همیشه دیالوگ ذخیره را باز کن و دایرکتوری پیش‌فرض را روی مسیر انتخاب‌شده از قبل بگذار
     if (electronUtils.isElectron) {
       try {
-        const result = await electronUtils.saveFileDialog(data, fileName);
+        const defaultPath = settings.backupPath ? `${settings.backupPath}/${fileName}` : fileName;
+        const result = await electronUtils.saveFileDialog(data, defaultPath);
         if (result) {
           notify('success', pick(`فایل ذخیره شد: ${result}`, `File saved: ${result}`));
           return;
@@ -134,8 +119,41 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
       }
     }
 
+    // وب با پوشهٔ انتخاب‌شده از File System Access API
+    if (backupDirHandle) {
+      try {
+        const fileHandle = await backupDirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        if (isZip) {
+          const binaryString = window.atob(zipBase64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          await writable.write(bytes);
+        } else {
+          await writable.write(data);
+        }
+        await writable.close();
+        notify('success', pick(`فایل در پوشه ${backupDirHandle.name} ذخیره شد`, `File saved to ${backupDirHandle.name}`));
+        return;
+      } catch (error) {
+        console.error('Error saving to directory:', error);
+      }
+    }
+
     // fallback: دانلود معمولی مرورگر
-    const blob = new Blob([data], { type: 'application/json' });
+    let blob;
+    if (isZip) {
+      const binaryString = window.atob(zipBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      blob = new Blob([bytes], { type: 'application/zip' });
+    } else {
+      blob = new Blob([data], { type: 'application/json' });
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -150,14 +168,24 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        await importData(ev.target?.result as string);
+        let importPayload = ev.target?.result as string;
+        if (file.name.endsWith('.zip')) {
+          const base64Data = importPayload.split('base64,')[1];
+          importPayload = `scalpai-backup:v3:base64:${base64Data}`;
+        }
+        await importData(importPayload);
         alert(t('restoreSuccess'));
         window.location.reload();
-      } catch {
+      } catch (error) {
+        console.error('Import error:', error);
         alert(t('restoreError'));
       }
     };
-    reader.readAsText(file);
+    if (file.name.endsWith('.zip')) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
   };
 
   // Electron: بازیابی از پوشه بکاپ (خواندن در main)
@@ -166,7 +194,7 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
     try {
       const content = await electronUtils.openAndReadFile({
         defaultPath: settings.backupPath || undefined,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
+        filters: [{ name: 'Backup Files', extensions: ['json', 'zip'] }],
       });
       if (content) {
         await importData(content);

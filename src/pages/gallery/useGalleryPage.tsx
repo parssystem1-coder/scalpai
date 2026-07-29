@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo, useCallback, type ReactNode } from 'react';
 import { Image, Video } from 'lucide-react';
-import { useGalleryStore, useClientsStore, useSettingsStore } from '../../store';
+import { useGalleryStore, useClientsStore } from '../../store';
 import { db, resolveGalleryItemUrl } from '../../db';
 import type { GalleryItem } from '../../db';
 import { generateMediaThumbnail } from '../../lib/mediaThumbnail';
@@ -43,8 +43,7 @@ import type { ClientAlbum } from './ClientAlbumTile';
 export function useGalleryPage() {
   const { items, loading, total, pageSize, fetchPage, addItem, deleteItem: deleteGalleryItemFromStore, fetchByClient } = useGalleryStore();
   const { clients, fetchClients } = useClientsStore();
-  const { settings } = useSettingsStore();
-  const isRtl = settings.language === 'fa';
+  const isRtl = false;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'photo' | 'video'>('photo');

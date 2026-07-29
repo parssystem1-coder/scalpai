@@ -31,6 +31,8 @@ export interface OodAssessment {
   topDeviatingIndices: number[];
   /** آیا اصلاً قابل ارزیابی بود؟ (نیازمند آمار آموزشی سازگار) */
   evaluated: boolean;
+  /** فاز ۳٫۳ — نمرهٔ فاصلهٔ ماهالانوبیس با منظم‌سازی باثبات */
+  mahalanobisDistance?: number;
 }
 
 const NOT_EVALUATED: OodAssessment = {
@@ -85,5 +87,24 @@ export function assessOutOfDistribution(
     level = 'borderline';
   }
 
-  return { level, meanAbsZ, maxAbsZ, topDeviatingIndices, evaluated: true };
+  const mahalanobisDistance = calculateMahalanobisDistance(featureVector, means, stds);
+
+  return { level, meanAbsZ, maxAbsZ, topDeviatingIndices, evaluated: true, mahalanobisDistance };
+}
+
+/**
+ * فاز ۳٫۳ — محاسبه فاصلهٔ ماهالانوبیس با کلاس‌های هموارساز قطری (Regularized Diagonal Mahalanobis).
+ */
+export function calculateMahalanobisDistance(
+  x: number[],
+  means: number[],
+  stds: number[],
+): number {
+  let sumSq = 0;
+  for (let i = 0; i < x.length; i++) {
+    const dev = x[i] - means[i];
+    const variance = Math.pow(stds[i], 2) + 1e-4; // Regularization term
+    sumSq += (dev * dev) / variance;
+  }
+  return Math.sqrt(sumSq);
 }

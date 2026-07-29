@@ -192,25 +192,31 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
     b, g, r = cv2.split(img)
     rf, gf, bf = r.astype(np.float32), g.astype(np.float32), b.astype(np.float32)
 
-    red_mask = (rf > gf + 25) & (rf > bf + 25) & (r > 100)
+    # فاز ۲ — آستانه‌یابی خودکار Otsu برای سگمنتیشن مو و پوست سر
+    otsu_thr, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    hair_threshold = max(50, min(110, otsu_thr))
+
+    dark_mask = gray < hair_threshold
+    hair_coverage = float(np.mean(dark_mask))
+
+    scalp_mask = ~dark_mask
+
+    red_mask = (rf > gf + 25) & (rf > bf + 25) & (r > 100) & scalp_mask
     redness_ratio = float(np.mean(red_mask))
 
-    white_mask = (gray > 200) & (r > 180) & (g > 180) & (b > 180)
+    white_mask = (gray > 200) & (r > 180) & (g > 180) & (b > 180) & scalp_mask
     white_flake_ratio = float(np.mean(white_mask))
 
     # براقی/سبوره: نقاط خیلی روشن و تقریباً بی‌رنگ (بازتاب نور مستقیم)،
     # آستانه‌ای بالاتر و سخت‌گیرانه‌تر از شوره تا با پوسته‌های مات اشتباه نشود
     max_channel_diff = np.maximum(np.maximum(np.abs(rf - gf), np.abs(gf - bf)), np.abs(rf - bf))
-    shine_mask = (gray > 245) & (max_channel_diff < 12)
+    shine_mask = (gray > 245) & (max_channel_diff < 12) & scalp_mask
     shine_ratio = float(np.mean(shine_mask))
 
     laplacian = cv2.Laplacian(gray, cv2.CV_64F)
     grad_magnitude = np.abs(laplacian)
     texture_variance = float(np.var(laplacian))
     edge_density = float(np.mean(grad_magnitude > 30))
-
-    dark_mask = gray < 60
-    hair_coverage = float(np.mean(dark_mask))
 
     # شاخص‌های ناحیه‌ای (شبکهٔ تطبیقی cols×rows): لکه‌ای بودن پوشش مو و
     # ناهمگونی رنگدانه/روشنایی بین نواحی مختلف تصویر
@@ -228,7 +234,7 @@ def analyze(image_path: str, lang: str = 'fa') -> dict:
             cell_gray = gray[y0:y1, x0:x1]
             if cell_gray.size == 0:
                 continue
-            cell_coverages.append(float(np.mean(cell_gray < 60)))
+            cell_coverages.append(float(np.mean(cell_gray < hair_threshold)))
             cell_brightnesses.append(float(np.mean(cell_gray)))
 
     patchiness_raw = float(np.std(cell_coverages)) if len(cell_coverages) > 1 else 0.0

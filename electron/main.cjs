@@ -68,6 +68,8 @@ if (!gotSingleInstanceLock) {
 
 // مسیرهای کاربر (app.setName بالاتر اجرا شده تا این مسیر ثابت بماند)
 const userDataPath = app.getPath('userData');
+const { initLogger } = require('./logger.cjs');
+initLogger(userDataPath);
 const dbPath = path.join(userDataPath, 'scalpai.db');
 
 /**
@@ -430,6 +432,9 @@ async function initDatabase() {
     createBaseTables(db);
     runMigrations(db);
 
+    // بررسی سلامت دیتابیس (فاز B2)
+    runDbIntegrityCheck(db);
+
     // تنظیمات پیش‌فرض
     const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('settings');
     if (!existing) {
@@ -573,14 +578,19 @@ function setupIpcHandlers() {
   ipcMain.handle('dialog:saveFile', async (event, options) => {
     const result = await dialog.showSaveDialog(mainWindow, {
       defaultPath: options?.defaultPath,
-      filters: options?.filters || [{ name: 'JSON', extensions: ['json'] }],
+      filters: options?.filters || [{ name: 'Backup Files', extensions: ['json', 'zip'] }],
     });
     if (result.canceled || !result.filePath) return null;
     allowFile(result.filePath);
     if (options?.data !== undefined && options?.data !== null) {
       try {
         ensureParentDir(result.filePath);
-        fs.writeFileSync(result.filePath, options.data);
+        if (typeof options.data === 'string' && options.data.startsWith('scalpai-backup:v3:base64:')) {
+          const base64Content = options.data.split('scalpai-backup:v3:base64:')[1];
+          fs.writeFileSync(result.filePath, Buffer.from(base64Content, 'base64'));
+        } else {
+          fs.writeFileSync(result.filePath, options.data);
+        }
         return { success: true, filePath: result.filePath };
       } catch (error) {
         return { success: false, error: error.message, filePath: result.filePath };
@@ -594,14 +604,20 @@ function setupIpcHandlers() {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
       defaultPath: options?.defaultPath,
-      filters: options?.filters || [{ name: 'JSON', extensions: ['json'] }],
+      filters: options?.filters || [{ name: 'Backup Files', extensions: ['json', 'zip'] }],
     });
     if (result.canceled || !result.filePaths?.length) return null;
     for (const filePath of result.filePaths) allowFile(filePath);
     if (options?.readContent) {
       try {
         const filePath = result.filePaths[0];
-        const content = fs.readFileSync(filePath, 'utf-8');
+        let content;
+        if (filePath.toLowerCase().endsWith('.zip')) {
+          const buffer = fs.readFileSync(filePath);
+          content = 'scalpai-backup:v3:base64:' + buffer.toString('base64');
+        } else {
+          content = fs.readFileSync(filePath, 'utf-8');
+        }
         return { filePaths: result.filePaths, content };
       } catch (error) {
         return { filePaths: result.filePaths, error: error.message };
@@ -615,7 +631,12 @@ function setupIpcHandlers() {
     try {
       const safePath = assertPathAllowed(filePath);
       ensureParentDir(safePath);
-      fs.writeFileSync(safePath, data);
+      if (typeof data === 'string' && data.startsWith('scalpai-backup:v3:base64:')) {
+        const base64Content = data.split('scalpai-backup:v3:base64:')[1];
+        fs.writeFileSync(safePath, Buffer.from(base64Content, 'base64'));
+      } else {
+        fs.writeFileSync(safePath, data);
+      }
       return { success: true };
     } catch (error) {
       return { error: error.message };
@@ -1031,6 +1052,12 @@ app.whenReady().then(async () => {
   await loadProxySettings();
   createWindow();
 
+  // راه‌اندازی آپدیت خودکار برنامه (فاز ۶)
+  setupAutoUpdater();
+
+  // اجرای زمان‌بندی بکاپ خودکار هوشمند (فاز ۶)
+  runAutoBackupScheduler();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -1038,17 +1065,133 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', () => {
-  if (db) {
-    db.close();
+async function runAutoBackupScheduler() {
+  if (!dbHandlers) return;
+  try {
+    const settings = await dbHandlers.handleDbQuery('getSettings', {});
+    if (!settings) return;
+
+    const now = Date.now();
+    const lastAutoBackup = parseInt(settings.lastAutoBackupTime, 10) || 0;
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    if (now - lastAutoBackup > oneDay) {
+      console.log('Starting automated scheduled backup...');
+      const backupString = await dbHandlers.handleDbQuery('exportData', {});
+      if (typeof backupString === 'string' && backupString.startsWith('scalpai-backup:v3:base64:')) {
+        const autoBackupDir = path.join(userDataPath, 'auto-backups');
+        if (!fs.existsSync(autoBackupDir)) {
+          fs.mkdirSync(autoBackupDir, { recursive: true });
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const timeStr = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+        const backupFileName = `scalpai-auto-backup-${dateStr}-${timeStr}.zip`;
+        const backupFilePath = path.join(autoBackupDir, backupFileName);
+
+        const base64Content = backupString.split('scalpai-backup:v3:base64:')[1];
+        fs.writeFileSync(backupFilePath, Buffer.from(base64Content, 'base64'));
+        console.log('Automated scheduled backup saved to:', backupFilePath);
+
+        // بروزرسانی زمان اجرای آخرین بکاپ خودکار
+        await dbHandlers.handleDbQuery('updateSettings', { lastAutoBackupTime: String(now) });
+
+        // پاک‌سازی: نگه داشتن حداکثر ۵ نسخه بکاپ خودکار آخر
+        const files = fs.readdirSync(autoBackupDir)
+          .filter(f => f.startsWith('scalpai-auto-backup-') && f.endsWith('.zip'))
+          .map(f => ({ name: f, time: fs.statSync(path.join(autoBackupDir, f)).mtime.getTime() }))
+          .sort((a, b) => b.time - a.time);
+
+        if (files.length > 5) {
+          for (let i = 5; i < files.length; i++) {
+            fs.unlinkSync(path.join(autoBackupDir, files[i].name));
+            console.log('Deleted old automated backup:', files[i].name);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error during automated scheduled backup:', err);
   }
+}
+
+function setupAutoUpdater() {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.checkForUpdatesAndNotify();
+
+    autoUpdater.on('update-available', () => {
+      console.log('Update available. Downloading...');
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+      console.log('Update downloaded. Will install on quit.');
+    });
+  } catch (err) {
+    console.warn('AutoUpdater initialization failed (likely in development or non-packaged environment):', err.message);
+  }
+}
+
+function runDbIntegrityCheck(dbInstance) {
+  try {
+    let lastCheckTime = 0;
+    const settingRow = dbInstance.prepare("SELECT value FROM settings WHERE key = ?").get('last_integrity_check');
+    if (settingRow) {
+      lastCheckTime = parseInt(settingRow.value, 10) || 0;
+    }
+
+    const now = Date.now();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    let checkResult = [];
+
+    if (now - lastCheckTime > oneWeek) {
+      console.log('Running full SQLite integrity_check...');
+      checkResult = dbInstance.pragma('integrity_check');
+      dbInstance.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+        .run('last_integrity_check', String(now));
+    } else {
+      console.log('Running quick SQLite quick_check...');
+      checkResult = dbInstance.pragma('quick_check');
+    }
+
+    const firstRowValue = checkResult && checkResult[0] ? Object.values(checkResult[0])[0] : '';
+    if (firstRowValue !== 'ok') {
+      const errorMsg = `پایگاه داده خراب شده است (SQLite Database Corruption).\nجزئیات: ${JSON.stringify(checkResult)}\n\nتوصیه می‌شود آخرین فایل پشتیبان (بکاپ) خود را بازیابی کنید تا از دست رفتن اطلاعات مراجعین جلوگیری شود.`;
+      console.error('Database integrity check failed:', checkResult);
+      dialog.showErrorBox('خطای یکپارچگی پایگاه داده', errorMsg);
+    } else {
+      console.log('Database integrity check passed successfully.');
+    }
+  } catch (error) {
+    console.error('Error during database integrity check:', error);
+  }
+}
+
+function closeDb() {
+  if (db) {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      console.log('WAL checkpoint (TRUNCATE) completed successfully.');
+    } catch (e) {
+      console.error('Error during WAL checkpoint:', e);
+    }
+    try {
+      db.close();
+      console.log('Database closed successfully.');
+    } catch (e) {
+      console.error('Error closing database:', e);
+    }
+    db = null;
+  }
+}
+
+app.on('window-all-closed', () => {
+  closeDb();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
-  if (db) {
-    db.close();
-  }
+  closeDb();
 });

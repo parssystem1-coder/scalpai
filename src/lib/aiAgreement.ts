@@ -194,3 +194,37 @@ export function buildAiAgreementReport(
     unchangedObservationCount: unchanged,
   };
 }
+
+/**
+ * فاز ۵.۲ — محاسبهٔ ضریب توافق کوهن (Cohen's Kappa Coefficient) برای ارزیابی ثبات ارزیاب‌ها.
+ * kappa = (P_o - P_e) / (1 - P_e)
+ * که در آن P_o نسبت توافق مشاهده‌شده و P_e احتمال توافق تصادفی است.
+ */
+export function computeCohensKappa(rater1: boolean[], rater2: boolean[]): number {
+  const n = rater1.length;
+  if (n === 0 || rater2.length !== n) return 0;
+
+  let bothYes = 0;
+  let bothNo = 0;
+  let r1YesR2No = 0;
+  let r1NoR2Yes = 0;
+
+  for (let i = 0; i < n; i++) {
+    const r1 = rater1[i];
+    const r2 = rater2[i];
+    if (r1 && r2) bothYes++;
+    else if (!r1 && !r2) bothNo++;
+    else if (r1 && !r2) r1YesR2No++;
+    else r1NoR2Yes++;
+  }
+
+  const pObserved = (bothYes + bothNo) / n;
+
+  const r1YesProb = (bothYes + r1YesR2No) / n;
+  const r2YesProb = (bothYes + r1NoR2Yes) / n;
+
+  const pChance = (r1YesProb * r2YesProb) + ((1 - r1YesProb) * (1 - r2YesProb));
+
+  if (pChance === 1) return 1;
+  return (pObserved - pChance) / (1 - pChance);
+}

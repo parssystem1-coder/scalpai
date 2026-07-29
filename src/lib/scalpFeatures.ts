@@ -258,6 +258,42 @@ export function computeAdaptiveGridDims(width: number, height: number): { cols: 
 }
 
 
+function otsuThreshold(histogram: number[], totalPixels: number): number {
+  let sum = 0;
+  for (let t = 0; t < 256; t++) {
+    sum += t * histogram[t];
+  }
+
+  let sumB = 0;
+  let wB = 0;
+  let wF = 0;
+
+  let varMax = 0;
+  let threshold = 0;
+
+  for (let t = 0; t < 256; t++) {
+    wB += histogram[t];
+    if (wB === 0) continue;
+
+    wF = totalPixels - wB;
+    if (wF === 0) break;
+
+    sumB += t * histogram[t];
+
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+
+    const varBetween = wB * wF * Math.pow(mB - mF, 2);
+
+    if (varBetween > varMax) {
+      varMax = varBetween;
+      threshold = t;
+    }
+  }
+
+  return threshold;
+}
+
 function computeRawMetrics(data: Uint8ClampedArray, width: number, height: number): ScalpRawMetrics {
   let totalR = 0, totalG = 0, totalB = 0;
   let whiteFlakes = 0;
@@ -269,6 +305,19 @@ function computeRawMetrics(data: Uint8ClampedArray, width: number, height: numbe
 
   const step = 4;
   const sampleCount = Math.floor(data.length / (4 * step));
+
+  const histogram = new Array(256).fill(0);
+  let pixelCount = 0;
+  for (let i = 0; i < data.length; i += 4 * step) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const brightness = Math.floor((r + g + b) / 3);
+    histogram[brightness]++;
+    pixelCount++;
+  }
+  const otsuThr = otsuThreshold(histogram, pixelCount);
+  const hairThreshold = Math.max(50, Math.min(110, otsuThr));
 
   const { cols: gridCols, rows: gridRows } = computeAdaptiveGridDims(width, height);
   const cellCount = gridCols * gridRows;
@@ -285,16 +334,19 @@ function computeRawMetrics(data: Uint8ClampedArray, width: number, height: numbe
     totalB += b;
 
     const brightness = (r + g + b) / 3;
-    const isWhiteFlake = brightness > 200 && r > 180 && g > 180 && b > 180;
-    if (isWhiteFlake) whiteFlakes++;
-    if (r > g + 25 && r > b + 25 && r > 100) redPixels++;
-    const isDark = brightness < 60;
+    const isDark = brightness < hairThreshold;
     if (isDark) darkPixels++;
 
-    // براقی/سبوره: نقاط خیلی روشن و تقریباً بی‌رنگ (بازتاب نور)، آستانه‌ای
-    // بالاتر از شوره تا با پوسته‌های مات (whiteFlake) اشتباه نشود
+    const isScalp = !isDark;
+
+    const isWhiteFlake = isScalp && brightness > 200 && r > 180 && g > 180 && b > 180;
+    if (isWhiteFlake) whiteFlakes++;
+
+    const isRed = isScalp && r > g + 25 && r > b + 25 && r > 100;
+    if (isRed) redPixels++;
+
     const maxChannelDiff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
-    if (brightness > 245 && maxChannelDiff < 12) shinePixels++;
+    if (isScalp && brightness > 245 && maxChannelDiff < 12) shinePixels++;
 
     const localIdx = Math.min(i + 4 * step, data.length - 4);
     const dr = r - data[localIdx];
@@ -304,7 +356,6 @@ function computeRawMetrics(data: Uint8ClampedArray, width: number, height: numbe
     varianceSum += gradMagnitude;
     if (gradMagnitude > 30) edgePixels++;
 
-    // موقعیت پیکسل برای تخصیص به خانهٔ شبکه (لکه‌ای بودن/ناهمگونی رنگدانه)
     const pixelIndex = i / 4;
     const x = pixelIndex % width;
     const y = Math.floor(pixelIndex / width);

@@ -1,7 +1,9 @@
 /**
- * منطق مشترک ساخت درخواست AI — منبع Electron (CJS).
- * نسخهٔ renderer/Vite: src/lib/aiRequestCore.ts (همان رفتار).
- * هنگام تغییر منطق، هر دو فایل را هم‌راستا نگه دارید.
+ * منطق مشترک ساخت درخواست AI — منبع الکترون و وب (CJS).
+ * -----------------------------------------------------------------------
+ * این فایل منبع واحد حقیقت (Single Source of Truth) برای تمام هدرها، بدنهٔ
+ * درخواست‌ها، استخراج متن هوش مصنوعی و فرآیندهای تحلیل خطا است.
+ * هرگونه تغییر در API ابری فقط در این فایل اعمال می‌شود.
  */
 
 'use strict';
@@ -23,6 +25,7 @@ const AI_VISION_TOP_P = 1;
 const AI_VISION_MAX_TOKENS = 4096;
 const AI_ANALYZE_TIMEOUT_MS = 45000;
 const AI_TEST_TIMEOUT_MS = 15000;
+const AI_MAX_TRANSIENT_RETRIES = 2;
 
 function stripDataUrlPrefix(base64Image) {
   return base64Image && String(base64Image).includes('base64,')
@@ -203,6 +206,36 @@ function extractResponseText(provider, data) {
   return null;
 }
 
+function extractResponseModelId(provider, data) {
+  if (provider === 'gemini') {
+    return (data && (data.modelVersion || data.model)) || null;
+  }
+  return (data && typeof data.model === 'string' && data.model) || null;
+}
+
+function isTransientAiError(status, message) {
+  if (typeof status === 'number') {
+    if (status === 408 || status === 425 || status === 429) return false;
+    if (status >= 500 && status < 600) return true;
+    return false;
+  }
+  const m = (message || '').toLowerCase();
+  if (!m) return false;
+  if (m.includes('rate limit') || m.includes('quota')) return false;
+  return (
+    m.includes('failed to fetch') ||
+    m.includes('network') ||
+    m.includes('timeout') ||
+    m.includes('econnreset') ||
+    m.includes('socket hang up')
+  );
+}
+
+function backoffDelayMs(attempt, baseMs = 700, maxMs = 6000) {
+  const exp = Math.min(maxMs, baseMs * Math.pow(2, Math.max(0, attempt)));
+  return Math.round(exp / 2 + Math.random() * (exp / 2));
+}
+
 function extractErrorMessage(status, data) {
   if (data && data.error) {
     if (typeof data.error === 'string') return data.error;
@@ -260,6 +293,7 @@ module.exports = {
   AI_VISION_MAX_TOKENS,
   AI_ANALYZE_TIMEOUT_MS,
   AI_TEST_TIMEOUT_MS,
+  AI_MAX_TRANSIENT_RETRIES,
   stripDataUrlPrefix,
   buildOpenAICompatibleHeaders,
   normalizeOpenRouterModel,
@@ -268,6 +302,9 @@ module.exports = {
   buildVisionRequest,
   buildTestConnectionRequest,
   extractResponseText,
+  extractResponseModelId,
+  isTransientAiError,
+  backoffDelayMs,
   extractErrorMessage,
   extractJsonText,
 };
