@@ -11,6 +11,25 @@ interface Props {
 export default function ResultsCharts({ result }: Props) {
   const t = useT(offlineDict);
 
+  const getTranslatedLabel = (label: string) => {
+    const l = label.toLowerCase();
+    if (l.includes('تراکم') || l.includes('density')) return t('metricDensity');
+    if (l.includes('چربی') || l.includes('oiliness')) return t('metricOiliness');
+    if (l.includes('خشکی') || l.includes('dryness')) return t('metricDryness');
+    if (l.includes('شوره') || l.includes('dandruff')) return t('metricDandruff');
+    if (l.includes('قرمزی') || l.includes('redness')) return t('metricRedness');
+    if (l.includes('براقی') || l.includes('shine')) return t('metricShine');
+    if (l.includes('لکه‌ای') || l.includes('patchiness')) return t('metricPatchiness');
+    if (l.includes('رنگدانه') || l.includes('pigmentation')) return t('metricPigmentation');
+    if (l.includes('ضخامت') || l.includes('thickness')) return t('hairThickness');
+    return label;
+  };
+
+  const translatedChartData = result.chartData?.map(item => ({
+    ...item,
+    label: getTranslatedLabel(item.label)
+  }));
+
   const radarData = [
     { metric: t('metricDensity'), value: result.hairDensity.score },
     { metric: t('metricOiliness'), value: result.scalpCondition.oiliness },
@@ -29,9 +48,9 @@ export default function ResultsCharts({ result }: Props) {
         title={t('metricsRadar')}
       />
 
-      {result.chartData && result.chartData.length > 0 && (
+      {translatedChartData && translatedChartData.length > 0 && (
         <MetricsBar3D
-          data={result.chartData}
+          data={translatedChartData}
           title={t('metricsChart')}
         />
       )}

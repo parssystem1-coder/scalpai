@@ -79,3 +79,80 @@ export function hashImagePayload(base64: string): string {
   }
   return `${len.toString(36)}-${(h1 >>> 0).toString(36)}-${(h2 >>> 0).toString(36)}`;
 }
+
+/**
+ * فاز ۵٫۱ — تولید هش ادراکی بصری dHash (Difference Hash) از تصویر.
+ * این الگوریتم برای تشخیص تصاویر بصری مشابه که فشرده یا تغییر اندازه داده شده‌اند،
+ * به شدت قوی و مناسب ممانعت از تداخل نمونه‌ها در استخر یادگیری ماشین است.
+ */
+export function computeDHash(base64: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof Image === 'undefined') {
+      // در محیط‌های تستی غیرمرورگر، یک هش شبیه‌سازی شده برمی‌گردانیم تا بیلد نشکند
+      resolve(hashImagePayload(base64).slice(0, 16).padEnd(16, '0'));
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 9;
+        canvas.height = 8;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve('');
+          return;
+        }
+        ctx.drawImage(img, 0, 0, 9, 8);
+        const imgData = ctx.getImageData(0, 0, 9, 8).data;
+
+        const gray: number[] = [];
+        for (let i = 0; i < imgData.length; i += 4) {
+          const r = imgData[i];
+          const g = imgData[i + 1];
+          const b = imgData[i + 2];
+          gray.push(0.299 * r + 0.587 * g + 0.114 * b);
+        }
+
+        let binary = '';
+        for (let row = 0; row < 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const left = gray[row * 9 + col];
+            const right = gray[row * 9 + col + 1];
+            binary += left > right ? '1' : '0';
+          }
+        }
+
+        let hex = '';
+        for (let i = 0; i < 64; i += 4) {
+          const nibble = binary.slice(i, i + 4);
+          hex += parseInt(nibble, 2).toString(16);
+        }
+        resolve(hex);
+      } catch {
+        resolve('');
+      }
+    };
+    img.onerror = () => resolve('');
+    img.src = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+  });
+}
+
+/**
+ * فاز ۵٫۱ — محاسبهٔ فاصلهٔ همینگ (Hamming Distance) بین دو dHash.
+ * فاصلهٔ کمتر یا مساوی ۴ نشان‌دهندهٔ تشابه بصری به شدت بالا (دوقلو) است.
+ */
+export function calculateHammingDistance(hash1: string, hash2: string): number {
+  if (hash1.length !== 16 || hash2.length !== 16) return 99;
+  let distance = 0;
+  for (let i = 0; i < 16; i++) {
+    const val1 = parseInt(hash1[i], 16);
+    const val2 = parseInt(hash2[i], 16);
+    let xor = val1 ^ val2;
+    while (xor > 0) {
+      if (xor & 1) distance++;
+      xor >>= 1;
+    }
+  }
+  return distance;
+}

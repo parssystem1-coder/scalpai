@@ -159,7 +159,7 @@ export default function MainLayout({ children }: Props) {
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? theme.activeMenu : theme.sidebarHover}`}
               >
                 <Icon size={20} />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span>{isRtl ? item.label : item.labelEn}</span>}
               </Link>
             );
           })}
@@ -178,7 +178,7 @@ export default function MainLayout({ children }: Props) {
               <h2 className="text-lg font-semibold">
                 {location.pathname === '/profile'
                   ? (isRtl ? 'پروفایل' : 'Profile')
-                  : menuItems.find(i => i.path === location.pathname)?.[isRtl ? 'label' : 'labelEn'] || 'ScalpAI'}
+                  : menuItems.find(i => i.path === location.pathname)?.[(isRtl && !['/clients', '/sessions', '/gallery'].includes(location.pathname)) ? 'label' : 'labelEn'] || 'ScalpAI'}
               </h2>
             </div>
             <div className="flex items-center gap-3">

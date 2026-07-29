@@ -445,6 +445,27 @@ export default function LearningTab() {
     await updateSettings({ useLocalModel: false });
   };
 
+  const isRtl = settings.language === 'fa';
+
+  const filteredSamples = trainingSamples.filter(s => {
+    // ۱. تفکیک محتوایی بر اساس تب فعال
+    if (labelingSource === 'client') {
+      if (s.clientId === 'system-training-pool') return false;
+    } else if (labelingSource === 'pool') {
+      if (s.clientId !== 'system-training-pool') return false;
+    } else {
+      return false; // در تب گالری پات نمایش داده نمی‌شود
+    }
+
+    // ۲. منطق صندوق ورودی (Inbox / To-Do List)
+    const approved = s.labelSource === 'expert' || s.approvedForTraining === true;
+    if (!approved) return true; // همیشه کارهای معلق هوش مصنوعی را نشان بده
+
+    // برای کارهای تایید شده/خبره، فقط نمونه‌های ۲۴ ساعت گذشته را نشان بده تا صفحه شلوغ نشود
+    const isRecent = Date.now() - new Date(s.createdAt).getTime() < 24 * 60 * 60 * 1000;
+    return isRecent;
+  });
+
   return (
     <div className="space-y-6">
       {labelingSource !== 'poolGallery' && !electronUtils.isElectron && (
@@ -529,7 +550,49 @@ export default function LearningTab() {
         </div>
       </div>
 
-      {labelingSource === 'pool' ? (
+      {editingSampleId ? (
+        <ExpertLabelingPanel
+          panelRef={expertPanelRef}
+          clients={clients}
+          labelClient={labelClient}
+          onLabelClientChange={id => {
+            setLabelClient(id);
+            if (!editingSampleId) {
+              setLabelImage(null);
+              setLabelForm({ ...DEFAULT_LABEL_FORM });
+            }
+          }}
+          labelGallery={labelGallery}
+          labelImage={labelImage}
+          onLabelImageChange={async item => {
+            if (!item) {
+              setLabelImage(null);
+              if (!editingSampleId) {
+                setLabelForm(prev => ({ ...prev, lesions: [], observations: [] }));
+              }
+              return;
+            }
+            const fullUrl = await resolveGalleryItemUrl(item);
+            setLabelImage({ ...item, url: fullUrl });
+            if (!editingSampleId) {
+              const latestAnalysis = analyses
+                .filter(analysis => analysis.clientId === item.clientId && analysis.galleryItemId === item.id && (analysis.aiResults || analysis.offlineResults))
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+              const analyzedLabel = latestAnalysis ? labelFormFromAnalysis(latestAnalysis) : null;
+              setLabelForm(analyzedLabel ?? { ...DEFAULT_LABEL_FORM });
+            }
+          }}
+          labelForm={labelForm}
+          onLabelFormChange={setLabelForm}
+          labelSaving={labelSaving}
+          onSave={handleSaveExpertLabel}
+          onSuggest={suggestHeuristicLabel}
+          editingSampleId={editingSampleId}
+          editingFromAi={editingFromAi}
+          onCancelEdit={handleCancelEdit}
+          hideClientSelector={labelClient === 'system-training-pool'}
+        />
+      ) : labelingSource === 'pool' ? (
         <TrainingGalleryTab />
       ) : labelingSource === 'poolGallery' ? (
         <TrainingPoolGalleryTab />
@@ -573,11 +636,12 @@ export default function LearningTab() {
           editingSampleId={editingSampleId}
           editingFromAi={editingFromAi}
           onCancelEdit={handleCancelEdit}
+          hideClientSelector={labelClient === 'system-training-pool'}
         />
       )}
 
       {labelingSource !== 'poolGallery' && <RecentSamplesPanel
-        samples={trainingSamples}
+        samples={filteredSamples}
         editingSampleId={editingSampleId}
         onDelete={async id => {
           if (editingSampleId === id) clearEditState();
@@ -585,6 +649,7 @@ export default function LearningTab() {
         }}
         onToggleApproval={(id, approved) => updateSample(id, { approvedForTraining: approved })}
         onEdit={handleEditSample}
+        isRtl={isRtl}
       />}
     </div>
   );

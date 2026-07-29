@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Plus, Calendar, Clock, X, Edit2, Trash2, Check, XCircle, Search, ChevronDown } from 'lucide-react';
-import { useSessionsStore, useClientsStore, useTrichologistsStore, useSettingsStore } from '../store';
+import { useSessionsStore, useClientsStore, useTrichologistsStore } from '../store';
 import PersianCalendar, { formatDateForDisplay } from '../components/PersianCalendar';
 import type { Session, Client } from '../db';
 
@@ -14,8 +14,7 @@ export default function Sessions() {
   const { sessions, loading, fetchSessions, addSession, updateSession, deleteSession } = useSessionsStore();
   const { clients, fetchClients } = useClientsStore();
   const { trichologists, fetchTrichologists } = useTrichologistsStore();
-  const { settings } = useSettingsStore();
-  const isRtl = settings.language === 'fa';
+  const isRtl = false;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);

@@ -7,6 +7,18 @@
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const AdmZip = require('adm-zip');
+
+function getPortableRelativePath(filePath) {
+  if (!filePath) return null;
+  const parts = filePath.split(/[/\\]/);
+  if (parts.length >= 2) {
+    const filename = parts[parts.length - 1];
+    const clientId = parts[parts.length - 2];
+    return `${clientId}/${filename}`;
+  }
+  return path.basename(filePath);
+}
 // nativeImage فقط برای تولید thumbnail لازم است؛ در محیط تست (بدون باینری
 // Electron) نبودش نباید کل ماژول را از کار بیندازد.
 let nativeImage = null;
@@ -731,16 +743,10 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             }));
             const modelMetadataRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('localModelMetadata');
             const galleryRows = db.prepare('SELECT * FROM gallery').all().map(item => {
-              // محتوای رسانه (عکس یا ویدیو) به‌صورت data URL داخل بکاپ قرار می‌گیرد
-              // تا فایل بکاپ به‌تنهایی قابل انتقال به سیستم دیگر باشد.
-              const imageData = item.filePath
-                ? readImageAsBase64(item.filePath)
-                : (item.url?.startsWith('data:') ? item.url : null);
-              const { filePath, ...portableItem } = item;
               return {
-                ...portableItem,
+                ...item,
                 metadata: parseStoredJson(item.metadata, {}),
-                imageData,
+                imageData: null,
               };
             });
             const analysisRows = db.prepare('SELECT * FROM analyses').all().map(analysis => ({
@@ -762,11 +768,70 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               localModelMetadata: modelMetadataRow ? JSON.parse(modelMetadataRow.value) : null,
               questionnaireRevisions: questionnaireRows,
             };
-            return JSON.stringify(createBackupEnvelope(data), null, 2);
+
+            const envelope = createBackupEnvelope(data);
+            envelope.version = 3;
+
+            const dataJsonString = JSON.stringify(envelope, null, 2);
+            const tmpPath = path.join(userDataPath, `backup-temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.zip`);
+
+            const { ZipArchive } = await import('archiver');
+            const createZipPromise = () => {
+              return new Promise((resolve, reject) => {
+                const output = fs.createWriteStream(tmpPath);
+                const archive = new ZipArchive({ zlib: { level: 9 } });
+
+                output.on('close', () => resolve());
+                output.on('end', () => resolve());
+                archive.on('error', (err) => reject(err));
+                archive.pipe(output);
+
+                archive.append(dataJsonString, { name: 'data.json' });
+
+                const originalGalleryRows = db.prepare('SELECT * FROM gallery').all();
+                for (const item of originalGalleryRows) {
+                  if (item.filePath && fs.existsSync(item.filePath)) {
+                    const portablePath = getPortableRelativePath(item.filePath);
+                    archive.file(item.filePath, { name: 'images/' + portablePath });
+                  }
+                }
+
+                archive.finalize();
+              });
+            };
+
+            await createZipPromise();
+
+            const zipBuffer = fs.readFileSync(tmpPath);
+            const base64Zip = zipBuffer.toString('base64');
+
+            try {
+              fs.unlinkSync(tmpPath);
+            } catch (err) {
+              console.error('Error deleting temp backup file:', err);
+            }
+
+            return 'scalpai-backup:v3:base64:' + base64Zip;
           }
 
           case 'importData': {
-            const data = parseBackupPayload(params.jsonData);
+            let data;
+            let isV3 = false;
+            let zip = null;
+
+            if (typeof params.jsonData === 'string' && params.jsonData.startsWith('scalpai-backup:v3:base64:')) {
+              isV3 = true;
+              const base64Content = params.jsonData.split('scalpai-backup:v3:base64:')[1];
+              const zipBuffer = Buffer.from(base64Content, 'base64');
+              zip = new AdmZip(zipBuffer);
+              const dataEntry = zip.getEntry('data.json');
+              if (!dataEntry) throw new Error('data.json not found in backup zip');
+              const dataJsonString = dataEntry.getData().toString('utf8');
+              data = parseBackupPayload(dataJsonString);
+            } else {
+              data = parseBackupPayload(params.jsonData);
+            }
+
             const previousGallery = db.prepare('SELECT filePath FROM gallery WHERE filePath IS NOT NULL').all();
             const createdFiles = [];
             try {
@@ -785,13 +850,48 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               const analysisRowsToImport = dropOrphans(data.analyses, 'analyses');
               const questionnaireRowsToImport = dropOrphans(data.questionnaireRevisions, 'questionnaire_revisions');
 
-              const importedGallery = galleryRows.map(item => {
-                const imageData = item.imageData || (item.url?.startsWith('data:') ? item.url : null);
-                if (!imageData) return { ...item, filePath: null };
-                const filePath = saveImageToFile(imageData, item.clientId);
-                createdFiles.push(filePath);
-                return { ...item, url: `file://${filePath}`, filePath };
-              });
+              let importedGallery;
+              if (isV3) {
+                importedGallery = galleryRows.map(item => {
+                  const portablePath = item.filePath
+                    ? getPortableRelativePath(item.filePath)
+                    : (item.filename ? `${item.clientId}/${item.filename}` : null);
+                  
+                  if (!portablePath) return { ...item, filePath: null };
+                  
+                  const entryName = 'images/' + portablePath;
+                  const entry = zip.getEntry(entryName);
+                  if (!entry) {
+                    console.warn(`Warning: Image entry ${entryName} not found in zip`);
+                    return { ...item, filePath: null };
+                  }
+
+                  const clientImagesPath = path.resolve(imagesPath, String(item.clientId || ''));
+                  if (!clientImagesPath.startsWith(imagesPath + path.sep)) {
+                    throw new Error('Invalid client id for media storage');
+                  }
+                  if (!fs.existsSync(clientImagesPath)) {
+                    fs.mkdirSync(clientImagesPath, { recursive: true });
+                  }
+
+                  const uniqueFilename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${path.extname(portablePath)}`;
+                  const newFilePath = path.join(clientImagesPath, uniqueFilename);
+
+                  fs.writeFileSync(newFilePath, entry.getData());
+                  createdFiles.push(newFilePath);
+
+                  return { ...item, url: `file://${newFilePath}`, filePath: newFilePath };
+                });
+              } else {
+                importedGallery = galleryRows.map(item => {
+                  const imageData = item.imageData || (item.url?.startsWith('data:') ? item.url : null);
+                  if (!imageData) return { ...item, filePath: null };
+                  const filePath = saveImageToFile(imageData, item.clientId);
+                  createdFiles.push(filePath);
+                  return { ...item, url: `file://${filePath}`, filePath };
+                });
+              }
+
               const currentSettingsRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('settings');
               const currentSettings = currentSettingsRow ? JSON.parse(currentSettingsRow.value) : {};
               const importedSettings = sanitizeSettingsForBackup(data.settings || {});

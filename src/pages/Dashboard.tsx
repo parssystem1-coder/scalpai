@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Users, Calendar, Image, Activity, TrendingUp, Clock } from 'lucide-react';
-import { useClientsStore, useSessionsStore, useGalleryStore } from '../store';
+import { useClientsStore, useSessionsStore, useGalleryStore, useSettingsStore } from '../store';
 
 /** تاریخ محلی به صورت yyyy-MM-dd — هم‌فرمت با تاریخ جلسات (نه UTC) */
 function toLocalDateString(date = new Date()): string {
@@ -71,12 +71,14 @@ export default function Dashboard() {
     };
   }, [sessions, clients, today, currentYear, currentMonth, monthPrefix, yearPrefix]);
 
-  // برچسب‌های داشبورد همیشه انگلیسی‌اند (مستقل از زبان UI)
+  const { settings } = useSettingsStore();
+  const isRtl = settings.language === 'fa';
+
   const stats = [
-    { icon: Users, label: 'Total Clients', value: clients.length, color: 'from-blue-500 to-cyan-500' },
-    { icon: Calendar, label: 'Upcoming Sessions', value: upcomingSessions, color: 'from-purple-500 to-pink-500' },
-    { icon: Image, label: 'Gallery Items', value: total, color: 'from-orange-500 to-red-500' },
-    { icon: Activity, label: 'Completed Sessions', value: completedSessions, color: 'from-green-500 to-emerald-500' },
+    { icon: Users, label: isRtl ? 'کل مراجعین' : 'Total Clients', value: clients.length, color: 'from-blue-500 to-cyan-500' },
+    { icon: Calendar, label: isRtl ? 'جلسات پیش رو' : 'Upcoming Sessions', value: upcomingSessions, color: 'from-purple-500 to-pink-500' },
+    { icon: Image, label: isRtl ? 'تصاویر گالری' : 'Gallery Items', value: total, color: 'from-orange-500 to-red-500' },
+    { icon: Activity, label: isRtl ? 'جلسات کامل شده' : 'Completed Sessions', value: completedSessions, color: 'from-green-500 to-emerald-500' },
   ];
 
   return (
@@ -106,10 +108,10 @@ export default function Dashboard() {
         <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6">
           <div className="flex items-center gap-3 mb-6">
             <Users size={24} className="text-blue-400" />
-            <h3 className="text-lg font-semibold">Recent Clients</h3>
+            <h3 className="text-lg font-semibold">{isRtl ? 'مراجعین اخیر' : 'Recent Clients'}</h3>
           </div>
           {recentClients.length === 0 ? (
-            <p className="text-center opacity-50 py-8">No clients yet</p>
+            <p className="text-center opacity-50 py-8">{isRtl ? 'هنوز مراجعی ثبت نشده است' : 'No clients yet'}</p>
           ) : (
             <div className="space-y-3">
               {recentClients.map(client => (
@@ -132,27 +134,27 @@ export default function Dashboard() {
         <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6">
           <div className="flex items-center gap-3 mb-6">
             <TrendingUp size={24} className="text-green-400" />
-            <h3 className="text-lg font-semibold">Quick Stats</h3>
+            <h3 className="text-lg font-semibold">{isRtl ? 'آمار سریع' : 'Quick Stats'}</h3>
           </div>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-4 rounded-xl bg-white/5">
-              <span>Clients This Month</span>
+              <span>{isRtl ? 'مراجعین این ماه' : 'Clients This Month'}</span>
               <span className="text-2xl font-bold text-blue-400">{clientsThisMonth}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-white/5">
-              <span>Today&apos;s Sessions</span>
+              <span>{isRtl ? 'جلسات امروز' : "Today's Sessions"}</span>
               <span className="text-2xl font-bold text-purple-400">{todaySessions}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-white/5">
-              <span>Sessions This Month</span>
+              <span>{isRtl ? 'جلسات این ماه' : 'Sessions This Month'}</span>
               <span className="text-2xl font-bold text-cyan-400">{monthSessions}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-white/5">
-              <span>Sessions This Year</span>
+              <span>{isRtl ? 'جلسات امسال' : 'Sessions This Year'}</span>
               <span className="text-2xl font-bold text-emerald-400">{yearSessions}</span>
             </div>
             <div className="flex justify-between items-center p-4 rounded-xl bg-white/5">
-              <span>Gallery Images</span>
+              <span>{isRtl ? 'تصاویر گالری' : 'Gallery Images'}</span>
               <span className="text-2xl font-bold text-orange-400">{total}</span>
             </div>
           </div>

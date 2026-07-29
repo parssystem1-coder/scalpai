@@ -47,9 +47,15 @@ import {
   computePositiveClassWeights,
   inactiveLabelIds,
   summarizeRepeatedRuns,
+  computeConfidenceInterval,
+  computeScoreMetrics,
+  computeCalibrationMetrics,
   type ClassificationSummary,
   type LabelSupport,
   type RepeatedMetricSummary,
+  type ScoreMetric,
+  type ConfidenceInterval,
+  type CalibrationSummary,
 } from './mlEvaluation';
 
 export {
@@ -66,7 +72,7 @@ export {
   computeClassificationSummary,
   calibrateThresholds,
 } from './mlEvaluation';
-export type { LabelSupport, PerClassMetric, ClassificationSummary } from './mlEvaluation';
+export type { LabelSupport, PerClassMetric, ClassificationSummary, ScoreMetric, ConfidenceInterval, CalibrationSummary } from './mlEvaluation';
 
 export {
   FEATURE_VERSION_WITH_QUESTIONNAIRE,
@@ -264,15 +270,28 @@ function buildModel(inputSize: number, positiveWeights?: number[]): tf.LayersMod
       const obsTrue = yTrue.slice([0, SCORE_COUNT], [-1, OBSERVATION_IDS.length]);
       const obsPred = yPred.slice([0, SCORE_COUNT], [-1, OBSERVATION_IDS.length]);
       const mse = tf.losses.meanSquaredError(scoreTrue, scorePred);
-      // BCE پایدار روی احتمال‌های sigmoid
+
+      // فاز ۳٫۱ — پیاده‌سازی Focal Loss جهت تمرکز روی نمونه‌های تشخیصی نادر بالینی
+      const gamma = 2.0;
       const eps = 1e-7;
-      const posTerm = tf.mul(obsTrue, tf.log(tf.add(obsPred, eps)));
-      const negTerm = tf.mul(tf.sub(1, obsTrue), tf.log(tf.add(tf.sub(1, obsPred), eps)));
+      const p = tf.clipByValue(obsPred, eps, 1.0 - eps);
+
+      // محاسبات پویای ترم‌های مثبت و منفی بر اساس تعدیل‌کننده (1 - p_t)^gamma
+      const posTerm = tf.mul(
+        tf.mul(tf.pow(tf.sub(1.0, p), gamma), tf.log(p)),
+        obsTrue
+      );
+      const negTerm = tf.mul(
+        tf.mul(tf.pow(p, gamma), tf.log(tf.sub(1.0, p))),
+        tf.sub(1.0, obsTrue)
+      );
+
       const weightedPos = posWeights
         ? tf.mul(posTerm, tf.tensor2d([posWeights]))
         : posTerm;
-      const bce = tf.mean(tf.neg(tf.add(weightedPos, negTerm)));
-      return tf.add(mse, tf.mul(bce, 0.6));
+
+      const focalLoss = tf.mean(tf.neg(tf.add(weightedPos, negTerm)));
+      return tf.add(mse, tf.mul(focalLoss, 0.6));
     });
 
   model.compile({ optimizer: tf.train.adam(0.008), loss: multiTaskLoss });
@@ -461,6 +480,64 @@ function splitByClient(
   };
 }
 
+export interface KFoldSplit {
+  train: TrainingSample[];
+  val: TrainingSample[];
+  holdout: TrainingSample[];
+}
+
+export function splitByClientKFold(
+  samples: TrainingSample[],
+  k = 5,
+  seed = Date.now(),
+): KFoldSplit[] {
+  const byClient = new Map<string, TrainingSample[]>();
+  for (const s of samples) {
+    const key = s.clientId || `anon-${s.id}`;
+    if (!byClient.has(key)) byClient.set(key, []);
+    byClient.get(key)!.push(s);
+  }
+  const clients = shuffleInPlace([...byClient.keys()], seed);
+
+  const actualK = Math.min(k, clients.length);
+  if (actualK < 3) {
+    const shuffled = shuffleInPlace([...samples], seed);
+    const nVal = Math.max(1, Math.floor(shuffled.length * 0.2));
+    const val = shuffled.slice(0, nVal);
+    const train = shuffled.slice(nVal);
+    return [{ train, val, holdout: val }];
+  }
+
+  const clientFolds: string[][] = Array.from({ length: actualK }, () => []);
+  for (let i = 0; i < clients.length; i++) {
+    clientFolds[i % actualK].push(clients[i]);
+  }
+
+  const folds: KFoldSplit[] = [];
+  for (let i = 0; i < actualK; i++) {
+    const holdoutClients = new Set(clientFolds[i]);
+    const valClients = new Set(clientFolds[(i + 1) % actualK]);
+
+    const train: TrainingSample[] = [];
+    const val: TrainingSample[] = [];
+    const holdout: TrainingSample[] = [];
+
+    for (const [cid, list] of byClient) {
+      if (holdoutClients.has(cid)) {
+        holdout.push(...list);
+      } else if (valClients.has(cid)) {
+        val.push(...list);
+      } else {
+        train.push(...list);
+      }
+    }
+
+    folds.push({ train, val, holdout });
+  }
+
+  return folds;
+}
+
 function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
   const out: TrainingSample[] = [];
   for (const s of samples) {
@@ -538,6 +615,8 @@ interface FitOutcome {
   model: tf.LayersModel;
   norm: { means: number[]; stds: number[] };
   metrics: FitMetrics;
+  holdoutTrue?: number[][];
+  holdoutPred?: number[][];
 }
 
 async function fitOnSplit(
@@ -556,18 +635,35 @@ async function fitOnSplit(
   const holdRows = holdout.map(s => sampleToXY(s, mode));
 
   const norm = computeNorm(trainRows.map(r => r.x));
-  const trainX = trainRows.map(r => applyNorm(r.x, norm.means, norm.stds));
   const valX = valRows.map(r => applyNorm(r.x, norm.means, norm.stds));
   const holdX = holdRows.map(r => applyNorm(r.x, norm.means, norm.stds));
 
+  const trainX: number[][] = [];
+  const augmentedTrainRows: typeof trainRows = [];
+  for (let i = 0; i < trainRows.length; i++) {
+    const normX = applyNorm(trainRows[i].x, norm.means, norm.stds);
+    trainX.push(normX);
+    augmentedTrainRows.push(trainRows[i]);
+
+    // فاز ۵٫۴ — فرآیند Augmentation محافظه‌کارانه فقط برای نمونه‌های متخصص در بخش آموزش
+    if (trainExp[i].labelSource === 'expert') {
+      const augmentedX = normX.map(v => {
+        const noise = (Math.random() - 0.5) * 2 * 0.03;
+        return v + noise;
+      });
+      trainX.push(augmentedX);
+      augmentedTrainRows.push(trainRows[i]);
+    }
+  }
+
   const xsT = tf.tensor2d(trainX);
-  const ysT = tf.tensor2d(trainRows.map(r => r.y));
+  const ysT = tf.tensor2d(augmentedTrainRows.map(r => r.y));
   const valXs = valX.length ? tf.tensor2d(valX) : null;
   const valYs = valRows.length ? tf.tensor2d(valRows.map(r => r.y)) : null;
 
   // فاز ۲٫۵ — وزن کلاس از روی توزیع واقعی بخش آموزش (نه کل دیتاست، تا نشت
   // اطلاعات از validation/holdout رخ ندهد)
-  const obsTrainMatrix = trainRows.map(r => r.y.slice(SCORE_COUNT));
+  const obsTrainMatrix = augmentedTrainRows.map(r => r.y.slice(SCORE_COUNT));
   const positiveWeights = computePositiveClassWeights(obsTrainMatrix, OBSERVATION_IDS.length);
 
   const model = buildModel(trainX[0].length, positiveWeights);
@@ -662,9 +758,9 @@ async function fitOnSplit(
         loss: lossArr[lossArr.length - 1],
         valLoss: valLossArr ? valLossArr[valLossArr.length - 1] : undefined,
         epochs: epochsRun || lossArr.length,
-        maeScores: maeScores(trainRows.map(r => r.y), trainPred),
+        maeScores: maeScores(augmentedTrainRows.map(r => r.y), trainPred),
         valMaeScores: valRows.length ? maeScores(valRows.map(r => r.y), valPred) : undefined,
-        obsF1: obsF1(trainRows.map(r => r.y), trainPred),
+        obsF1: obsF1(augmentedTrainRows.map(r => r.y), trainPred),
         valObsF1: valRows.length ? obsF1(valRows.map(r => r.y), valPred) : undefined,
         holdoutMae: holdRows.length ? maeScores(holdRows.map(r => r.y), holdPred) : undefined,
         holdoutObsF1: holdoutPerClass?.microF1,
@@ -672,6 +768,8 @@ async function fitOnSplit(
         holdoutPerClass,
         obsThresholds,
       },
+      holdoutTrue: holdRows.length ? holdRows.map(r => r.y) : undefined,
+      holdoutPred: holdRows.length ? holdPred : undefined,
     };
   } catch (err) {
     try { model.dispose(); } catch { /* ignore */ }
@@ -860,6 +958,15 @@ export interface TrainResult {
     mae: RepeatedMetricSummary;
     macroF1: RepeatedMetricSummary;
   };
+  /** فاز ۱٫۲ — گزارش ارزیابی K-Fold */
+  kFoldEvaluation?: {
+    mae: ConfidenceInterval;
+    macroF1: ConfidenceInterval;
+  };
+  /** فاز ۱٫۳ — گزارش سنجش کالیبراسیون */
+  calibration?: CalibrationSummary;
+  /** فاز ۱٫۱ — متریک‌های MAE و R2 برای هر یک از ۹ امتیاز عددی روی holdout */
+  scoreMetrics?: ScoreMetric[];
   /** فاز ۰٫۱ — نتیجهٔ گیت مقایسه با مدل فعال قبلی */
   retrainGate: RetrainGateDecision;
   /** اگر false باشد، وزن‌های مدل ذخیره نشدند و مدل فعال قبلی سرجای خود است */
@@ -902,6 +1009,8 @@ export interface LocalModelPrediction {
   observations: ObservationId[];
   /** فاز ۴٫۳ — آیا این تصویر شبیه دادهٔ آموزشی مدل است؟ */
   ood?: OodAssessment;
+  /** فاز ۳٫۲ — نمرهٔ عدم‌قطعیت بالینی مبتنی بر MC-Dropout */
+  uncertainty?: number;
 }
 
 export interface TrainProgressLogs {
@@ -1097,6 +1206,58 @@ export async function trainLocalModel(
     OBSERVATION_IDS,
   );
 
+  // فاز ۱٫۲ — اعتبارسنجی K-Fold بر اساس مشتری (K=5)
+  const kFoldMaes: number[] = [];
+  const kFoldMacroF1s: number[] = [];
+
+  const folds = splitByClientKFold(pool, 5, splitSeed);
+  for (const fold of folds) {
+    if (!fold.train.length || !fold.holdout.length) continue;
+    let foldFit: FitOutcome | null = null;
+    try {
+      foldFit = await fitOnSplit(fold.train, fold.val, fold.holdout, 'v3');
+      if (typeof foldFit.metrics.holdoutMae === 'number') {
+        kFoldMaes.push(foldFit.metrics.holdoutMae);
+      }
+      if (typeof foldFit.metrics.holdoutMacroF1 === 'number') {
+        kFoldMacroF1s.push(foldFit.metrics.holdoutMacroF1);
+      }
+    } catch (err) {
+      console.error('Error fitting K-Fold fold:', err);
+    } finally {
+      if (foldFit) {
+        try { foldFit.model.dispose(); } catch { /* ignore */ }
+      }
+    }
+  }
+
+  const kFoldEvaluation = kFoldMaes.length > 0 ? {
+    mae: computeConfidenceInterval(kFoldMaes),
+    macroF1: computeConfidenceInterval(kFoldMacroF1s),
+  } : undefined;
+
+  // فاز ۱٫۳ — کالیبراسیون بر روی holdout مدل نهایی
+  let calibration: CalibrationSummary | undefined;
+  let scoreMetrics: ScoreMetric[] | undefined;
+  if (active.holdoutTrue && active.holdoutPred) {
+    const obsSlice = (rows: number[][]) => rows.map(r => r.slice(SCORE_COUNT));
+    calibration = computeCalibrationMetrics(
+      obsSlice(active.holdoutTrue),
+      obsSlice(active.holdoutPred),
+      OBSERVATION_IDS.length
+    );
+
+    const scoresSlice = (rows: number[][]) => rows.map(r => r.slice(0, SCORE_COUNT));
+    scoreMetrics = computeScoreMetrics(
+      scoresSlice(active.holdoutTrue),
+      scoresSlice(active.holdoutPred),
+      [
+        'oiliness', 'dryness', 'dandruff', 'redness', 'densityScore',
+        'shine', 'patchiness', 'pigmentation', 'hairThickness',
+      ]
+    );
+  }
+
   return {
     obsThresholds: active.metrics.obsThresholds,
     holdoutPerClass: active.metrics.holdoutPerClass,
@@ -1107,6 +1268,9 @@ export async function trainLocalModel(
       mae: summarizeRepeatedRuns(repeatedMae),
       macroF1: summarizeRepeatedRuns(repeatedMacro),
     },
+    kFoldEvaluation,
+    calibration,
+    scoreMetrics,
     retrainGate,
     modelPersisted,
     loss: active.metrics.loss,
@@ -1218,6 +1382,31 @@ export async function rollbackLocalModel(): Promise<boolean> {
   return true;
 }
 
+async function predictWithMCDropout(
+  model: tf.LayersModel,
+  vector: number[],
+  numRuns = 10
+): Promise<{ meanValues: number[]; uncertainty: number }> {
+  return tf.tidy(() => {
+    const inputT = tf.tensor2d([vector]);
+    const predictions: tf.Tensor[] = [];
+    for (let r = 0; r < numRuns; r++) {
+      const pred = model.apply(inputT, { training: true }) as tf.Tensor;
+      predictions.push(pred);
+    }
+    const stacked = tf.stack(predictions);
+    const mean = tf.mean(stacked, 0);
+    const variance = tf.mean(tf.square(tf.sub(stacked, mean)), 0);
+    const std = tf.sqrt(variance);
+    const meanUncertainty = tf.mean(std);
+
+    return {
+      meanValues: Array.from(mean.dataSync()),
+      uncertainty: meanUncertainty.dataSync()[0],
+    };
+  });
+}
+
 export async function predictWithLocalModel(
   features: ScalpRawMetrics,
   questionnaireFeatures?: number[] | null,
@@ -1249,16 +1438,13 @@ export async function predictWithLocalModel(
     return null;
   }
 
-  const inputT = tf.tensor2d([vector]);
-  const outputT = model.predict(inputT) as tf.Tensor;
-  const values = Array.from(await outputT.data());
-  inputT.dispose();
-  outputT.dispose();
+  // فاز ۳٫۲ — استفاده از فرآیند پیش‌بینی تصادفی با فرکانس MC-Dropout
+  const { meanValues, uncertainty } = await predictWithMCDropout(model, vector, 10);
 
   const clamp = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 100);
   const scores = {} as ScalpHeuristicScores;
   SCORE_KEYS.forEach((key, i) => {
-    scores[key] = clamp(values[i]);
+    scores[key] = clamp(meanValues[i]);
   });
 
   /**
@@ -1268,12 +1454,12 @@ export async function predictWithLocalModel(
    */
   const observations = OBSERVATION_IDS.filter((id, i) => {
     if (cachedSuppressedLabels.has(id)) return false;
-    const v = values[SCORE_COUNT + i] ?? 0;
+    const v = meanValues[SCORE_COUNT + i] ?? 0;
     const thr = cachedObsThresholds?.[i] ?? OBS_THRESHOLD;
     return v >= thr;
   });
 
-  return { scores, observations, ood };
+  return { scores, observations, ood, uncertainty };
 }
 
 /** مقایسهٔ خروجی مدل با امتیازهای heuristic روی همان فیچرها */

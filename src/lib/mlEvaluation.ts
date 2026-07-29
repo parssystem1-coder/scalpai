@@ -250,3 +250,140 @@ export function summarizeRepeatedRuns(values: (number | undefined)[]): RepeatedM
 export function inactiveLabelIds(support: LabelSupport[]): string[] {
   return support.filter(s => !s.active).map(s => s.id);
 }
+
+/**
+ * فاز ۱٫۱ — محاسبهٔ MAE و R² برای تک‌تک امتیازهای عددی ۹ گانه.
+ */
+export interface ScoreMetric {
+  key: string;
+  mae: number;
+  r2: number;
+}
+
+export function computeScoreMetrics(
+  yTrue: number[][],
+  yPred: number[][],
+  scoreKeys: string[]
+): ScoreMetric[] {
+  const n = yTrue.length;
+  const metrics: ScoreMetric[] = [];
+  if (n === 0) return [];
+
+  for (let k = 0; k < scoreKeys.length; k++) {
+    let absDiffSum = 0;
+    let sqDiffSum = 0;
+    let trueSum = 0;
+
+    for (let i = 0; i < n; i++) {
+      const t = yTrue[i]?.[k] ?? 0;
+      const p = yPred[i]?.[k] ?? 0;
+      absDiffSum += Math.abs(t - p);
+      sqDiffSum += Math.pow(t - p, 2);
+      trueSum += t;
+    }
+
+    const meanTrue = trueSum / n;
+    let totSumSq = 0;
+    for (let i = 0; i < n; i++) {
+      const t = yTrue[i]?.[k] ?? 0;
+      totSumSq += Math.pow(t - meanTrue, 2);
+    }
+
+    const mae = absDiffSum / n;
+    const r2 = totSumSq === 0 ? 0 : 1 - (sqDiffSum / totSumSq);
+
+    metrics.push({
+      key: scoreKeys[k],
+      mae,
+      r2
+    });
+  }
+
+  return metrics;
+}
+
+/**
+ * فاز ۱٫۳ — سنجش کالیبراسیون با ECE (Expected Calibration Error) و Brier Score.
+ */
+export interface CalibrationSummary {
+  ece: number;
+  brier: number;
+}
+
+export function computeCalibrationMetrics(
+  yTrue: number[][],
+  yPred: number[][],
+  labelCount: number,
+  numBins = 10
+): CalibrationSummary {
+  const n = yTrue.length;
+  if (n === 0) return { ece: 0, brier: 0 };
+
+  let totalBrier = 0;
+  let totalEce = 0;
+  let countsWithConfidence = 0;
+
+  for (let k = 0; k < labelCount; k++) {
+    const bins: { trueSum: number; predSum: number; count: number }[] = Array.from(
+      { length: numBins },
+      () => ({ trueSum: 0, predSum: 0, count: 0 })
+    );
+
+    for (let i = 0; i < n; i++) {
+      const t = (yTrue[i]?.[k] ?? 0) >= 0.5 ? 1 : 0;
+      const p = yPred[i]?.[k] ?? 0;
+
+      totalBrier += Math.pow(t - p, 2);
+
+      let binIdx = Math.floor(p * numBins);
+      if (binIdx >= numBins) binIdx = numBins - 1;
+      if (binIdx < 0) binIdx = 0;
+
+      bins[binIdx].trueSum += t;
+      bins[binIdx].predSum += p;
+      bins[binIdx].count += 1;
+    }
+
+    let labelEce = 0;
+    for (const bin of bins) {
+      if (bin.count > 0) {
+        const accuracy = bin.trueSum / bin.count;
+        const confidence = bin.predSum / bin.count;
+        labelEce += (bin.count / n) * Math.abs(accuracy - confidence);
+      }
+    }
+    totalEce += labelEce;
+    countsWithConfidence++;
+  }
+
+  return {
+    ece: countsWithConfidence > 0 ? totalEce / countsWithConfidence : 0,
+    brier: (n * labelCount) > 0 ? totalBrier / (n * labelCount) : 0
+  };
+}
+
+/**
+ * فاز ۱٫۲ — محاسبهٔ فاصله اطمینان ۹۵٪ آماری برای نتایج ارزیابی.
+ */
+export interface ConfidenceInterval {
+  mean: number;
+  margin: number;
+  lower: number;
+  upper: number;
+}
+
+export function computeConfidenceInterval(values: number[]): ConfidenceInterval {
+  const n = values.length;
+  if (n === 0) return { mean: 0, margin: 0, lower: 0, upper: 0 };
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  if (n < 2) return { mean, margin: 0, lower: mean, upper: mean };
+  const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+  const std = Math.sqrt(variance);
+  const margin = 1.96 * (std / Math.sqrt(n));
+  return {
+    mean,
+    margin,
+    lower: mean - margin,
+    upper: mean + margin
+  };
+}

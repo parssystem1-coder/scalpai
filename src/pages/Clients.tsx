@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Edit2, Trash2, X, User, Loader, ChevronRight, ChevronLeft } from 'lucide-react';
-import { useClientsStore, useSettingsStore } from '../store';
+import { useClientsStore } from '../store';
 import PersianCalendar, { formatDateForDisplay } from '../components/PersianCalendar';
 import type { Client } from '../db';
 
 export default function Clients() {
   const { managedClients: clients, managedLoading: loading, managedTotal: total, managedPage: page, managedPageSize: pageSize, managedSearch: search, fetchManagedClients, setManagedSearch, goToManagedPage, addClient, updateClient, deleteClient } = useClientsStore();
-  const { settings } = useSettingsStore();
-  const isRtl = settings.language === 'fa';
+  const isRtl = false;
 
   const [searchInput, setSearchInput] = useState('');
   const [showModal, setShowModal] = useState(false);
