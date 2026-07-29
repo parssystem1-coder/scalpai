@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Check, Pencil, Trash2, X, ChevronRight, ChevronLeft, Filter } from 'lucide-react';
+import { Check, Pencil, Trash2, X, ChevronRight, ChevronLeft, Filter, Calendar, Search } from 'lucide-react';
 import type { TrainingSample } from '../../db';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { useT } from '../../i18n';
 import { offlineDict } from './strings';
+import { observationGroups, observationsInGroup } from '../../lib/diagnosisCatalog';
 
 interface Props {
   samples: TrainingSample[];
@@ -14,22 +15,23 @@ interface Props {
   isRtl?: boolean;
 }
 
-// لیست عوارض بالینی معروف برای فیلتر
-const FILTER_OBSERVATIONS = [
-  { id: 'dandruff', fa: 'شوره', en: 'Dandruff', color: 'border-white/10 text-white hover:bg-white/5' },
-  { id: 'redness', fa: 'قرمزی', en: 'Redness', color: 'border-red-500/30 text-red-300 hover:bg-red-500/5' },
-  { id: 'oily', fa: 'چربی سر', en: 'Oily Scalp', color: 'border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/5' },
-  { id: 'hairLoss', fa: 'ریزش مو', en: 'Hair Loss', color: 'border-purple-500/30 text-purple-300 hover:bg-purple-500/5' },
-  { id: 'alopecia', fa: 'آلوپسی', en: 'Alopecia', color: 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/5' },
-  { id: 'thinning', fa: 'نازک شدن مو', en: 'Thinning', color: 'border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/5' },
-];
-
 export default function RecentSamplesPanel({
   samples, onDelete, onToggleApproval, onEdit, editingSampleId, isRtl = true,
 }: Props) {
   const t = useT(offlineDict);
 
+  // فیلترهای پیشرفته
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [selectedObs, setSelectedObs] = useState<string | null>(null);
+
+  // مدال عوارض بالینی
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalSearch, setModalSearch] = useState('');
+
+  // صفحه‌بندی
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -45,11 +47,25 @@ export default function RecentSamplesPanel({
     return isRtl ? 'آفلاین' : 'Offline';
   };
 
-  // اعمال فیلتر بر اساس عارضه بالینی انتخابی
+  // اعمال تمام فیلترها (منبع، تاریخ، عارضه بالینی)
   const filteredSamples = samples.filter(s => {
-    if (!selectedObs) return true;
-    const obsList = s.label?.observations ?? [];
-    return obsList.includes(selectedObs);
+    // ۱. فیلتر منبع تحلیل
+    if (selectedSource !== 'all') {
+      if (s.labelSource !== selectedSource) return false;
+    }
+
+    // ۲. فیلتر بازه زمانی (بر اساس تاریخ شمسی یا میلادی ذخیره شده در createdAt)
+    const sDate = s.createdAt.slice(0, 10); // YYYY-MM-DD
+    if (dateFrom && sDate < dateFrom) return false;
+    if (dateTo && sDate > dateTo) return false;
+
+    // ۳. فیلتر عارضه بالینی
+    if (selectedObs) {
+      const obsList = s.label?.observations ?? [];
+      if (!obsList.includes(selectedObs)) return false;
+    }
+
+    return true;
   });
 
   // محاسبات صفحه‌بندی
@@ -58,64 +74,156 @@ export default function RecentSamplesPanel({
   const startIndex = (activePage - 1) * pageSize;
   const pagedSamples = filteredSamples.slice(startIndex, startIndex + pageSize);
 
-  const handleSelectObs = (obsId: string | null) => {
-    setSelectedObs(obsId);
-    setCurrentPage(1); // بازگشت به صفحه اول در زمان تغییر فیلتر
+  // پیدا کردن برچسب عارضه بالینی انتخاب‌شده برای نمایش
+  const getSelectedObsLabel = () => {
+    if (!selectedObs) return '';
+    for (const group of observationGroups) {
+      const items = observationsInGroup(group.id);
+      const found = items.find(o => o.id === selectedObs);
+      if (found) return isRtl ? found.fa : found.en;
+    }
+    return selectedObs;
   };
 
+  const clearAllFilters = () => {
+    setSelectedSource('all');
+    setDateFrom('');
+    setDateTo('');
+    setSelectedObs(null);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = selectedSource !== 'all' || dateFrom || dateTo || selectedObs !== null;
+
   return (
-    <div className="rounded-2xl bg-white/5 border border-white/10 p-6 space-y-6 shadow-xl">
+    <div className="rounded-2xl bg-white/5 border border-white/10 p-6 space-y-6 shadow-xl relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <Filter size={20} className="text-blue-400" />
           <span>{isRtl ? 'نمونه‌های آموزشی اخیر در این صندوق' : 'Recent Training Samples'}</span>
         </h3>
-        <span className="text-xs opacity-50">
-          {isRtl 
-            ? `نمایش ${pagedSamples.length} از ${filteredSamples.length} نمونه` 
-            : `Showing ${pagedSamples.length} of ${filteredSamples.length} samples`}
-        </span>
-      </div>
-
-      {/* نوار فیلتر عوارض بالینی */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium opacity-65">{isRtl ? 'فیلتر بر اساس عارضه بالینی:' : 'Filter by Clinical Observation:'}</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => handleSelectObs(null)}
-            className={`px-3 py-1 rounded-full text-xs border transition-all ${
-              selectedObs === null
-                ? 'border-blue-500 bg-blue-500/20 text-blue-300 font-semibold'
+            onClick={() => setFilterPanelOpen(!filterPanelOpen)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all ${
+              filterPanelOpen || hasActiveFilters
+                ? 'border-blue-500 bg-blue-500/20 text-blue-300'
                 : 'border-white/10 text-white/70 hover:bg-white/5'
             }`}
           >
-            {isRtl ? 'همه عوارض' : 'All'}
+            <Filter size={14} />
+            <span>{isRtl ? 'فیلترهای پیشرفته بالینی' : 'Advanced Filters'}</span>
           </button>
-          {FILTER_OBSERVATIONS.map(obs => {
-            const selected = selectedObs === obs.id;
-            return (
-              <button
-                key={obs.id}
-                type="button"
-                onClick={() => handleSelectObs(obs.id)}
-                className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                  selected
-                    ? 'border-blue-500 bg-blue-500/20 text-blue-300 font-semibold'
-                    : obs.color
-                }`}
-              >
-                {isRtl ? obs.fa : obs.en}
-              </button>
-            );
-          })}
+          <span className="text-xs opacity-50">
+            {isRtl 
+              ? `نمایش ${pagedSamples.length} از ${filteredSamples.length} نمونه` 
+              : `Showing ${pagedSamples.length} of ${filteredSamples.length} samples`}
+          </span>
         </div>
       </div>
+
+      {/* پنل فیلتر پیشرفته تاشو */}
+      {filterPanelOpen && (
+        <div className="rounded-xl bg-black/25 border border-white/5 p-4 grid grid-cols-1 md:grid-cols-3 gap-4 transition-all">
+          {/* فیلتر منبع تحلیل */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium opacity-70">{isRtl ? 'منبع تحلیل:' : 'Analysis Source:'}</label>
+            <select
+              value={selectedSource}
+              onChange={e => { setSelectedSource(e.target.value); setCurrentPage(1); }}
+              className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">{isRtl ? 'همه منابع' : 'All Sources'}</option>
+              <option value="online_ai">{isRtl ? 'آنلاین (هوش مصنوعی)' : 'Online AI'}</option>
+              <option value="offline_heuristic">{isRtl ? 'آفلاین (قانون‌محور)' : 'Offline Heuristic'}</option>
+              <option value="expert">{isRtl ? 'تحلیل تریکولوژیست' : 'Trichologist (Expert)'}</option>
+            </select>
+          </div>
+
+          {/* فیلتر بازه زمانی */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium opacity-70">{isRtl ? 'بازه زمانی (از / تا):' : 'Date Range (From / To):'}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <Calendar size={14} className="absolute top-1/2 -translate-y-1/2 start-3 opacity-40" />
+                <input
+                  type="text"
+                  placeholder="YYYY-MM-DD"
+                  value={dateFrom}
+                  onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                  className="w-full ps-9 pe-2 py-2 rounded-xl bg-white/5 border border-white/10 text-xs focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div className="relative">
+                <Calendar size={14} className="absolute top-1/2 -translate-y-1/2 start-3 opacity-40" />
+                <input
+                  type="text"
+                  placeholder="YYYY-MM-DD"
+                  value={dateTo}
+                  onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                  className="w-full ps-9 pe-2 py-2 rounded-xl bg-white/5 border border-white/10 text-xs focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* فیلتر عوارض بالینی (باز کردن پاپ‌آپ) */}
+          <div className="space-y-1.5 flex flex-col justify-end">
+            <label className="block text-xs font-medium opacity-70 mb-1">{isRtl ? 'انتخاب عارضه بالینی:' : 'Clinical Observation:'}</label>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="w-full py-2 px-4 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold hover:bg-white/10 hover:border-white/20 transition flex items-center justify-between"
+            >
+              <span>{selectedObs ? getSelectedObsLabel() : (isRtl ? 'انتخاب عارضه بالینی...' : 'Select Observation...')}</span>
+              <span className="text-xs text-blue-400 font-bold">{isRtl ? 'تغییر' : 'Change'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نشانگر فیلترهای فعال */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs">
+          <span className="opacity-60">{isRtl ? 'فیلترهای فعال:' : 'Active Filters:'}</span>
+          {selectedSource !== 'all' && (
+            <span className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-center gap-1.5">
+              <span>{isRtl ? 'منبع: ' : 'Source: '}{getSourceLabel(selectedSource)}</span>
+              <button onClick={() => { setSelectedSource('all'); setCurrentPage(1); }} className="hover:text-white"><X size={12} /></button>
+            </span>
+          )}
+          {dateFrom && (
+            <span className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-center gap-1.5">
+              <span>{isRtl ? 'از تاریخ: ' : 'From: '}{dateFrom}</span>
+              <button onClick={() => { setDateFrom(''); setCurrentPage(1); }} className="hover:text-white"><X size={12} /></button>
+            </span>
+          )}
+          {dateTo && (
+            <span className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-center gap-1.5">
+              <span>{isRtl ? 'تا تاریخ: ' : 'To: '}{dateTo}</span>
+              <button onClick={() => { setDateTo(''); setCurrentPage(1); }} className="hover:text-white"><X size={12} /></button>
+            </span>
+          )}
+          {selectedObs && (
+            <span className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-center gap-1.5">
+              <span>{isRtl ? 'عارضه: ' : 'Obs: '}{getSelectedObsLabel()}</span>
+              <button onClick={() => { setSelectedObs(null); setCurrentPage(1); }} className="hover:text-white"><X size={12} /></button>
+            </span>
+          )}
+          <button
+            onClick={clearAllFilters}
+            className="ms-auto text-xs text-red-400 hover:underline flex items-center gap-1"
+          >
+            <span>{isRtl ? 'پاک کردن همه' : 'Clear All'}</span>
+          </button>
+        </div>
+      )}
 
       {/* لیست نمونه‌ها */}
       {pagedSamples.length === 0 ? (
         <div className="text-center py-8 opacity-50 text-sm">
-          {isRtl ? 'هیچ نمونه‌ای با این عارضه در این صندوق یافت نشد.' : 'No samples found with this observation.'}
+          {isRtl ? 'هیچ نمونه‌ای با این عوارض در این صندوق یافت نشد.' : 'No samples found with this observation.'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -212,6 +320,101 @@ export default function RecentSamplesPanel({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* مدال پاپ‌آپ پیشرفتهٔ انتخاب تمام عوارض بالینی */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-gray-900 border border-white/10 rounded-3xl p-6 max-h-[85vh] overflow-y-auto space-y-4 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Filter className="text-blue-400" size={20} />
+                <span>{isRtl ? 'انتخاب عارضه بالینی برای فیلتر' : 'Select Clinical Observation for Filter'}</span>
+              </h3>
+              <button
+                onClick={() => { setModalOpen(false); setModalSearch(''); }}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-white/70 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* کادر جستجوی عوارض در مدال */}
+            <div className="relative">
+              <Search size={18} className="absolute top-1/2 -translate-y-1/2 start-4 opacity-40" />
+              <input
+                type="text"
+                placeholder={isRtl ? 'جستجوی عارضه بالینی...' : 'Search clinical observation...'}
+                value={modalSearch}
+                onChange={e => setModalSearch(e.target.value)}
+                className="w-full ps-11 pe-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* لیست دسته‌بندی‌شدهٔ تمام عوارض بالینی */}
+            <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+              {observationGroups.map(group => {
+                const items = observationsInGroup(group.id).filter(o => {
+                  if (!modalSearch) return true;
+                  const query = modalSearch.toLowerCase();
+                  return o.id.toLowerCase().includes(query) || o.fa.toLowerCase().includes(query) || o.en.toLowerCase().includes(query);
+                });
+
+                if (items.length === 0) return null;
+
+                return (
+                  <div key={group.id} className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider border-s-2 border-blue-500 ps-2">
+                      {isRtl ? group.fa : group.en}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {items.map(o => {
+                        const selected = selectedObs === o.id;
+                        return (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedObs(o.id);
+                              setCurrentPage(1);
+                              setModalOpen(false);
+                              setModalSearch('');
+                            }}
+                            className={`px-3 py-2 rounded-xl border text-start text-xs transition-all flex items-center justify-between ${
+                              selected
+                                ? 'border-blue-500 bg-blue-500/10 text-blue-300 font-semibold'
+                                : 'border-white/10 bg-white/[0.01] text-white/80 hover:bg-white/5 hover:border-white/20'
+                            }`}
+                          >
+                            <span className="truncate">{isRtl ? o.fa : o.en}</span>
+                            <span className="text-[10px] opacity-40 truncate">({o.id})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-white/10 pt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setSelectedObs(null); setModalOpen(false); setModalSearch(''); }}
+                className="px-4 py-2 rounded-xl text-xs bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20"
+              >
+                {isRtl ? 'حذف فیلتر عارضه' : 'Clear Observation'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModalOpen(false); setModalSearch(''); }}
+                className="px-4 py-2 rounded-xl text-xs bg-white/5 border border-white/10 text-white/80 hover:bg-white/10"
+              >
+                {isRtl ? 'بستن' : 'Close'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
