@@ -300,6 +300,8 @@ pnpm install && pnpm verify && pnpm electron:dev
 | `Failed to load better-sqlite3` | ABI ناسازگار | `pnpm run rebuild:native` |
 | `Failed to load a SQLite driver (tried better-sqlite3-multiple-ciphers...)` | ABI ناسازگار/نصب ناقص | `pnpm run rebuild:native` — موج ۲: درایور رسمی SQLCipher است؛ در صورت شکست، better-sqlite3 ساده fallback می‌شود (رمزنگاری دیتابیس غیرفعال) |
 | `gyp ERR! ... headers.tar.gz` | نبود اینترنت هنگام نصب | با VPN/mirror دوباره `pnpm install` |
+| `ECONNRESET` / `UND_ERR_SOCKET` / `ETIMEDOUT` به `registry.npmjs.org` هنگام `pnpm install` | مسدودی/اختلال registry در شبکهٔ ایران — خطای پروژه نیست | رجیستری موقت npmmirror (تنها روی همین ماشین، نه در مخزن): `pnpm config set registry https://registry.npmmirror.com` سپس `pnpm install`؛ پس از موفقیت با `pnpm config set registry https://registry.npmjs.org` برگردانید. جایگزین: روشن کردن VPN و `pnpm install` مستقیم. یک-install موفق کافی است؛ اجراهای بعدی شبکه نمی‌خواهند |
+| دانلود prebuilt native (`better-sqlite3-multiple-ciphers`) شکست خورد | GitHub releases به کندی/ناپایدانی می‌رسد | چون خودِ github.com کار می‌کند (clone/push سالم است) معمولاً retry داخل پکیج کفایت می‌کند؛ اگر نه، `pnpm install` را دوباره بزنید و در نهایت `pnpm run rebuild:native` (نیازمند VS Build Tools) |
 | `unable to verify the first certificate` | فیلترینگ/پروکسی | `ELECTRON_BUILDER_BINARIES_MIRROR` را ست کنید |
 | `cannot find specified resource "build/..."` | ✅ رفع شد | — |
 | صفحهٔ سفید در نسخهٔ بیلدشده | `dist/` ساخته نشده | اول `pnpm build` |
