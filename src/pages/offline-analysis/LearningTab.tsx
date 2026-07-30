@@ -21,6 +21,7 @@ import EngineComparePanel from './EngineComparePanel';
 import ClassMetricsPanel from './ClassMetricsPanel';
 import AiAgreementPanel from './AiAgreementPanel';
 import DataMaturityPanel from './DataMaturityPanel';
+import HeuristicCalibrationPanel from './HeuristicCalibrationPanel';
 import DatasetAuditPanel from './DatasetAuditPanel';
 import FeatureRecomputePanel from './FeatureRecomputePanel';
 import TrainingGalleryTab from './TrainingGalleryTab';
@@ -143,6 +144,8 @@ export default function LearningTab() {
         thresholds: modelMetadata.obsThresholds,
         suppressedLabels: modelMetadata.suppressedLabels,
       });
+      // موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شده (اگر چیزی ذخیره نشده → ۱ یعنی بدون دما)
+      m.setCachedModelTemperature(modelMetadata.calibrationTemperature);
       m.setCachedFeatureNorm({
         means: modelMetadata.featureMeans!,
         stds: modelMetadata.featureStds!,
@@ -392,6 +395,12 @@ export default function LearningTab() {
         labelSupport: trainResult.labelSupport,
         suppressedLabels: trainResult.suppressedLabels,
         repeatedHoldout: trainResult.repeatedHoldout,
+        // موج ۴ (D1/D3) — شاخص‌های کالیبراسیون، CI95 و تصمیم دما برای کارت «کالیبراسیون»
+        calibration: trainResult.calibration,
+        kFoldEvaluation: trainResult.kFoldEvaluation,
+        kFoldMinimalFallback: trainResult.kFoldMinimalFallback,
+        temperatureScaling: trainResult.temperatureScaling,
+        calibrationTemperature: trainResult.calibrationTemperature,
       });
       await markSamplesUsed(trainResult.trainedIds, nextVersion);
       setModelHasWeights(true);
@@ -541,6 +550,10 @@ export default function LearningTab() {
           eligibleCount={stats.eligibleCount}
           modelMetadata={modelMetadata}
         />
+      )}
+
+      {labelingSource !== 'poolGallery' && (
+        <HeuristicCalibrationPanel samples={trainingSamples} />
       )}
 
       {/* موج ۱ (W1-4) — بازمحاسبهٔ فیچر نمونه‌های قدیمی از تصویر خام */}

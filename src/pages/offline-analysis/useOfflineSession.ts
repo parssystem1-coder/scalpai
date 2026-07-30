@@ -290,6 +290,7 @@ export function useOfflineSession() {
             predictWithLocalModel,
             setCachedFeatureNorm,
             setCachedObsPolicy,
+            setCachedModelTemperature,
           } = await loadLocalModel();
           if (modelMetadata.featureMeans?.length && modelMetadata.featureStds?.length) {
             setCachedFeatureNorm({
@@ -302,6 +303,8 @@ export function useOfflineSession() {
             thresholds: modelMetadata.obsThresholds,
             suppressedLabels: modelMetadata.suppressedLabels,
           });
+          // موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شده (بدون مقدار → ۱ = بدون دما)
+          setCachedModelTemperature(modelMetadata.calibrationTemperature);
           const modelReady = await hasLocalModel();
           if (modelReady) {
             const extracted = await extractImageFeatures(imageUrl);

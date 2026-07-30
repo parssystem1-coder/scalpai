@@ -71,6 +71,8 @@ export default function RecentSamplesPanel({
           thresholds: modelMetadata.obsThresholds,
           suppressedLabels: modelMetadata.suppressedLabels,
         });
+        // موج ۴ (D3) — دمای کالیبراسیون (در نبود مقدار، ماژول به ۱ برمی‌گردد)
+        modelMod.setCachedModelTemperature(modelMetadata.calibrationTemperature);
       }
       if (!(await modelMod.hasLocalModel())) {
         setAlMessage(t('activeLearningNoModel'));

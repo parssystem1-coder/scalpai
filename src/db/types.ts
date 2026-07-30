@@ -439,6 +439,30 @@ export interface LocalModelMetadata {
     mae: import('../lib/mlEvaluation').RepeatedMetricSummary;
     macroF1: import('../lib/mlEvaluation').RepeatedMetricSummary;
   };
+  /** موج ۴ (D1) — ECE و Brier روی holdout مدل فعال (پیش از اعتماد به احتمال‌ها بخوانید) */
+  calibration?: import('../lib/mlEvaluation').CalibrationSummary;
+  /** موج ۴ (D1) — CI95 مربوط به K-Fold مشتری‌محور */
+  kFoldEvaluation?: {
+    mae: import('../lib/mlEvaluation').ConfidenceInterval;
+    macroF1: import('../lib/mlEvaluation').ConfidenceInterval;
+  };
+  /**
+   * موج ۴ (D1) — گفتار آماری صادق: با <۳ مشتری، K-Fold روی val=holdout
+   * چرخیده و CI95 خوش‌بینانه است. فقط وقتی true ذخیره می‌شود.
+   */
+  kFoldMinimalFallback?: boolean;
+  /** موج ۴ (D3) — گزارش تصمیم کالیبراسیون دما (فقط وقتی تلاش صورت گرفت) */
+  temperatureScaling?: {
+    attempted: boolean;
+    adopted: boolean;
+    reason: string;
+    fittedT?: number;
+    eceBefore?: number;
+    eceAfter?: number;
+    sampleSizes?: { validation: number; holdout: number };
+  };
+  /** موج ۴ (D3) — دمای پذیرفته‌شده برای calib هنگام predict (۱ یعنی بدون دما) */
+  calibrationTemperature?: number;
 }
 
 export interface Settings {

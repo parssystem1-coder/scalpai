@@ -63,6 +63,13 @@ import {
   type ConfidenceInterval,
   type CalibrationSummary,
 } from './mlEvaluation';
+import {
+  applyTemperature,
+  decideTemperatureScaling,
+  logitToProb,
+  probToLogit,
+  type TemperatureScalingDecision,
+} from './temperatureScaling';
 
 export {
   MIN_SAMPLES_TO_TRAIN,
@@ -168,6 +175,23 @@ export function getCachedObsPolicy() {
     thresholds: cachedObsThresholds,
     suppressedLabels: [...cachedSuppressedLabels],
   };
+}
+
+/**
+ * موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شدهٔ مدل فعال.
+ * از متادیتا (`calibrationTemperature`) خوانده و در کنار سیاست برچسب تزریق
+ * می‌شود تا رفتار predict دقیقاً همان باشد که موقع ارزیابی اندازه گرفته‌ایم
+ * (predict-time == eval-time). مقدار ۱ یعنی «بدون دما».
+ */
+let cachedModelTemperature = 1;
+
+export function setCachedModelTemperature(value?: number | null) {
+  cachedModelTemperature =
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+export function getCachedModelTemperature(): number {
+  return cachedModelTemperature;
 }
 
 export function getCachedFeatureNorm() {
@@ -492,11 +516,17 @@ export interface KFoldSplit {
   holdout: TrainingSample[];
 }
 
+/**
+ * موج ۴ (D1) — برگشت ساختاریافته: خود فولدها + پرچم «ارزیابی حداقلی».
+ * وقتی کمتر از ۳ مشتری داریم، holdout عملاً همان validation است (نشت پنهانِ
+ * اسمی) — این وضعیت باید در متادیتا و UI مشخص شود، نه اینکه عددی خوش‌بینانه
+ * بدون سیاههٔ توضیح نمایش داده شود.
+ */
 export function splitByClientKFold(
   samples: TrainingSample[],
   k = 5,
   seed = Date.now(),
-): KFoldSplit[] {
+): { folds: KFoldSplit[]; minimalFallback: boolean } {
   const byClient = new Map<string, TrainingSample[]>();
   for (const s of samples) {
     const key = s.clientId || `anon-${s.id}`;
@@ -511,7 +541,7 @@ export function splitByClientKFold(
     const nVal = Math.max(1, Math.floor(shuffled.length * 0.2));
     const val = shuffled.slice(0, nVal);
     const train = shuffled.slice(nVal);
-    return [{ train, val, holdout: val }];
+    return { folds: [{ train, val, holdout: val }], minimalFallback: true };
   }
 
   const clientFolds: string[][] = Array.from({ length: actualK }, () => []);
@@ -541,7 +571,7 @@ export function splitByClientKFold(
     folds.push({ train, val, holdout });
   }
 
-  return folds;
+  return { folds, minimalFallback: false };
 }
 
 function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
@@ -623,6 +653,12 @@ interface FitOutcome {
   metrics: FitMetrics;
   holdoutTrue?: number[][];
   holdoutPred?: number[][];
+  /**
+   * موج ۴ (D3) — خروجی واقعی/پیش‌بینی validation برای برازش دمای کالیبراسیون.
+   * (T باید روی validation برازش شود، نه holdout — بی‌طرفی holdout حفظ می‌شود.)
+   */
+  valTrue?: number[][];
+  valPred?: number[][];
 }
 
 async function fitOnSplit(
@@ -776,6 +812,8 @@ async function fitOnSplit(
       },
       holdoutTrue: holdRows.length ? holdRows.map(r => r.y) : undefined,
       holdoutPred: holdRows.length ? holdPred : undefined,
+      valTrue: valRows.length ? valRows.map(r => r.y) : undefined,
+      valPred: valRows.length ? valPred : undefined,
     };
   } catch (err) {
     try { model.dispose(); } catch { /* ignore */ }
@@ -971,6 +1009,12 @@ export interface TrainResult {
   };
   /** فاز ۱٫۳ — گزارش سنجش کالیبراسیون */
   calibration?: CalibrationSummary;
+  /** موج ۴ (D1) — وقتی < ۳ مشتری داریم K-Fold به حالت حداقلی می‌افتد (holdout == val) */
+  kFoldMinimalFallback?: boolean;
+  /** موج ۴ (D3) — گزارش A/B تصمیم کالیبراسیون دما (گیت‌ها + تلاش + پذیرش/رد) */
+  temperatureScaling?: TemperatureScalingDecision;
+  /** موج ۴ (D3) — دمای پذیرفته‌شده برای predict؛ فقط وقتی adopted (۱ = بدون دما) */
+  calibrationTemperature?: number;
   /** فاز ۱٫۱ — متریک‌های MAE و R2 برای هر یک از ۹ امتیاز عددی روی holdout */
   scoreMetrics?: ScoreMetric[];
   /** فاز ۰٫۱ — نتیجهٔ گیت مقایسه با مدل فعال قبلی */
@@ -1216,7 +1260,8 @@ export async function trainLocalModel(
   const kFoldMaes: number[] = [];
   const kFoldMacroF1s: number[] = [];
 
-  const folds = splitByClientKFold(pool, 5, splitSeed);
+  // موج ۴ (D1) — پرچم fallback حفظ می‌شود تا UI روی اعداد خوش‌بینانه هشدار دهد
+  const { folds, minimalFallback: kFoldMinimalFallback } = splitByClientKFold(pool, 5, splitSeed);
   for (const fold of folds) {
     if (!fold.train.length || !fold.holdout.length) continue;
     let foldFit: FitOutcome | null = null;
@@ -1243,17 +1288,17 @@ export async function trainLocalModel(
   } : undefined;
 
   // فاز ۱٫۳ — کالیبراسیون بر روی holdout مدل نهایی
+  const obsSlice = (rows: number[][]) => rows.map(r => r.slice(SCORE_COUNT));
+  const scoresSlice = (rows: number[][]) => rows.map(r => r.slice(0, SCORE_COUNT));
   let calibration: CalibrationSummary | undefined;
   let scoreMetrics: ScoreMetric[] | undefined;
   if (active.holdoutTrue && active.holdoutPred) {
-    const obsSlice = (rows: number[][]) => rows.map(r => r.slice(SCORE_COUNT));
     calibration = computeCalibrationMetrics(
       obsSlice(active.holdoutTrue),
       obsSlice(active.holdoutPred),
       OBSERVATION_IDS.length
     );
 
-    const scoresSlice = (rows: number[][]) => rows.map(r => r.slice(0, SCORE_COUNT));
     scoreMetrics = computeScoreMetrics(
       scoresSlice(active.holdoutTrue),
       scoresSlice(active.holdoutPred),
@@ -1262,6 +1307,57 @@ export async function trainLocalModel(
         'shine', 'patchiness', 'pigmentation', 'hairThickness',
       ]
     );
+  }
+
+  /**
+   * موج ۴ (D3) — کالیبراسیون دمای واقعی (فقط روی مدل فعال، نه اجراهای K-Fold).
+   * گیت‌های نقشه‌راه داخل decideTemperatureScaling است: holdout ≥ ۶۰،
+   * ECE قبل > 0.10، val ≥ ۳۰. T روی validation برازش می‌شود و فقط در صورت
+   * بهبود واقعی ECE روی holdout پذیرفته می‌شود. اگر پذیرفته شد:
+   *  - آستانه‌های برچسب روی احتمالِ دماشدهٔ validation بازکالیبره می‌شوند
+   *  - گزارش per-class/F1 هولدوت با همان سیاست predict بازمحاسبه می‌شود
+   *  - شاخص ECE/Brier گزارش‌شده، وضعیتِ «پس از دما» را نشان می‌دهد تا با
+   *    رفتاری که کاربر در predict می‌بیند یکی باشد (جفت قبل/بعد در
+   *    temperatureScaling.eceBefore/eceAfter محفوظ است — سند A/B).
+   */
+  let temperatureScaling: TemperatureScalingDecision | undefined;
+  let calibrationTemperature: number | undefined;
+  if (active.valTrue && active.valPred && active.holdoutTrue && active.holdoutPred) {
+    temperatureScaling = decideTemperatureScaling({
+      validationTrue: obsSlice(active.valTrue),
+      validationPred: obsSlice(active.valPred),
+      holdoutTrue: obsSlice(active.holdoutTrue),
+      holdoutPred: obsSlice(active.holdoutPred),
+      labelCount: OBSERVATION_IDS.length,
+    });
+    if (temperatureScaling.adopted && typeof temperatureScaling.fittedT === 'number') {
+      const T = temperatureScaling.fittedT;
+      calibrationTemperature = T;
+      const temperedValPred = applyTemperature(obsSlice(active.valPred), T);
+      const temperedHoldPred = applyTemperature(obsSlice(active.holdoutPred), T);
+
+      const recalibratedThresholds = calibrateThresholds(
+        obsSlice(active.valTrue),
+        temperedValPred,
+        OBSERVATION_IDS.length,
+        OBS_THRESHOLD,
+      );
+      const temperedPerClass = computeClassificationSummary(
+        obsSlice(active.holdoutTrue),
+        temperedHoldPred,
+        OBSERVATION_IDS,
+        recalibratedThresholds,
+      );
+      active.metrics.obsThresholds = recalibratedThresholds;
+      active.metrics.holdoutPerClass = temperedPerClass;
+      active.metrics.holdoutObsF1 = temperedPerClass.microF1;
+      active.metrics.holdoutMacroF1 = temperedPerClass.macroF1;
+      calibration = computeCalibrationMetrics(
+        obsSlice(active.holdoutTrue),
+        temperedHoldPred,
+        OBSERVATION_IDS.length,
+      );
+    }
   }
 
   return {
@@ -1276,6 +1372,9 @@ export async function trainLocalModel(
     },
     kFoldEvaluation,
     calibration,
+    kFoldMinimalFallback,
+    temperatureScaling,
+    calibrationTemperature,
     scoreMetrics,
     retrainGate,
     modelPersisted,
@@ -1581,7 +1680,15 @@ export async function predictWithLocalModel(
    */
   const observations = OBSERVATION_IDS.filter((id, i) => {
     if (cachedSuppressedLabels.has(id)) return false;
-    const v = meanValues[SCORE_COUNT + i] ?? 0;
+    const raw = meanValues[SCORE_COUNT + i] ?? 0;
+    /**
+     * موج ۴ (D3) — اگر کالیبراسیون دما پذیرفته شده، همان T این‌جا هم اعمال
+     * می‌شود تا احتمالی که با آستانه مقایسه می‌کنیم، کالیبره باشد. آستانه‌ها
+     * خودشان از قبل روی احتمال دماشده کالیبره شده‌اند؛ بنابراین مقایسه منصفانه است.
+     */
+    const v = cachedModelTemperature === 1
+      ? raw
+      : logitToProb(probToLogit(raw) / cachedModelTemperature);
     const thr = cachedObsThresholds?.[i] ?? OBS_THRESHOLD;
     return v >= thr;
   });
