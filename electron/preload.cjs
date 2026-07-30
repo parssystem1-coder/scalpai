@@ -59,6 +59,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isAvailable: () => ipcRenderer.invoke('safeStorage:isAvailable'),
   },
 
+  // =============== Encryption (موج ۲) ===============
+  encryption: {
+    getStatus: () => ipcRenderer.invoke('encryption:getStatus'),
+    encryptLegacyImages: () => ipcRenderer.invoke('encryption:encryptLegacyImages'),
+    revealRecoveryKey: (username, password) => ipcRenderer.invoke('encryption:revealRecoveryKey', { username, password }),
+    onProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on('encryption:progress', listener);
+      return () => ipcRenderer.removeListener('encryption:progress', listener);
+    },
+  },
+
   // =============== Offline Analysis ===============
   offline: {
     analyze: (base64Image, lang) => ipcRenderer.invoke('offline:analyze', { base64Image, lang }),

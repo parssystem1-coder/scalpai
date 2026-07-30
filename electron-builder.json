@@ -13,10 +13,12 @@
     "shared/**/*",
     "public/**/*",
     "!node_modules/**/*",
-    "node_modules/better-sqlite3/**/*"
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/better-sqlite3-multiple-ciphers/**/*"
   ],
   "asarUnpack": [
-    "node_modules/better-sqlite3/**/*"
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/better-sqlite3-multiple-ciphers/**/*"
   ],
   "extraMetadata": {
     "main": "electron/main.cjs"

@@ -87,6 +87,10 @@ export const aiAnalysisDict = {
     fa: 'لطفا کلید API را در تنظیمات وارد کنید',
     en: 'Please configure API key in settings',
   },
+  privacyConsentRequired: {
+    fa: 'تحلیل آنلاین تا ثبت رضایت‌نامهٔ حریم‌خصوصی غیرفعال است (تصویر به سرویس بیرونی ارسال می‌شود). لطفاً بعد از خواندن اطلاع‌رسانی، رضایت را تأیید کنید.',
+    en: 'Online analysis is disabled until the privacy notice is acknowledged (images are sent to an external service). Please review and accept the notice.',
+  },
   analysisCancelled: { fa: 'تحلیل لغو شد', en: 'Analysis cancelled' },
   unknownError: { fa: 'خطای ناشناخته', en: 'Unknown error' },
   imageAnalysisError: { fa: 'خطا در تحلیل تصویر', en: 'Error analyzing image' },

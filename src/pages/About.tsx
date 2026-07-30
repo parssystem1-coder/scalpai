@@ -1,4 +1,4 @@
-import { Heart, Globe, Mail, Phone, MapPin, Brain, Cpu, ShieldCheck, Layers, Sparkles } from 'lucide-react';
+import { Heart, Globe, Mail, Phone, MapPin, Brain, Cpu, ShieldCheck, Layers, Sparkles, Lock } from 'lucide-react';
 import { useSettingsStore } from '../store';
 
 export default function About() {
@@ -45,6 +45,14 @@ export default function About() {
         ? 'تلفیق هش باینری فوق‌سریع نمونه‌برداری با الگوریتم dHash و فاصلهٔ همینگ جهت شناسایی دوقلوهای بصری فشرده یا ریسایز شده.' 
         : 'Combining sub-millisecond binary hash with perceptual dHash and Hamming distance to eliminate compressed or resized twins.',
       color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+    },
+    {
+      icon: Lock,
+      title: isRtl ? 'رمزنگاری دادهٔ در سکون' : 'Data-at-Rest Encryption',
+      desc: isRtl
+        ? 'در نسخهٔ دسکتاپ، دیتابیس بالینی با SQLCipher (AES-256) و تصاویر با AES-256-GCM رمز می‌شوند و کلیدها در گاوصندوق سیستم‌عامل (DPAPI/Keychain) محافظت می‌شوند؛ هر ارسال ابری در لاگ حسابرسی ثبت می‌شود (جزئیات و استثناها در docs/privacy.md).'
+        : 'In the desktop app, the clinical database is encrypted with SQLCipher (AES-256) and images with AES-256-GCM, with keys protected by the OS safeStorage (DPAPI/Keychain); every cloud send is recorded in the audit log (details and exceptions in docs/privacy.md).',
+      color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
     }
   ];
 

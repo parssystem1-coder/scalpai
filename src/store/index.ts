@@ -624,8 +624,9 @@ interface SettingsState {
   loading: boolean;
   fetchSettings: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
-  exportData: () => Promise<string>;
-  importData: (json: string) => Promise<void>;
+  /** موج ۲ (C2.4): backupPassword فقط در Electron اثر دارد */
+  exportData: (options?: { backupPassword?: string }) => Promise<string>;
+  importData: (json: string, options?: { backupPassword?: string }) => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: Settings = { language: 'fa', theme: 'mint', aiConfidenceThreshold: DEFAULT_AI_CONFIDENCE_THRESHOLD };
@@ -675,12 +676,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  exportData: async () => {
-    return db.exportData();
+  exportData: async (options) => {
+    return db.exportData(options);
   },
 
-  importData: async (json) => {
-    await db.importData(json);
+  importData: async (json, options) => {
+    await db.importData(json, options);
     await get().fetchSettings();
   },
 }));

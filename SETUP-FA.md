@@ -20,7 +20,7 @@
 | رابط کاربری | `src/` (۱۹۴ فایل، ~۲۷٬۵۰۰ خط) | React 18 + TypeScript + Tailwind 3 + HashRouter + Zustand + Recharts |
 | پوستهٔ دسکتاپ | `electron/*.cjs` | Electron 42، `contextIsolation`, `sandbox: true`, preload امن |
 | موتور تحلیل | `src/lib/scalpFeatures.ts` + `python/analyze.py` | TensorFlow.js + OpenCV، با fallback خودکار |
-| ذخیره‌سازی | `electron/db-handlers*.cjs` | better-sqlite3 → JSON → localforage (نسخهٔ وب) |
+| ذخیره‌سازی | `electron/db-handlers*.cjs` | better-sqlite3-multiple-ciphers (SQLCipher، موج ۲) → better-sqlite3 → JSON → localforage (نسخهٔ وب) |
 
 نکات معماری خوبی که در کد دیدم و باید حفظ شوند:
 
@@ -298,6 +298,7 @@ pnpm install && pnpm verify && pnpm electron:dev
 | خطا | علت | راه حل |
 |---|---|---|
 | `Failed to load better-sqlite3` | ABI ناسازگار | `pnpm run rebuild:native` |
+| `Failed to load a SQLite driver (tried better-sqlite3-multiple-ciphers...)` | ABI ناسازگار/نصب ناقص | `pnpm run rebuild:native` — موج ۲: درایور رسمی SQLCipher است؛ در صورت شکست، better-sqlite3 ساده fallback می‌شود (رمزنگاری دیتابیس غیرفعال) |
 | `gyp ERR! ... headers.tar.gz` | نبود اینترنت هنگام نصب | با VPN/mirror دوباره `pnpm install` |
 | `unable to verify the first certificate` | فیلترینگ/پروکسی | `ELECTRON_BUILDER_BINARIES_MIRROR` را ست کنید |
 | `cannot find specified resource "build/..."` | ✅ رفع شد | — |

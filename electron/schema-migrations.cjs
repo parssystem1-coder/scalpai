@@ -6,7 +6,7 @@
  */
 
 /** آخرین نسخهٔ اسکیما پس از اعمال همهٔ migrationها */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const {
   buildSystemTrainingPoolClientRecord,
@@ -161,6 +161,24 @@ const MIGRATIONS = [
       // تا بتوان «توافق AI با متخصص» را واقعاً اندازه گرفت.
       addColumnIfMissing(db, 'training_samples', 'originalAiLabel', 'TEXT');
       addColumnIfMissing(db, 'training_samples', 'originalAiLabelAt', 'TEXT');
+    },
+  },
+  {
+    version: 10,
+    up(db) {
+      // موج ۲ (C3.3) — ردپای حسابرسی سبک: «چه کسی چه زمانی داده را بیرون برد».
+      // detail عمداً TEXT ساده است و طبق قرارداد فقط دادهٔ غیرحساس (شناسه/پرچم)
+      // می‌گیرد — نه نام بیمار، نه تصویر، نه کلید.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id TEXT PRIMARY KEY,
+          event TEXT NOT NULL,
+          actor TEXT,
+          detail TEXT,
+          createdAt TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_log_createdAt ON audit_log(createdAt);
+      `);
     },
   },
 ];

@@ -41,6 +41,17 @@ const {
   SYSTEM_TRAINING_POOL_CLIENT_ID,
   ensureSystemTrainingPoolClientSqlite,
 } = require('./db-common.cjs');
+const {
+  encryptBuffer,
+  decryptBuffer,
+  isEncryptedBuffer,
+  encryptWithPassword,
+  decryptWithPassword,
+  isPasswordProtectedBuffer,
+  reencryptImportedMedia,
+} = require('./file-crypto.cjs');
+const { getPurposeKey } = require('./dek.cjs');
+const { AUDIT_EVENTS, createAuditRecorder } = require('./audit.cjs');
 
 /**
  * ایجاد هندلرهای دیتابیس
@@ -57,6 +68,22 @@ function createDbHandlers(db, userDataPath, safeStorage) {
   }
 
   const { encryptValue, decryptValue } = createValueCrypto(safeStorage);
+
+  // موج ۲ (C3.3) — رویدادهای حسابرسی در همان دیتابیس ذخیره می‌شوند؛
+  // recorder محلی (نه sink جهانی) تا چند نمونهٔ هم‌زمان در تست‌ها تداخل نکنند.
+  const recordEvent = createAuditRecorder((entry) => {
+    db.prepare(
+      'INSERT INTO audit_log (id, event, actor, detail, createdAt) VALUES (?, ?, ?, ?, ?)',
+    ).run(entry.id, entry.event, entry.actor, entry.detail, entry.createdAt);
+  });
+
+  /**
+   * کلید رمزنگاری تصاویر (HKDF از DEK) — null یعنی لایهٔ رمز غیرفعال است
+   * (safeStorage در دسترس نیست) و رفتار دقیقاً مثل قبل از موج ۲ می‌ماند.
+   */
+  function imageKeyOrNull() {
+    return getPurposeKey('image-aes');
+  }
 
   /**
    * ذخیره تصویر یا ویدیو (data URL) در فایل سیستم
@@ -82,9 +109,32 @@ function createDbHandlers(db, userDataPath, safeStorage) {
     const uniqueFilename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${parsed.extension}`;
     const filePath = path.join(clientImagesPath, uniqueFilename);
 
-    fs.writeFileSync(filePath, parsed.base64, 'base64');
+    // موج ۲ (C2): وقتی لایهٔ رمز فعال است، فایل plaintext روی دیسک نمی‌ماند.
+    const plain = Buffer.from(parsed.base64, 'base64');
+    const imageKey = imageKeyOrNull();
+    fs.writeFileSync(filePath, imageKey ? encryptBuffer(plain, imageKey) : plain);
 
     return filePath;
+  }
+
+  /**
+   * خواندن بایت‌های خام یک فایل رسانه با رمزگشایی شفاف (موج ۲ / C2):
+   * فایل با magic header رمزشده → رمزگشایی با کلید تصاویر؛ فایل legacy
+   * (بدون magic) → همان بایت‌ها (سازگاری عقب‌رو تا زمان ابزار مهاجرت).
+   * اگر فایل رمزشده باشد ولی کلید در دسترس نباشد، null برمی‌گردد.
+   * @param {string} filePath
+   * @returns {Buffer|null}
+   */
+  function readMediaBytes(filePath) {
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath);
+    if (!isEncryptedBuffer(raw)) return raw;
+    const imageKey = imageKeyOrNull();
+    if (!imageKey) {
+      console.error('Media file is encrypted but the encryption key is unavailable:', filePath);
+      return null;
+    }
+    return decryptBuffer(raw, imageKey);
   }
 
   /**
@@ -94,8 +144,8 @@ function createDbHandlers(db, userDataPath, safeStorage) {
    */
   function readImageAsBase64(filePath) {
     try {
-      if (fs.existsSync(filePath)) {
-        const data = fs.readFileSync(filePath);
+      const data = readMediaBytes(filePath);
+      if (data) {
         const mimeType = mimeForExtension(path.extname(filePath).slice(1));
         return `data:${mimeType};base64,${data.toString('base64')}`;
       }
@@ -118,7 +168,10 @@ function createDbHandlers(db, userDataPath, safeStorage) {
     try {
       if (!fs.existsSync(row.filePath)) return null;
       if (!nativeImage) return null;
-      const image = nativeImage.createFromPath(row.filePath);
+      // موج ۲ (C2): برای فایل رمزشده به‌جای createFromPath از بافر رمزگشایی‌شده
+      const mediaBytes = readMediaBytes(row.filePath);
+      if (!mediaBytes) return null;
+      const image = nativeImage.createFromBuffer(mediaBytes);
       if (image.isEmpty()) return null;
       const { width, height } = image.getSize();
       if (!width || !height) return null;
@@ -284,7 +337,16 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             if (clientImagesPath.startsWith(imagesPath + path.sep) && fs.existsSync(clientImagesPath)) {
               fs.rmSync(clientImagesPath, { recursive: true, force: true });
             }
+            // موج ۲ (C3.3) — حذف کل مشتری (شامل دادهٔ بالینی‌اش) باید رد داشته باشد
+            recordEvent(AUDIT_EVENTS.CLIENT_DELETE, 'local-user', { clientId: params.id, cascadedFiles: galleryItems.length });
             return { success: true };
+          }
+
+          case 'getAuditLog': {
+            const limit = Math.min(params.limit || 200, 1000);
+            return db
+              .prepare('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT ?')
+              .all(limit);
           }
 
           // =============== Gallery ===============
@@ -757,6 +819,13 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               offlineResults: parseStoredJson(analysis.offlineResults, null),
             }));
             const questionnaireRows = db.prepare('SELECT * FROM questionnaire_revisions').all().map(mapQuestionnaireRevisionRow);
+            // موج ۲ (C2.4): تصاویر داخل ZIP همان بایت‌های روی دیسک‌اند. وقتی
+            // رمزنگاری فعال است یعنی ciphertext با کلید این دستگاه — برای
+            // بازیابی روی دستگاه دیگر، کلید مشتق تصاویر (نه DEK اصلی) همراه
+            // envelope می‌آید تا import با کلید مقصد بازنویسی کند. هشدار: با
+            // این کلید، ZIP رمزشده معادل plaintext است؛ برای انتقال امن از
+            // گزینهٔ پسورد بکاپ (همان پنل) استفاده کنید.
+            const imageKey = imageKeyOrNull();
             const data = {
               clients: db.prepare('SELECT * FROM clients').all(),
               gallery: galleryRows,
@@ -767,6 +836,10 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               trainingSamples: trainingSamplesRows,
               localModelMetadata: modelMetadataRow ? JSON.parse(modelMetadataRow.value) : null,
               questionnaireRevisions: questionnaireRows,
+              auditLog: db.prepare('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT 2000').all(),
+              mediaEncryption: imageKey
+                ? { version: 1, algorithm: 'AES-256-GCM', kdf: 'HKDF-SHA256', purpose: 'image-aes', key: imageKey.toString('base64') }
+                : undefined,
             };
 
             const envelope = createBackupEnvelope(data);
@@ -803,7 +876,6 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             await createZipPromise();
 
             const zipBuffer = fs.readFileSync(tmpPath);
-            const base64Zip = zipBuffer.toString('base64');
 
             try {
               fs.unlinkSync(tmpPath);
@@ -811,7 +883,16 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               console.error('Error deleting temp backup file:', err);
             }
 
-            return 'scalpai-backup:v3:base64:' + base64Zip;
+            // موج ۲ (C2.4) — گزینهٔ «پشتیبان رمزدار با پسورد»: کل ZIP نهایی با
+            // کلید PBKDF2 مشتق از پسورد کاربر رمز می‌شود؛ تنها مسیر امن برای
+            // انتقال بکاپ بین دستگاه‌ها (envelope حاوی کلید تصاویر است).
+            if (params.backupPassword) {
+              recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v4-encrypted', passwordProtected: true, mediaKeyIncluded: !!imageKey });
+              return 'scalpai-backup:v4:enc:base64:' + encryptWithPassword(zipBuffer, params.backupPassword).toString('base64');
+            }
+
+            recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v3', passwordProtected: false, mediaKeyIncluded: !!imageKey });
+            return 'scalpai-backup:v3:base64:' + zipBuffer.toString('base64');
           }
 
           case 'importData': {
@@ -819,9 +900,17 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             let isV3 = false;
             let zip = null;
 
-            if (typeof params.jsonData === 'string' && params.jsonData.startsWith('scalpai-backup:v3:base64:')) {
+            let rawPayload = params.jsonData;
+            // موج ۲ (C2.4) — بکاپ رمزدار v4: اول کل فایل با پسورد کاربر باز می‌شود
+            if (typeof rawPayload === 'string' && rawPayload.startsWith('scalpai-backup:v4:enc:base64:')) {
+              if (!params.backupPassword) throw new Error('Backup password required');
+              const encBytes = Buffer.from(rawPayload.split('scalpai-backup:v4:enc:base64:')[1], 'base64');
+              rawPayload = 'scalpai-backup:v3:base64:' + decryptWithPassword(encBytes, params.backupPassword).toString('base64');
+            }
+
+            if (typeof rawPayload === 'string' && rawPayload.startsWith('scalpai-backup:v3:base64:')) {
               isV3 = true;
-              const base64Content = params.jsonData.split('scalpai-backup:v3:base64:')[1];
+              const base64Content = rawPayload.split('scalpai-backup:v3:base64:')[1];
               const zipBuffer = Buffer.from(base64Content, 'base64');
               zip = new AdmZip(zipBuffer);
               const dataEntry = zip.getEntry('data.json');
@@ -829,8 +918,14 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               const dataJsonString = dataEntry.getData().toString('utf8');
               data = parseBackupPayload(dataJsonString);
             } else {
-              data = parseBackupPayload(params.jsonData);
+              data = parseBackupPayload(rawPayload);
             }
+
+            // کلید تصاویر مبدأ (در صورت وجود) برای بازنویسی با کلید این دستگاه
+            const sourceImageKey = data.mediaEncryption && data.mediaEncryption.key
+              ? Buffer.from(data.mediaEncryption.key, 'base64')
+              : null;
+            const localImageKey = imageKeyOrNull();
 
             const previousGallery = db.prepare('SELECT filePath FROM gallery WHERE filePath IS NOT NULL').all();
             const createdFiles = [];
@@ -877,7 +972,10 @@ function createDbHandlers(db, userDataPath, safeStorage) {
                   const uniqueFilename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${path.extname(portablePath)}`;
                   const newFilePath = path.join(clientImagesPath, uniqueFilename);
 
-                  fs.writeFileSync(newFilePath, entry.getData());
+                  // موج ۲ (C2.4): بایت‌های بکاپ ممکن است با کلید مبدأ رمزشده
+                  // باشند → با کلید envelope باز و با کلید این دستگاه بازنویسی
+                  // می‌شوند (یا در نبود رمز محلی، به‌صورت plaintext ذخیره).
+                  fs.writeFileSync(newFilePath, reencryptImportedMedia(entry.getData(), sourceImageKey, localImageKey));
                   createdFiles.push(newFilePath);
 
                   return { ...item, url: `file://${newFilePath}`, filePath: newFilePath };
@@ -994,6 +1092,12 @@ function createDbHandlers(db, userDataPath, safeStorage) {
                     sample.originalAiLabelAt || null,
                   );
                 }
+                // ردپای حسابرسی بکاپ هم حفظ می‌شود (OR IGNORE — idها یکتا هستند
+                // و رویدادهای هم‌تراز دوباره درج نمی‌شوند)
+                for (const entry of data.auditLog || []) {
+                  db.prepare('INSERT OR IGNORE INTO audit_log (id, event, actor, detail, createdAt) VALUES (?, ?, ?, ?, ?)')
+                    .run(entry.id, entry.event, entry.actor || null, entry.detail || null, entry.createdAt);
+                }
                 if (data.localModelMetadata) {
                   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('localModelMetadata', JSON.stringify(data.localModelMetadata));
                 }
@@ -1008,6 +1112,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               throw error;
             }
             for (const item of previousGallery) deleteImageFile(item.filePath);
+            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: isV3 ? 'v3/v4' : 'legacy', clients: (data.clients || []).length, gallery: (data.gallery || []).length });
             return { success: true };
           }
 

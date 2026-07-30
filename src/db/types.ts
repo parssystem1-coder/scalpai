@@ -451,6 +451,12 @@ export interface Settings {
    * پیش‌فرض false — بدون رضایت فقط تصویر و زمینهٔ لنز/ناحیه ارسال می‌شود.
    */
   includeMedicalDataInAi?: boolean;
+  /**
+   * موج ۲ (C3.1): رضایت آگاهانهٔ حریم‌خصوصی — نسخه و زمان ثبت.
+   * تا وقتی با نسخهٔ جاری (src/lib/privacyConsent.ts) ثبت نشده باشد، تحلیل
+   * آنلاین (تنها مسیر خروج داده از دستگاه) در UI مسدود است.
+   */
+  privacyConsent?: { version: string; at: string };
   backupPath?: string;
   username?: string;
   password?: string;
@@ -586,8 +592,12 @@ export interface DatabaseAdapter {
   updateSettings(patch: Partial<Settings>): Promise<Settings>;
 
   // Import/Export
-  exportData(): Promise<string>;
-  importData(jsonData: string): Promise<void>;
+  /**
+   * موج ۲ (C2.4): backupPassword اختیاری است و فقط در Electron پشتیبانی می‌شود —
+   * خروجی رمزدار v4 می‌سازد. بک‌اند وب فعلاً بدون رمز خروجی می‌دهد (مستند در privacy.md).
+   */
+  exportData(options?: { backupPassword?: string }): Promise<string>;
+  importData(jsonData: string, options?: { backupPassword?: string }): Promise<void>;
 
   // Auth
   verifyCredentials(username: string, password: string): Promise<boolean>;

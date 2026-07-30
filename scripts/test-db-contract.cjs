@@ -23,6 +23,12 @@ Module._load = function (request, parent, isMain) {
           getSize: () => ({ width: 0, height: 0 }),
           resize: () => ({ toJPEG: () => Buffer.alloc(0) }),
         }),
+        // موج ۲ (C2): مسیر رمزگشایی‌شده از بافر می‌خواند نه از مسیر فایل
+        createFromBuffer: () => ({
+          isEmpty: () => true,
+          getSize: () => ({ width: 0, height: 0 }),
+          resize: () => ({ toJPEG: () => Buffer.alloc(0) }),
+        }),
       },
     };
   }
@@ -34,6 +40,10 @@ const { createDbHandlers } = require('../electron/db-handlers.cjs');
 const { createJsonDbHandlers } = require('../electron/db-handlers-json.cjs');
 const { createBaseTables, runMigrations, SCHEMA_VERSION } = require('../electron/schema-migrations.cjs');
 const { hashPassword, verifyPassword, parseStoredJson } = require('../electron/db-common.cjs');
+// موج ۲ (C1.5): قرارداد روی «هر دو حالت» رمزشده/رمزنشده اجرا می‌شود — لایهٔ رمز
+// باید برای کل قرارداد شفاف باشد (هیچ assertionی نباید تغییر کند).
+const { initDek, _resetForTests } = require('../electron/dek.cjs');
+const { FILE_MAGIC } = require('../electron/file-crypto.cjs');
 
 /**
  * قرارداد cascade از فایل دامنه خوانده می‌شود (نه کپی دستی).
@@ -51,19 +61,34 @@ const safeStorageMock = {
   isEncryptionAvailable: () => false,
 };
 
+/**
+ * mock فعال safeStorage برای اجرای حالت رمزشده: wrap/unwrap قطعی (deterministic)
+ * تا DEK ساخته‌شده در یک harness در همان اجرا قابل باز شدن باشد.
+ */
+const safeStorageMockEnabled = {
+  isEncryptionAvailable: () => true,
+  encryptString: (text) => Buffer.from(`mockwrap:${String(text)}`, 'utf-8').toString('base64'),
+  decryptString: (buffer) => {
+    const raw = Buffer.from(buffer).toString('utf-8');
+    if (!raw.startsWith('mockwrap:')) throw new Error('mock unwrap failed');
+    return raw.slice('mockwrap:'.length);
+  },
+};
+
 function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-function createSqliteHarness() {
+function createSqliteHarness(label = 'sqlite', safeStorage = safeStorageMock) {
   const dir = makeTempDir('scalpai-sqlite-');
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   createBaseTables(db);
   runMigrations(db);
-  const handlers = createDbHandlers(db, dir, safeStorageMock);
+  const handlers = createDbHandlers(db, dir, safeStorage);
   return {
-    label: 'sqlite',
+    label,
+    backend: 'sqlite',
     dir,
     async query(method, params = {}) {
       return handlers.handleDbQuery(method, params);
@@ -75,11 +100,12 @@ function createSqliteHarness() {
   };
 }
 
-function createJsonHarness() {
+function createJsonHarness(label = 'json', safeStorage = safeStorageMock) {
   const dir = makeTempDir('scalpai-json-');
-  const handlers = createJsonDbHandlers(dir, safeStorageMock);
+  const handlers = createJsonDbHandlers(dir, safeStorage);
   return {
-    label: 'json',
+    label,
+    backend: 'json',
     dir,
     async query(method, params = {}) {
       return handlers.handleDbQuery(method, params);
@@ -100,6 +126,8 @@ async function assertOk(result, msg) {
 async function runContract(harness) {
   const q = harness.query.bind(harness);
   const tag = harness.label;
+  const isSqlite = harness.backend === 'sqlite';
+  const isEncryptedMode = tag.endsWith('-encrypted');
 
   // --- settings default theme ---
   const settings = await assertOk(await q('getSettings'), `${tag} getSettings`);
@@ -281,13 +309,29 @@ async function runContract(harness) {
     metadata: { camera: 'test', zoom: 2, scalpRegion: 'frontal', trichoscopeMode: 'NL' },
   }), `${tag} addGalleryItem`);
 
-  if (tag === 'sqlite') {
+  if (isSqlite) {
     // روی دیسک ذخیره می‌شود؛ لیست باید metadata را به‌صورت object برگرداند
     const list = await assertOk(await q('getGalleryByClient', { clientId: client.id }), `${tag} getGallery`);
     assert.ok(Array.isArray(list) && list.length >= 1);
     const item = list.find((g) => g.id === gallery.id) || list[0];
     assert.ok(item.metadata && typeof item.metadata === 'object', `${tag}: metadata must be object`);
     assert.strictEqual(item.metadata.camera, 'test');
+
+    if (isEncryptedMode) {
+      // موج ۲ (DoD): تصویر تازه باید *رمزشده* روی دیسک باشد (هدر SCPA) ولی
+      // خواندن شفاف همان دادهٔ اصلی را برگرداند.
+      assert.ok(item.filePath && fs.existsSync(item.filePath), `${tag}: media file must exist on disk`);
+      const head = Buffer.alloc(FILE_MAGIC.length);
+      const fd = fs.openSync(item.filePath, 'r');
+      fs.readSync(fd, head, 0, FILE_MAGIC.length, 0);
+      fs.closeSync(fd);
+      assert.ok(head.equals(FILE_MAGIC), `${tag}: new media file must be stored ENCRYPTED (SCPA magic)`);
+      const roundTrip = await assertOk(await q('getGalleryItemDataUrl', { id: gallery.id }), `${tag} getGalleryItemDataUrl (encrypted)`);
+      assert.ok(
+        typeof roundTrip === 'string' && roundTrip.startsWith('data:image/png;base64,'),
+        `${tag}: encrypted media must transparently decrypt to a data URL`,
+      );
+    }
   }
 
   // --- server-side gallery query + atomic training-pool transition ---
@@ -380,6 +424,27 @@ async function runContract(harness) {
     await cascadeChecks[entity]();
   }
 
+  // --- audit trail (موج ۲ / C3.3) ---
+  // حذف مشتریِ بالا باید رد حسابرسی داشته باشد؛ export/import هم رویداد دارند.
+  const auditAfterDelete = await assertOk(await q('getAuditLog', {}), `${tag} getAuditLog`);
+  assert.ok(
+    auditAfterDelete.some((r) => r.event === 'client.delete'),
+    `${tag}: audit_log must contain client.delete after deleteClient`,
+  );
+  const exported = await assertOk(await q('exportData', {}), `${tag} exportData`);
+  assert.strictEqual(typeof exported, 'string', `${tag}: exportData returns a string payload`);
+  const auditAfterExport = await assertOk(await q('getAuditLog', {}), `${tag} getAuditLog after export`);
+  assert.ok(
+    auditAfterExport.some((r) => r.event === 'data.export'),
+    `${tag}: audit_log must contain data.export after exportData`,
+  );
+  await assertOk(await q('importData', { jsonData: exported }), `${tag} importData self-backup`);
+  const auditAfterImport = await assertOk(await q('getAuditLog', {}), `${tag} getAuditLog after import`);
+  assert.ok(
+    auditAfterImport.some((r) => r.event === 'data.import'),
+    `${tag}: audit_log must contain data.import after importData`,
+  );
+
   // --- settings UPSERT when row missing (sqlite) / always works (json) ---
   const updated = await assertOk(await q('updateSettings', { language: 'en' }), `${tag} updateSettings`);
   assert.strictEqual(updated.language, 'en');
@@ -392,6 +457,16 @@ async function runContract(harness) {
   assert.strictEqual(ok, true, `${tag}: credentials verify`);
   const bad = await assertOk(await q('verifyCredentials', { username: 'admin', password: 'wrong-pass' }), `${tag} verify bad`);
   assert.strictEqual(bad, false);
+
+  if (isEncryptedMode && harness.backend === 'json') {
+    // موج ۲ (C1.4): کل فایل فروشگاه JSON باید رمزشده روی دیسک باشد، در حالی که
+    // همهٔ assertionهای بالا بدون هیچ تغییری سبز شده‌اند (شفافیت لایهٔ رمز).
+    const raw = fs.readFileSync(path.join(harness.dir, 'scalpai-data.json'));
+    assert.ok(
+      raw.subarray(0, FILE_MAGIC.length).equals(FILE_MAGIC),
+      `${tag}: JSON store file must be encrypted at rest (SCPA magic)`,
+    );
+  }
 
   console.log(`OK contract (${tag})`);
 }
@@ -459,6 +534,8 @@ async function main() {
   testPasswordHashAlignment();
   await testSchemaMigrations();
 
+  // حالت ۱ — بدون لایهٔ رمز (رفتار legacy؛ safeStorage unavailable)
+  _resetForTests();
   const sqlite = createSqliteHarness();
   const json = createJsonHarness();
   try {
@@ -467,6 +544,25 @@ async function main() {
   } finally {
     sqlite.close();
     json.close();
+  }
+
+  // حالت ۲ — با لایهٔ رمز فعال (موج ۲ / DoD: «روی هر دو حالت»): DEK از طریق
+  // mock فعال safeStorage ساخته می‌شود و *همان* قرارداد بدون هیچ تغییری باید
+  // سبز بماند — علاوه بر دو assertion رمزنگاری (فایل تصویر/JSON روی دیسک).
+  _resetForTests();
+  const dekDir = makeTempDir('scalpai-dek-');
+  const dekInit = initDek(safeStorageMockEnabled, dekDir);
+  assert.strictEqual(dekInit.status, 'active', 'mock DEK must activate');
+  const sqliteEnc = createSqliteHarness('sqlite-encrypted', safeStorageMockEnabled);
+  const jsonEnc = createJsonHarness('json-encrypted', safeStorageMockEnabled);
+  try {
+    await runContract(sqliteEnc);
+    await runContract(jsonEnc);
+  } finally {
+    sqliteEnc.close();
+    jsonEnc.close();
+    _resetForTests();
+    fs.rmSync(dekDir, { recursive: true, force: true });
   }
 
   console.log('ALL_DB_CONTRACT_TESTS_PASSED');

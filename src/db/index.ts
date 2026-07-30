@@ -37,6 +37,30 @@ interface ElectronAPI {
   safeStorage: {
     isAvailable: () => Promise<boolean>;
   };
+  encryption?: {
+    getStatus: () => Promise<{
+      driver: string;
+      keyStatus: string;
+      dbEncrypted: boolean;
+      imageEncryption: boolean;
+      migrationReport: { tables: number; rows: number } | null;
+    }>;
+    encryptLegacyImages: () => Promise<{
+      success: boolean;
+      error?: string;
+      scanned?: number;
+      alreadyEncrypted?: number;
+      encrypted?: number;
+      failed?: number;
+      failures?: Array<{ file: string; error: string }>;
+    }>;
+    revealRecoveryKey: (username: string, password: string) => Promise<{
+      success: boolean;
+      error?: string;
+      recoveryKey?: string;
+    }>;
+    onProgress: (callback: (progress: { done: number; total: number }) => void) => () => void;
+  };
   app: {
     getPath: (name: string) => Promise<string>;
     quit: () => Promise<void>;
@@ -254,12 +278,12 @@ const createElectronAdapter = (): DatabaseAdapter => ({
     return await callDb('updateSettings', patch as Record<string, unknown>) as Awaited<ReturnType<DatabaseAdapter['updateSettings']>>;
   },
 
-  async exportData() {
-    return await callDb('exportData') as string;
+  async exportData(options) {
+    return await callDb('exportData', options?.backupPassword ? { backupPassword: options.backupPassword } : undefined) as string;
   },
 
-  async importData(jsonData) {
-    await callDb('importData', { jsonData });
+  async importData(jsonData, options) {
+    await callDb('importData', { jsonData, backupPassword: options?.backupPassword });
   },
 
   async verifyCredentials(username, password) {
@@ -507,6 +531,34 @@ export const safeStorageUtils = {
   async isAvailable(): Promise<boolean> {
     if (!isElectron) return false;
     return await window.electronAPI!.safeStorage.isAvailable();
+  },
+};
+
+// Export Encryption utilities (موج ۲) — وضعیت لایهٔ رمز + ابزار مهاجرت تصاویر قدیمی
+export const encryptionUtils = {
+  isElectron,
+
+  async getStatus() {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    return await window.electronAPI.encryption.getStatus();
+  },
+
+  async encryptLegacyImages(
+    onProgress?: (progress: { done: number; total: number }) => void,
+  ) {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    const api = window.electronAPI.encryption;
+    const unsubscribe = onProgress ? api.onProgress(onProgress) : null;
+    try {
+      return await api.encryptLegacyImages();
+    } finally {
+      if (unsubscribe) unsubscribe();
+    }
+  },
+
+  async revealRecoveryKey(username: string, password: string) {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    return await window.electronAPI.encryption.revealRecoveryKey(username, password);
   },
 };
 

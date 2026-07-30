@@ -25,20 +25,42 @@ const {
   updateSessionUsername,
 } = require('./auth-session.cjs');
 
+// موج ۲ (C1) — درایور SQLite ترجیحاً better-sqlite3-multiple-ciphers (SQLCipher)
+// است؛ fallback به better-sqlite3 ساده با رمزنگاریِ غیرفعال (جزئیات در sqlite-driver.cjs)
+const { loadSqliteDriver } = require('./sqlite-driver.cjs');
+const { initDek, getDek, getPurposeKey, getEncryptionStatus } = require('./dek.cjs');
+const {
+  tryOpenKeyed,
+  openPlain,
+  migratePlaintextToEncrypted,
+  cleanupPlainOldAfterSuccessfulBoot,
+  recoverIncompleteMigration,
+} = require('./db-encryption.cjs');
+const { encryptBuffer, decryptBuffer, isEncryptedBuffer, FILE_MAGIC } = require('./file-crypto.cjs');
+const { AUDIT_EVENTS, recordAudit, setAuditSink } = require('./audit.cjs');
+
 // Database setup
-let Database;
-let dbLoadError = null;
-try {
-  Database = require('better-sqlite3');
-} catch (e) {
-  dbLoadError = e;
-  console.error('Failed to load better-sqlite3. The native module is likely missing or was built for the wrong Node/Electron ABI. Run "npm install" (which now rebuilds it for Electron automatically) or "npx electron-rebuild -f -w better-sqlite3".', e);
+const sqliteDriver = loadSqliteDriver();
+const Database = sqliteDriver.Database;
+const dbLoadError = sqliteDriver.loadError || null;
+if (!Database) {
+  console.error('Failed to load a SQLite driver (tried better-sqlite3-multiple-ciphers, then better-sqlite3). The native module is likely missing or was built for the wrong Node/Electron ABI. Run "pnpm install" (which rebuilds it via scripts/rebuild-native.cjs) or "npx @electron/rebuild -f -w better-sqlite3-multiple-ciphers".', dbLoadError);
+} else if (!sqliteDriver.cipherCapable) {
+  console.warn('[encryption] better-sqlite3-multiple-ciphers unavailable — database encryption is DISABLED for this run (using plain better-sqlite3).');
 }
 
 let mainWindow;
 let db;
 let dbHandlers;
 let offlineHandlers;
+// موج ۲ (C1) — وضعیت لایهٔ رمزنگاری برای IPC تنظیمات و لاگ
+const encryptionState = {
+  driver: 'none',
+  keyStatus: 'uninitialized',
+  dbEncrypted: false,
+  imageEncryption: false,
+  migrationReport: null,
+};
 const aiHandlers = createAiHandlers(net);
 
 // نام اپ را صریح ثابت می‌کنیم: بدون این، Electron در حالت توسعه از `name` در
@@ -315,7 +337,20 @@ function existingSqliteDataNote() {
 function readJsonFallbackData(jsonPath) {
   try {
     if (!fs.existsSync(jsonPath)) return null;
-    const parsed = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+    const rawBytes = fs.readFileSync(jsonPath);
+    let jsonText;
+    if (isEncryptedBuffer(rawBytes)) {
+      // موج ۲ (C1.4): فایل fallback ممکن است رمزشده باشد — با کلید این دستگاه باز کن
+      const jsonKey = getPurposeKey('json-store');
+      if (!jsonKey) {
+        console.warn('JSON fallback file is encrypted but the key is unavailable; skipping migration into SQLite.');
+        return null;
+      }
+      jsonText = decryptBuffer(rawBytes, jsonKey).toString('utf-8');
+    } else {
+      jsonText = rawBytes.toString('utf-8');
+    }
+    const parsed = JSON.parse(jsonText);
     // ردیف مشتری سیستمی (استخر آموزشی) در این شمارش لحاظ نمی‌شود، وگرنه
     // فایل JSON که فقط همان ردیف را دارد به‌اشتباه «دادهٔ واقعی» تلقی می‌شود.
     const realClientsCount = Array.isArray(parsed?.clients)
@@ -434,20 +469,28 @@ async function migrateJsonFallbackIntoSqlite() {
 }
 
 /**
- * راه‌اندازی دیتابیس
+ * راه‌اندازی دیتابیس — موج ۲ (C1): باز کردن رمزشده/مهاجرت plaintext→SQLCipher
  */
 async function initDatabase() {
+  // مقداردهی کلید رمزنگاری دادهٔ در سکون *قبل* از هر باز کردن فایل دیتابیس
+  const dekInit = initDek(safeStorage, userDataPath);
+  const dek = getDek();
+  const hexKey = dek ? dek.toString('hex') : null;
+  encryptionState.driver = sqliteDriver.driverName;
+  encryptionState.keyStatus = dekInit.status;
+  encryptionState.imageEncryption = Boolean(getPurposeKey('image-aes'));
+
   if (!Database) {
-    console.warn('better-sqlite3 unavailable, falling back to JSON file storage:', dbLoadError && dbLoadError.message);
+    console.warn('SQLite driver unavailable, falling back to JSON file storage:', dbLoadError && dbLoadError.message);
     dbHandlers = createJsonDbHandlers(userDataPath, safeStorage);
     offlineHandlers = createOfflineHandlers();
     dialog.showMessageBox(null, {
       type: 'warning',
       title: 'حالت ذخیره‌سازی جایگزین / Fallback Storage',
       message:
-        'ماژول better-sqlite3 بارگذاری نشد، بنابراین برنامه از یک فایل ذخیره‌سازی ساده (JSON) به‌جای SQLite استفاده می‌کند.\n' +
+        'درایور SQLite (better-sqlite3-multiple-ciphers / better-sqlite3) بارگذاری نشد، بنابراین برنامه از یک فایل ذخیره‌سازی ساده (JSON) به‌جای SQLite استفاده می‌کند.\n' +
         'اطلاعات شما ذخیره خواهند شد، اما برای عملکرد کامل‌تر (SQLite) توصیه می‌شود دستور زیر را یک‌بار در پوشه برنامه اجرا کنید:\n\n' +
-        'npm install\n\n' +
+        'pnpm install\n\n' +
         'Details: ' + (dbLoadError ? dbLoadError.message : 'unknown') +
         existingSqliteDataNote(),
     });
@@ -455,7 +498,61 @@ async function initDatabase() {
   }
 
   try {
-    db = new Database(dbPath);
+    const canEncrypt = Boolean(hexKey) && sqliteDriver.cipherCapable;
+    let migratedNow = false;
+
+    // ترمیم کرش احتمالی وسط جایگزینیِ مهاجرت قبلی (قبل از هر باز کردن فایل)
+    recoverIncompleteMigration(dbPath, {
+      Database: canEncrypt ? Database : undefined,
+      hexKey: canEncrypt ? hexKey : undefined,
+    });
+
+    if (canEncrypt) {
+      if (fs.existsSync(dbPath)) {
+        try {
+          // دیتابیس از قبل رمزشده است
+          db = tryOpenKeyed(Database, dbPath, hexKey).db;
+          encryptionState.dbEncrypted = true;
+          cleanupPlainOldAfterSuccessfulBoot(dbPath);
+        } catch (keyedError) {
+          // فایل با کلید باز نشد → plaintext legacy (یا خراب؛ تلاش بعدی مشخص می‌کند)
+          db = openPlain(Database, dbPath);
+          encryptionState.dbEncrypted = false;
+        }
+      } else {
+        // نصب تازه — دیتابیس از همان ابتدا رمزشده ساخته می‌شود
+        db = tryOpenKeyed(Database, dbPath, hexKey).db;
+        encryptionState.dbEncrypted = true;
+      }
+    } else {
+      if (sqliteDriver.cipherCapable && dekInit.status !== 'active') {
+        console.warn('[encryption] SQLCipher driver present but key unavailable (status: %s) — running WITHOUT database encryption.', dekInit.status);
+      }
+      db = openPlain(Database, dbPath);
+      encryptionState.dbEncrypted = false;
+    }
+
+    // مهاجرت دیتابیس plaintext موجود به SQLCipher — «کپی → راستی‌آزمایی → جایگزینی»
+    if (canEncrypt && !encryptionState.dbEncrypted) {
+      console.info('[encryption] starting plaintext → SQLCipher migration...');
+      // اسکیمای مبدأ به نسخهٔ جاری برسد تا کپی ستونی دقیق بماند، سپس WAL بسته شود
+      db.pragma('journal_mode = WAL');
+      createBaseTables(db);
+      runMigrations(db);
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+      encryptionState.migrationReport = migratePlaintextToEncrypted({
+        Database,
+        dbPath,
+        hexKey,
+        backupDir: path.join(userDataPath, 'backups'),
+        log: console,
+      });
+      db = tryOpenKeyed(Database, dbPath, hexKey).db;
+      encryptionState.dbEncrypted = true;
+      migratedNow = true;
+      console.info('[encryption] migration complete — database is now encrypted at rest');
+    }
 
     // WAL: نوشتن هم‌زمان با خواندن، مقاوم‌تر در برابر بسته‌شدن ناگهانی برنامه.
     // foreign_keys: بدون این pragma، تعریف FOREIGN KEY در SQLite عملاً بی‌اثر است.
@@ -464,6 +561,18 @@ async function initDatabase() {
 
     createBaseTables(db);
     runMigrations(db);
+
+    // موج ۲ (C3.3) — sink جهانی برای رویدادهای main-process (ورود/خروج/AI ابری)
+    // به همان دیتابیس فعال؛ رویدادهای درون هندلرها recorder محلی خود را دارند.
+    setAuditSink((entry) => {
+      try {
+        db.prepare(
+          'INSERT INTO audit_log (id, event, actor, detail, createdAt) VALUES (?, ?, ?, ?, ?)',
+        ).run(entry.id, entry.event, entry.actor, entry.detail, entry.createdAt);
+      } catch (auditError) {
+        console.warn('[audit] sqlite sink failed:', auditError.message);
+      }
+    });
 
     // بررسی سلامت دیتابیس (فاز B2)
     runDbIntegrityCheck(db);
@@ -483,10 +592,19 @@ async function initDatabase() {
     dbHandlers = createDbHandlers(db, userDataPath, safeStorage);
     offlineHandlers = createOfflineHandlers();
 
+    // رویداد مهاجرت رمزنگاری باید *بعد* از اتصال sink حسابرسی ثبت شود
+    if (migratedNow) {
+      recordAudit(AUDIT_EVENTS.DB_MIGRATION_ENCRYPTED, 'system', {
+        tables: encryptionState.migrationReport.tablesCopied.length,
+        rows: encryptionState.migrationReport.rowsCopied,
+        backupPath: path.basename(encryptionState.migrationReport.backupPath),
+      });
+    }
+
     // اگر قبلاً در حالت جایگزین (JSON) داده ثبت شده، به SQLite منتقل می‌شود
     await migrateJsonFallbackIntoSqlite();
 
-    console.log('Database initialized at:', dbPath);
+    console.log('Database initialized at:', dbPath, encryptionState.dbEncrypted ? '(encrypted)' : '(plaintext)');
     return db;
   } catch (error) {
     console.error('Database initialization error, falling back to JSON file storage:', error);
@@ -716,6 +834,7 @@ function setupIpcHandlers() {
     loginThrottle.failures = 0;
     loginThrottle.lockedUntil = 0;
     const token = createSession(username);
+    recordAudit(AUDIT_EVENTS.AUTH_LOGIN, username);
     return { success: true, token, username };
   });
 
@@ -724,7 +843,10 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('auth:destroySession', async (event, { token }) => {
-    return destroySession(token);
+    const existing = validateSession(token);
+    const result = destroySession(token);
+    if (existing.valid) recordAudit(AUDIT_EVENTS.AUTH_LOGOUT, existing.username);
+    return result;
   });
 
   ipcMain.handle('auth:updateUsername', async (event, { token, username }) => {
@@ -970,6 +1092,93 @@ function setupIpcHandlers() {
     return safeStorage.isEncryptionAvailable();
   });
 
+  // =============== Encryption (موج ۲ / C1-C2) ===============
+  ipcMain.handle('encryption:getStatus', () => ({
+    driver: encryptionState.driver,
+    keyStatus: encryptionState.keyStatus,
+    dbEncrypted: encryptionState.dbEncrypted,
+    imageEncryption: encryptionState.imageEncryption,
+    migrationReport: encryptionState.migrationReport
+      ? {
+        tables: encryptionState.migrationReport.tablesCopied.length,
+        rows: encryptionState.migrationReport.rowsCopied,
+      }
+      : null,
+  }));
+
+  // ابزار یک‌بارهٔ «رمزنگاری تصاویر موجود» (C2.3): فایل‌های بدون magic header
+  // پیدا و رمز می‌شوند؛ فایل‌های رمزشده دست‌نخورده می‌مانند (idempotent).
+  ipcMain.handle('encryption:encryptLegacyImages', async (event) => {
+    const imageKey = getPurposeKey('image-aes');
+    if (!imageKey) return { success: false, error: 'encryption-unavailable' };
+
+    const imagesRoot = path.join(userDataPath, 'images');
+    const files = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.isFile()) files.push(full);
+      }
+    };
+    if (fs.existsSync(imagesRoot)) walk(imagesRoot);
+
+    // فقط ۴ بایت اول برای تشخیص legacy — خواندن کل ویدیوها فقط برای هدر هزینه‌بر است
+    const legacy = [];
+    for (const filePath of files) {
+      try {
+        const fd = fs.openSync(filePath, 'r');
+        const head = Buffer.alloc(FILE_MAGIC.length);
+        fs.readSync(fd, head, 0, FILE_MAGIC.length, 0);
+        fs.closeSync(fd);
+        if (!head.equals(FILE_MAGIC)) legacy.push(filePath);
+      } catch { /* فایل قفل/ناموجود — رد می‌شود */ }
+    }
+
+    let encrypted = 0;
+    const failures = [];
+    for (let i = 0; i < legacy.length; i += 1) {
+      const filePath = legacy[i];
+      try {
+        fs.writeFileSync(filePath, encryptBuffer(fs.readFileSync(filePath), imageKey));
+        encrypted += 1;
+      } catch (error) {
+        failures.push({ file: path.basename(filePath), error: error.message });
+      }
+      if (i % 5 === 0 || i === legacy.length - 1) {
+        try { event.sender.send('encryption:progress', { done: i + 1, total: legacy.length }); } catch { /* پنجره بسته شده */ }
+      }
+    }
+    if (encrypted > 0 || failures.length > 0) {
+      recordAudit(AUDIT_EVENTS.IMAGES_LEGACY_ENCRYPTED, 'local-user', { encrypted, failed: failures.length });
+    }
+    return {
+      success: true,
+      scanned: files.length,
+      alreadyEncrypted: files.length - legacy.length,
+      encrypted,
+      failed: failures.length,
+      failures: failures.slice(0, 20),
+    };
+  });
+
+  // «کلید بازیابی» (کاهش ریسک گم شدن DEK — نقشه‌راه C1): hex کلید اصلی فقط
+  // پس از احراز مجدد پسورد اپ فاش می‌شود تا کاربر آن را یک‌بار یادداشت و امن
+  // نگه دارد. هر نمایش در لاگ حسابرسی ثبت می‌شود.
+  ipcMain.handle('encryption:revealRecoveryKey', async (_event, { username, password } = {}) => {
+    if (!dbHandlers) return { success: false, error: 'db-unavailable' };
+    const dekBuffer = getDek();
+    if (!dekBuffer) return { success: false, error: 'encryption-unavailable' };
+    try {
+      const valid = await dbHandlers.handleDbQuery('verifyCredentials', { username, password });
+      if (valid !== true) return { success: false, error: 'invalid-credentials' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+    recordAudit(AUDIT_EVENTS.DATA_EXPORT, username || 'local-user', { purpose: 'recovery-key-reveal' });
+    return { success: true, recoveryKey: dekBuffer.toString('hex') };
+  });
+
   // =============== Offline Analysis ===============
   ipcMain.handle('offline:analyze', async (event, { base64Image, lang }) => {
     if (!offlineHandlers) return { success: false, error: 'Offline handlers not initialized', fallback: true };
@@ -1016,6 +1225,9 @@ function setupIpcHandlers() {
     }
     // از renderer فقط دادهٔ تحلیل + requestId (برای لغو) پذیرفته می‌شود
     const { base64Image, mimeType, prompt, requestId } = params || {};
+    // موج ۲ (C3.3) — تنها نقطهٔ خروج دادهٔ بالینی از دستگاه؛ باید رد داشته باشد.
+    // detail عمداً فقط provider/model است (نه تصویر، نه prompt، نه شناسهٔ بیمار).
+    recordAudit(AUDIT_EVENTS.AI_CLOUD_REQUEST, 'local-user', { provider: config.provider, model: config.model || null });
     return await aiHandlers.analyze({ ...config, base64Image, mimeType, prompt, requestId });
   });
 

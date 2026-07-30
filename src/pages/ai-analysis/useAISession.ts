@@ -39,6 +39,7 @@ import {
   resolveActiveSession,
 } from '../../lib/sessionVisit';
 import { useLang, usePick, useT } from '../../i18n';
+import { hasValidPrivacyConsent } from '../../lib/privacyConsent';
 import { aiAnalysisDict } from './strings';
 import { type TabId } from './constants';
 import type { SessionPhotoView } from './VisualizationTab';
@@ -327,6 +328,11 @@ export function useAISession() {
       }
     }
     setDuplicateWarning(null);
+    // موج ۲ (C3.1) — درگاه سخت: ارسال تصویر به سرویس ابری بدون رضایت ثبت‌شده مجاز نیست
+    if (!hasValidPrivacyConsent(settings)) {
+      setError(t('privacyConsentRequired'));
+      return;
+    }
     if (!settings.hasApiKey && !settings.aiApiKey) {
       setError(t('configureApiKey'));
       return;

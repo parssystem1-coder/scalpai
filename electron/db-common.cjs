@@ -177,6 +177,16 @@ function parseBackupPayload(jsonData) {
   if (data.questionnaireRevisions !== undefined && !Array.isArray(data.questionnaireRevisions)) {
     throw new Error('Invalid backup field: questionnaireRevisions');
   }
+  // موج ۲: ردپای حسابرسی و بلوک کلید تصاویر (در صورت وجود) باید ساختاریاعتبار داشته باشند
+  if (data.auditLog !== undefined && !Array.isArray(data.auditLog)) {
+    throw new Error('Invalid backup field: auditLog');
+  }
+  if (data.mediaEncryption !== undefined) {
+    const m = data.mediaEncryption;
+    if (m === null || typeof m !== 'object' || typeof m.key !== 'string') {
+      throw new Error('Invalid backup field: mediaEncryption');
+    }
+  }
   return data;
 }
 

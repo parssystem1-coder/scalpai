@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { Globe, Palette, Database, Download, Upload, FolderOpen, Sparkles, Bot } from 'lucide-react';
+import { Globe, Palette, Database, Download, Upload, FolderOpen, Sparkles, Bot, Lock } from 'lucide-react';
 import { useSettingsStore } from '../../store';
 import { electronUtils } from '../../db';
 import { useT, usePick } from '../../i18n';
 import { settingsDict } from './strings';
 import type { Notify } from './types';
+import EncryptionPanel from './EncryptionPanel';
+
+const V3_PREFIX = 'scalpai-backup:v3:base64:';
+const V4_PREFIX = 'scalpai-backup:v4:enc:base64:';
+const MIN_BACKUP_PASSWORD_LENGTH = 8;
 
 const THEME_OPTIONS = [
   {
@@ -64,6 +69,45 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
 
   const [backupDirHandle, setBackupDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
 
+  // موج ۲ (C2.4) — گزینهٔ «پشتیبان رمزدار با پسورد» (فقط Electron؛ بک‌اند وب فعلاً بدون رمز)
+  const [useBackupPassword, setUseBackupPassword] = useState(false);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [backupPasswordConfirm, setBackupPasswordConfirm] = useState('');
+  // وقتی فایل انتخابی برای بازیابی رمزدار v4 بود، payload اینجا نگه داشته می‌شود تا پسورد گرفته شود
+  const [pendingEncryptedImport, setPendingEncryptedImport] = useState<string | null>(null);
+  const [importPassword, setImportPassword] = useState('');
+
+  const validateBackupPassword = (): string | null => {
+    if (!useBackupPassword) return null;
+    if (backupPassword.length < MIN_BACKUP_PASSWORD_LENGTH) return t('backupPasswordShort');
+    if (backupPassword !== backupPasswordConfirm) return t('backupPasswordMismatch');
+    return null;
+  };
+
+  const importWithOptionalPassword = async (payload: string) => {
+    if (payload.startsWith(V4_PREFIX)) {
+      setPendingEncryptedImport(payload);
+      return;
+    }
+    await importData(payload);
+    alert(t('restoreSuccess'));
+    window.location.reload();
+  };
+
+  const completeEncryptedImport = async () => {
+    if (!pendingEncryptedImport) return;
+    try {
+      await importData(pendingEncryptedImport, { backupPassword: importPassword });
+      setPendingEncryptedImport(null);
+      setImportPassword('');
+      alert(t('restoreSuccess'));
+      window.location.reload();
+    } catch (error) {
+      console.error('Encrypted import error:', error);
+      notify('error', t('wrongBackupPassword'));
+    }
+  };
+
   // انتخاب پوشه بکاپ — در Electron با دیالوگ سیستم، در وب با File System Access API
   const selectBackupDirectory = async () => {
     try {
@@ -91,7 +135,14 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
   };
 
   const handleExport = async () => {
-    const data = await exportData();
+    const passwordError = validateBackupPassword();
+    if (passwordError) {
+      notify('error', passwordError);
+      return;
+    }
+    const data = await exportData(
+      useBackupPassword && electronUtils.isElectron ? { backupPassword } : undefined,
+    );
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
@@ -99,10 +150,13 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
     let isZip = false;
     let zipBase64 = '';
 
-    if (typeof data === 'string' && data.startsWith('scalpai-backup:v3:base64:')) {
+    if (typeof data === 'string' && data.startsWith(V3_PREFIX)) {
       fileName = `scalpai-backup-${dateStr}-${timeStr}.zip`;
       isZip = true;
-      zipBase64 = data.split('scalpai-backup:v3:base64:')[1];
+      zipBase64 = data.split(V3_PREFIX)[1];
+    } else if (typeof data === 'string' && data.startsWith(V4_PREFIX)) {
+      // بکاپ رمزدار v4 — محتوا رشتهٔ متنی prefix است (ZIP رمزشده نمی‌تواند باز شود)
+      fileName = `scalpai-backup-${dateStr}-${timeStr}.zip.enc`;
     }
 
     // Electron: همیشه دیالوگ ذخیره را باز کن و دایرکتوری پیش‌فرض را روی مسیر انتخاب‌شده از قبل بگذار
@@ -171,11 +225,9 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
         let importPayload = ev.target?.result as string;
         if (file.name.endsWith('.zip')) {
           const base64Data = importPayload.split('base64,')[1];
-          importPayload = `scalpai-backup:v3:base64:${base64Data}`;
+          importPayload = `${V3_PREFIX}${base64Data}`;
         }
-        await importData(importPayload);
-        alert(t('restoreSuccess'));
-        window.location.reload();
+        await importWithOptionalPassword(importPayload);
       } catch (error) {
         console.error('Import error:', error);
         alert(t('restoreError'));
@@ -194,12 +246,10 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
     try {
       const content = await electronUtils.openAndReadFile({
         defaultPath: settings.backupPath || undefined,
-        filters: [{ name: 'Backup Files', extensions: ['json', 'zip'] }],
+        filters: [{ name: 'Backup Files', extensions: ['json', 'zip', 'enc'] }],
       });
       if (content) {
-        await importData(content);
-        alert(t('restoreSuccess'));
-        window.location.reload();
+        await importWithOptionalPassword(content);
       }
     } catch (error) {
       console.error('Error importing from backup path:', error);
@@ -303,9 +353,87 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
             <label className="flex-1 flex items-center justify-center gap-2 p-4 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition cursor-pointer">
               <Upload size={20} />
               <span>{t('restore')}</span>
-              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+              <input type="file" accept=".json,.zip,.enc" onChange={handleImport} className="hidden" />
             </label>
           )}
+        </div>
+
+        {/* موج ۲ (C2.4) — گزینهٔ پشتیبان رمزدار با پسورد (فقط Electron) */}
+        {electronUtils.isElectron && (
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useBackupPassword}
+                onChange={e => setUseBackupPassword(e.target.checked)}
+                className="w-4 h-4 accent-green-500"
+              />
+              <span>{t('backupUsePassword')}</span>
+            </label>
+            {useBackupPassword && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="password"
+                  value={backupPassword}
+                  onChange={e => setBackupPassword(e.target.value)}
+                  placeholder={t('backupPasswordLabel')}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 focus:border-green-400 focus:outline-none text-sm"
+                  dir="ltr"
+                />
+                <input
+                  type="password"
+                  value={backupPasswordConfirm}
+                  onChange={e => setBackupPasswordConfirm(e.target.value)}
+                  placeholder={t('backupPasswordConfirmLabel')}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 focus:border-green-400 focus:outline-none text-sm"
+                  dir="ltr"
+                />
+              </div>
+            )}
+            <p className="text-xs text-yellow-200/60 flex items-start gap-1.5">
+              <Lock size={12} className="flex-shrink-0 mt-0.5" />
+              <span>{t('backupPasswordNote')}</span>
+            </p>
+          </div>
+        )}
+
+        {/* موج ۲ (C2.4) — ورود پسورد برای فایل پشتیبان رمزدار هنگام بازیابی */}
+        {pendingEncryptedImport && (
+          <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 space-y-3">
+            <p className="text-sm text-yellow-100/90 flex items-center gap-2">
+              <Lock size={15} />
+              <span>{t('enterBackupPassword')}</span>
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={importPassword}
+                onChange={e => setImportPassword(e.target.value)}
+                placeholder={t('backupPasswordLabel')}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none text-sm"
+                dir="ltr"
+                onKeyDown={e => { if (e.key === 'Enter') completeEncryptedImport(); }}
+              />
+              <button
+                onClick={completeEncryptedImport}
+                disabled={!importPassword}
+                className="px-4 py-2.5 rounded-xl bg-yellow-500/25 text-yellow-200 hover:bg-yellow-500/35 transition text-sm font-semibold disabled:opacity-50"
+              >
+                {t('decryptAndRestore')}
+              </button>
+              <button
+                onClick={() => { setPendingEncryptedImport(null); setImportPassword(''); }}
+                className="px-4 py-2.5 rounded-xl bg-white/5 text-white/60 hover:bg-white/10 transition text-sm"
+              >
+                {t('cancelEncryptedRestore')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* موج ۲ (C1-C2) — وضعیت رمزنگاری + ابزار مهاجرت تصاویر قدیمی */}
+        <div className="mt-4">
+          <EncryptionPanel />
         </div>
       </div>
     </div>

@@ -29,6 +29,15 @@ const {
   SYSTEM_TRAINING_POOL_CLIENT_ID,
   buildSystemTrainingPoolClientRecord,
 } = require('./db-common.cjs');
+const {
+  encryptBuffer,
+  decryptBuffer,
+  isEncryptedBuffer,
+  encryptWithPassword,
+  decryptWithPassword,
+} = require('./file-crypto.cjs');
+const { getPurposeKey } = require('./dek.cjs');
+const { AUDIT_EVENTS, setAuditSink, createAuditRecorder } = require('./audit.cjs');
 
 function emptyData() {
   return {
@@ -39,6 +48,7 @@ function emptyData() {
     analyses: [],
     trainingSamples: [],
     questionnaireRevisions: [],
+    auditLog: [],
     localModelMetadata: null,
     settings: { language: 'fa', theme: 'mint', aiConfidenceThreshold: 0.7 },
   };
@@ -54,12 +64,32 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
 
   let data = emptyData();
 
+  // موج ۲ (C1.4): کل فایل JSON (که تصاویر را هم به‌صورت inline دارد) با کلید
+  // مشتق از DEK رمز می‌شود. کلید نباشد → رفتار plaintext قبلی (fail-open مستند).
+  function jsonKeyOrNull() {
+    return getPurposeKey('json-store');
+  }
+
+  // اگر فایل رمزشده باشد ولی کلید در دسترس نباشد، هرگز نباید با دادهٔ خالی
+  // بازنویسی‌اش کرد (نابودی داده) — نوشتن مسدود و وضعیت گزارش می‌شود.
+  let persistenceBlocked = false;
+
   function load() {
     try {
       if (fs.existsSync(dataFile)) {
-        const raw = fs.readFileSync(dataFile, 'utf-8');
-        const parsed = JSON.parse(raw);
-        data = { ...emptyData(), ...parsed };
+        const rawBytes = fs.readFileSync(dataFile);
+        if (isEncryptedBuffer(rawBytes)) {
+          const jsonKey = jsonKeyOrNull();
+          if (!jsonKey) {
+            persistenceBlocked = true;
+            console.error('scalpai-data.json is encrypted but the encryption key is unavailable — persistence is DISABLED to protect the encrypted store. Data from the encrypted file will not be visible in this session.');
+            data = emptyData();
+            return;
+          }
+          data = { ...emptyData(), ...JSON.parse(decryptBuffer(rawBytes, jsonKey).toString('utf-8')) };
+        } else {
+          data = { ...emptyData(), ...JSON.parse(rawBytes.toString('utf-8')) };
+        }
       } else {
         save();
       }
@@ -87,11 +117,30 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
   // نوشتن اتمیک: اول در فایل موقت، بعد rename — تا اگر برنامه وسط نوشتن بسته شد،
   // فایل اصلی خراب/نصفه نشود.
   function save() {
-    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf-8');
+    if (persistenceBlocked) {
+      // فایل رمزشده با کلید ناموجود — هرگز بازنویسی نکن (دیدن کامنت load)
+      return;
+    }
+    const jsonText = JSON.stringify(data, null, 2);
+    const jsonKey = jsonKeyOrNull();
+    fs.writeFileSync(tmpFile, jsonKey ? encryptBuffer(Buffer.from(jsonText, 'utf-8'), jsonKey) : jsonText, jsonKey ? undefined : 'utf-8');
     fs.renameSync(tmpFile, dataFile);
   }
 
   const { encryptValue, decryptValue } = createValueCrypto(safeStorage);
+
+  // موج ۲ (C3.3) — ردپای حسابرسی داخل خود فایل JSON ذخیره می‌شود.
+  const appendAuditEntry = (entry) => {
+    if (!Array.isArray(data.auditLog)) data.auditLog = [];
+    data.auditLog.push(entry);
+    // سقف نگه‌داری تا فایل JSON بی‌نهایت رشد نکند (با SQLite حد ۲۰۰۰ در export)
+    if (data.auditLog.length > 2000) data.auditLog = data.auditLog.slice(-2000);
+    save();
+  };
+  // recorder محلی برای رویدادهای خود هندلر (بدون تداخل چند نمونهٔ هم‌زمان)…
+  const recordEvent = createAuditRecorder(appendAuditEntry);
+  // …و sink جهانی برای رویدادهای main-process وقتی این بک‌اند فعال است
+  setAuditSink(appendAuditEntry);
 
   load();
 
@@ -172,7 +221,15 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
             data.questionnaireRevisions = (data.questionnaireRevisions || []).filter(r => r.clientId !== params.id);
             data.clients = data.clients.filter(c => c.id !== params.id);
             save();
+            recordEvent(AUDIT_EVENTS.CLIENT_DELETE, 'local-user', { clientId: params.id });
             return { success: true };
+          }
+
+          case 'getAuditLog': {
+            const limit = Math.min(params.limit || 200, 1000);
+            return [...(data.auditLog || [])]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .slice(0, limit);
           }
 
           // =============== Gallery ===============
@@ -505,11 +562,24 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
           case 'exportData': {
             const exportable = JSON.parse(JSON.stringify(data));
             exportable.settings = sanitizeSettingsForBackup(exportable.settings || {});
-            return JSON.stringify(createBackupEnvelope(exportable), null, 2);
+            const envelopeText = JSON.stringify(createBackupEnvelope(exportable), null, 2);
+            recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: params.backupPassword ? 'v4-encrypted' : 'json', passwordProtected: !!params.backupPassword });
+            // موج ۲ (C2.4) — همان گزینهٔ پشتیبان رمزدار با پسورد برای بک‌اند JSON
+            if (params.backupPassword) {
+              return 'scalpai-backup:v4:enc:base64:' + encryptWithPassword(Buffer.from(envelopeText, 'utf-8'), params.backupPassword).toString('base64');
+            }
+            return envelopeText;
           }
 
           case 'importData': {
-            const imported = parseBackupPayload(params.jsonData);
+            let rawPayload = params.jsonData;
+            // موج ۲ (C2.4) — بکاپ رمزدارِ تولیدشده در همین بک‌اند (envelope JSON رمزشده)
+            if (typeof rawPayload === 'string' && rawPayload.startsWith('scalpai-backup:v4:enc:base64:')) {
+              if (!params.backupPassword) throw new Error('Backup password required');
+              const encBytes = Buffer.from(rawPayload.split('scalpai-backup:v4:enc:base64:')[1], 'base64');
+              rawPayload = decryptWithPassword(encBytes, params.backupPassword).toString('utf-8');
+            }
+            const imported = parseBackupPayload(rawPayload);
             const previousData = data;
             const importedSettings = sanitizeSettingsForBackup(imported.settings || {});
             const nextData = {
@@ -533,6 +603,7 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
               data = previousData;
               throw error;
             }
+            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: 'json', clients: (imported.clients || []).length });
             return { success: true };
           }
 
@@ -667,6 +738,10 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
     deleteImageFile: null,
     encryptValue,
     decryptValue,
+    /** موج ۲: وقتی فایل رمزشده ولی کلید ناموجود است true می‌شود (نوشتن مسدود است) */
+    getStorageState() {
+      return { persistenceBlocked };
+    },
 
     getDecryptedAiApiKey() {
       if (!data.settings.aiApiKey) return null;

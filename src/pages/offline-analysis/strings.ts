@@ -434,6 +434,11 @@ export const offlineDict = {
   },
   activeLearningDefaultOrder: { fa: 'بازگشت به ترتیب پیش‌فرض', en: 'Back to default order' },
   uncertaintyBadge: { fa: 'عدم‌قطعیت', en: 'Uncertainty' },
+  // موج ۲ (C3.1)
+  privacyConsentRequired: {
+    fa: 'ارسال تصویر به سرویس ابری تا ثبت رضایت‌نامهٔ حریم‌خصوصی غیرفعال است.',
+    en: 'Sending images to a cloud service is disabled until the privacy notice is acknowledged.',
+  },
 
   // ── موج ۱ (W1-2) — پنل ممیزی دیتاست ──
   datasetAuditTitle: { fa: 'ممیزی دیتاست آموزشی', en: 'Training dataset audit' },
