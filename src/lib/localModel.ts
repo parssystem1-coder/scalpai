@@ -172,12 +172,12 @@ export function getCachedModelFeatureVersion() {
   return cachedModelFeatureVersion;
 }
 
-/** مدل ذخیره‌شده با v3 یا v4 ارتقایافته هنوز قابل استفاده است */
+/** آیا نسخهٔ فیچر مدل ذخیره‌شده با یکی از دو نسخهٔ قابل‌استفادهٔ فعلی سازگار است؟ */
 export function isActiveLocalModelVersion(version?: string | null): boolean {
   return version === FEATURE_VERSION || version === FEATURE_VERSION_WITH_QUESTIONNAIRE;
 }
 
-/** آیا نمونه برای آموزش باکیفیت واجد شرایط است؟ (فیچر تصویر = v3) */
+/** آیا نمونه برای آموزش باکیفیت واجد شرایط است؟ (فیچر تصویر = FEATURE_VERSION فعلی یا نسخهٔ legacy مجاز) */
 export function isSampleEligibleForTraining(s: TrainingSample): boolean {
   if (s.featureVersion && s.featureVersion !== FEATURE_VERSION && !LEGACY_FEATURE_VERSIONS.includes(s.featureVersion as typeof LEGACY_FEATURE_VERSIONS[number])) return false;
   if (s.labelSource === 'expert') return true;

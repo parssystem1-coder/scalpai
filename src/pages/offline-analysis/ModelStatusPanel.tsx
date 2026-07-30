@@ -1,7 +1,9 @@
-import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert } from 'lucide-react';
+import { useMemo } from 'react';
+import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert, Activity } from 'lucide-react';
 import type { LocalModelMetadata, TrainingSample } from '../../db';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { FEATURE_VERSION } from '../../lib/scalpFeatures';
+import { monitorDataDrift } from '../../lib/driftMonitor';
 import {
   FEATURE_VERSION_WITH_QUESTIONNAIRE,
   MIN_QUESTIONNAIRE_CLIENTS_FOR_V4,
@@ -78,6 +80,30 @@ export default function ModelStatusPanel({
   ).size;
   const v4GateReady = questionnaireSampleCount >= MIN_QUESTIONNAIRE_SAMPLES_FOR_V4
     && questionnaireClientCount >= MIN_QUESTIONNAIRE_CLIENTS_FOR_V4;
+
+  // موج ۱ (W1-1) — پایش رانش داده: میانگین فیچرهای ۳۰ نمونهٔ اخیر در برابر
+  // آمار مرجع زمان آموزش. بدون آمار مرجع یا نمونهٔ کافی، وضعیت خنثی گزارش
+  // می‌شود («نمی‌دانم» با «پایدار است» یکی گرفته نمی‌شود).
+  const driftReport = useMemo(() => {
+    if (!modelMetadata?.featureMeans?.length || !modelMetadata?.featureStds?.length) return null;
+    const recent = [...trainingSamples]
+      .filter(s => s.features && typeof s.features === 'object')
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .slice(0, 30);
+    return monitorDataDrift(recent, modelMetadata.featureMeans, modelMetadata.featureStds);
+  }, [trainingSamples, modelMetadata]);
+
+  const driftTone = !driftReport?.evaluated
+    ? 'neutral'
+    : driftReport.driftDetected
+      ? 'warn'
+      : 'ok';
+  const driftStyles = {
+    neutral: 'bg-white/5 border-white/10 text-white/60',
+    ok: 'bg-emerald-500/5 border-emerald-500/20 text-emerald-200/90',
+    warn: 'bg-amber-500/10 border-amber-500/30 text-amber-100',
+  } as const;
+  const driftedKeys = driftReport?.featureDrifts.filter(f => f.drifted).map(f => f.key) ?? [];
 
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
@@ -212,6 +238,26 @@ export default function ModelStatusPanel({
           )}
         </div>
       )}
+
+      {/* موج ۱ (W1-1) — ردیف وضعیت پایش رانش داده */}
+      <div className={`rounded-xl border p-3 mb-4 text-xs flex items-start gap-2 ${driftStyles[driftTone]}`}>
+        <Activity size={14} className="flex-shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold">{t('driftMonitorTitle')}: </span>
+          {!driftReport?.evaluated && <span>{t('driftUnavailable')}</span>}
+          {driftReport?.evaluated && !driftReport.driftDetected && <span>{t('driftStable')}</span>}
+          {driftReport?.evaluated && driftReport.driftDetected && (
+            <span>
+              {t('driftDetected')}
+              {driftedKeys.length > 0 && (
+                <span className="block mt-1 opacity-80" dir="ltr">
+                  {t('driftedFeaturesLabel')}: {driftedKeys.join(', ')}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
 
       <div className="rounded-xl bg-white/5 p-3 mb-4 text-xs opacity-80 space-y-1">
         <p>

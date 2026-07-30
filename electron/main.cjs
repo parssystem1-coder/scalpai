@@ -73,6 +73,39 @@ initLogger(userDataPath);
 const dbPath = path.join(userDataPath, 'scalpai.db');
 
 /**
+ * موج ۱ (W1-6) — پوشهٔ اختصاصی فایل‌های موقت چاپ داخل userData.
+ * قبلاً گزارش HTML (حاوی دادهٔ بالینی بیمار) در %TEMP% سیستم‌عامل نوشته می‌شد
+ * و فقط هنگام بستنِ مرتب پنجره پاک می‌شد؛ کرش یا kill یعنی بقایای دائمی
+ * دادهٔ بیمار روی دیسک. حالا فایل‌ها کنار بقیهٔ داده‌های اپ نگه داشته می‌شوند
+ * و بقایای جلسات خراب در استارت‌آپ بعدی پاک می‌شوند.
+ */
+function getPrintTmpDir() {
+  const dir = path.join(userDataPath, 'print-tmp');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+/** پاک‌سازی فایل‌های موقت چاپ باقی‌مانده از جلسات قبلی (کرش/خروج ناگهانی) */
+function cleanupStalePrintTemp() {
+  try {
+    const dir = path.join(userDataPath, 'print-tmp');
+    if (!fs.existsSync(dir)) return;
+    for (const name of fs.readdirSync(dir)) {
+      if (name.startsWith('scalpai-print-') && name.endsWith('.html')) {
+        try {
+          fs.unlinkSync(path.join(dir, name));
+          console.log('Removed stale print temp file:', name);
+        } catch { /* فایل قفل/حذف‌شده — نادیده بگیر */ }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not clean stale print temp files:', err);
+  }
+}
+
+/**
  * تنظیم پروکسی برای session
  * @param {string} proxyUrl - آدرس پروکسی (مثلاً http://127.0.0.1:10808)
  */
@@ -726,7 +759,8 @@ function setupIpcHandlers() {
   }
 
   async function createPrintWindow(html, { show = false, withPreviewPreload = false } = {}) {
-    const tmpPath = path.join(app.getPath('temp'), `scalpai-print-${Date.now()}.html`);
+    // موج ۱ (W1-6) — فایل موقت داخل userData (نه %TEMP% سیستم‌عامل)
+    const tmpPath = path.join(getPrintTmpDir(), `scalpai-print-${Date.now()}.html`);
     fs.writeFileSync(tmpPath, html, 'utf8');
 
     const printWin = new BrowserWindow({
@@ -1040,6 +1074,8 @@ app.whenReady().then(async () => {
 
   await initDatabase();
   setupIpcHandlers();
+  // موج ۱ (W1-6) — پاک‌سازی بقایای فایل‌های موقت چاپ از جلسات خراب قبلی
+  cleanupStalePrintTemp();
   // پس از ری‌استارت، پوشهٔ بکاپ ذخیره‌شده را دوباره به allowlist اضافه کن
   try {
     const settings = await dbHandlers.handleDbQuery('getSettings', {});

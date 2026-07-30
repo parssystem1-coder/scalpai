@@ -33,7 +33,18 @@ import { overlayLesionBoxes, findHotspotSquares } from './lesionVisualization';
 // تصویر به‌جای شبکهٔ ثابت مربعی) اضافه شد. چون توزیع مقادیر فیچرهای خام
 // واقعاً تغییر کرده (نه فقط برچسب نسخه)، این نسخه عمداً در LEGACY_FEATURE_VERSIONS
 // قرار نمی‌گیرد — نمونه‌های آموزشی قدیمی باید دوباره تحلیل/برچسب‌گذاری شوند.
-export const FEATURE_VERSION = 'v3.2-normalized-adaptive-grid';
+//
+// v4.2 (موج ۱ / W1-4) — ترمیم انضباط نسخه برای سگمنتیشن Otsu:
+// فاز ۲ (Otsu + ماسک پوست سر) توزیع فیچرها را واقعاً عوض کرد (rednessRatio،
+// whiteFlakeRatio و hairCoverageRatio حالا maskدار و آستانه به‌جای ثابت ۶۰
+// پویا از Otsu می‌آید) ولی نسخه بامپ نشد؛ در نتیجه نمونه‌های پیش‌‌از-Otsu و
+// پس‌از-Otsu با برچسب یکسان v3.2 مخلوط شدند. این بامپ عقب‌افتاده آن جداسازی
+// خاموش را می‌بندد. نمونه‌های v3.2 به‌صورت خودکار غیرواجد می‌شوند و با
+// مکانیزم بازمحاسبهٔ فیچر (`featureRecompute.ts`) از تصویر خام به v4.2
+// ارتقا می‌یابند — بدون سوزاندن برچسب‌های متخصص.
+// نسخه با `FEATURE_VERSION_WITH_QUESTIONNAIRE` هم‌قدم بامپ شد چون بردار
+// پرسشنامه‌دار همان بردار تصویری را هم شامل می‌شود.
+export const FEATURE_VERSION = 'v4.2-otsu-scalp-mask';
 export const LEGACY_FEATURE_VERSIONS = ['v3'] as const;
 
 // GRID_SIZE از shared/scalp-constants.json می‌آید (مشترک با python/analyze.py)

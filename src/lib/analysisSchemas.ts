@@ -93,6 +93,8 @@ export const offlineAnalysisResultSchema = z.object({
     isLowContrast: z.boolean(),
     hasIssue: z.boolean(),
   }).optional(),
+  // موج ۱ (W1-1) — عدم‌قطعیت MC-Dropout مدل محلی (فقط وقتی engine='model')
+  modelUncertainty: z.number().min(0).optional(),
 });
 
 
@@ -277,6 +279,7 @@ export function parseOfflineAnalysisResult(raw: unknown, confidenceThreshold = 0
     annotatedImageBase64: parsed.annotatedImageBase64,
     engine: parsed.engine,
     imageQuality: parsed.imageQuality,
+    modelUncertainty: parsed.modelUncertainty,
   };
 }
 

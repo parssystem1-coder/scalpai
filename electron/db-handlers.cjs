@@ -1116,6 +1116,10 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             const questionnaireFeaturesJson = params.questionnaireFeatures !== undefined
               ? (params.questionnaireFeatures != null ? JSON.stringify(params.questionnaireFeatures) : null)
               : row.questionnaireFeatures;
+            // موج ۱ (W1-4) — بازنویسی فیچرهای بازمحاسبه‌شده از تصویر خام
+            const featuresJson = params.features !== undefined
+              ? JSON.stringify(params.features)
+              : row.features;
             // فاز ۳٫۱ — baseline فقط یک‌بار نوشته می‌شود (write-once).
             // اگر متخصص چندبار ویرایش کند، مبنای مقایسه باید همان پاسخ اولیهٔ AI
             // بماند؛ وگرنه «توافق AI با متخصص» به‌تدریج و ساختگی بهبود پیدا می‌کند.
@@ -1139,7 +1143,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               UPDATE training_samples
               SET approvedForTraining = ?, featureVersion = ?, label = ?, labelSource = ?,
                   confidence = ?, usedInTraining = ?, clientId = ?, galleryItemId = ?,
-                  questionnaireFeatures = ?, originalAiLabel = ?, originalAiLabelAt = ?
+                  questionnaireFeatures = ?, originalAiLabel = ?, originalAiLabelAt = ?, features = ?
               WHERE id = ?
             `).run(
               approved,
@@ -1153,6 +1157,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               questionnaireFeaturesJson,
               originalAiLabelJson,
               originalAiLabelAt || null,
+              featuresJson,
               params.id,
             );
             const updated = db.prepare('SELECT * FROM training_samples WHERE id = ?').get(params.id);

@@ -612,6 +612,8 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
               ...(params.questionnaireFeatures !== undefined
                 ? { questionnaireFeatures: params.questionnaireFeatures || undefined }
                 : {}),
+              // موج ۱ (W1-4) — بازنویسی فیچرهای بازمحاسبه‌شده از تصویر خام
+              ...(params.features !== undefined ? { features: params.features } : {}),
             };
             save();
             return data.trainingSamples[idx];

@@ -233,6 +233,11 @@ export interface OfflineAnalysisResult {
    * فقط وقتی پر است که پیش‌بینی با مدل محلی انجام شده باشد.
    */
   ood?: import('../lib/outOfDistribution').OodAssessment;
+  /**
+   * موج ۱ (W1-1) — عدم‌قطعیت مدل محلی: میانگین انحراف‌معیار پیش‌بینی‌های
+   * MC-Dropout (۱۰ استنتاج تصادفی). فقط وقتی پر است که engine = 'model' باشد.
+   */
+  modelUncertainty?: number;
   imageQuality?: {
     blurVariance: number;
     meanBrightness: number;
@@ -346,6 +351,8 @@ export type TrainingSampleUpdatePatch = Partial<Pick<TrainingSample,
   | 'galleryItemId'
   | 'originalAiLabel'
   | 'originalAiLabelAt'
+  // موج ۱ (W1-4) — بازمحاسبهٔ فیچر از تصویر خام، باید در هر سه بک‌اند قابل نوشتن باشد
+  | 'features'
 >>;
 
 export interface LocalModelMetricsSnapshot {

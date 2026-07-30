@@ -21,6 +21,8 @@ import EngineComparePanel from './EngineComparePanel';
 import ClassMetricsPanel from './ClassMetricsPanel';
 import AiAgreementPanel from './AiAgreementPanel';
 import DataMaturityPanel from './DataMaturityPanel';
+import DatasetAuditPanel from './DatasetAuditPanel';
+import FeatureRecomputePanel from './FeatureRecomputePanel';
 import TrainingGalleryTab from './TrainingGalleryTab';
 import TrainingPoolGalleryTab from './TrainingPoolGalleryTab';
 
@@ -483,6 +485,11 @@ export default function LearningTab() {
         />
       )}
 
+      {/* موج ۱ (W1-4) — بازمحاسبهٔ فیچر نمونه‌های قدیمی از تصویر خام */}
+      {labelingSource !== 'poolGallery' && (
+        <FeatureRecomputePanel samples={trainingSamples} />
+      )}
+
       {labelingSource !== 'poolGallery' && <ModelStatusPanel
         trainingSamples={trainingSamples}
         samplesBySource={stats.samplesBySource}
@@ -512,6 +519,11 @@ export default function LearningTab() {
 
       {labelingSource !== 'poolGallery' && (
         <AiAgreementPanel samples={trainingSamples} />
+      )}
+
+      {/* موج ۱ (W1-2) — ممیزی دیتاست: برچسب‌های کم‌نمونه، تکراری‌ها و دوقلوهای بصری */}
+      {labelingSource !== 'poolGallery' && (
+        <DatasetAuditPanel samples={trainingSamples} />
       )}
 
       {labelingSource !== 'poolGallery' && <EngineComparePanel

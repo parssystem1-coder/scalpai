@@ -10,16 +10,16 @@ export default function About() {
       icon: Cpu,
       title: isRtl ? 'پردازش تصویر هوشمند' : 'Intelligent Image Processing',
       desc: isRtl 
-        ? 'سگمنتیشن Otsu بر روی کانال اشباع پوست سر به همراه CLAHE و کالیبراسیون لنز جهت حذف اثر تداخل مو بر روی محاسبات قرمزی و شوره.' 
-        : 'Otsu segmentation on saturation channel with CLAHE and lens calibration to eliminate hair interference on redness and dandruff.',
+        ? 'سگمنتیشن خودکار مو/پوست با آستانه‌یابی Otsu روی هیستوگرام روشنایی و ماسک پوست سر، جهت حذف اثر تداخل مو بر روی محاسبات قرمزی، شوره و پیگمنتاسیون.' 
+        : 'Automatic hair/scalp segmentation with Otsu thresholding on the brightness histogram and a scalp mask, eliminating hair interference on redness, dandruff and pigmentation metrics.',
       color: 'text-blue-400 bg-blue-500/10 border-blue-500/20'
     },
     {
       icon: Brain,
       title: isRtl ? 'هوش مصنوعی محلی پایدار' : 'Stable Local Machine Learning',
       desc: isRtl 
-        ? 'مدل محلی مجهز به ساختار Focal Loss جهت مهار عدم توازن کلاس‌های پزشکی و کالیبراسیون دما (Temperature Scaling) برای ارتقای ECE.' 
-        : 'Local model equipped with Focal Loss to handle clinical class imbalance and Temperature Scaling to optimize ECE.',
+        ? 'مدل محلی مجهز به Focal Loss جهت مهار عدم‌توازن کلاس‌های پزشکی و سنجش صادقانهٔ کالیبراسیون با ECE و Brier Score (کالیبراسیون دمایی پس از تأیید نیاز با دادهٔ واقعی اعمال می‌شود).' 
+        : 'Local model with Focal Loss to handle clinical class imbalance and honest calibration measurement via ECE and Brier Score (temperature scaling is applied only after real-world data proves it necessary).',
       color: 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/20'
     },
     {

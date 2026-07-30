@@ -19,8 +19,13 @@ import {
   type QuestionnaireFieldKey,
 } from './medicalQuestionnaireSchema';
 
-/** نسخهٔ فیچر تصویر+پرسشنامه — فعال نمی‌شود مگر برتری holdout اثبات شود */
-export const FEATURE_VERSION_WITH_QUESTIONNAIRE = 'v4.1-observation-catalog';
+/**
+ * نسخهٔ فیچر تصویر+پرسشنامه — فعال نمی‌شود مگر برتری holdout اثبات شود.
+ * موج ۱ (W1-4): هم‌قدم با FEATURE_VERSION تصویر از v4.1 به v4.2 بامپ شد، چون
+ * بردار پرسشنامه‌دار = بردار تصویری + فیچرهای پرسشنامه است و تغییر فرمول
+ * تصویر (سگمنتیشن Otsu در فاز ۲) بخش تصویری مدل‌های v4.1 را هم قدیمی می‌کند.
+ */
+export const FEATURE_VERSION_WITH_QUESTIONNAIRE = 'v4.2-otsu-questionnaire';
 
 /** حداقل نمونهٔ دارای پرسشنامه برای شروع آزمایش v4 */
 export const MIN_QUESTIONNAIRE_SAMPLES_FOR_V4 = 30;

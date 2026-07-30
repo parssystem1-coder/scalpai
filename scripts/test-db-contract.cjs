@@ -206,6 +206,16 @@ async function runContract(harness) {
   assert.strictEqual(sample.approvedForTraining, true, `${tag}: approvedForTraining`);
   assert.strictEqual(sample.featureVersion, 'v3', `${tag}: featureVersion`);
 
+  // موج ۱ (W1-4) — بازنویسی فیچرهای بازمحاسبه‌شده باید در هر دو بک‌اند round-trip شود
+  const recomputedFeatures = { brightness: 42, whiteFlakeRatio: 0.2, hairCoverageRatio: 0.6 };
+  const patchedSample = await assertOk(await q('updateTrainingSample', {
+    id: sample.id,
+    features: recomputedFeatures,
+    featureVersion: 'v4.2-otsu-scalp-mask',
+  }), `${tag} updateTrainingSample(features)`);
+  assert.deepStrictEqual(patchedSample.features, recomputedFeatures, `${tag}: features round-trip`);
+  assert.strictEqual(patchedSample.featureVersion, 'v4.2-otsu-scalp-mask', `${tag}: featureVersion bump round-trip`);
+
   // --- questionnaire revisions: upsert + read + cascade ---
   const revision = await assertOk(await q('saveQuestionnaireRevision', {
     clientId: client.id,

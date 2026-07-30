@@ -342,6 +342,8 @@ export function useOfflineSession() {
                 acquisitionContext,
                 // فاز ۴٫۳ — اگر تصویر خارج از توزیع آموزشی باشد، در UI هشدار داده می‌شود
                 ood: prediction.ood,
+                // موج ۱ (W1-1) — نمرهٔ عدم‌قطعیت MC-Dropout برای نمایش به پزشک
+                modelUncertainty: prediction.uncertainty,
               };
               setEngineInfo(t('engineLocalModel'));
             }

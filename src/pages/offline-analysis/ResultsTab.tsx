@@ -1,5 +1,5 @@
 import {
-  CheckCircle, BarChart3, User, Calendar, Eye, Printer, Share2, AlertTriangle, FileDown,
+  CheckCircle, BarChart3, User, Calendar, Eye, Printer, Share2, AlertTriangle, FileDown, Gauge,
 } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer,
@@ -273,9 +273,49 @@ export default function ResultsTab({
             {(result as OfflineAnalysisResult).ood!.level === 'outOfRange'
               ? t('oodOutOfRange')
               : t('oodBorderline')}
+            {/* موج ۱ (W1-1) — عدد فاصلهٔ ماهالانوبیس برای عیب‌یابی متخصص */}
+            {typeof (result as OfflineAnalysisResult).ood!.mahalanobisDistance === 'number'
+              && Number.isFinite((result as OfflineAnalysisResult).ood!.mahalanobisDistance) && (
+              <span className="opacity-70 text-xs block mt-0.5">
+                {t('oodDistanceLabel')}: {(result as OfflineAnalysisResult).ood!.mahalanobisDistance!.toFixed(2)}
+              </span>
+            )}
           </span>
         </div>
       )}
+      {/* موج ۱ (W1-1) — نمایش نمرهٔ عدم‌قطعیت MC-Dropout به پزشک */}
+      {isOfflineSource
+        && (result as OfflineAnalysisResult).engine === 'model'
+        && typeof (result as OfflineAnalysisResult).modelUncertainty === 'number'
+        && Number.isFinite((result as OfflineAnalysisResult).modelUncertainty) && (() => {
+          // آستانه‌های نمایش برآورد مهندسی‌اند و طبق قرارداد پروژه با دادهٔ
+          // میدانی آینده بازکالیبره می‌شوند (مانند آستانه‌های OOD).
+          const u = (result as OfflineAnalysisResult).modelUncertainty!;
+          const level: 'high' | 'medium' | 'low' = u < 0.05 ? 'high' : u < 0.12 ? 'medium' : 'low';
+          const styles = {
+            high: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100/90',
+            medium: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-100/90',
+            low: 'border-orange-500/30 bg-orange-500/10 text-orange-100/90',
+          } as const;
+          const iconColor = { high: 'text-emerald-400', medium: 'text-yellow-400', low: 'text-orange-400' } as const;
+          const label = level === 'high'
+            ? t('uncertaintyHighConfidence')
+            : level === 'medium'
+              ? t('uncertaintyMediumConfidence')
+              : t('uncertaintyHighLevel');
+          return (
+            <div
+              className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${styles[level]}`}
+              title={t('modelUncertaintyHint')}
+            >
+              <Gauge size={16} className={`flex-shrink-0 mt-0.5 ${iconColor[level]}`} />
+              <span>
+                {t('modelConfidenceTitle')}: <b>{label}</b>
+                <span className="opacity-60 text-xs" dir="ltr"> ({u.toFixed(3)})</span>
+              </span>
+            </div>
+          );
+        })()}
       {isOfflineSource && (result as OfflineAnalysisResult).engine !== 'model' && (
         <div className="flex items-start gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-sm text-sky-100/85">
           <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-sky-400" />

@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Check, Pencil, Trash2, X, ChevronRight, ChevronLeft, Filter, Calendar, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Pencil, Trash2, X, ChevronRight, ChevronLeft, Filter, Calendar, Search, Gauge, Loader } from 'lucide-react';
 import type { TrainingSample } from '../../db';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { useT } from '../../i18n';
 import { offlineDict } from './strings';
 import { observationGroups, observationsInGroup } from '../../lib/diagnosisCatalog';
+import { useTrainingSamplesStore } from '../../store';
 
 interface Props {
   samples: TrainingSample[];
@@ -34,6 +35,64 @@ export default function RecentSamplesPanel({
   // صفحه‌بندی
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  // موج ۱ (W1-1) — مرتب‌سازی یادگیری فعال: شناسهٔ نمونه → عدم‌قطعیت MC-Dropout
+  const [alBusy, setAlBusy] = useState(false);
+  const [alOrder, setAlOrder] = useState<Map<string, number> | null>(null);
+  const [alMessage, setAlMessage] = useState('');
+  const modelMetadata = useTrainingSamplesStore(s => s.modelMetadata);
+
+  // با تغییر مجموعهٔ نمونه‌ها (تأیید/حذف/ویرایش)، رتبه‌بندی قدیمی باطل می‌شود
+  // تا نمره‌های بیات روی نمونه‌های تازه دیده نشوند.
+  useEffect(() => {
+    setAlOrder(null);
+    setAlMessage('');
+  }, [samples]);
+
+  /** فعال‌سازی مرتب‌سازی بر اساس عدم‌قطعیت مدل روی نمونه‌های در انتظار بازبینی */
+  const handleActiveLearningSort = async () => {
+    if (alOrder) {
+      setAlOrder(null);
+      setAlMessage('');
+      return;
+    }
+    setAlBusy(true);
+    setAlMessage('');
+    try {
+      // بارگذاری تنبل — چپ TF.js فقط هنگام استفادهٔ واقعی وارد باندل می‌شود
+      const modelMod = await import('../../lib/localModel');
+      const { rankActiveLearningQueue } = await import('../../lib/activeLearning');
+      if (modelMetadata?.featureMeans?.length && modelMetadata?.featureStds?.length) {
+        modelMod.setCachedFeatureNorm({
+          means: modelMetadata.featureMeans,
+          stds: modelMetadata.featureStds,
+        });
+        modelMod.setCachedObsPolicy({
+          thresholds: modelMetadata.obsThresholds,
+          suppressedLabels: modelMetadata.suppressedLabels,
+        });
+      }
+      if (!(await modelMod.hasLocalModel())) {
+        setAlMessage(t('activeLearningNoModel'));
+        return;
+      }
+      // صف یادگیری فعال = نمونه‌هایی که هنوز تأیید متخصص نشده‌اند
+      const pending = filteredSamples.filter(
+        s => !(s.labelSource === 'expert' || s.approvedForTraining === true),
+      );
+      if (pending.length === 0) {
+        setAlMessage(t('activeLearningNoPending'));
+        return;
+      }
+      const queue = await rankActiveLearningQueue(pending);
+      setAlOrder(new Map(queue.map(q => [q.sample.id, q.uncertainty])));
+      setAlMessage(t('activeLearningSorted'));
+    } catch {
+      setAlMessage(t('activeLearningNoModel'));
+    } finally {
+      setAlBusy(false);
+    }
+  };
 
   if (samples.length === 0) return null;
 
@@ -68,11 +127,24 @@ export default function RecentSamplesPanel({
     return true;
   });
 
+  // موج ۱ (W1-1) — هنگام فعال بودن یادگیری فعال، نمونه‌ها بر اساس عدم‌قطعیت
+  // مرتب می‌شوند؛ نمونه‌های بدون نمره (مثلاً قبلاً تأییدشده) به انتها می‌روند.
+  const orderedSamples = alOrder
+    ? [...filteredSamples].sort((a, b) => {
+      const ua = alOrder.get(a.id);
+      const ub = alOrder.get(b.id);
+      if (ua === undefined && ub === undefined) return 0;
+      if (ua === undefined) return 1;
+      if (ub === undefined) return -1;
+      return ub - ua;
+    })
+    : filteredSamples;
+
   // محاسبات صفحه‌بندی
-  const totalPages = Math.max(1, Math.ceil(filteredSamples.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(orderedSamples.length / pageSize));
   const activePage = Math.min(currentPage, totalPages);
   const startIndex = (activePage - 1) * pageSize;
-  const pagedSamples = filteredSamples.slice(startIndex, startIndex + pageSize);
+  const pagedSamples = orderedSamples.slice(startIndex, startIndex + pageSize);
 
   // پیدا کردن برچسب عارضه بالینی انتخاب‌شده برای نمایش
   const getSelectedObsLabel = () => {
@@ -103,6 +175,27 @@ export default function RecentSamplesPanel({
           <span>{isRtl ? 'نمونه‌های آموزشی اخیر در این صندوق' : 'Recent Training Samples'}</span>
         </h3>
         <div className="flex items-center gap-3">
+          {/* موج ۱ (W1-1) — دکمهٔ مرتب‌سازی یادگیری فعال */}
+          <button
+            type="button"
+            onClick={handleActiveLearningSort}
+            disabled={alBusy}
+            title={t('activeLearningSort')}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all disabled:opacity-50 ${
+              alOrder
+                ? 'border-fuchsia-500 bg-fuchsia-500/20 text-fuchsia-300'
+                : 'border-white/10 text-white/70 hover:bg-white/5'
+            }`}
+          >
+            {alBusy ? <Loader size={14} className="animate-spin" /> : <Gauge size={14} />}
+            <span>
+              {alBusy
+                ? t('activeLearningSorting')
+                : alOrder
+                  ? t('activeLearningDefaultOrder')
+                  : t('activeLearningSort')}
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => setFilterPanelOpen(!filterPanelOpen)}
@@ -183,6 +276,19 @@ export default function RecentSamplesPanel({
         </div>
       )}
 
+      {/* موج ۱ (W1-1) — پیام وضعیت مرتب‌سازی یادگیری فعال */}
+      {alMessage && (
+        <div className={`rounded-xl border px-3 py-2 text-xs ${
+          alOrder
+            ? 'bg-fuchsia-500/10 border-fuchsia-500/25 text-fuchsia-200/90'
+            : alMessage === t('activeLearningNoModel')
+              ? 'bg-yellow-500/10 border-yellow-500/25 text-yellow-200/90'
+              : 'bg-white/5 border-white/10 text-white/70'
+        }`}>
+          {alMessage}
+        </div>
+      )}
+
       {/* نشانگر فیلترهای فعال */}
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2 bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs">
@@ -260,6 +366,24 @@ export default function RecentSamplesPanel({
                       {formatDateForDisplay(s.createdAt.split('T')[0])}
                     </span>
                     {s.usedInTraining && <span className="text-xs text-blue-400">{t('used')}</span>}
+                    {/* موج ۱ (W1-1) — نشان عدم‌قطعیت هنگام مرتب‌سازی یادگیری فعال */}
+                    {alOrder && alOrder.get(s.id) !== undefined && (() => {
+                      const u = alOrder.get(s.id)!;
+                      const tone = u >= 0.12
+                        ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                        : u >= 0.05
+                          ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                      return (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs border ${tone}`}
+                          title={t('modelUncertaintyHint')}
+                          dir="ltr"
+                        >
+                          {t('uncertaintyBadge')}: {u.toFixed(3)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button

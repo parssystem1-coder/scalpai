@@ -386,4 +386,85 @@ export const offlineDict = {
     en: 'Configure an AI API key in Settings first',
   },
   noRegionTag: { fa: 'بدون برچسب ناحیه', en: 'No region tag' },
+
+  // ── موج ۱ (W1-1) — نمایش عدم‌قطعیت مدل محلی در تب نتایج ──
+  modelConfidenceTitle: { fa: 'اطمینان مدل محلی', en: 'Local model confidence' },
+  modelUncertaintyHint: {
+    fa: 'عدم‌قطعیت = میانگین انحراف‌معیار ۱۰ پیش‌بینی تصادفی MC-Dropout؛ بالاتر یعنی مدل کمتر مطمئن است.',
+    en: 'Uncertainty = mean std-dev of 10 MC-Dropout stochastic passes; higher means the model is less sure.',
+  },
+  uncertaintyHighConfidence: { fa: 'اطمینان بالا', en: 'High confidence' },
+  uncertaintyMediumConfidence: { fa: 'اطمینان متوسط', en: 'Medium confidence' },
+  uncertaintyHighLevel: {
+    fa: 'عدم‌قطعیت بالا — بازبینی متخصص توصیه می‌شود',
+    en: 'High uncertainty — expert review recommended',
+  },
+  oodDistanceLabel: { fa: 'فاصلهٔ ماهالانوبیس', en: 'Mahalanobis distance' },
+
+  // ── موج ۱ (W1-1) — پایش رانش داده در پنل وضعیت مدل ──
+  driftMonitorTitle: { fa: 'پایش رانش داده', en: 'Data drift monitor' },
+  driftStable: { fa: 'توزیع نمونه‌های اخیر نسبت به زمان آموزش پایدار است', en: 'Recent sample distribution is stable vs. training time' },
+  driftDetected: {
+    fa: 'رانش داده شناسایی شد — بازآموزی مدل توصیه می‌شود',
+    en: 'Data drift detected — retraining the model is recommended',
+  },
+  driftUnavailable: {
+    fa: 'دادهٔ کافی برای پایش رانش نیست (مدل یا نمونه‌های اخیر ناکافی)',
+    en: 'Not enough data for drift monitoring (model or recent samples missing)',
+  },
+  driftedFeaturesLabel: { fa: 'فیچرهای منحرف', en: 'Drifting features' },
+
+  // ── موج ۱ (W1-1) — مرتب‌سازی یادگیری فعال در صف برچسب‌گذاری ──
+  activeLearningSort: {
+    fa: 'مرتب‌سازی بر اساس سختی برای مدل (یادگیری فعال)',
+    en: 'Sort by hardness for the model (active learning)',
+  },
+  activeLearningSorting: { fa: 'در حال امتیازدهی عدم‌قطعیت با MC-Dropout...', en: 'Scoring uncertainty with MC-Dropout...' },
+  activeLearningNoModel: {
+    fa: 'مدل محلی در دسترس نیست — ابتدا مدل را آموزش دهید تا مرتب‌سازی بر اساس عدم‌قطعیت فعال شود.',
+    en: 'No local model available — train the model first to enable uncertainty-based sorting.',
+  },
+  activeLearningNoPending: {
+    fa: 'نمونهٔ در انتظار بازبینی برای مرتب‌سازی وجود ندارد (همه تأیید شده‌اند).',
+    en: 'No pending samples to sort (everything is already approved).',
+  },
+  activeLearningSorted: {
+    fa: 'مرتب‌شده بر اساس عدم‌قطعیت (سخت‌ترین برای مدل اول)',
+    en: 'Sorted by uncertainty (hardest for the model first)',
+  },
+  activeLearningDefaultOrder: { fa: 'بازگشت به ترتیب پیش‌فرض', en: 'Back to default order' },
+  uncertaintyBadge: { fa: 'عدم‌قطعیت', en: 'Uncertainty' },
+
+  // ── موج ۱ (W1-2) — پنل ممیزی دیتاست ──
+  datasetAuditTitle: { fa: 'ممیزی دیتاست آموزشی', en: 'Training dataset audit' },
+  datasetAuditDesc: {
+    fa: 'برچسب‌های کم‌نمونه، تکراری‌های هم‌تصویر و دوقلوهای بصری (dHash) — گزارش فقط خواندنی است و هیچ حذف خودکاری انجام نمی‌دهد.',
+    en: 'Under-supported labels, same-image duplicates and visual twins (dHash) — read-only report, nothing is deleted automatically.',
+  },
+  auditRun: { fa: 'اجرای ممیزی', en: 'Run audit' },
+  auditRunning: { fa: 'در حال اجرای ممیزی...', en: 'Running audit...' },
+  auditTotalSamples: { fa: 'کل نمونه‌ها', en: 'Total samples' },
+  auditUnderSupported: { fa: 'برچسب‌های کم‌نمونه (زیر ۵ نمونه)', en: 'Under-supported labels (under 5)' },
+  auditDuplicates: { fa: 'تکراری‌های هم‌تصویر', en: 'Same-image duplicates' },
+  auditVisualTwins: { fa: 'دوقلوهای بصری (dHash)', en: 'Visual twins (dHash)' },
+  auditDhashCoverage: { fa: 'پوشش dHash تصاویر گالری', en: 'Gallery dHash coverage' },
+  auditNoIssue: { fa: 'مورد قابل‌توجهی یافت نشد', en: 'Nothing notable found' },
+  auditMinDistanceLabel: { fa: 'کمترین فاصلهٔ همینگ', en: 'Min Hamming distance' },
+  auditSamplesLabel: { fa: 'نمونه', en: 'samples' },
+  auditImagesLabel: { fa: 'تصویر', en: 'images' },
+
+  // ── موج ۱ (W1-4) — پنل بازمحاسبهٔ فیچر ──
+  recomputeTitle: { fa: 'به‌روزرسانی نسخهٔ فیچرها', en: 'Feature version upgrade' },
+  recomputeDesc: {
+    fa: 'با ارتقای موتور استخراج (سگمنتیشن Otsu)، فیچر نمونه‌های قدیمی باید با فرمول جدید بازمحاسبه شود تا استخر آموزشی مخلوط نشود. برچسب‌های متخصص حفظ می‌شوند.',
+    en: 'After the extraction engine upgrade (Otsu segmentation), old sample features must be recomputed with the new formula to keep the training pool unmixed. Expert labels are preserved.',
+  },
+  recomputeRun: { fa: 'بازمحاسبهٔ فیچرها', en: 'Recompute features' },
+  recomputeRunning: { fa: 'در حال بازمحاسبه...', en: 'Recomputing...' },
+  recomputeCancel: { fa: 'لغو', en: 'Cancel' },
+  recomputeNothing: { fa: 'همهٔ نمونه‌ها به‌روز هستند', en: 'All samples are up to date' },
+  recomputeUpgradable: { fa: 'قابل ارتقا', en: 'Upgradable' },
+  recomputeNoImage: { fa: 'بدون تصویر خام (بازنشسته)', en: 'No raw image (retired)' },
+  recomputeCurrentVersion: { fa: 'به‌روز', en: 'Up to date' },
+  recomputeFailedLabel: { fa: 'ناموفق', en: 'failed' },
 } as const satisfies Dict;
