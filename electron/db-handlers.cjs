@@ -236,6 +236,60 @@ function createDbHandlers(db, userDataPath, safeStorage) {
     };
   }
 
+  /**
+   * نوشتن ZIP بکاپ در مسیر مشخص: data.json + تصاویر + (اختیاری) مدل TF.js.
+   * موج ۳ (O2/O3) — تنها محل ساخت ZIP بکاپ؛ خروجی همیشه استریم روی دیسک
+   * است و این تابع هیچ بافر بزرگی (کل آرشیو) در حافظه نمی‌سازد.
+   * @param {string} zipPath
+   * @param {string} dataJsonString — محتوای data.json (envelope آماده)
+   * @param {object} [modelBundle] — { modelTopology, weightSpecs, weightDataBase64, featureVersion, metadata }
+   * @returns {Promise<void>}
+   */
+  async function writeBackupZip(zipPath, dataJsonString, modelBundle) {
+    const { ZipArchive } = await import('archiver');
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(zipPath);
+      const archive = new ZipArchive({ zlib: { level: 9 } });
+
+      output.on('close', () => resolve());
+      output.on('end', () => resolve());
+      archive.on('error', (err) => reject(err));
+      archive.pipe(output);
+
+      archive.append(dataJsonString, { name: 'data.json' });
+
+      const originalGalleryRows = db.prepare('SELECT * FROM gallery').all();
+      for (const item of originalGalleryRows) {
+        if (item.filePath && fs.existsSync(item.filePath)) {
+          const portablePath = getPortableRelativePath(item.filePath);
+          archive.file(item.filePath, { name: 'images/' + portablePath });
+        }
+      }
+
+      // موج ۳ (O3): مدل TF.js — topology+specs به‌صورت model.json و وزن‌ها
+      // به‌صورت باینری model.weights.bin داخل ZIP می‌آیند تا بکاپ، مدل
+      // آموزش‌دیده را هم حمل کند. importData آن‌ها را می‌خواند و به‌عنوان
+      // challenger به renderer برمی‌گرداند (هیچ‌وقت مستقیم فعال نمی‌شود).
+      if (
+        modelBundle && typeof modelBundle === 'object' &&
+        modelBundle.modelTopology && Array.isArray(modelBundle.weightSpecs) &&
+        typeof modelBundle.weightDataBase64 === 'string'
+      ) {
+        archive.append(JSON.stringify({
+          format: 'scalpai-model-bundle',
+          version: 1,
+          featureVersion: modelBundle.featureVersion || null,
+          metadata: modelBundle.metadata || null,
+          modelTopology: modelBundle.modelTopology,
+          weightSpecs: modelBundle.weightSpecs,
+        }), { name: 'model.json' });
+        archive.append(Buffer.from(modelBundle.weightDataBase64, 'base64'), { name: 'model.weights.bin' });
+      }
+
+      archive.finalize();
+    });
+  }
+
   return {
     /**
      * پردازش متدهای دیتابیس
@@ -848,32 +902,7 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             const dataJsonString = JSON.stringify(envelope, null, 2);
             const tmpPath = path.join(userDataPath, `backup-temp-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.zip`);
 
-            const { ZipArchive } = await import('archiver');
-            const createZipPromise = () => {
-              return new Promise((resolve, reject) => {
-                const output = fs.createWriteStream(tmpPath);
-                const archive = new ZipArchive({ zlib: { level: 9 } });
-
-                output.on('close', () => resolve());
-                output.on('end', () => resolve());
-                archive.on('error', (err) => reject(err));
-                archive.pipe(output);
-
-                archive.append(dataJsonString, { name: 'data.json' });
-
-                const originalGalleryRows = db.prepare('SELECT * FROM gallery').all();
-                for (const item of originalGalleryRows) {
-                  if (item.filePath && fs.existsSync(item.filePath)) {
-                    const portablePath = getPortableRelativePath(item.filePath);
-                    archive.file(item.filePath, { name: 'images/' + portablePath });
-                  }
-                }
-
-                archive.finalize();
-              });
-            };
-
-            await createZipPromise();
+            await writeBackupZip(tmpPath, dataJsonString, params.modelBundle);
 
             const zipBuffer = fs.readFileSync(tmpPath);
 
@@ -895,10 +924,93 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             return 'scalpai-backup:v3:base64:' + zipBuffer.toString('base64');
           }
 
+          // موج ۳ (O2) — خروجی فایل‌محور: ZIP مستقیماً در کنار مقصد ساخته و
+          // اتمیک rename می‌شود؛ payload باینری هرگز روی IPC رفت‌وبرگشت
+          // نمی‌کند (پاک شدن مسیر ۳ نسخهٔ هم‌زمان: zipBuffer + base64 +
+          // کپی IPC). بکاپ رمزدار v4 نیز همان envelope موج ۲ (SCPB) است ولی
+          // نتیجه به‌جای رشته، در فایل مقصد نوشته می‌شود.
+          case 'exportDataToFile': {
+            const rawSettings = JSON.parse(db.prepare('SELECT value FROM settings WHERE key = ?').get('settings')?.value || '{}');
+            const trainingSamplesRows = db.prepare('SELECT * FROM training_samples').all().map(r => ({
+              ...r,
+              features: parseStoredJson(r.features, {}),
+              label: parseStoredJson(r.label, {}),
+              questionnaireFeatures: parseStoredJson(r.questionnaireFeatures, undefined),
+              originalAiLabel: parseStoredJson(r.originalAiLabel, undefined),
+              originalAiLabelAt: r.originalAiLabelAt || undefined,
+              usedInTraining: !!r.usedInTraining,
+            }));
+            const modelMetadataRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('localModelMetadata');
+            const galleryRows = db.prepare('SELECT * FROM gallery').all().map(item => ({
+              ...item,
+              metadata: parseStoredJson(item.metadata, {}),
+              imageData: null,
+            }));
+            const analysisRows = db.prepare('SELECT * FROM analyses').all().map(analysis => ({
+              ...analysis,
+              medicalQuestionnaire: parseStoredJson(analysis.medicalQuestionnaire, {}),
+              observations: parseStoredJson(analysis.observations, []),
+              aiResults: parseStoredJson(analysis.aiResults, null),
+              offlineResults: parseStoredJson(analysis.offlineResults, null),
+            }));
+            const questionnaireRows = db.prepare('SELECT * FROM questionnaire_revisions').all().map(mapQuestionnaireRevisionRow);
+            const imageKey = imageKeyOrNull();
+            const data = {
+              clients: db.prepare('SELECT * FROM clients').all(),
+              gallery: galleryRows,
+              sessions: db.prepare('SELECT * FROM sessions').all(),
+              trichologists: db.prepare('SELECT * FROM trichologists').all(),
+              analyses: analysisRows,
+              settings: sanitizeSettingsForBackup(rawSettings),
+              trainingSamples: trainingSamplesRows,
+              localModelMetadata: modelMetadataRow ? JSON.parse(modelMetadataRow.value) : null,
+              questionnaireRevisions: questionnaireRows,
+              auditLog: db.prepare('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT 2000').all(),
+              mediaEncryption: imageKey
+                ? { version: 1, algorithm: 'AES-256-GCM', kdf: 'HKDF-SHA256', purpose: 'image-aes', key: imageKey.toString('base64') }
+                : undefined,
+            };
+            const envelope = createBackupEnvelope(data);
+            envelope.version = 3;
+
+            const targetPath = typeof params.targetPath === 'string' ? params.targetPath : '';
+            if (!targetPath) throw new Error('exportDataToFile: targetPath is required');
+            const partPath = `${targetPath}.part-${crypto.randomUUID().slice(0, 8)}`;
+            try {
+              await writeBackupZip(partPath, JSON.stringify(envelope, null, 2), params.modelBundle);
+              if (params.backupPassword) {
+                // بکاپ رمزدار: کل ZIP یک‌بار رمز و مستقیم روی مقصد نوشته می‌شود.
+                // یک نسخهٔ بافر در main لازم است (جایگزین ۳+ نسخهٔ مسیر قدیمی؛
+                // فرمت متنی prefix + base64 با خروجی رشته‌ای موج ۲ و مسیر import
+                // وب یکسان است تا هر فایل .zip.enc روی هر دو مسیر باز شود).
+                const encrypted = encryptWithPassword(fs.readFileSync(partPath), params.backupPassword);
+                fs.rmSync(partPath, { force: true });
+                fs.writeFileSync(targetPath, 'scalpai-backup:v4:enc:base64:' + encrypted.toString('base64'), 'utf-8');
+                recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v4-file', passwordProtected: true, mediaKeyIncluded: !!imageKey });
+              } else {
+                fs.renameSync(partPath, targetPath);
+                recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v3-file', passwordProtected: false, mediaKeyIncluded: !!imageKey });
+              }
+              return {
+                success: true,
+                filePath: targetPath,
+                bytes: fs.statSync(targetPath).size,
+                passwordProtected: !!params.backupPassword,
+              };
+            } catch (error) {
+              fs.rmSync(partPath, { force: true });
+              throw error;
+            }
+          }
+
           case 'importData': {
             let data;
             let isV3 = false;
             let zip = null;
+            // موج ۳ (O3): مدل داخل بکاپ — به‌عنوان challenger به renderer
+            // برگردانده می‌شود و این‌جا فقط استخراج می‌گردد (فعال‌سازی بر عهدهٔ
+            // renderer با گیت دستی کاربر است).
+            let importedModel = null;
 
             let rawPayload = params.jsonData;
             // موج ۲ (C2.4) — بکاپ رمزدار v4: اول کل فایل با پسورد کاربر باز می‌شود
@@ -917,8 +1029,33 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               if (!dataEntry) throw new Error('data.json not found in backup zip');
               const dataJsonString = dataEntry.getData().toString('utf8');
               data = parseBackupPayload(dataJsonString);
+
+              const modelJsonEntry = zip.getEntry('model.json');
+              const modelWeightsEntry = zip.getEntry('model.weights.bin');
+              if (modelJsonEntry && modelWeightsEntry) {
+                try {
+                  const modelDoc = JSON.parse(modelJsonEntry.getData().toString('utf8'));
+                  if (modelDoc && modelDoc.modelTopology && Array.isArray(modelDoc.weightSpecs)) {
+                    importedModel = {
+                      modelTopology: modelDoc.modelTopology,
+                      weightSpecs: modelDoc.weightSpecs,
+                      weightDataBase64: modelWeightsEntry.getData().toString('base64'),
+                      featureVersion: modelDoc.featureVersion || null,
+                      metadata: modelDoc.metadata || null,
+                    };
+                  }
+                } catch (modelError) {
+                  // مدل معیوب نباید import داده را متوقف کند — بکاپ بدون مدل هم معتبر است
+                  console.warn('Ignoring invalid model bundle in backup:', modelError.message);
+                }
+              }
             } else {
               data = parseBackupPayload(rawPayload);
+              // بک‌اند JSON/وب: مدل به‌صورت فیلد ساختاری در envelope می‌آید
+              if (data.modelBundle) {
+                importedModel = { ...data.modelBundle };
+                delete data.modelBundle;
+              }
             }
 
             // کلید تصاویر مبدأ (در صورت وجود) برای بازنویسی با کلید این دستگاه
@@ -1112,8 +1249,8 @@ function createDbHandlers(db, userDataPath, safeStorage) {
               throw error;
             }
             for (const item of previousGallery) deleteImageFile(item.filePath);
-            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: isV3 ? 'v3/v4' : 'legacy', clients: (data.clients || []).length, gallery: (data.gallery || []).length });
-            return { success: true };
+            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: isV3 ? 'v3/v4' : 'legacy', clients: (data.clients || []).length, gallery: (data.gallery || []).length, modelIncluded: !!importedModel });
+            return { success: true, importedModel };
           }
 
           // =============== یادگیری ماشین محلی (Training Samples) ===============

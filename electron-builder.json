@@ -14,7 +14,8 @@
     "public/**/*",
     "!node_modules/**/*",
     "node_modules/better-sqlite3/**/*",
-    "node_modules/better-sqlite3-multiple-ciphers/**/*"
+    "node_modules/better-sqlite3-multiple-ciphers/**/*",
+    "node_modules/electron-updater/**/*"
   ],
   "asarUnpack": [
     "node_modules/better-sqlite3/**/*",
@@ -116,5 +117,12 @@
     "category": "Medical",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
   },
-  "publish": null
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "parssystem1-coder",
+      "repo": "scalpai",
+      "releaseType": "release"
+    }
+  ]
 }

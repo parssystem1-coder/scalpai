@@ -61,6 +61,25 @@ export const settingsDict = {
   decryptAndRestore: { fa: 'رمزگشایی و بازیابی', en: 'Decrypt & restore' },
   cancelEncryptedRestore: { fa: 'انصراف', en: 'Cancel' },
   wrongBackupPassword: { fa: 'پسورد اشتباه است یا فایل خراب شده', en: 'Wrong password or corrupted file' },
+  // موج ۳ (O2/O3) — بکاپ فایل‌محور + مدل داخل بکاپ
+  backupExportError: { fa: 'تهیهٔ فایل پشتیبان ناموفق بود', en: 'Creating the backup failed' },
+  backupTransferBusy: { fa: 'در حال پردازش…', en: 'Working…' },
+  includeModelInBackup: {
+    fa: 'مدل محلی هوش مصنوعی هم داخل بکاپ قرار گیرد',
+    en: 'Include the local AI model in the backup',
+  },
+  backupModelHint: {
+    fa: 'وزن‌های مدل محلی (در صورت وجود) داخل فایل پشتیبان می‌نشینند. هنگام بازیابی، مدل به‌صورت «چلنجر غیرفعال» پیشنهاد می‌شود و فقط با تأیید شما در تب یادگیری ماشین فعال خواهد شد.',
+    en: 'Local model weights (if any) are embedded in the backup. On restore, the model is staged as an inactive “challenger” and is only activated with your approval in the Machine Learning tab.',
+  },
+  modelStagedAsChallenger: {
+    fa: 'مدل داخل بکاپ به‌عنوان «چلنجر» در تب یادگیری ماشین آمادهٔ بررسی است.',
+    en: 'The bundled model is staged as a “challenger” in the Machine Learning tab for your review.',
+  },
+  modelImportRejected: {
+    fa: 'مدل داخل بکاپ معتبر یا سازگار نبود و پارک نشد؛ خودِ داده‌ها بازیابی شدند.',
+    en: 'The bundled model was invalid/incompatible and was not staged; your data was still restored.',
+  },
 
   // پروفایل
   personalInfo: { fa: 'اطلاعات شخصی', en: 'Personal Information' },

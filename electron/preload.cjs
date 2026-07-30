@@ -59,6 +59,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isAvailable: () => ipcRenderer.invoke('safeStorage:isAvailable'),
   },
 
+  // =============== Backup فایل‌محور (موج ۳ / O2) ===============
+  // برخلاف مسیر قدیمی، هیچ payload باینری‌ای از IPC عبور نمی‌کند؛ main خودش
+  // دیالوگ را نشان می‌دهد و فایل را می‌سازد/می‌خواند.
+  backup: {
+    exportToPath: (options) => ipcRenderer.invoke('backup:exportToPath', options),
+    importFromPath: (options) => ipcRenderer.invoke('backup:importFromPath', options),
+  },
+
+  // =============== Auto-Updater (موج ۳ / O1) ===============
+  // در dev، کنترلر main در حالت stub است و enabled=false برمی‌گردد؛ بنر فقط وقتی
+  // ظاهر می‌شود که رویدادی واقعی رسیده باشد.
+  updater: {
+    getState: () => ipcRenderer.invoke('updater:getState'),
+    checkNow: () => ipcRenderer.invoke('updater:checkNow'),
+    quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),
+    onStatus: (callback) => {
+      const listener = (_event, status) => callback(status);
+      ipcRenderer.on('updater:status', listener);
+      return () => ipcRenderer.removeListener('updater:status', listener);
+    },
+  },
+
   // =============== Encryption (موج ۲) ===============
   encryption: {
     getStatus: () => ipcRenderer.invoke('encryption:getStatus'),

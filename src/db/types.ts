@@ -390,6 +390,15 @@ export interface LocalModelV4Experiment {
   v4HoldoutObsF1?: number;
 }
 
+/**
+ * موج ۳ (O3): گزارش نتیجهٔ بازیابی بکاپ.
+ * importedModel: اگر بکاپ مدل TF.js داشته باشد، این‌جا به‌صورت خام برمی‌گردد تا
+ * renderer آن را «به‌عنوان چلنجر» پارک کند — هرگز مستقیم فعال نمی‌شود.
+ */
+export interface ImportBackupReport {
+  importedModel: import('../lib/modelBundle').LocalModelBackupBundle | null;
+}
+
 export interface LocalModelMetadata {
   version: number;
   trainedAt: string;
@@ -465,6 +474,17 @@ export interface Settings {
   firstName?: string;
   lastName?: string;
   useLocalModel?: boolean; // استفاده از مدل محلی آموزش‌دیده در تحلیل آفلاین (در صورت وجود)
+  /**
+   * موج ۳ (O3): مدل «چلنجر» — مدلی که از داخل یک بکاپ بازیابی و در
+   * indexeddb://scalpai-local-model-challenger پارک شده است. تا وقتی کاربر
+   * دستی «فعال‌سازی» را در تب یادگیری ماشین نزند، هیچ‌اثری در تحلیل ندارد.
+   * خود وزن‌ها این‌جا ذخیره نمی‌شوند؛ فقط متادیتا برای نمایش کارت چلنجر.
+   */
+  localModelChallenger?: {
+    stagedAt: string;
+    featureVersion?: string | null;
+    metadata?: LocalModelMetadata | null;
+  } | null;
 }
 
 export interface Notification {
@@ -595,9 +615,12 @@ export interface DatabaseAdapter {
   /**
    * موج ۲ (C2.4): backupPassword اختیاری است و فقط در Electron پشتیبانی می‌شود —
    * خروجی رمزدار v4 می‌سازد. بک‌اند وب فعلاً بدون رمز خروجی می‌دهد (مستند در privacy.md).
+   * موج ۳ (O3): modelBundle اختیاری — مدل محلی TF.js داخل بکاپ قرار می‌گیرد تا
+   * در بازیابی، به‌صورت «چلنجر» (غیرفعال) به کاربر پیشنهاد شود.
    */
-  exportData(options?: { backupPassword?: string }): Promise<string>;
-  importData(jsonData: string, options?: { backupPassword?: string }): Promise<void>;
+  exportData(options?: { backupPassword?: string; modelBundle?: import('../lib/modelBundle').LocalModelBackupBundle | null }): Promise<string>;
+  /** موج ۳: به‌جای void گزارش بازیابی برمی‌گردد؛ importedModel یعنی بکاپ مدل داشته. */
+  importData(jsonData: string, options?: { backupPassword?: string }): Promise<ImportBackupReport>;
 
   // Auth
   verifyCredentials(username: string, password: string): Promise<boolean>;

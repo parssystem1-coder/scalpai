@@ -8,7 +8,7 @@
  * از مدل تصویر-فقط همان مجموعه بهتر شود؛ در غیر این صورت v3 می‌ماند.
  */
 import * as tf from '@tensorflow/tfjs';
-import type { TrainingSample } from '../db';
+import type { TrainingSample, LocalModelMetadata } from '../db';
 import { SYSTEM_TRAINING_POOL_CLIENT_ID } from './systemTrainingPool';
 import { OBSERVATION_IDS, normalizeObservationIds, type ObservationId } from './diagnosisCatalog';
 import {
@@ -40,6 +40,12 @@ import {
   zeroQuestionnaireFeatures,
 } from './questionnaireMlFeatures';
 import { assessOutOfDistribution, type OodAssessment } from './outOfDistribution';
+import {
+  artifactsToBundle,
+  bundleToArtifacts,
+  isValidModelBundle,
+  type LocalModelBackupBundle,
+} from './modelBundle';
 import {
   calibrateThresholds,
   computeClassificationSummary,
@@ -1380,6 +1386,127 @@ export async function rollbackLocalModel(): Promise<boolean> {
   cachedModelFeatureVersion = null;
   cachedNorm = null;
   return true;
+}
+
+// =============== موج ۳ (O3) — مدل داخل بکاپ + challenger وارداتی ===============
+
+/** نشانی ذخیرهٔ مدل وارداتی تا لحظهٔ تصمیم کاربر — «مستقیم فعال نشود» نقشه‌راه */
+const MODEL_CHALLENGER_URL = 'indexeddb://scalpai-local-model-challenger';
+
+/**
+ * خروجی مدل فعال به‌صورت بستهٔ قابل‌حمل برای قرار گرفتن در ZIP بکاپ.
+ * بدون مدل فعال → null (بکاپ بدون مدل هم معتبر است).
+ */
+export async function exportActiveModelBundle(
+  metadata: LocalModelMetadata | null,
+): Promise<LocalModelBackupBundle | null> {
+  const model = await loadLocalModel();
+  if (!model) return null;
+  // handler هنری save می‌شود ولی هیچ‌جا ارسال نمی‌شود — فقط artifacts را
+  // برای ما می‌گیرد (الگوی استاندارد استخراج مدل به حافظه در tfjs).
+  // نکته: داخل یک object box نگه داشته می‌شود چون narrowing تایپ‌اسکریپت
+  // مقداردهی داخل closure را نمی‌بیند و متغیر ساده را never حدس می‌زند.
+  const box: { artifacts: tf.io.ModelArtifacts | null } = { artifacts: null };
+  await model.save(tf.io.withSaveHandler(async (a: tf.io.ModelArtifacts) => {
+    box.artifacts = a;
+    return { modelArtifactsInfo: { dateSaved: new Date(), modelTopologyType: 'JSON' } };
+  }));
+  const captured = box.artifacts;
+  if (!captured || !captured.modelTopology || !captured.weightSpecs || !captured.weightData) {
+    return null;
+  }
+  // WeightData می‌تواند چند ArrayBuffer باشد؛ برای base64 تک‌بافر می‌خواهیم.
+  // ترتیب الحاق همان ترتیب WeightData است و manifest هم به همین ترتیب آفست
+  // می‌خورد، پس round-trip با tf.io.fromMemory سازگار می‌ماند.
+  const weightData = captured.weightData instanceof ArrayBuffer
+    ? captured.weightData
+    : (() => {
+        const parts = captured.weightData as ArrayBuffer[];
+        const total = parts.reduce((sum, b) => sum + b.byteLength, 0);
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const part of parts) { out.set(new Uint8Array(part), offset); offset += part.byteLength; }
+        return out.buffer;
+      })();
+  return artifactsToBundle(
+    {
+      modelTopology: captured.modelTopology as Record<string, unknown>,
+      weightSpecs: captured.weightSpecs as unknown as Array<Record<string, unknown>>,
+      weightData,
+    },
+    // متادیتا به‌صورت JSON خام در بکاپ می‌نشیند؛ نوع ساختاری آن به LocalModelMetadata
+    // برمی‌گردد (interface بدون index signature است → cast مرزی لازم است).
+    { featureVersion: cachedModelFeatureVersion, metadata: metadata as unknown as Record<string, unknown> | null },
+  );
+}
+
+/**
+ * استقرار بستهٔ وارداتی در جایگاه challenger (نه فعال). بستهٔ نامعتبر خطا
+ * می‌اندازد تا UI خطای «بکاپ مدل خراب» را نشان دهد نه فاجعهٔ بی‌صدا.
+ */
+export async function stageBundleAsChallenger(bundle: LocalModelBackupBundle): Promise<void> {
+  if (!isValidModelBundle(bundle)) throw new Error('Invalid model bundle');
+  const artifacts = bundleToArtifacts(bundle);
+  const challenger = await tf.loadLayersModel(
+    tf.io.fromMemory({
+      modelTopology: artifacts.modelTopology,
+      weightSpecs: artifacts.weightSpecs,
+      weightData: artifacts.weightData,
+    }),
+  );
+  try {
+    await challenger.save(MODEL_CHALLENGER_URL);
+  } finally {
+    try { challenger.dispose(); } catch { /* ignore */ }
+  }
+}
+
+/** آیا مدل وارداتی در انتظار تصمیم کاربر است؟ */
+export async function hasChallengerModel(): Promise<boolean> {
+  try {
+    const models = await tf.io.listModels();
+    return Object.prototype.hasOwnProperty.call(models, MODEL_CHALLENGER_URL);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * فعال‌سازی challenger به تصمیم کاربر — با همان قاعدهٔ امن آموزش: ابتدا از
+ * مدل فعال فعلی پشتیبان (rollback) گرفته می‌شود، بعد جایگزینی. در صورت شکست،
+ * false برمی‌گردد و هیچ‌کدام از دو جایگاه خراب نمی‌شود.
+ */
+export async function activateChallengerModel(): Promise<boolean> {
+  if (!(await hasChallengerModel())) return false;
+  try {
+    if (await hasLocalModel()) {
+      try { await tf.io.copyModel(MODEL_STORAGE_URL, MODEL_BACKUP_URL); } catch { /* ignore */ }
+    } else {
+      try { await tf.io.removeModel(MODEL_BACKUP_URL); } catch { /* ignore */ }
+    }
+    await tf.io.copyModel(MODEL_CHALLENGER_URL, MODEL_STORAGE_URL);
+    try { await tf.io.removeModel(MODEL_CHALLENGER_URL); } catch { /* ignore */ }
+  } catch {
+    return false;
+  }
+  // کش خنثی تا خواندن بعدی challenger فعال‌شده را بگیرد (و اعتبارسنجی
+  // اندازهٔ خروجی loadLocalModel روی آن هم اعمال شود)
+  if (cachedModel) {
+    try { cachedModel.dispose(); } catch { /* ignore */ }
+  }
+  cachedModel = null;
+  cachedModelFeatureVersion = null;
+  cachedNorm = null;
+  return true;
+}
+
+/** حذف challenger بدون فعال‌سازی */
+export async function discardChallengerModel(): Promise<void> {
+  try {
+    await tf.io.removeModel(MODEL_CHALLENGER_URL);
+  } catch {
+    /* challengeri وجود نداشت */
+  }
 }
 
 async function predictWithMCDropout(

@@ -445,6 +445,132 @@ async function runContract(harness) {
     `${tag}: audit_log must contain data.import after importData`,
   );
 
+  // --- موج ۳ (O3): مدل داخل بکاپ در هر دو بک‌اند + round-trip به‌عنوان challenger ---
+  const sampleBundle = {
+    modelTopology: { className: 'Sequential', config: { layers: [{ class_name: 'Dense' }] } },
+    weightSpecs: [{ name: 'dense/kernel', shape: [2, 2], dtype: 'float32' }],
+    weightDataBase64: Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]).toString('base64'),
+    featureVersion: 'test-feature-v1',
+    metadata: { version: 2, trainedAt: '2026-01-01T00:00:00.000Z', sampleCount: 10 },
+  };
+  const exportedWithModel = await assertOk(await q('exportData', { modelBundle: sampleBundle }), `${tag} exportData + modelBundle`);
+  assert.strictEqual(typeof exportedWithModel, 'string', `${tag}: exportData با مدل هم رشته برمی‌گرداند`);
+
+  // اثبات حضور مدل داخل آرشیو/پاکت — برای sqlite داخل ZIP: model.json + model.weights.bin
+  if (harness.backend === 'sqlite') {
+    assert.ok(exportedWithModel.startsWith('scalpai-backup:v3:base64:'), `${tag}: sqlite export باید v3 zip باشد`);
+    const zipBuffer = Buffer.from(exportedWithModel.slice('scalpai-backup:v3:base64:'.length), 'base64');
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip(zipBuffer);
+    const modelJsonEntry = zip.getEntry('model.json');
+    const modelWeightsEntry = zip.getEntry('model.weights.bin');
+    assert.ok(modelJsonEntry, `${tag}: model.json داخل ZIP هست`);
+    assert.ok(modelWeightsEntry, `${tag}: model.weights.bin داخل ZIP هست`);
+    const modelDoc = JSON.parse(modelJsonEntry.getData().toString('utf8'));
+    assert.strictEqual(modelDoc.format, 'scalpai-model-bundle', `${tag}: قالب model.json`);
+    assert.strictEqual(modelDoc.featureVersion, 'test-feature-v1', `${tag}: featureVersion داخل model.json`);
+    assert.deepStrictEqual(modelDoc.modelTopology, sampleBundle.modelTopology, `${tag}: topology ۱:۱`);
+    assert.deepStrictEqual(modelDoc.weightSpecs, sampleBundle.weightSpecs, `${tag}: weightSpecs ۱:۱`);
+    assert.deepStrictEqual(modelDoc.metadata, sampleBundle.metadata, `${tag}: metadata ۱:۱`);
+    assert.ok(
+      modelWeightsEntry.getData().equals(Buffer.from([1, 2, 3, 4, 5, 6, 7, 8])),
+      `${tag}: بایت‌های وزن در model.weights.bin ۱:۱`,
+    );
+  } else {
+    // بک‌اند JSON: مدل به‌صورت ساختاری در envelope می‌آید
+    const envelope = JSON.parse(exportedWithModel);
+    assert.ok(envelope.data.modelBundle, `${tag}: modelBundle در envelope JSON هست`);
+    assert.strictEqual(envelope.data.modelBundle.weightDataBase64, sampleBundle.weightDataBase64, `${tag}: وزن‌ها ۱:۱ در JSON`);
+  }
+
+  // import: مدل به‌عنوان challenger برگردانده می‌شود (۱:۱) و audit پرچم modelIncluded دارد
+  const importReport = await assertOk(await q('importData', { jsonData: exportedWithModel }), `${tag} importData + model`);
+  assert.ok(importReport && importReport.success === true, `${tag}: importData گزارش success برمی‌گرداند`);
+  assert.ok(importReport.importedModel, `${tag}: importedModel برگردانده شد`);
+  assert.deepStrictEqual(importReport.importedModel.modelTopology, sampleBundle.modelTopology, `${tag}: topology وارداتی ۱:۱`);
+  assert.deepStrictEqual(importReport.importedModel.weightSpecs, sampleBundle.weightSpecs, `${tag}: weightSpecs وارداتی ۱:۱`);
+  assert.strictEqual(importReport.importedModel.weightDataBase64, sampleBundle.weightDataBase64, `${tag}: وزن‌های وارداتی ۱:۱`);
+  assert.strictEqual(importReport.importedModel.featureVersion, 'test-feature-v1', `${tag}: featureVersion وارداتی`);
+  assert.deepStrictEqual(importReport.importedModel.metadata, sampleBundle.metadata, `${tag}: metadata وارداتی ۱:۱`);
+  const auditAfterModelImport = await assertOk(await q('getAuditLog', {}), `${tag} audit after model import`);
+  // نکته: با رویدادهای هم‌میلی‌ثانیه ترتیب دقیق تضمینی نیست، پس قرارداد این است:
+  // «حداقل یک data.import با modelIncluded:true باید ثبت شده باشد»، نه «آخرین رویداد».
+  assert.ok(
+    auditAfterModelImport.some(
+      (r) => r.event === 'data.import' && String(r.detail || '').includes('"modelIncluded":true'),
+    ),
+    `${tag}: رد حسابرسی باید حداقل یک data.import با modelIncluded:true داشته باشد`,
+  );
+
+  // سازگاری عقب‌رو: بکاپ بدون مدل → importedModel تهی است (نه خطا)
+  const exportedNoModel = await assertOk(await q('exportData', {}), `${tag} exportData بدون مدل`);
+  const importNoModel = await assertOk(await q('importData', { jsonData: exportedNoModel }), `${tag} import بدون مدل`);
+  assert.ok(importNoModel && importNoModel.success === true, `${tag}: import بدون مدل موفق`);
+  assert.strictEqual(importNoModel.importedModel ?? null, null, `${tag}: importedModel باید null باشد`);
+
+  // --- موج ۳ (O2): exportDataToFile — خروجی فایل‌محور روی دیسک ---
+  const fsOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scalpai-contract-out-'));
+  try {
+    const targetPath = path.join(fsOutDir, `contract-${harness.backend}.zip`);
+    const fileResult = await assertOk(
+      await q('exportDataToFile', { targetPath, modelBundle: sampleBundle }),
+      `${tag} exportDataToFile`,
+    );
+    assert.strictEqual(fileResult.success, true, `${tag}: exportDataToFile موفق`);
+    assert.strictEqual(fileResult.filePath, targetPath, `${tag}: filePath برگشتی همان مقصد است`);
+    assert.ok(fs.existsSync(targetPath), `${tag}: فایل روی دیسک ساخته شده`);
+    assert.strictEqual(fileResult.bytes, fs.statSync(targetPath).size, `${tag}: bytes = اندازهٔ واقعی`);
+    assert.strictEqual(fileResult.passwordProtected, false, `${tag}: بدون پسورد → passwordProtected=false`);
+    // جادوی ZIP (PK\x03\x04) — نشانهٔ فایل آرشیو واقعی نه رشتهٔ JSON
+    const head = fs.readFileSync(targetPath).subarray(0, 4);
+    if (harness.backend === 'sqlite') {
+      assert.ok(head[0] === 0x50 && head[1] === 0x4b, `${tag}: خروجی sqlite با جادوی PK شروع می‌شود (ZIP واقعی)`);
+      // رفت‌وبرگشت: همان فایل از دیسک به importData برمی‌گردد و مدل را هم می‌آورد
+      const zipBase64 = fs.readFileSync(targetPath).toString('base64');
+      const roundTrip = await assertOk(
+        await q('importData', { jsonData: `scalpai-backup:v3:base64:${zipBase64}` }),
+        `${tag} import از فایل exportDataToFile`,
+      );
+      assert.ok(roundTrip.importedModel, `${tag}: مدل از فایل دیسک هم round-trip می‌شود`);
+      assert.strictEqual(roundTrip.importedModel.weightDataBase64, sampleBundle.weightDataBase64, `${tag}: وزن‌ها از فایل هم ۱:۱`);
+    } else {
+      // بک‌اند JSON: خروجی فایل، متن JSON envelope است (یا با پسورد prefix v4)
+      const text = fs.readFileSync(targetPath, 'utf-8');
+      assert.ok(text.startsWith('{'), `${tag}: خروجی فایل JSON است`);
+      const roundTrip = await assertOk(await q('importData', { jsonData: text }), `${tag} import از فایل JSON`);
+      assert.ok(roundTrip.importedModel, `${tag}: مدل از فایل JSON هم round-trip می‌شود`);
+    }
+    assert.strictEqual(
+      fs.readdirSync(fsOutDir).filter((f) => f.includes('.part-')).length,
+      0,
+      `${tag}: فایل موقت .part باقی نمانده`,
+    );
+
+    // مسیر رمزدار v4 هم فایل می‌شود و فقط با پسورد درست باز می‌شود
+    const encTarget = path.join(fsOutDir, `contract-${harness.backend}.zip.enc`);
+    const encResult = await assertOk(
+      await q('exportDataToFile', { targetPath: encTarget, backupPassword: 'contract-pass-123' }),
+      `${tag} exportDataToFile رمزدار`,
+    );
+    assert.strictEqual(encResult.passwordProtected, true, `${tag}: passwordProtected=true`);
+    const encText = fs.readFileSync(encTarget, 'utf-8');
+    assert.ok(encText.startsWith('scalpai-backup:v4:enc:base64:'), `${tag}: فایل v4 با prefix درست`);
+    const encImport = await assertOk(
+      await q('importData', { jsonData: encText, backupPassword: 'contract-pass-123' }),
+      `${tag} import فایل v4 با پسورد درست`,
+    );
+    assert.strictEqual(encImport.success, true, `${tag}: import v4 موفق`);
+    // پسورد اشتباه باید خطا بدهد (نه دادهٔ خراب) — handleDbQuery خطا می‌اندازد به
+    // شکل { error } برمی‌گرداند؛ رمزگشایی قبل از هر نوشتاری روی DB شکست می‌خورد.
+    const wrongOut = await q('importData', { jsonData: encText, backupPassword: 'wrong-password' });
+    assert.ok(
+      wrongOut && typeof wrongOut === 'object' && wrongOut.error,
+      `${tag}: پسورد اشتباه برای v4 رد می‌شود (باید error برگردد)`,
+    );
+  } finally {
+    fs.rmSync(fsOutDir, { recursive: true, force: true });
+  }
+
   // --- settings UPSERT when row missing (sqlite) / always works (json) ---
   const updated = await assertOk(await q('updateSettings', { language: 'en' }), `${tag} updateSettings`);
   assert.strictEqual(updated.language, 'en');

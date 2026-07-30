@@ -291,6 +291,35 @@ export const offlineDict = {
     en: 'Use local model for future offline analyses',
   },
   deleteModel: { fa: 'حذف مدل', en: 'Delete model' },
+  // موج ۳ (O3) — challenger: مدل وارداتی از بکاپ (غیرفعال تا تصمیم کاربر)
+  challengerTitle: {
+    fa: 'مدل «چلنجر» از بکاپ بازیابی شده — منتظر تصمیم شما',
+    en: 'A “challenger” model was restored from a backup — awaiting your decision',
+  },
+  challengerStagedAt: { fa: 'زمان پارک', en: 'Staged at' },
+  challengerTrainedWith: { fa: 'نمونهٔ آموزشی', en: 'training samples' },
+  challengerVersionMismatch: {
+    fa: 'نسخهٔ فیچر این مدل با نسخهٔ جاری برنامه متفاوت است؛ اگر فعالش کنید، تحلیل‌ها ممکن است نادقیق شوند تا وقتی دوباره آموزش ببیند.',
+    en: 'This model was trained with a different feature version; if activated, analyses may be less accurate until it is retrained.',
+  },
+  challengerActivate: { fa: 'فعال‌سازی challenger', en: 'Activate challenger' },
+  challengerDiscard: { fa: 'حذف challenger', en: 'Discard challenger' },
+  challengerActivateHint: {
+    fa: 'مدل فعال فعلی به‌صورت خودکار نسخهٔ پشتیبان می‌شود و challenger جای آن را می‌گیرد (قابل بازگشت با دکمهٔ بازگردانی نسخهٔ قبلی).',
+    en: 'The current active model is backed up automatically and the challenger takes its place (undo via Rollback).',
+  },
+  challengerDiscardHint: {
+    fa: 'مدل وارداتی بدون هیچ اثری روی مدل فعال حذف می‌شود.',
+    en: 'The imported model is deleted without affecting the active model.',
+  },
+  challengerActivatedNotice: {
+    fa: 'مدل challenger فعال شد؛ مدل قبلی به‌عنوان نسخهٔ پشتیبان در دسترس است.',
+    en: 'Challenger activated; the previous model is kept as a rollback backup.',
+  },
+  challengerActivateFailed: {
+    fa: 'فعال‌سازی challenger ناموفق بود؛ مدل فعال قبلی دست‌نخورده باقی ماند.',
+    en: 'Failed to activate the challenger; the previous active model is untouched.',
+  },
   trainProgressHint: {
     fa: 'آموزش با early stopping، اعتبارسنجی بر اساس مشتری و ارزیابی hold-out انجام می‌شود.',
     en: 'Training uses early stopping, client-based validation, and hold-out evaluation.',

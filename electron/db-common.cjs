@@ -187,6 +187,19 @@ function parseBackupPayload(jsonData) {
       throw new Error('Invalid backup field: mediaEncryption');
     }
   }
+  // موج ۳ (O3): مدل TF.js داخل بکاپ JSON-محور (بک‌اند JSON / وب) — ساختار
+  // باید معتبر باشد؛ وزن‌ها به‌صورت base64 نگه داشته می‌شوند (مدل بزرگ نیست).
+  if (data.modelBundle !== undefined && data.modelBundle !== null) {
+    const b = data.modelBundle;
+    if (
+      typeof b !== 'object' ||
+      typeof b.modelTopology !== 'object' || b.modelTopology === null ||
+      !Array.isArray(b.weightSpecs) ||
+      typeof b.weightDataBase64 !== 'string'
+    ) {
+      throw new Error('Invalid backup field: modelBundle');
+    }
+  }
   return data;
 }
 

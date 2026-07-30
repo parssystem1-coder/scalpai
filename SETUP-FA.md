@@ -306,6 +306,9 @@ pnpm install && pnpm verify && pnpm electron:dev
 | `cannot find specified resource "build/..."` | ✅ رفع شد | — |
 | صفحهٔ سفید در نسخهٔ بیلدشده | `dist/` ساخته نشده | اول `pnpm build` |
 | Python analyzer کار نمی‌کند | `cv2` نصب نیست | `pip install -r python/requirements.txt` (اختیاری) |
+| بنر آپدیت هرگز ظاهر نمی‌شود (نسخهٔ dev) | موج ۳: چک آپدیت فقط در نسخهٔ **نصب‌شده** فعال است؛ در dev عمداً غیرفعال است | انتشار تگ `v*` → نصب exe → بنر ظاهر می‌شود (جزئیات `docs/release.md`) |
+| SmartScreen آبی هنگام نصب/آپدیت | نصب‌کننده هنوز بدون امضای کد است (موج ۳: زیرساخت آماده، گواهی خریداری نشده) | «More info → Run anyway»؛ برای حذف دائمی: فعال‌سازی سکرت‌های `CSC_LINK`/`CSC_KEY_PASSWORD` طبق `docs/release.md` |
+| تگ زدید ولی ریلیز ساخته نشد | ورک‌فلوی ریلیز به دلیل مجوز GitHub App در `docs/release-pipeline/` آماده شده و هنوز به `.github/workflows/` کپی نشده | دو `cp` و یک کامیت مالک — §۰ از `docs/release.md` (همان الگوی موج ۱ برای `docs/ci/verify.yml`) |
 
 ---
 

@@ -562,6 +562,8 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
           case 'exportData': {
             const exportable = JSON.parse(JSON.stringify(data));
             exportable.settings = sanitizeSettingsForBackup(exportable.settings || {});
+            // موج ۳ (O3) — مدل TF.js در کالبد envelope (بک‌اند JSON فایل‌محور ندارد)
+            if (params.modelBundle) exportable.modelBundle = params.modelBundle;
             const envelopeText = JSON.stringify(createBackupEnvelope(exportable), null, 2);
             recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: params.backupPassword ? 'v4-encrypted' : 'json', passwordProtected: !!params.backupPassword });
             // موج ۲ (C2.4) — همان گزینهٔ پشتیبان رمزدار با پسورد برای بک‌اند JSON
@@ -569,6 +571,37 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
               return 'scalpai-backup:v4:enc:base64:' + encryptWithPassword(Buffer.from(envelopeText, 'utf-8'), params.backupPassword).toString('base64');
             }
             return envelopeText;
+          }
+
+          // موج ۳ (O2) — خروجی فایل‌محور: نوشتن اتمیک (part + rename) بدون
+          // برگرداندن محتوا از طریق IPC.
+          case 'exportDataToFile': {
+            const targetPath = typeof params.targetPath === 'string' ? params.targetPath : '';
+            if (!targetPath) throw new Error('exportDataToFile: targetPath is required');
+            const exportable = JSON.parse(JSON.stringify(data));
+            exportable.settings = sanitizeSettingsForBackup(exportable.settings || {});
+            if (params.modelBundle) exportable.modelBundle = params.modelBundle;
+            const envelopeText = JSON.stringify(createBackupEnvelope(exportable), null, 2);
+            const partPath = `${targetPath}.part-${crypto.randomUUID().slice(0, 8)}`;
+            try {
+              if (params.backupPassword) {
+                fs.writeFileSync(partPath, 'scalpai-backup:v4:enc:base64:' + encryptWithPassword(Buffer.from(envelopeText, 'utf-8'), params.backupPassword).toString('base64'), 'utf-8');
+                recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v4-file', passwordProtected: true });
+              } else {
+                fs.writeFileSync(partPath, envelopeText, 'utf-8');
+                recordEvent(AUDIT_EVENTS.DATA_EXPORT, 'local-user', { format: 'v3-file', passwordProtected: false });
+              }
+              fs.renameSync(partPath, targetPath);
+              return {
+                success: true,
+                filePath: targetPath,
+                bytes: fs.statSync(targetPath).size,
+                passwordProtected: !!params.backupPassword,
+              };
+            } catch (error) {
+              fs.rmSync(partPath, { force: true });
+              throw error;
+            }
           }
 
           case 'importData': {
@@ -580,6 +613,12 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
               rawPayload = decryptWithPassword(encBytes, params.backupPassword).toString('utf-8');
             }
             const imported = parseBackupPayload(rawPayload);
+            // موج ۳ (O3): مدل داخل envelope به‌عنوان challenger به renderer برمی‌گردد
+            let importedModel = null;
+            if (imported.modelBundle) {
+              importedModel = { ...imported.modelBundle };
+              delete imported.modelBundle;
+            }
             const previousData = data;
             const importedSettings = sanitizeSettingsForBackup(imported.settings || {});
             const nextData = {
@@ -603,8 +642,8 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
               data = previousData;
               throw error;
             }
-            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: 'json', clients: (imported.clients || []).length });
-            return { success: true };
+            recordEvent(AUDIT_EVENTS.DATA_IMPORT, 'local-user', { format: 'json', clients: (imported.clients || []).length, modelIncluded: !!importedModel });
+            return { success: true, importedModel };
           }
 
           // =============== یادگیری ماشین محلی (Training Samples) ===============

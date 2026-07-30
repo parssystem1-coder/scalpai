@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert, Activity } from 'lucide-react';
+import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert, Activity, Package, CheckCircle2, XCircle } from 'lucide-react';
 import type { LocalModelMetadata, TrainingSample } from '../../db';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { FEATURE_VERSION } from '../../lib/scalpFeatures';
@@ -46,6 +46,18 @@ interface Props {
   canRollback?: boolean;
   onRollback?: () => void;
   rollbackBusy?: boolean;
+  /**
+   * موج ۳ (O3) — challenger: مدلی که از داخل بکاپ بازیابی و پارک شده.
+   * تا کاربر دستی فعالش نکند هیچ‌اثری روی تحلیل ندارد (قرارداد نقشه‌راه).
+   */
+  challengerInfo?: {
+    stagedAt: string;
+    featureVersion?: string | null;
+    metadata?: LocalModelMetadata | null;
+  } | null;
+  onActivateChallenger?: () => void;
+  onDiscardChallenger?: () => void;
+  challengerBusy?: boolean;
 }
 
 function fmt(n?: number, digits = 4) {
@@ -58,6 +70,7 @@ export default function ModelStatusPanel({
   modelMetadata, modelHasWeights, training, trainProgress, trainError, useLocalModel,
   onTrain, onDeleteModel, onToggleLocalModel,
   retrainNotice, onForceTrain, canRollback, onRollback, rollbackBusy,
+  challengerInfo, onActivateChallenger, onDiscardChallenger, challengerBusy,
 }: Props) {
   const t = useT(offlineDict);
   const pick = usePick();
@@ -358,6 +371,52 @@ export default function ModelStatusPanel({
         </div>
       )}
       {trainError && <p className="text-xs text-red-400 mt-3 whitespace-pre-wrap">{trainError}</p>}
+
+      {/* موج ۳ (O3) — کارت challenger: مدل وارداتی از بکاپ، منتظر تصمیم کاربر */}
+      {challengerInfo && onActivateChallenger && onDiscardChallenger && (
+        <div className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Package size={16} className="text-cyan-300" />
+            <h4 className="text-sm font-semibold text-cyan-100">{t('challengerTitle')}</h4>
+          </div>
+          <div className="text-xs text-cyan-100/80 space-y-1">
+            <p>
+              {/* formatDateForDisplay ورودی yyyy-MM-dd می‌خواهد؛ stagedAt کامل ISO است */}
+              {t('challengerStagedAt')}: {formatDateForDisplay(challengerInfo.stagedAt.slice(0, 10)) || '—'}
+              {challengerInfo.metadata?.sampleCount != null && (
+                <> · {t('challengerTrainedWith')}: {challengerInfo.metadata.sampleCount}</>
+              )}
+              {typeof challengerInfo.metadata?.holdoutObsF1 === 'number' && (
+                <> · holdout F1: {fmt(challengerInfo.metadata.holdoutObsF1, 2)}</>
+              )}
+            </p>
+            {challengerInfo.featureVersion && !isUsableModelVersion(challengerInfo.featureVersion) && (
+              <p className="text-amber-200/90 flex items-start gap-1.5">
+                <ShieldAlert size={12} className="flex-shrink-0 mt-0.5" />
+                <span>{t('challengerVersionMismatch')}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onActivateChallenger}
+              disabled={challengerBusy || training}
+              title={t('challengerActivateHint')}
+              className="px-3 py-2 rounded-xl bg-cyan-500/25 hover:bg-cyan-500/35 disabled:opacity-40 text-cyan-100 text-sm flex items-center gap-1.5 font-medium"
+            >
+              <CheckCircle2 size={14} /> {t('challengerActivate')}
+            </button>
+            <button
+              onClick={onDiscardChallenger}
+              disabled={challengerBusy || training}
+              title={t('challengerDiscardHint')}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white/60 text-sm flex items-center gap-1.5"
+            >
+              <XCircle size={14} /> {t('challengerDiscard')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

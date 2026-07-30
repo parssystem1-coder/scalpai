@@ -53,6 +53,9 @@ let mainWindow;
 let db;
 let dbHandlers;
 let offlineHandlers;
+// موج ۳ (O2): آخرین مسیر فایل بازیابی انتخاب‌شده توسط دیالوگ main — برای
+// تلاش مجدد با پسورد بدون باز کردن دوبارهٔ دیالوگ (ببین backup:importFromPath).
+let lastImportFromPath = null;
 // موج ۲ (C1) — وضعیت لایهٔ رمزنگاری برای IPC تنظیمات و لاگ
 const encryptionState = {
   driver: 'none',
@@ -1179,6 +1182,95 @@ function setupIpcHandlers() {
     return { success: true, recoveryKey: dekBuffer.toString('hex') };
   });
 
+  // =============== Backup فایل‌محور (موج ۳ / O2) ===============
+  // خروجی کاملاً فایل‌محور: دیالوگ ذخیره → ساخت ZIP در main → rename اتمیک در
+  // main. payload باینری دیگر مثل مسیر قدیمی (exportData → base64 → dialog:saveFile)
+  // سه‌بار روی IPC رفت‌وبرگشت نمی‌کند.
+  ipcMain.handle('backup:exportToPath', async (event, { backupPassword, modelBundle, defaultPath } = {}) => {
+    if (!dbHandlers) return { success: false, error: 'db-unavailable' };
+    const dateStr = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+    const fileExt = backupPassword ? 'zip.enc' : 'zip';
+    // defaultPath صرفاً نقطهٔ شروع دیالوگ سیستم است (مثل پوشهٔ بکاپ انتخابی قدیمی)؛
+    // مسیر نهایی همیشه تأیید خودِ کاربر در دیالوگ OS است، پس ورودی renderer فقط
+    // راحتی UX است نه تصمیم امنیتی.
+    const suggested = typeof defaultPath === 'string' && defaultPath.trim()
+      ? defaultPath
+      : `scalpai-backup-${dateStr}-${timeStr}.${fileExt}`;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: suggested,
+      filters: [{ name: 'ScalpAI Backup', extensions: [backupPassword ? 'enc' : 'zip'] }],
+    });
+    if (result.canceled || !result.filePath) return { success: false, canceled: true };
+    allowFile(result.filePath);
+    ensureParentDir(result.filePath);
+    return await dbHandlers.handleDbQuery('exportDataToFile', { targetPath: result.filePath, backupPassword, modelBundle });
+  });
+
+  // بازیابی نیز متقارن فایل‌محور شد: فایل مستقیم در main خوانده می‌شود و به
+  // importData می‌رسد — بدون اینکه کل آرشیو یک‌بار به renderer بیاید و برگردد.
+  ipcMain.handle('backup:importFromPath', async (event, { backupPassword, retryLast } = {}) => {
+    if (!dbHandlers) return { success: false, error: 'db-unavailable' };
+    // retryLast: وقتی فایل رمزدار v4 انتخاب شد و renderer پسورد گرفت، دیالوگ
+    // انتخاب فایل دوباره باز نمی‌شود — همان مسیر قبلی (که خود main از دیالوگ
+    // سیستم گرفته و allowFile کرده) دوباره خوانده می‌شود.
+    let srcPath;
+    if (retryLast && lastImportFromPath) {
+      srcPath = lastImportFromPath;
+    } else {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [{ name: 'ScalpAI Backup', extensions: ['zip', 'enc', 'json'] }],
+      });
+      if (result.canceled || !result.filePaths?.length) return { success: false, canceled: true };
+      srcPath = result.filePaths[0];
+      allowFile(srcPath);
+    }
+    try {
+      const raw = fs.readFileSync(srcPath);
+      const head = raw.toString('utf-8', 0, 64);
+      let payload;
+      if (head.startsWith('scalpai-backup:v4:enc:base64:')) {
+        if (!backupPassword) {
+          // مسیر را برای تلاش بعدی (retryLast) نگه می‌داریم تا کاربر فایل را
+          // دوباره انتخاب نکند — مسیر از دیالوگ خود main آمده و allowFile شده است.
+          lastImportFromPath = srcPath;
+          return { success: false, passwordRequired: true };
+        }
+        payload = raw.toString('utf-8');
+      } else if (head.startsWith('{')) {
+        payload = raw.toString('utf-8');
+      } else {
+        payload = 'scalpai-backup:v3:base64:' + raw.toString('base64');
+      }
+      return await dbHandlers.handleDbQuery('importData', { jsonData: payload, backupPassword });
+    } catch (error) {
+      // پیام خطای رمزگشایی v4 عمداً عبارت password را دارد تا renderer بدون
+      // string-matching روی متن کامل، خطای پسورد را تشخیص دهد.
+      const message = error && error.message ? error.message : String(error);
+      const passwordError = /password|decryption failed/i.test(message);
+      return { success: false, error: message, ...(passwordError ? { passwordError: true } : {}) };
+    }
+  });
+
+  // =============== Auto-Updater (موج ۳ / O1) ===============
+  // renderer فقط وضعیت می‌خواند/چک دستی/نصب می‌کند؛ هیچ URL یا کانفیگی از
+  // renderer پذیرفته نمی‌شود (منبع آپدیت فقط publish config بیلد است).
+  ipcMain.handle('updater:getState', () => {
+    if (updateController) return updateController.getState();
+    return { enabled: false, checking: false, updateAvailable: false, updateDownloaded: false, version: null, error: null };
+  });
+  ipcMain.handle('updater:checkNow', async () => {
+    if (!updateController) return { ok: false, error: 'updater-unavailable' };
+    return await updateController.checkNow();
+  });
+  ipcMain.handle('updater:quitAndInstall', async () => {
+    if (!updateController || !updateController.installNow()) {
+      return { ok: false, error: 'no-downloaded-update' };
+    }
+    return { ok: true };
+  });
+
   // =============== Offline Analysis ===============
   ipcMain.handle('offline:analyze', async (event, { base64Image, lang }) => {
     if (!offlineHandlers) return { success: false, error: 'Offline handlers not initialized', fallback: true };
@@ -1325,20 +1417,21 @@ async function runAutoBackupScheduler() {
 
     if (now - lastAutoBackup > oneDay) {
       console.log('Starting automated scheduled backup...');
-      const backupString = await dbHandlers.handleDbQuery('exportData', {});
-      if (typeof backupString === 'string' && backupString.startsWith('scalpai-backup:v3:base64:')) {
-        const autoBackupDir = path.join(userDataPath, 'auto-backups');
-        if (!fs.existsSync(autoBackupDir)) {
-          fs.mkdirSync(autoBackupDir, { recursive: true });
-        }
+      // موج ۳ (O2.3): بکاپ خودکار هم مثل بکاپ دستی مستقیم روی دیسک نوشته
+      // می‌شود — مسیر قدیمی کل ZIP را یک‌بار به رشتهٔ base64 تبدیل و دوباره
+      // decode می‌کرد (۲ نسخهٔ اضافه در حافظه + رفت‌وبرگشت handler).
+      const autoBackupDir = path.join(userDataPath, 'auto-backups');
+      if (!fs.existsSync(autoBackupDir)) {
+        fs.mkdirSync(autoBackupDir, { recursive: true });
+      }
 
-        const dateStr = new Date().toISOString().split('T')[0];
-        const timeStr = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
-        const backupFileName = `scalpai-auto-backup-${dateStr}-${timeStr}.zip`;
-        const backupFilePath = path.join(autoBackupDir, backupFileName);
+      const dateStr = new Date().toISOString().split('T')[0];
+      const timeStr = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+      const backupFileName = `scalpai-auto-backup-${dateStr}-${timeStr}.zip`;
+      const backupFilePath = path.join(autoBackupDir, backupFileName);
 
-        const base64Content = backupString.split('scalpai-backup:v3:base64:')[1];
-        fs.writeFileSync(backupFilePath, Buffer.from(base64Content, 'base64'));
+      const exportResult = await dbHandlers.handleDbQuery('exportDataToFile', { targetPath: backupFilePath });
+      if (exportResult && exportResult.success) {
         console.log('Automated scheduled backup saved to:', backupFilePath);
 
         // بروزرسانی زمان اجرای آخرین بکاپ خودکار
@@ -1363,21 +1456,37 @@ async function runAutoBackupScheduler() {
   }
 }
 
+// =============== Auto-Updater (موج ۳ / O1) ===============
+// قرارداد با renderer در electron/updater.cjs است؛ این‌جا فقط wiring واقعی است.
+// نکتهٔ مهم: فقط وقتی app.isPackaged است چک می‌کنیم — چک کردن در dev ارزشی ندارد
+// (هیچ latest.yml منتشرشده‌ای نسبت به نسخهٔ dev وجود ندارد) و لاگ خطای گمراه‌کننده
+// می‌ساخت.
+const { createAutoUpdateController } = require('./updater.cjs');
+let updateController = null;
+
 function setupAutoUpdater() {
-  try {
-    const { autoUpdater } = require('electron-updater');
-    autoUpdater.checkForUpdatesAndNotify();
-
-    autoUpdater.on('update-available', () => {
-      console.log('Update available. Downloading...');
-    });
-
-    autoUpdater.on('update-downloaded', () => {
-      console.log('Update downloaded. Will install on quit.');
-    });
-  } catch (err) {
-    console.warn('AutoUpdater initialization failed (likely in development or non-packaged environment):', err.message);
+  let autoUpdater = null;
+  if (app.isPackaged) {
+    try {
+      ({ autoUpdater } = require('electron-updater'));
+    } catch (err) {
+      // اگر ماژول در بستهٔ نصبی نبود (خرابی نصب/پرت) نصب شود، اپ نباید بمیرد —
+      // کنترلر خودش به حالت stub می‌افتد.
+      console.warn('AutoUpdater module unavailable in packaged build:', err.message);
+    }
   }
+  updateController = createAutoUpdateController({
+    isPackaged: app.isPackaged,
+    autoUpdater,
+    log: console,
+    notify: (status) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:status', status);
+      }
+    },
+  });
+  updateController.start();
+  return updateController;
 }
 
 function runDbIntegrityCheck(dbInstance) {
