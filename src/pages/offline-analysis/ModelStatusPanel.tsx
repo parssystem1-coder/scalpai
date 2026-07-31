@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert, Activity, Package, CheckCircle2, XCircle } from 'lucide-react';
 import type { LocalModelMetadata, TrainingSample } from '../../db';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { FEATURE_VERSION } from '../../lib/scalpFeatures';
 import { monitorDataDrift } from '../../lib/driftMonitor';
 import {

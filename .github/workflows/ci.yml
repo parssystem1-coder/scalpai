@@ -62,6 +62,15 @@ jobs:
       - name: قرارداد دیتابیس (هر دو موتور)
         run: node scripts/test-db-contract.cjs
 
+      - name: کنترلر به‌روزرسانی خودکار (موج ۳)
+        run: node scripts/test-updater.cjs
+
+      - name: استریم و پروفایل حافظهٔ بکاپ (موج ۳)
+        run: node --expose-gc scripts/test-backup-stream.cjs
+
+      - name: قفل نسخه و CHANGELOG (موج ۳)
+        run: node scripts/check-changelog-version.cjs
+
       - name: همگامی ثابت‌های مشترک TS و Python
         # نگهبان اینکه موتور مرورگر و موتور Python روی یک تصویر نتیجهٔ
         # متفاوت ندهند — چون fallback بین دو موتور خودکار و بی‌صداست.

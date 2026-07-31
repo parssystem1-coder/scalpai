@@ -339,6 +339,15 @@ const createElectronAdapter = (): DatabaseAdapter => ({
     return await callDb('verifyCredentials', { username, password }) as boolean;
   },
 
+  // فاز ۲ (AUD-11) — ردپای حسابرسی برای نمایش در تنظیمات
+  async getAuditLog(params) {
+    return await callDb('getAuditLog', (params ?? {}) as Record<string, unknown>) as import('./types').AuditLogEntry[];
+  },
+
+  async getAuditLogCount() {
+    return await callDb('getAuditLogCount') as number;
+  },
+
   async hasCredentials() {
     return await callDb('hasCredentials') as boolean;
   },

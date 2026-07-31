@@ -30,6 +30,7 @@ const {
   verifyLegacyPlaintextPassword,
   sanitizeSettings,
   sanitizeSettingsForBackup,
+  assertBackupPasswordWhenEncryptionActive,
   createBackupEnvelope,
   parseBackupPayload,
   parseStoredJson,
@@ -47,11 +48,10 @@ const {
   isEncryptedBuffer,
   encryptWithPassword,
   decryptWithPassword,
-  isPasswordProtectedBuffer,
   reencryptImportedMedia,
 } = require('./file-crypto.cjs');
 const { getPurposeKey } = require('./dek.cjs');
-const { AUDIT_EVENTS, createAuditRecorder } = require('./audit.cjs');
+const { AUDIT_EVENTS, createAuditRecorder, auditRetentionCutoff, AUDIT_MAX_ROWS } = require('./audit.cjs');
 
 /**
  * ایجاد هندلرهای دیتابیس
@@ -398,9 +398,33 @@ function createDbHandlers(db, userDataPath, safeStorage) {
 
           case 'getAuditLog': {
             const limit = Math.min(params.limit || 200, 1000);
+            const offset = Math.max(params.offset || 0, 0);
             return db
-              .prepare('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT ?')
-              .all(limit);
+              .prepare('SELECT * FROM audit_log ORDER BY createdAt DESC LIMIT ? OFFSET ?')
+              .all(limit, offset);
+          }
+
+          // فاز ۲ (AUD-11) — شمارش کل برای صفحه‌بندی رابط کاربری
+          case 'getAuditLogCount':
+            return db.prepare('SELECT COUNT(*) as c FROM audit_log').get().c;
+
+          // فاز ۲ (AUD-12) — اعمال سیاست نگهداری؛ در استارت‌آپ صدا زده می‌شود.
+          // برخلاف مسیر JSON که از قبل سقف داشت، جدول SQLite بی‌مرز رشد می‌کرد.
+          case 'pruneAuditLog': {
+            const cutoff = auditRetentionCutoff();
+            const byAge = db.prepare('DELETE FROM audit_log WHERE createdAt < ?').run(cutoff);
+            // سقف تعدادی: هر چه بیرون از تازه‌ترین AUDIT_MAX_ROWS ردیف است حذف شود
+            const byCount = db.prepare(`
+              DELETE FROM audit_log WHERE id NOT IN (
+                SELECT id FROM audit_log ORDER BY createdAt DESC LIMIT ?
+              )
+            `).run(AUDIT_MAX_ROWS);
+            return {
+              success: true,
+              removedByAge: byAge.changes,
+              removedByCount: byCount.changes,
+              cutoff,
+            };
           }
 
           // =============== Gallery ===============
@@ -880,6 +904,9 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             // این کلید، ZIP رمزشده معادل plaintext است؛ برای انتقال امن از
             // گزینهٔ پسورد بکاپ (همان پنل) استفاده کنید.
             const imageKey = imageKeyOrNull();
+            // فاز ۱ (AUD-9) — گیت سخت: تا وقتی کلید تصاویر داخل بسته می‌رود،
+            // ساختن بکاپ بدون پسورد ممنوع است. جزئیات در db-common.cjs.
+            assertBackupPasswordWhenEncryptionActive(imageKey, params.backupPassword);
             const data = {
               clients: db.prepare('SELECT * FROM clients').all(),
               gallery: galleryRows,
@@ -955,6 +982,8 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             }));
             const questionnaireRows = db.prepare('SELECT * FROM questionnaire_revisions').all().map(mapQuestionnaireRevisionRow);
             const imageKey = imageKeyOrNull();
+            // فاز ۱ (AUD-9) — همان گیت سخت برای مسیر فایل‌محور موج ۳ (O2)
+            assertBackupPasswordWhenEncryptionActive(imageKey, params.backupPassword);
             const data = {
               clients: db.prepare('SELECT * FROM clients').all(),
               gallery: galleryRows,

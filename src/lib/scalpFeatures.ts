@@ -18,6 +18,7 @@ import { resolveObservations, type ObservationId } from './diagnosisCatalog';
 import {
   GRID_SIZE,
   HEURISTIC_FEATURE_SCALE,
+  CALIBRATION_VERSION,
   HEURISTIC_METRIC_RECOMMEND,
   HEURISTIC_SCORE_RECOMMEND,
   COLOR_NORMALIZATION,
@@ -588,6 +589,13 @@ export interface ComposedOfflineResult {
   annotatedImageBase64: string;
   engine: 'browser' | 'model';
   observationsFilledFromHeuristic: boolean;
+  /**
+   * AUD-18 — نسخهٔ ضرایب نمره‌دهی که این نتیجه با آن ساخته شده.
+   * بدون این، اگر روزی ضرایب کالیبره شوند، نمودار روند بیمار بی‌صدا بی‌معنا
+   * می‌شود: پزشک تغییر عدد را «بهبود بالینی» می‌خواند در حالی که فقط خط‌کش
+   * عوض شده است.
+   */
+  calibrationVersion: string;
   /** فاز ۱ — ارزیابی کیفیت تصویر ورودی خام (تار/نور/کنتراست)، برای هشدار در UI */
   imageQuality?: ImageQualityAssessment;
 }
@@ -707,6 +715,7 @@ export function composeOfflineResult(
     annotatedImageBase64: canvas.toDataURL('image/png'),
     engine,
     observationsFilledFromHeuristic: resolvedObs.filledFromHeuristic,
+    calibrationVersion: CALIBRATION_VERSION,
     imageQuality,
   };
 }

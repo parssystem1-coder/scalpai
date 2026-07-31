@@ -2,6 +2,7 @@ import { Brain, Loader, AlertCircle, Search, ZoomIn, ZoomOut, Download } from 'l
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '../../store';
 import { getAiPublicModelLabel } from '../../lib/aiProvider';
+import { hasValidPrivacyConsent } from '../../lib/privacyConsent';
 import { ANALYSIS_ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from '../../lib/mediaUiConstants';
 import { useLang, useT } from '../../i18n';
 import AnalysisGalleryPicker from '../../components/AnalysisGalleryPicker';
@@ -50,7 +51,15 @@ export default function AnalysisTab({ session: s }: { session: AnalysisTabSessio
   const { settings } = useSettingsStore();
   const publicModel = getAiPublicModelLabel(settings, lang);
   const analyzingLabel = t('analyzingWithModel').replace('{model}', publicModel);
-  const canAnalyze = Boolean(s.selectedImage && s.hasApiKey);
+  /**
+   * فاز ۲ (AUD-2) — درگاه رضایت‌نامه پیش‌دستانه، نه «کلیک مرده».
+   * تا پیش از این کاربر کلیک می‌کرد و *بعد* خطای privacyConsentRequired
+   * می‌گرفت. حالا دکمه از همان لحظهٔ رندر غیرفعال است و دلیلش را در tooltip
+   * می‌گوید. گیت منطقی داخل useAISession عمداً حذف نشده و به‌عنوان لایهٔ دفاع
+   * دوم می‌ماند (رابط کاربری هرگز تنها گیت امنیتی نیست).
+   */
+  const hasConsent = hasValidPrivacyConsent(settings);
+  const canAnalyze = Boolean(s.selectedImage && s.hasApiKey && hasConsent);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -142,6 +151,14 @@ export default function AnalysisTab({ session: s }: { session: AnalysisTabSessio
           <p className="text-sm text-center opacity-60">{t('selectImageFirst')}</p>
         )}
 
+        {/* فاز ۲ (AUD-2) — دلیل غیرفعال بودن باید دیده شود، نه فقط در tooltip */}
+        {!hasConsent && (
+          <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-sm flex items-start gap-2">
+            <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+            <span>{t('privacyConsentRequired')}</span>
+          </div>
+        )}
+
         <div className="flex gap-2">
           {s.analyzing ? (
             <button
@@ -157,7 +174,15 @@ export default function AnalysisTab({ session: s }: { session: AnalysisTabSessio
               type="button"
               onClick={() => s.analyzeWithGemini()}
               disabled={!canAnalyze}
-              title={!s.hasApiKey ? t('apiKeyMissing') : !s.selectedImage ? t('selectImageFirst') : undefined}
+              title={
+                !hasConsent
+                  ? t('privacyConsentRequired')
+                  : !s.hasApiKey
+                    ? t('apiKeyMissing')
+                    : !s.selectedImage
+                      ? t('selectImageFirst')
+                      : undefined
+              }
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:from-purple-400 hover:to-fuchsia-400 transition"
             >
               <Brain size={18} />

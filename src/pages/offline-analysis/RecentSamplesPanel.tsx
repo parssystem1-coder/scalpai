@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Pencil, Trash2, X, ChevronRight, ChevronLeft, Filter, Calendar, Search, Gauge, Loader } from 'lucide-react';
 import type { TrainingSample } from '../../db';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { useT } from '../../i18n';
 import { offlineDict } from './strings';
 import { observationGroups, observationsInGroup } from '../../lib/diagnosisCatalog';

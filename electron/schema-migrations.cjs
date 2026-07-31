@@ -8,10 +8,7 @@
 /** آخرین نسخهٔ اسکیما پس از اعمال همهٔ migrationها */
 const SCHEMA_VERSION = 10;
 
-const {
-  buildSystemTrainingPoolClientRecord,
-  ensureSystemTrainingPoolClientSqlite,
-} = require('./db-common.cjs');
+const { ensureSystemTrainingPoolClientSqlite } = require('./db-common.cjs');
 
 /**
  * @param {import('better-sqlite3').Database} db

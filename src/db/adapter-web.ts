@@ -650,6 +650,21 @@ export const webAdapter: DatabaseAdapter = {
     }
   },
 
+  /**
+   * فاز ۲ (AUD-11) — بک‌اند وب ردپای حسابرسی **ندارد**.
+   * رویدادهای حسابرسی در main-process الکترون ثبت می‌شوند (ورود، صدور داده،
+   * ارسال ابری و…) و نسخهٔ مرورگر اصلاً چنین لایه‌ای ندارد. عمداً آرایهٔ خالی
+   * برمی‌گردانیم و نه دادهٔ ساختگی؛ رابط کاربری خودش پیام صریح «در نسخهٔ وب
+   * در دسترس نیست» را نشان می‌دهد. این محدودیت در docs/privacy.md مستند است.
+   */
+  async getAuditLog() {
+    return [];
+  },
+
+  async getAuditLogCount() {
+    return 0;
+  },
+
   async getModelMetadata() {
     return (await modelMetadataStore.getItem<import('./types').LocalModelMetadata>('metadata')) ?? null;
   },

@@ -128,6 +128,29 @@ check('analyze.py ضرایب را از SCALE می‌خواند (نه عدد ثا
   );
 });
 
+// ── AUD-18) شناسهٔ نسخهٔ کالیبراسیون موجود و در خروجی تحلیل ثبت می‌شود ──
+check('نسخهٔ کالیبراسیون (AUD-18) تعریف و در خروجی تحلیل ثبت می‌شود', () => {
+  // چرا این گارد لازم است: اگر روزی کسی ضرایب را کالیبره کند ولی نسخه را بالا
+  // نبرد، تحلیل‌های قدیم و جدید با یک برچسب مخلوط می‌شوند و نمودار روند بیمار
+  // بی‌صدا بی‌معنا می‌شود — همان خطای بالینی خاموشی که AUD-18 می‌بندد.
+  assert.ok(
+    typeof shared.CALIBRATION_VERSION === 'string' && shared.CALIBRATION_VERSION.length > 0,
+    'CALIBRATION_VERSION در shared/scalp-constants.json تعریف نشده است',
+  );
+
+  assert.ok(
+    /export const CALIBRATION_VERSION/.test(tsSrc)
+    && /sharedConstants\.CALIBRATION_VERSION/.test(tsSrc),
+    'heuristicConstants.ts باید CALIBRATION_VERSION را از فایل مشترک بخواند (نه هاردکد)',
+  );
+
+  const featSrc = read('src/lib/scalpFeatures.ts');
+  assert.ok(
+    /calibrationVersion: CALIBRATION_VERSION/.test(featSrc),
+    'خروجی composeOfflineResult باید calibrationVersion را ثبت کند',
+  );
+});
+
 // ── ۴) کلیدهای fallback پایتون با فایل مشترک یکی است ────────────────────
 check('کلیدهای fallback در analyze.py با فایل مشترک یکی است', () => {
   const start = pySrc.indexOf("'FEATURE_SCALE': {");

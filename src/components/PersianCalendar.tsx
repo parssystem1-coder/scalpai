@@ -9,13 +9,10 @@ import {
   persianToGregorian,
   persianToGregorianDate,
   formatDateForDisplay,
-  formatDateForStorage,
   BIRTH_YEAR_LOOKBACK,
   SESSION_YEAR_LOOKAHEAD,
 } from '../lib/jalaliDate';
 
-// Re-exports for backward compatibility with existing imports from this module
-export { persianToGregorian, formatDateForDisplay, formatDateForStorage };
 
 interface PersianCalendarProps {
   value: string;
@@ -81,7 +78,9 @@ export default function PersianCalendar({ value, onChange, isRtl = true, variant
   }, [value]);
 
   // اعتبارسنجی و تبدیل تاریخ
-  const validateAndConvert = (day: string, month: string, year: string) => {
+  // با useCallback ارجاعش پایدار می‌شود تا بتواند بدون ساختن حلقه به آرایهٔ
+  // وابستگی handleDateComplete اضافه شود (رفع ریشه‌ای هشدار exhaustive-deps).
+  const validateAndConvert = useCallback((day: string, month: string, year: string) => {
     const d = parseInt(toEnglishDigits(day));
     const m = parseInt(toEnglishDigits(month));
     const y = parseInt(toEnglishDigits(year));
@@ -108,7 +107,7 @@ export default function PersianCalendar({ value, onChange, isRtl = true, variant
       onChange(gregorianDate);
       setCurrentMonth({ year: y, month: m - 1 });
     }
-  };
+  }, [minYear, maxYear, onChange]);
 
   // پردازش ورودی روز با auto-focus
   const handleDayChange = (val: string) => {
@@ -138,7 +137,7 @@ export default function PersianCalendar({ value, onChange, isRtl = true, variant
     if (dayInput.length >= 1 && monthInput.length >= 1 && yearInput.length >= 4) {
       validateAndConvert(dayInput, monthInput, yearInput);
     }
-  }, [dayInput, monthInput, yearInput]);
+  }, [dayInput, monthInput, yearInput, validateAndConvert]);
 
   // پردازش ورودی ماه با auto-focus
   const handleMonthChange = (val: string) => {

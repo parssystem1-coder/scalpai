@@ -4,7 +4,7 @@
  * محلی نگه می‌دارد؛ این فایل فقط ناوبری تب‌ها و پیام سراسری را مدیریت می‌کند.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Settings as SettingsIcon, Users, Brain, User, Shield, Check, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Users, Brain, User, Shield, Check, AlertCircle, ScrollText } from 'lucide-react';
 import { useSettingsStore, useTrichologistsStore } from '../store';
 import { useT } from '../i18n';
 import { settingsDict } from './settings/strings';
@@ -14,6 +14,7 @@ import ProfileTab from './settings/ProfileTab';
 import ProxyTab from './settings/ProxyTab';
 import TrichologistsTab from './settings/TrichologistsTab';
 import AITab from './settings/AITab';
+import AuditTab from './settings/AuditTab';
 
 const tabs = [
   { id: 'general', icon: SettingsIcon, labelKey: 'tabGeneral' },
@@ -21,6 +22,8 @@ const tabs = [
   { id: 'proxy', icon: Shield, labelKey: 'tabProxy' },
   { id: 'trichologists', icon: Users, labelKey: 'tabTrichologists' },
   { id: 'ai', icon: Brain, labelKey: 'tabAI' },
+  // فاز ۲ (AUD-11) — ردپای حسابرسی حالا برای کاربر/بازرس قابل مشاهده است
+  { id: 'audit', icon: ScrollText, labelKey: 'tabAudit' },
 ] as const;
 
 export default function Settings() {
@@ -84,6 +87,7 @@ export default function Settings() {
       {activeTab === 'proxy' && <ProxyTab notify={notify} />}
       {activeTab === 'trichologists' && <TrichologistsTab />}
       {activeTab === 'ai' && <AITab />}
+      {activeTab === 'audit' && <AuditTab notify={notify} />}
     </div>
   );
 }

@@ -15,9 +15,11 @@ export default function Login() {
   const navigate = useNavigate();
   const { settings, fetchSettings } = useSettingsStore();
 
+  // اکشن‌های zustand یک‌بار در create ساخته می‌شوند و ارجاعشان پایدار است،
+  // پس افزودنشان به آرایهٔ وابستگی حلقه نمی‌سازد و هشدار را ریشه‌ای می‌بندد.
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
 
   const isRtl = settings.language === 'fa';
 
