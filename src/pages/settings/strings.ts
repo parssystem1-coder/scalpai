@@ -8,6 +8,38 @@ export const settingsDict = {
   tabProxy: { fa: 'پروکسی', en: 'Proxy' },
   tabTrichologists: { fa: 'تریکولوژیست‌ها', en: 'Trichologists' },
   tabAI: { fa: 'هوش مصنوعی', en: 'AI Settings' },
+  tabAudit: { fa: 'ردپای حسابرسی', en: 'Audit Trail' },
+
+  // فاز ۲ (AUD-11) — تب ردپای حسابرسی
+  auditTitle: { fa: 'ردپای حسابرسی', en: 'Audit trail' },
+  auditIntro: {
+    fa: 'سیاههٔ رویدادهای حساس برنامه: ورود و خروج، صدور و بازیابی داده، حذف مراجع و ارسال تصویر به سرویس ابری. این سیاهه پاسخ می‌دهد «چه کسی، چه زمانی، چه داده‌ای را بیرون برد».',
+    en: 'A log of sensitive events: sign-in/out, data export/import, client deletion and cloud AI requests. It answers "who took what data out, and when".',
+  },
+  auditPrivacyNote: {
+    fa: 'به‌دلیل حریم خصوصی، ستون جزئیات فقط شناسه‌های فنی و پرچم‌ها را نگه می‌دارد — هرگز نام بیمار، تصویر، کلید یا پسورد در آن ثبت نمی‌شود.',
+    en: 'For privacy, the detail column stores only technical identifiers and flags — never patient names, images, keys or passwords.',
+  },
+  auditRetentionNote: {
+    fa: 'سیاست نگهداری: رویدادهای قدیمی‌تر از ۲۴ ماه و نیز مازاد بر ۵۰٬۰۰۰ رویداد، هنگام اجرای برنامه به‌صورت خودکار پاک می‌شوند.',
+    en: 'Retention policy: entries older than 24 months, and anything beyond 50,000 entries, are pruned automatically at startup.',
+  },
+  auditEmpty: { fa: 'هنوز هیچ رویدادی ثبت نشده است.', en: 'No events recorded yet.' },
+  auditWebUnavailable: {
+    fa: 'ردپای حسابرسی فقط در نسخهٔ دسکتاپ (Electron) ثبت می‌شود؛ نسخهٔ مرورگر چنین لایه‌ای ندارد.',
+    en: 'The audit trail is only recorded in the desktop (Electron) build; the browser version has no such layer.',
+  },
+  auditLoadError: { fa: 'خواندن ردپای حسابرسی ناموفق بود', en: 'Could not load the audit trail' },
+  auditColTime: { fa: 'زمان', en: 'Time' },
+  auditColEvent: { fa: 'رویداد', en: 'Event' },
+  auditColActor: { fa: 'کاربر', en: 'Actor' },
+  auditColDetail: { fa: 'جزئیات', en: 'Detail' },
+  auditExportCsv: { fa: 'خروجی CSV برای بازرس', en: 'Export CSV for auditor' },
+  auditExportDone: { fa: 'فایل CSV ذخیره شد', en: 'CSV file saved' },
+  auditExportError: { fa: 'ذخیرهٔ فایل CSV ناموفق بود', en: 'Saving the CSV file failed' },
+  auditRefresh: { fa: 'به‌روزرسانی', en: 'Refresh' },
+  auditPrev: { fa: 'صفحهٔ قبل', en: 'Previous' },
+  auditNext: { fa: 'صفحهٔ بعد', en: 'Next' },
 
   // عمومی — زبان و تم
   language: { fa: 'زبان', en: 'Language' },

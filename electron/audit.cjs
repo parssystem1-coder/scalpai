@@ -23,6 +23,53 @@ const AUDIT_EVENTS = {
   IMAGES_LEGACY_ENCRYPTED: 'images.legacy.encrypted',
 };
 
+/**
+ * فاز ۲ / AUD-12 — سیاست نگهداری ردپای حسابرسی (منبع واحد حقیقت)
+ * -----------------------------------------------------------------------
+ * مشکلی که این بخش حل می‌کند: مسیر JSON از قبل سقف ۲۰۰۰ ردیف داشت، ولی جدول
+ * SQLite هیچ محدودیتی نداشت و در کلینیک با چند سال استفاده بی‌نهایت رشد
+ * می‌کرد. علاوه بر مسئلهٔ اندازه، «تا ابد نگه‌داشتن» خودش با اصل پایانگاری
+ * دادهٔ GDPR ناسازگار است: لاگ باید به اندازهٔ نیاز پاسخ‌گویی بماند، نه بیشتر.
+ *
+ * سیاست دوگانه (هر دو باید رعایت شوند):
+ *   ۱) سقف زمانی — رویدادهای قدیمی‌تر از ۲۴ ماه حذف می‌شوند.
+ *   ۲) سقف تعدادی — حتی اگر همه در بازهٔ ۲۴ ماه باشند، فقط تازه‌ترین
+ *      ۵۰٬۰۰۰ رویداد می‌ماند (سپر در برابر انفجار ناگهانی رویداد).
+ *
+ * چرا ۲۴ ماه: پوشش دو دورهٔ کامل ممیزی سالانه. اگر کلینیکی الزام قانونی
+ * طولانی‌تری دارد، همین دو ثابت تنها نقطه‌ای است که باید عوض شود.
+ */
+const AUDIT_RETENTION_MONTHS = 24;
+const AUDIT_MAX_ROWS = 50000;
+
+/**
+ * مرز زمانی حذف را برمی‌گرداند: هر رویداد قدیمی‌تر از این ISO timestamp باید برود.
+ * @param {Date} [now] — برای تست‌پذیری قابل تزریق است
+ * @returns {string} ISO 8601
+ */
+function auditRetentionCutoff(now = new Date()) {
+  const cutoff = new Date(now.getTime());
+  cutoff.setMonth(cutoff.getMonth() - AUDIT_RETENTION_MONTHS);
+  return cutoff.toISOString();
+}
+
+/**
+ * اعمال سیاست نگهداری روی یک آرایهٔ رویداد (مسیر JSON و نیز تست‌ها).
+ * تابع خالص است: ورودی را تغییر نمی‌دهد و آرایهٔ جدید مرتب‌شده (نو → کهنه)
+ * برمی‌گرداند.
+ * @param {Array<{createdAt: string}>} entries
+ * @param {Date} [now]
+ * @returns {Array<{createdAt: string}>}
+ */
+function applyAuditRetention(entries, now = new Date()) {
+  if (!Array.isArray(entries)) return [];
+  const cutoff = auditRetentionCutoff(now);
+  return entries
+    .filter((e) => e && typeof e.createdAt === 'string' && e.createdAt >= cutoff)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, AUDIT_MAX_ROWS);
+}
+
 const noop = () => {};
 
 /**
@@ -67,4 +114,14 @@ function recordAudit(event, actor = 'local-user', detail = null) {
   createAuditRecorder(globalSink)(event, actor, detail);
 }
 
-module.exports = { AUDIT_EVENTS, setAuditSink, recordAudit, createAuditRecorder };
+module.exports = {
+  AUDIT_EVENTS,
+  setAuditSink,
+  recordAudit,
+  createAuditRecorder,
+  // فاز ۲ / AUD-12 — سیاست نگهداری
+  AUDIT_RETENTION_MONTHS,
+  AUDIT_MAX_ROWS,
+  auditRetentionCutoff,
+  applyAuditRetention,
+};

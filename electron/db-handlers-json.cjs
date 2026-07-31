@@ -38,7 +38,7 @@ const {
   decryptWithPassword,
 } = require('./file-crypto.cjs');
 const { getPurposeKey } = require('./dek.cjs');
-const { AUDIT_EVENTS, setAuditSink, createAuditRecorder } = require('./audit.cjs');
+const { AUDIT_EVENTS, setAuditSink, createAuditRecorder, applyAuditRetention, AUDIT_MAX_ROWS } = require('./audit.cjs');
 
 function emptyData() {
   return {
@@ -134,8 +134,11 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
   const appendAuditEntry = (entry) => {
     if (!Array.isArray(data.auditLog)) data.auditLog = [];
     data.auditLog.push(entry);
-    // سقف نگه‌داری تا فایل JSON بی‌نهایت رشد نکند (با SQLite حد ۲۰۰۰ در export)
-    if (data.auditLog.length > 2000) data.auditLog = data.auditLog.slice(-2000);
+    // فاز ۲ (AUD-12) — سقف تعدادی حالا از منبع واحد audit.cjs می‌آید تا با
+    // بک‌اند SQLite یک عدد باشد (قبلاً ۲۰۰۰ محلی و ناهماهنگ بود).
+    if (data.auditLog.length > AUDIT_MAX_ROWS) {
+      data.auditLog = data.auditLog.slice(-AUDIT_MAX_ROWS);
+    }
     save();
   };
   // recorder محلی برای رویدادهای خود هندلر (بدون تداخل چند نمونهٔ هم‌زمان)…
@@ -228,9 +231,23 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
 
           case 'getAuditLog': {
             const limit = Math.min(params.limit || 200, 1000);
+            const offset = Math.max(params.offset || 0, 0);
             return [...(data.auditLog || [])]
               .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-              .slice(0, limit);
+              .slice(offset, offset + limit);
+          }
+
+          // فاز ۲ (AUD-11) — شمارش کل برای صفحه‌بندی رابط کاربری
+          case 'getAuditLogCount':
+            return (data.auditLog || []).length;
+
+          // فاز ۲ (AUD-12) — همان سیاست نگهداری بک‌اند SQLite، از منبع واحد
+          case 'pruneAuditLog': {
+            const before = (data.auditLog || []).length;
+            data.auditLog = applyAuditRetention(data.auditLog || []);
+            const removed = before - data.auditLog.length;
+            if (removed > 0) save();
+            return { success: true, removed, remaining: data.auditLog.length };
           }
 
           // =============== Gallery ===============

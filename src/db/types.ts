@@ -399,6 +399,20 @@ export interface ImportBackupReport {
   importedModel: import('../lib/modelBundle').LocalModelBackupBundle | null;
 }
 
+/**
+ * فاز ۲ (AUD-11) — یک ردیف از ردپای حسابرسی.
+ * قرارداد امنیتی: `detail` طبق `electron/audit.cjs` هرگز دادهٔ بالینی، کلید یا
+ * پسورد ندارد — فقط شناسه‌های فنی و پرچم‌ها (مثل provider سرویس AI).
+ */
+export interface AuditLogEntry {
+  id: string;
+  /** یکی از مقادیر AUDIT_EVENTS مثل 'auth.login' یا 'data.export' */
+  event: string;
+  actor: string | null;
+  detail: string | null;
+  createdAt: string;
+}
+
 export interface LocalModelMetadata {
   version: number;
   trainedAt: string;
@@ -649,6 +663,14 @@ export interface DatabaseAdapter {
   // Auth
   verifyCredentials(username: string, password: string): Promise<boolean>;
   hasCredentials(): Promise<boolean>;
+
+  /**
+   * فاز ۲ (AUD-11) — ردپای حسابرسی برای نمایش به کاربر.
+   * تا پیش از این، متد فقط در main وجود داشت و هیچ مسیری از UI به آن نمی‌رسید؛
+   * یعنی ادعای «پاسخ‌پذیری» در docs/privacy.md عملاً برای کاربر دست‌نیافتنی بود.
+   */
+  getAuditLog(params?: { limit?: number; offset?: number }): Promise<AuditLogEntry[]>;
+  getAuditLogCount(): Promise<number>;
 
   // یادگیری ماشین محلی — نمونه‌های آموزشی (برچسب خودکار AI + برچسب دستی متخصص)
   getTrainingSamples(): Promise<TrainingSample[]>;

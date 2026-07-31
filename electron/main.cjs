@@ -1395,6 +1395,18 @@ app.whenReady().then(async () => {
   // فاز ۱ (AUD-8) — همان کار برای تصاویر موقت تحلیل آفلاین: هر عکس بالینی که
   // از یک جلسهٔ کرش‌کرده روی دیسک جا مانده، همین‌جا پاک می‌شود.
   cleanupStaleAnalyzeTemp();
+  // فاز ۲ (AUD-12) — اعمال سیاست نگهداری ردپای حسابرسی (۲۴ ماه + سقف ۵۰٬۰۰۰).
+  // یک‌بار در استارت‌آپ کافی است؛ ایندکس idx_audit_log_createdAt این را ارزان
+  // می‌کند و خرابی‌اش نباید بالا آمدن اپ را متوقف کند.
+  try {
+    const pruned = await dbHandlers.handleDbQuery('pruneAuditLog', {});
+    if (pruned && !pruned.error) {
+      const removed = (pruned.removedByAge || 0) + (pruned.removedByCount || 0) + (pruned.removed || 0);
+      if (removed > 0) console.log(`Audit retention: removed ${removed} expired audit entries`);
+    }
+  } catch (e) {
+    console.warn('Audit retention pass failed (non-fatal):', e && e.message);
+  }
   // پس از ری‌استارت، پوشهٔ بکاپ ذخیره‌شده را دوباره به allowlist اضافه کن
   try {
     const settings = await dbHandlers.handleDbQuery('getSettings', {});

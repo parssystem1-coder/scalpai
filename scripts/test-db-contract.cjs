@@ -99,6 +99,9 @@ function createSqliteHarness(label = 'sqlite', safeStorage = safeStorageMock) {
     label,
     backend: 'sqlite',
     dir,
+    // فاز ۲ (AUD-12): تست نگهداری باید بتواند یک ردیف *واقعاً کهنه* بکارد؛
+    // بدون دسترسی خام، تست فقط «خطا نداد» را می‌سنجید نه «واقعاً حذف کرد».
+    rawDb: db,
     async query(method, params = {}) {
       return handlers.handleDbQuery(method, params);
     },
@@ -517,6 +520,72 @@ async function runContract(harness) {
     auditAfterImport.some((r) => r.event === 'data.import'),
     `${tag}: audit_log must contain data.import after importData`,
   );
+
+  // --- فاز ۲ (AUD-11/AUD-12): قرارداد نمایش و نگهداری ردپای حسابرسی ---
+  // این متدها تا فاز ۲ فقط در main بودند و هیچ مصرف‌کنندهٔ UI نداشتند؛ حالا که
+  // تب «ردپای حسابرسی» به آن‌ها تکیه می‌کند، هر دو بک‌اند باید یکسان رفتار کنند.
+  const auditTotal = await assertOk(await q('getAuditLogCount', {}), `${tag} getAuditLogCount`);
+  assert.strictEqual(typeof auditTotal, 'number', `${tag}: getAuditLogCount باید عدد بدهد`);
+  assert.ok(auditTotal >= auditAfterImport.length, `${tag}: شمارش کل نباید از صفحهٔ اول کمتر باشد`);
+
+  // صفحه‌بندی: صفحهٔ اول و دوم نباید ردیف مشترک داشته باشند
+  const firstPage = await assertOk(await q('getAuditLog', { limit: 2, offset: 0 }), `${tag} audit page 1`);
+  assert.ok(firstPage.length <= 2, `${tag}: limit رعایت می‌شود`);
+  if (auditTotal > 2) {
+    const secondPage = await assertOk(await q('getAuditLog', { limit: 2, offset: 2 }), `${tag} audit page 2`);
+    const firstIds = new Set(firstPage.map((r) => r.id));
+    assert.ok(
+      secondPage.every((r) => !firstIds.has(r.id)),
+      `${tag}: offset باید صفحهٔ متفاوت بدهد (نه تکرار صفحهٔ اول)`,
+    );
+  }
+
+  // ترتیب باید نزولی باشد (تازه‌ترین اول) — قرارداد نمایش جدول
+  for (let i = 1; i < auditAfterImport.length; i += 1) {
+    assert.ok(
+      auditAfterImport[i - 1].createdAt >= auditAfterImport[i].createdAt,
+      `${tag}: ردپای حسابرسی باید نزولی مرتب باشد`,
+    );
+  }
+
+  // سیاست نگهداری (AUD-12): یک رویداد *واقعاً کهنه* کاشته می‌شود تا ثابت شود
+  // pruning عملاً حذف می‌کند، نه اینکه فقط بدون خطا برگردد.
+  const ANCIENT_ID = 'contract-ancient-audit-row';
+  const ANCIENT_AT = '2019-01-01T00:00:00.000Z'; // خیلی قدیمی‌تر از ۲۴ ماه
+  if (isSqlite) {
+    harness.rawDb
+      .prepare('INSERT INTO audit_log (id, event, actor, detail, createdAt) VALUES (?, ?, ?, ?, ?)')
+      .run(ANCIENT_ID, 'auth.login', 'ancient-user', null, ANCIENT_AT);
+  } else {
+    // بک‌اند JSON: از مسیر عمومی خودش رویداد را می‌کاریم و تاریخش را کهنه می‌کنیم
+    const storePath = path.join(harness.dir, 'scalpai-data.json');
+    if (!isEncryptedMode && fs.existsSync(storePath)) {
+      const raw = JSON.parse(fs.readFileSync(storePath, 'utf-8'));
+      raw.auditLog = raw.auditLog || [];
+      raw.auditLog.push({ id: ANCIENT_ID, event: 'auth.login', actor: 'ancient-user', detail: null, createdAt: ANCIENT_AT });
+      fs.writeFileSync(storePath, JSON.stringify(raw), 'utf-8');
+    }
+  }
+
+  const prunedReport = await assertOk(await q('pruneAuditLog', {}), `${tag} pruneAuditLog`);
+  assert.strictEqual(prunedReport.success, true, `${tag}: pruneAuditLog گزارش success می‌دهد`);
+
+  const afterPrune = await assertOk(await q('getAuditLog', { limit: 1000 }), `${tag} getAuditLog after prune`);
+  assert.ok(
+    afterPrune.some((r) => r.event === 'data.import'),
+    `${tag}: پاک‌سازی نباید رویدادهای تازه را ببرد`,
+  );
+  if (isSqlite) {
+    // آزمون واقعی: ردیف کهنه باید رفته باشد
+    const stillThere = harness.rawDb
+      .prepare('SELECT COUNT(*) AS c FROM audit_log WHERE id = ?')
+      .get(ANCIENT_ID).c;
+    assert.strictEqual(
+      stillThere,
+      0,
+      `${tag}: رویداد قدیمی‌تر از سیاست نگهداری باید واقعاً حذف شده باشد`,
+    );
+  }
 
   // --- موج ۳ (O3): مدل داخل بکاپ در هر دو بک‌اند + round-trip به‌عنوان challenger ---
   const sampleBundle = {
