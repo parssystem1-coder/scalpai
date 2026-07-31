@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search, Users } from 'lucide-react';
 import type { Analysis, Client } from '../../db';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { groupAnalysesIntoVisits } from '../../lib/sessionVisit';
 import { usePick, useT } from '../../i18n';
 import { aiAnalysisDict } from './strings';

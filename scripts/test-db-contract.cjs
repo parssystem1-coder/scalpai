@@ -14,7 +14,9 @@ const Module = require('module');
 
 // mock ماژول electron قبل از load کردن db-handlers
 const originalLoad = Module._load;
-Module._load = function (request, parent, isMain) {
+// پارامترها با `_` علامت خورده‌اند: خودشان مصرف نمی‌شوند ولی باید در امضا
+// بمانند چون فراخوانی اصلی از طریق `arguments` عبور داده می‌شود.
+Module._load = function (request, _parent, _isMain) {
   if (request === 'electron') {
     return {
       nativeImage: {

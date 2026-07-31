@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Search, Edit2, Trash2, X, User, Loader, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useClientsStore } from '../store';
-import PersianCalendar, { formatDateForDisplay } from '../components/PersianCalendar';
+import PersianCalendar from '../components/PersianCalendar';
+import { formatDateForDisplay } from '../lib/jalaliDate';
 import type { Client } from '../db';
 
 export default function Clients() {
@@ -17,16 +18,24 @@ export default function Clients() {
     firstName: '', lastName: '', phone: '', email: '', gender: 'male', birthDate: '', notes: ''
   });
 
-  useEffect(() => { fetchManagedClients(1); }, []);
+  // ارجاع اکشن zustand پایدار است، پس افزودنش حلقه نمی‌سازد
+  useEffect(() => { fetchManagedClients(1); }, [fetchManagedClients]);
 
   // جستجو با تاخیر کوتاه (debounce) به دیتابیس ارسال می‌شود، نه فقط روی همان صفحهٔ
   // بارگذاری‌شده فیلتر شود — وگرنه مشتری‌های صفحات بعدی هیچ‌وقت در نتیجهٔ جستجو دیده نمی‌شدند.
+  // `search` عمداً در آرایهٔ وابستگی نیست: مقدارِ درون‌استور با هر بار تایپ
+  // عوض می‌شود و اگر وابستگی می‌شد، تایمر مدام ری‌ست و debounce بی‌اثر می‌شد.
+  // راه درست، خواندن آخرین مقدار از ref در لحظهٔ اجرای تایمر است — این هم
+  // هشدار لینت را ریشه‌ای می‌بندد و هم رفتار debounce را دست‌نخورده نگه می‌دارد.
+  const searchRef = useRef(search);
+  searchRef.current = search;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchInput !== search) setManagedSearch(searchInput);
+      if (searchInput !== searchRef.current) setManagedSearch(searchInput);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchInput]);
+  }, [searchInput, setManagedSearch]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 

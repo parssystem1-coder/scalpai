@@ -471,7 +471,12 @@ async function main() {
   testDek();
   await testSqliteEncryption();
   await testRecovery();
-  console.log(`\nALL_ENCRYPTION_TESTS_PASSED`);
+  // فاز ۳ (AUD-10): شمارندهٔ `passed` شمرده می‌شد ولی هرگز گزارش نمی‌شد —
+  // لینت آن را به‌عنوان متغیر بی‌مصرف پیدا کرد. بقیهٔ اسکریپت‌های گیت (مثل
+  // test-build-assets) عدد بررسی‌ها را چاپ می‌کنند؛ این یکی هم باید بکند تا
+  // «سبز شد» قابل‌شمارش باشد و کم شدن بی‌صدای یک بررسی دیده شود.
+  console.log(`\n✅ ${passed} بررسی رمزنگاری موفق.`);
+  console.log(`ALL_ENCRYPTION_TESTS_PASSED`);
 }
 
 main().catch((error) => {

@@ -32,7 +32,9 @@ if (typeof global.gc !== 'function') {
 
 // mock ماژول electron (nativeImage) مثل test-db-contract.cjs
 const originalLoad = Module._load;
-Module._load = function (request, parent, isMain) {
+// پارامترها با `_` علامت خورده‌اند: خودشان مصرف نمی‌شوند ولی باید در امضا
+// بمانند چون فراخوانی اصلی از طریق `arguments` عبور داده می‌شود.
+Module._load = function (request, _parent, _isMain) {
   if (request === 'electron') {
     return {
       nativeImage: {

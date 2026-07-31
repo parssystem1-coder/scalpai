@@ -5,7 +5,7 @@ import {
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import type { Analysis, ClinicalAnalysisResult } from '../../db';
 import MetricPercentBar from '../../components/MetricPercentBar';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { useLang, useT } from '../../i18n';
 import { offlineDict } from './strings';
 import {

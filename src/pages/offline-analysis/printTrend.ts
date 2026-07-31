@@ -1,5 +1,5 @@
 import type { Analysis } from '../../db';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import type { MetricDelta } from './resultInsights';
 
 export interface TrendPoint {

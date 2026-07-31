@@ -48,7 +48,6 @@ const {
   isEncryptedBuffer,
   encryptWithPassword,
   decryptWithPassword,
-  isPasswordProtectedBuffer,
   reencryptImportedMedia,
 } = require('./file-crypto.cjs');
 const { getPurposeKey } = require('./dek.cjs');

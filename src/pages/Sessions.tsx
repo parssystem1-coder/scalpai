@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Plus, Calendar, Clock, X, Edit2, Trash2, Check, XCircle, Search, ChevronDown } from 'lucide-react';
 import { useSessionsStore, useClientsStore, useTrichologistsStore } from '../store';
-import PersianCalendar, { formatDateForDisplay } from '../components/PersianCalendar';
+import PersianCalendar from '../components/PersianCalendar';
+import { formatDateForDisplay } from '../lib/jalaliDate';
 import type { Session, Client } from '../db';
 
 const STATUS_LABELS: Record<Session['status'], string> = {
@@ -27,7 +28,13 @@ export default function Sessions() {
   const clientDropdownRef = useRef<HTMLDivElement>(null);
   const clientInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchSessions(); fetchClients(); fetchTrichologists(); }, []);
+  // ارجاع اکشن‌های zustand پایدار است (یک‌بار در create ساخته می‌شوند)،
+  // پس افزودنشان به deps حلقه نمی‌سازد و هشدار را ریشه‌ای می‌بندد.
+  useEffect(() => {
+    fetchSessions();
+    fetchClients();
+    fetchTrichologists();
+  }, [fetchSessions, fetchClients, fetchTrichologists]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

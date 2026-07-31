@@ -5,7 +5,7 @@
 import { useMemo } from 'react';
 import { Calendar, ClipboardList, User } from 'lucide-react';
 import type { Analysis, Client } from '../db';
-import { formatDateForDisplay } from './PersianCalendar';
+import { formatDateForDisplay } from '../lib/jalaliDate';
 import {
   getAnalysisClinicalResult,
   groupAnalysesIntoVisits,

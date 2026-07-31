@@ -10,7 +10,7 @@ import DiagnosisResultGrid from '../../components/DiagnosisResultGrid';
 import MetricPercentBar from '../../components/MetricPercentBar';
 import ImageQualityWarning from '../../components/ImageQualityWarning';
 import { resolveObservations, lesionDisplayLabel } from '../../lib/diagnosisCatalog';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { useLang, useT } from '../../i18n';
 import { offlineDict } from './strings';
 import { computeHealthScore, healthScoreColor, healthScoreLabel } from './healthScore';

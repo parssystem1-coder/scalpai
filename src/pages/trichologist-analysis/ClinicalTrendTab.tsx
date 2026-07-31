@@ -19,7 +19,7 @@ import {
 } from 'recharts';
 import { db, type GalleryItem } from '../../db';
 import { useAnalysesStore, useGalleryStore, useSessionsStore } from '../../store';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { useLang, useT } from '../../i18n';
 import {
   FIELD_LABELS_EN,

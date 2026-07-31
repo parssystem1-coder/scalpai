@@ -33,7 +33,7 @@ const {
 // موج ۲ (C1) — درایور SQLite ترجیحاً better-sqlite3-multiple-ciphers (SQLCipher)
 // است؛ fallback به better-sqlite3 ساده با رمزنگاریِ غیرفعال (جزئیات در sqlite-driver.cjs)
 const { loadSqliteDriver } = require('./sqlite-driver.cjs');
-const { initDek, getDek, getPurposeKey, getEncryptionStatus } = require('./dek.cjs');
+const { initDek, getDek, getPurposeKey } = require('./dek.cjs');
 const {
   tryOpenKeyed,
   openPlain,

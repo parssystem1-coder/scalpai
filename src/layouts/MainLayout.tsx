@@ -39,7 +39,8 @@ export default function MainLayout({ children }: Props) {
   const navigate = useNavigate();
   const { settings, updateSettings, fetchSettings } = useSettingsStore();
 
-  useEffect(() => { fetchSettings(); }, []);
+  // ارجاع اکشن zustand پایدار است (یک‌بار در create ساخته می‌شود)
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -328,4 +329,3 @@ export default function MainLayout({ children }: Props) {
   );
 }
 
-export { themeConfig } from './themeConfig';

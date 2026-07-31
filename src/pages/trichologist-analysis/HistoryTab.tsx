@@ -1,6 +1,6 @@
 import { Calendar, ClipboardList, User } from 'lucide-react';
 import type { Analysis, Client } from '../../db';
-import { formatDateForDisplay } from '../../components/PersianCalendar';
+import { formatDateForDisplay } from '../../lib/jalaliDate';
 import { useLang, useT } from '../../i18n';
 import { trichoDict, observationLabel } from './strings';
 
