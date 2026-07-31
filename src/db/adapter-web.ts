@@ -74,6 +74,19 @@ function parseBackupPayload(jsonData: string): Record<string, unknown> {
   if (data.questionnaireRevisions !== undefined && !Array.isArray(data.questionnaireRevisions)) {
     throw new Error('Invalid backup field: questionnaireRevisions');
   }
+  // موج ۳ (O3): مدل داخل بکاپ وب — فقط ساختار اعتبارسنجی می‌شود؛ پارک‌کردن
+  // چلنجر (و گیت سقف حجم) را localModel.ts انجام می‌دهد.
+  if (data.modelBundle !== undefined && data.modelBundle !== null) {
+    const b = data.modelBundle as Record<string, unknown>;
+    if (
+      typeof b !== 'object' ||
+      typeof b.modelTopology !== 'object' || b.modelTopology === null ||
+      !Array.isArray(b.weightSpecs) ||
+      typeof b.weightDataBase64 !== 'string'
+    ) {
+      throw new Error('Invalid backup field: modelBundle');
+    }
+  }
   return data;
 }
 
@@ -452,7 +465,7 @@ export const webAdapter: DatabaseAdapter = {
     return !!(settings?.username && (settings.passwordHash || settings.password));
   },
 
-  async exportData() {
+  async exportData(options) {
     const settings = await this.getSettings();
     // توجه: از getAllFromStore خام (نه this.getClients()/this.getAllGallery()) استفاده
     // می‌شود تا کلاینت سیستمی و گالری/نمونه‌های آموزشی وابسته هم در بکاپ کامل باشند —
@@ -467,6 +480,9 @@ export const webAdapter: DatabaseAdapter = {
       trainingSamples: await this.getTrainingSamples(),
       localModelMetadata: await this.getModelMetadata(),
       questionnaireRevisions: await getAllFromStore<QuestionnaireRevision>(questionnaireRevisionsStore),
+      // موج ۳ (O3): مدل محلی داخل بکاپ — وزن‌ها به‌صورت base64. undefined یعنی
+      // مدلی نبوده و در JSON خروجی فیلدی هم نوشته نمی‌شود (سازگاری عقب‌رو).
+      modelBundle: options?.modelBundle ?? undefined,
     };
     return JSON.stringify({
       format: BACKUP_FORMAT,
@@ -478,6 +494,10 @@ export const webAdapter: DatabaseAdapter = {
 
   async importData(jsonData) {
     const data = parseBackupPayload(jsonData);
+    // موج ۳ (O3): مدل داخل بکاپ قبل از اعمال داده جدا می‌شود؛ فعال‌سازی‌اش بر
+    // عهدهٔ renderer است (همیشه به‌عنوان چلنجر غیرفعال پارک می‌شود).
+    const importedModel = (data.modelBundle ?? null) as import('../lib/modelBundle').LocalModelBackupBundle | null;
+    delete data.modelBundle;
     const previous = {
       clients: await getAllFromStore<Client>(clientsStore),
       gallery: await getAllFromStore<GalleryItem>(galleryStore),
@@ -539,6 +559,7 @@ export const webAdapter: DatabaseAdapter = {
       // چه بازیابی موفق شده باشد چه به حالت قبلی برگردیم.
       await ensureSystemTrainingPoolClient();
     }
+    return { importedModel };
   },
 
   async getTrainingSamples() {

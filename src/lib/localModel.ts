@@ -8,7 +8,7 @@
  * از مدل تصویر-فقط همان مجموعه بهتر شود؛ در غیر این صورت v3 می‌ماند.
  */
 import * as tf from '@tensorflow/tfjs';
-import type { TrainingSample } from '../db';
+import type { TrainingSample, LocalModelMetadata } from '../db';
 import { SYSTEM_TRAINING_POOL_CLIENT_ID } from './systemTrainingPool';
 import { OBSERVATION_IDS, normalizeObservationIds, type ObservationId } from './diagnosisCatalog';
 import {
@@ -41,6 +41,12 @@ import {
 } from './questionnaireMlFeatures';
 import { assessOutOfDistribution, type OodAssessment } from './outOfDistribution';
 import {
+  artifactsToBundle,
+  bundleToArtifacts,
+  isValidModelBundle,
+  type LocalModelBackupBundle,
+} from './modelBundle';
+import {
   calibrateThresholds,
   computeClassificationSummary,
   computeLabelSupport,
@@ -57,6 +63,13 @@ import {
   type ConfidenceInterval,
   type CalibrationSummary,
 } from './mlEvaluation';
+import {
+  applyTemperature,
+  decideTemperatureScaling,
+  logitToProb,
+  probToLogit,
+  type TemperatureScalingDecision,
+} from './temperatureScaling';
 
 export {
   MIN_SAMPLES_TO_TRAIN,
@@ -164,6 +177,23 @@ export function getCachedObsPolicy() {
   };
 }
 
+/**
+ * موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شدهٔ مدل فعال.
+ * از متادیتا (`calibrationTemperature`) خوانده و در کنار سیاست برچسب تزریق
+ * می‌شود تا رفتار predict دقیقاً همان باشد که موقع ارزیابی اندازه گرفته‌ایم
+ * (predict-time == eval-time). مقدار ۱ یعنی «بدون دما».
+ */
+let cachedModelTemperature = 1;
+
+export function setCachedModelTemperature(value?: number | null) {
+  cachedModelTemperature =
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+export function getCachedModelTemperature(): number {
+  return cachedModelTemperature;
+}
+
 export function getCachedFeatureNorm() {
   return cachedNorm;
 }
@@ -172,12 +202,12 @@ export function getCachedModelFeatureVersion() {
   return cachedModelFeatureVersion;
 }
 
-/** مدل ذخیره‌شده با v3 یا v4 ارتقایافته هنوز قابل استفاده است */
+/** آیا نسخهٔ فیچر مدل ذخیره‌شده با یکی از دو نسخهٔ قابل‌استفادهٔ فعلی سازگار است؟ */
 export function isActiveLocalModelVersion(version?: string | null): boolean {
   return version === FEATURE_VERSION || version === FEATURE_VERSION_WITH_QUESTIONNAIRE;
 }
 
-/** آیا نمونه برای آموزش باکیفیت واجد شرایط است؟ (فیچر تصویر = v3) */
+/** آیا نمونه برای آموزش باکیفیت واجد شرایط است؟ (فیچر تصویر = FEATURE_VERSION فعلی یا نسخهٔ legacy مجاز) */
 export function isSampleEligibleForTraining(s: TrainingSample): boolean {
   if (s.featureVersion && s.featureVersion !== FEATURE_VERSION && !LEGACY_FEATURE_VERSIONS.includes(s.featureVersion as typeof LEGACY_FEATURE_VERSIONS[number])) return false;
   if (s.labelSource === 'expert') return true;
@@ -486,11 +516,17 @@ export interface KFoldSplit {
   holdout: TrainingSample[];
 }
 
+/**
+ * موج ۴ (D1) — برگشت ساختاریافته: خود فولدها + پرچم «ارزیابی حداقلی».
+ * وقتی کمتر از ۳ مشتری داریم، holdout عملاً همان validation است (نشت پنهانِ
+ * اسمی) — این وضعیت باید در متادیتا و UI مشخص شود، نه اینکه عددی خوش‌بینانه
+ * بدون سیاههٔ توضیح نمایش داده شود.
+ */
 export function splitByClientKFold(
   samples: TrainingSample[],
   k = 5,
   seed = Date.now(),
-): KFoldSplit[] {
+): { folds: KFoldSplit[]; minimalFallback: boolean } {
   const byClient = new Map<string, TrainingSample[]>();
   for (const s of samples) {
     const key = s.clientId || `anon-${s.id}`;
@@ -505,7 +541,7 @@ export function splitByClientKFold(
     const nVal = Math.max(1, Math.floor(shuffled.length * 0.2));
     const val = shuffled.slice(0, nVal);
     const train = shuffled.slice(nVal);
-    return [{ train, val, holdout: val }];
+    return { folds: [{ train, val, holdout: val }], minimalFallback: true };
   }
 
   const clientFolds: string[][] = Array.from({ length: actualK }, () => []);
@@ -535,7 +571,7 @@ export function splitByClientKFold(
     folds.push({ train, val, holdout });
   }
 
-  return folds;
+  return { folds, minimalFallback: false };
 }
 
 function oversampleExperts(samples: TrainingSample[]): TrainingSample[] {
@@ -617,6 +653,12 @@ interface FitOutcome {
   metrics: FitMetrics;
   holdoutTrue?: number[][];
   holdoutPred?: number[][];
+  /**
+   * موج ۴ (D3) — خروجی واقعی/پیش‌بینی validation برای برازش دمای کالیبراسیون.
+   * (T باید روی validation برازش شود، نه holdout — بی‌طرفی holdout حفظ می‌شود.)
+   */
+  valTrue?: number[][];
+  valPred?: number[][];
 }
 
 async function fitOnSplit(
@@ -770,6 +812,8 @@ async function fitOnSplit(
       },
       holdoutTrue: holdRows.length ? holdRows.map(r => r.y) : undefined,
       holdoutPred: holdRows.length ? holdPred : undefined,
+      valTrue: valRows.length ? valRows.map(r => r.y) : undefined,
+      valPred: valRows.length ? valPred : undefined,
     };
   } catch (err) {
     try { model.dispose(); } catch { /* ignore */ }
@@ -965,6 +1009,12 @@ export interface TrainResult {
   };
   /** فاز ۱٫۳ — گزارش سنجش کالیبراسیون */
   calibration?: CalibrationSummary;
+  /** موج ۴ (D1) — وقتی < ۳ مشتری داریم K-Fold به حالت حداقلی می‌افتد (holdout == val) */
+  kFoldMinimalFallback?: boolean;
+  /** موج ۴ (D3) — گزارش A/B تصمیم کالیبراسیون دما (گیت‌ها + تلاش + پذیرش/رد) */
+  temperatureScaling?: TemperatureScalingDecision;
+  /** موج ۴ (D3) — دمای پذیرفته‌شده برای predict؛ فقط وقتی adopted (۱ = بدون دما) */
+  calibrationTemperature?: number;
   /** فاز ۱٫۱ — متریک‌های MAE و R2 برای هر یک از ۹ امتیاز عددی روی holdout */
   scoreMetrics?: ScoreMetric[];
   /** فاز ۰٫۱ — نتیجهٔ گیت مقایسه با مدل فعال قبلی */
@@ -1210,7 +1260,8 @@ export async function trainLocalModel(
   const kFoldMaes: number[] = [];
   const kFoldMacroF1s: number[] = [];
 
-  const folds = splitByClientKFold(pool, 5, splitSeed);
+  // موج ۴ (D1) — پرچم fallback حفظ می‌شود تا UI روی اعداد خوش‌بینانه هشدار دهد
+  const { folds, minimalFallback: kFoldMinimalFallback } = splitByClientKFold(pool, 5, splitSeed);
   for (const fold of folds) {
     if (!fold.train.length || !fold.holdout.length) continue;
     let foldFit: FitOutcome | null = null;
@@ -1237,17 +1288,17 @@ export async function trainLocalModel(
   } : undefined;
 
   // فاز ۱٫۳ — کالیبراسیون بر روی holdout مدل نهایی
+  const obsSlice = (rows: number[][]) => rows.map(r => r.slice(SCORE_COUNT));
+  const scoresSlice = (rows: number[][]) => rows.map(r => r.slice(0, SCORE_COUNT));
   let calibration: CalibrationSummary | undefined;
   let scoreMetrics: ScoreMetric[] | undefined;
   if (active.holdoutTrue && active.holdoutPred) {
-    const obsSlice = (rows: number[][]) => rows.map(r => r.slice(SCORE_COUNT));
     calibration = computeCalibrationMetrics(
       obsSlice(active.holdoutTrue),
       obsSlice(active.holdoutPred),
       OBSERVATION_IDS.length
     );
 
-    const scoresSlice = (rows: number[][]) => rows.map(r => r.slice(0, SCORE_COUNT));
     scoreMetrics = computeScoreMetrics(
       scoresSlice(active.holdoutTrue),
       scoresSlice(active.holdoutPred),
@@ -1256,6 +1307,57 @@ export async function trainLocalModel(
         'shine', 'patchiness', 'pigmentation', 'hairThickness',
       ]
     );
+  }
+
+  /**
+   * موج ۴ (D3) — کالیبراسیون دمای واقعی (فقط روی مدل فعال، نه اجراهای K-Fold).
+   * گیت‌های نقشه‌راه داخل decideTemperatureScaling است: holdout ≥ ۶۰،
+   * ECE قبل > 0.10، val ≥ ۳۰. T روی validation برازش می‌شود و فقط در صورت
+   * بهبود واقعی ECE روی holdout پذیرفته می‌شود. اگر پذیرفته شد:
+   *  - آستانه‌های برچسب روی احتمالِ دماشدهٔ validation بازکالیبره می‌شوند
+   *  - گزارش per-class/F1 هولدوت با همان سیاست predict بازمحاسبه می‌شود
+   *  - شاخص ECE/Brier گزارش‌شده، وضعیتِ «پس از دما» را نشان می‌دهد تا با
+   *    رفتاری که کاربر در predict می‌بیند یکی باشد (جفت قبل/بعد در
+   *    temperatureScaling.eceBefore/eceAfter محفوظ است — سند A/B).
+   */
+  let temperatureScaling: TemperatureScalingDecision | undefined;
+  let calibrationTemperature: number | undefined;
+  if (active.valTrue && active.valPred && active.holdoutTrue && active.holdoutPred) {
+    temperatureScaling = decideTemperatureScaling({
+      validationTrue: obsSlice(active.valTrue),
+      validationPred: obsSlice(active.valPred),
+      holdoutTrue: obsSlice(active.holdoutTrue),
+      holdoutPred: obsSlice(active.holdoutPred),
+      labelCount: OBSERVATION_IDS.length,
+    });
+    if (temperatureScaling.adopted && typeof temperatureScaling.fittedT === 'number') {
+      const T = temperatureScaling.fittedT;
+      calibrationTemperature = T;
+      const temperedValPred = applyTemperature(obsSlice(active.valPred), T);
+      const temperedHoldPred = applyTemperature(obsSlice(active.holdoutPred), T);
+
+      const recalibratedThresholds = calibrateThresholds(
+        obsSlice(active.valTrue),
+        temperedValPred,
+        OBSERVATION_IDS.length,
+        OBS_THRESHOLD,
+      );
+      const temperedPerClass = computeClassificationSummary(
+        obsSlice(active.holdoutTrue),
+        temperedHoldPred,
+        OBSERVATION_IDS,
+        recalibratedThresholds,
+      );
+      active.metrics.obsThresholds = recalibratedThresholds;
+      active.metrics.holdoutPerClass = temperedPerClass;
+      active.metrics.holdoutObsF1 = temperedPerClass.microF1;
+      active.metrics.holdoutMacroF1 = temperedPerClass.macroF1;
+      calibration = computeCalibrationMetrics(
+        obsSlice(active.holdoutTrue),
+        temperedHoldPred,
+        OBSERVATION_IDS.length,
+      );
+    }
   }
 
   return {
@@ -1270,6 +1372,9 @@ export async function trainLocalModel(
     },
     kFoldEvaluation,
     calibration,
+    kFoldMinimalFallback,
+    temperatureScaling,
+    calibrationTemperature,
     scoreMetrics,
     retrainGate,
     modelPersisted,
@@ -1382,6 +1487,127 @@ export async function rollbackLocalModel(): Promise<boolean> {
   return true;
 }
 
+// =============== موج ۳ (O3) — مدل داخل بکاپ + challenger وارداتی ===============
+
+/** نشانی ذخیرهٔ مدل وارداتی تا لحظهٔ تصمیم کاربر — «مستقیم فعال نشود» نقشه‌راه */
+const MODEL_CHALLENGER_URL = 'indexeddb://scalpai-local-model-challenger';
+
+/**
+ * خروجی مدل فعال به‌صورت بستهٔ قابل‌حمل برای قرار گرفتن در ZIP بکاپ.
+ * بدون مدل فعال → null (بکاپ بدون مدل هم معتبر است).
+ */
+export async function exportActiveModelBundle(
+  metadata: LocalModelMetadata | null,
+): Promise<LocalModelBackupBundle | null> {
+  const model = await loadLocalModel();
+  if (!model) return null;
+  // handler هنری save می‌شود ولی هیچ‌جا ارسال نمی‌شود — فقط artifacts را
+  // برای ما می‌گیرد (الگوی استاندارد استخراج مدل به حافظه در tfjs).
+  // نکته: داخل یک object box نگه داشته می‌شود چون narrowing تایپ‌اسکریپت
+  // مقداردهی داخل closure را نمی‌بیند و متغیر ساده را never حدس می‌زند.
+  const box: { artifacts: tf.io.ModelArtifacts | null } = { artifacts: null };
+  await model.save(tf.io.withSaveHandler(async (a: tf.io.ModelArtifacts) => {
+    box.artifacts = a;
+    return { modelArtifactsInfo: { dateSaved: new Date(), modelTopologyType: 'JSON' } };
+  }));
+  const captured = box.artifacts;
+  if (!captured || !captured.modelTopology || !captured.weightSpecs || !captured.weightData) {
+    return null;
+  }
+  // WeightData می‌تواند چند ArrayBuffer باشد؛ برای base64 تک‌بافر می‌خواهیم.
+  // ترتیب الحاق همان ترتیب WeightData است و manifest هم به همین ترتیب آفست
+  // می‌خورد، پس round-trip با tf.io.fromMemory سازگار می‌ماند.
+  const weightData = captured.weightData instanceof ArrayBuffer
+    ? captured.weightData
+    : (() => {
+        const parts = captured.weightData as ArrayBuffer[];
+        const total = parts.reduce((sum, b) => sum + b.byteLength, 0);
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const part of parts) { out.set(new Uint8Array(part), offset); offset += part.byteLength; }
+        return out.buffer;
+      })();
+  return artifactsToBundle(
+    {
+      modelTopology: captured.modelTopology as Record<string, unknown>,
+      weightSpecs: captured.weightSpecs as unknown as Array<Record<string, unknown>>,
+      weightData,
+    },
+    // متادیتا به‌صورت JSON خام در بکاپ می‌نشیند؛ نوع ساختاری آن به LocalModelMetadata
+    // برمی‌گردد (interface بدون index signature است → cast مرزی لازم است).
+    { featureVersion: cachedModelFeatureVersion, metadata: metadata as unknown as Record<string, unknown> | null },
+  );
+}
+
+/**
+ * استقرار بستهٔ وارداتی در جایگاه challenger (نه فعال). بستهٔ نامعتبر خطا
+ * می‌اندازد تا UI خطای «بکاپ مدل خراب» را نشان دهد نه فاجعهٔ بی‌صدا.
+ */
+export async function stageBundleAsChallenger(bundle: LocalModelBackupBundle): Promise<void> {
+  if (!isValidModelBundle(bundle)) throw new Error('Invalid model bundle');
+  const artifacts = bundleToArtifacts(bundle);
+  const challenger = await tf.loadLayersModel(
+    tf.io.fromMemory({
+      modelTopology: artifacts.modelTopology,
+      weightSpecs: artifacts.weightSpecs,
+      weightData: artifacts.weightData,
+    }),
+  );
+  try {
+    await challenger.save(MODEL_CHALLENGER_URL);
+  } finally {
+    try { challenger.dispose(); } catch { /* ignore */ }
+  }
+}
+
+/** آیا مدل وارداتی در انتظار تصمیم کاربر است؟ */
+export async function hasChallengerModel(): Promise<boolean> {
+  try {
+    const models = await tf.io.listModels();
+    return Object.prototype.hasOwnProperty.call(models, MODEL_CHALLENGER_URL);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * فعال‌سازی challenger به تصمیم کاربر — با همان قاعدهٔ امن آموزش: ابتدا از
+ * مدل فعال فعلی پشتیبان (rollback) گرفته می‌شود، بعد جایگزینی. در صورت شکست،
+ * false برمی‌گردد و هیچ‌کدام از دو جایگاه خراب نمی‌شود.
+ */
+export async function activateChallengerModel(): Promise<boolean> {
+  if (!(await hasChallengerModel())) return false;
+  try {
+    if (await hasLocalModel()) {
+      try { await tf.io.copyModel(MODEL_STORAGE_URL, MODEL_BACKUP_URL); } catch { /* ignore */ }
+    } else {
+      try { await tf.io.removeModel(MODEL_BACKUP_URL); } catch { /* ignore */ }
+    }
+    await tf.io.copyModel(MODEL_CHALLENGER_URL, MODEL_STORAGE_URL);
+    try { await tf.io.removeModel(MODEL_CHALLENGER_URL); } catch { /* ignore */ }
+  } catch {
+    return false;
+  }
+  // کش خنثی تا خواندن بعدی challenger فعال‌شده را بگیرد (و اعتبارسنجی
+  // اندازهٔ خروجی loadLocalModel روی آن هم اعمال شود)
+  if (cachedModel) {
+    try { cachedModel.dispose(); } catch { /* ignore */ }
+  }
+  cachedModel = null;
+  cachedModelFeatureVersion = null;
+  cachedNorm = null;
+  return true;
+}
+
+/** حذف challenger بدون فعال‌سازی */
+export async function discardChallengerModel(): Promise<void> {
+  try {
+    await tf.io.removeModel(MODEL_CHALLENGER_URL);
+  } catch {
+    /* challengeri وجود نداشت */
+  }
+}
+
 async function predictWithMCDropout(
   model: tf.LayersModel,
   vector: number[],
@@ -1454,7 +1680,15 @@ export async function predictWithLocalModel(
    */
   const observations = OBSERVATION_IDS.filter((id, i) => {
     if (cachedSuppressedLabels.has(id)) return false;
-    const v = meanValues[SCORE_COUNT + i] ?? 0;
+    const raw = meanValues[SCORE_COUNT + i] ?? 0;
+    /**
+     * موج ۴ (D3) — اگر کالیبراسیون دما پذیرفته شده، همان T این‌جا هم اعمال
+     * می‌شود تا احتمالی که با آستانه مقایسه می‌کنیم، کالیبره باشد. آستانه‌ها
+     * خودشان از قبل روی احتمال دماشده کالیبره شده‌اند؛ بنابراین مقایسه منصفانه است.
+     */
+    const v = cachedModelTemperature === 1
+      ? raw
+      : logitToProb(probToLogit(raw) / cachedModelTemperature);
     const thr = cachedObsThresholds?.[i] ?? OBS_THRESHOLD;
     return v >= thr;
   });

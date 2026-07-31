@@ -3,12 +3,16 @@ packages:
 
 allowBuilds:
   better-sqlite3: true
+  # موج ۲ (C1): درایور SQLCipher — باینری native است و build script لازم دارد
+  # (prebuild-install دانلود می‌کند؛ نبود ابزار build هم به‌آرامی رد می‌شود)
+  better-sqlite3-multiple-ciphers: true
   core-js: true
   electron-winstaller: true
   esbuild: true
 
 onlyBuiltDependencies:
   - better-sqlite3
+  - better-sqlite3-multiple-ciphers
   - electron
   - esbuild
   - core-js

@@ -1,7 +1,9 @@
-import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert } from 'lucide-react';
+import { useMemo } from 'react';
+import { Brain, Loader, Sparkles, Trash2, RotateCcw, ShieldAlert, Activity, Package, CheckCircle2, XCircle } from 'lucide-react';
 import type { LocalModelMetadata, TrainingSample } from '../../db';
 import { formatDateForDisplay } from '../../components/PersianCalendar';
 import { FEATURE_VERSION } from '../../lib/scalpFeatures';
+import { monitorDataDrift } from '../../lib/driftMonitor';
 import {
   FEATURE_VERSION_WITH_QUESTIONNAIRE,
   MIN_QUESTIONNAIRE_CLIENTS_FOR_V4,
@@ -44,6 +46,18 @@ interface Props {
   canRollback?: boolean;
   onRollback?: () => void;
   rollbackBusy?: boolean;
+  /**
+   * موج ۳ (O3) — challenger: مدلی که از داخل بکاپ بازیابی و پارک شده.
+   * تا کاربر دستی فعالش نکند هیچ‌اثری روی تحلیل ندارد (قرارداد نقشه‌راه).
+   */
+  challengerInfo?: {
+    stagedAt: string;
+    featureVersion?: string | null;
+    metadata?: LocalModelMetadata | null;
+  } | null;
+  onActivateChallenger?: () => void;
+  onDiscardChallenger?: () => void;
+  challengerBusy?: boolean;
 }
 
 function fmt(n?: number, digits = 4) {
@@ -56,6 +70,7 @@ export default function ModelStatusPanel({
   modelMetadata, modelHasWeights, training, trainProgress, trainError, useLocalModel,
   onTrain, onDeleteModel, onToggleLocalModel,
   retrainNotice, onForceTrain, canRollback, onRollback, rollbackBusy,
+  challengerInfo, onActivateChallenger, onDiscardChallenger, challengerBusy,
 }: Props) {
   const t = useT(offlineDict);
   const pick = usePick();
@@ -78,6 +93,30 @@ export default function ModelStatusPanel({
   ).size;
   const v4GateReady = questionnaireSampleCount >= MIN_QUESTIONNAIRE_SAMPLES_FOR_V4
     && questionnaireClientCount >= MIN_QUESTIONNAIRE_CLIENTS_FOR_V4;
+
+  // موج ۱ (W1-1) — پایش رانش داده: میانگین فیچرهای ۳۰ نمونهٔ اخیر در برابر
+  // آمار مرجع زمان آموزش. بدون آمار مرجع یا نمونهٔ کافی، وضعیت خنثی گزارش
+  // می‌شود («نمی‌دانم» با «پایدار است» یکی گرفته نمی‌شود).
+  const driftReport = useMemo(() => {
+    if (!modelMetadata?.featureMeans?.length || !modelMetadata?.featureStds?.length) return null;
+    const recent = [...trainingSamples]
+      .filter(s => s.features && typeof s.features === 'object')
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .slice(0, 30);
+    return monitorDataDrift(recent, modelMetadata.featureMeans, modelMetadata.featureStds);
+  }, [trainingSamples, modelMetadata]);
+
+  const driftTone = !driftReport?.evaluated
+    ? 'neutral'
+    : driftReport.driftDetected
+      ? 'warn'
+      : 'ok';
+  const driftStyles = {
+    neutral: 'bg-white/5 border-white/10 text-white/60',
+    ok: 'bg-emerald-500/5 border-emerald-500/20 text-emerald-200/90',
+    warn: 'bg-amber-500/10 border-amber-500/30 text-amber-100',
+  } as const;
+  const driftedKeys = driftReport?.featureDrifts.filter(f => f.drifted).map(f => f.key) ?? [];
 
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
@@ -213,6 +252,26 @@ export default function ModelStatusPanel({
         </div>
       )}
 
+      {/* موج ۱ (W1-1) — ردیف وضعیت پایش رانش داده */}
+      <div className={`rounded-xl border p-3 mb-4 text-xs flex items-start gap-2 ${driftStyles[driftTone]}`}>
+        <Activity size={14} className="flex-shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold">{t('driftMonitorTitle')}: </span>
+          {!driftReport?.evaluated && <span>{t('driftUnavailable')}</span>}
+          {driftReport?.evaluated && !driftReport.driftDetected && <span>{t('driftStable')}</span>}
+          {driftReport?.evaluated && driftReport.driftDetected && (
+            <span>
+              {t('driftDetected')}
+              {driftedKeys.length > 0 && (
+                <span className="block mt-1 opacity-80" dir="ltr">
+                  {t('driftedFeaturesLabel')}: {driftedKeys.join(', ')}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-xl bg-white/5 p-3 mb-4 text-xs opacity-80 space-y-1">
         <p>
           {t('v4GateStatus')}:{' '}
@@ -312,6 +371,52 @@ export default function ModelStatusPanel({
         </div>
       )}
       {trainError && <p className="text-xs text-red-400 mt-3 whitespace-pre-wrap">{trainError}</p>}
+
+      {/* موج ۳ (O3) — کارت challenger: مدل وارداتی از بکاپ، منتظر تصمیم کاربر */}
+      {challengerInfo && onActivateChallenger && onDiscardChallenger && (
+        <div className="mt-4 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Package size={16} className="text-cyan-300" />
+            <h4 className="text-sm font-semibold text-cyan-100">{t('challengerTitle')}</h4>
+          </div>
+          <div className="text-xs text-cyan-100/80 space-y-1">
+            <p>
+              {/* formatDateForDisplay ورودی yyyy-MM-dd می‌خواهد؛ stagedAt کامل ISO است */}
+              {t('challengerStagedAt')}: {formatDateForDisplay(challengerInfo.stagedAt.slice(0, 10)) || '—'}
+              {challengerInfo.metadata?.sampleCount != null && (
+                <> · {t('challengerTrainedWith')}: {challengerInfo.metadata.sampleCount}</>
+              )}
+              {typeof challengerInfo.metadata?.holdoutObsF1 === 'number' && (
+                <> · holdout F1: {fmt(challengerInfo.metadata.holdoutObsF1, 2)}</>
+              )}
+            </p>
+            {challengerInfo.featureVersion && !isUsableModelVersion(challengerInfo.featureVersion) && (
+              <p className="text-amber-200/90 flex items-start gap-1.5">
+                <ShieldAlert size={12} className="flex-shrink-0 mt-0.5" />
+                <span>{t('challengerVersionMismatch')}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onActivateChallenger}
+              disabled={challengerBusy || training}
+              title={t('challengerActivateHint')}
+              className="px-3 py-2 rounded-xl bg-cyan-500/25 hover:bg-cyan-500/35 disabled:opacity-40 text-cyan-100 text-sm flex items-center gap-1.5 font-medium"
+            >
+              <CheckCircle2 size={14} /> {t('challengerActivate')}
+            </button>
+            <button
+              onClick={onDiscardChallenger}
+              disabled={challengerBusy || training}
+              title={t('challengerDiscardHint')}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-40 text-white/60 text-sm flex items-center gap-1.5"
+            >
+              <XCircle size={14} /> {t('challengerDiscard')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

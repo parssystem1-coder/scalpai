@@ -177,6 +177,29 @@ function parseBackupPayload(jsonData) {
   if (data.questionnaireRevisions !== undefined && !Array.isArray(data.questionnaireRevisions)) {
     throw new Error('Invalid backup field: questionnaireRevisions');
   }
+  // موج ۲: ردپای حسابرسی و بلوک کلید تصاویر (در صورت وجود) باید ساختاریاعتبار داشته باشند
+  if (data.auditLog !== undefined && !Array.isArray(data.auditLog)) {
+    throw new Error('Invalid backup field: auditLog');
+  }
+  if (data.mediaEncryption !== undefined) {
+    const m = data.mediaEncryption;
+    if (m === null || typeof m !== 'object' || typeof m.key !== 'string') {
+      throw new Error('Invalid backup field: mediaEncryption');
+    }
+  }
+  // موج ۳ (O3): مدل TF.js داخل بکاپ JSON-محور (بک‌اند JSON / وب) — ساختار
+  // باید معتبر باشد؛ وزن‌ها به‌صورت base64 نگه داشته می‌شوند (مدل بزرگ نیست).
+  if (data.modelBundle !== undefined && data.modelBundle !== null) {
+    const b = data.modelBundle;
+    if (
+      typeof b !== 'object' ||
+      typeof b.modelTopology !== 'object' || b.modelTopology === null ||
+      !Array.isArray(b.weightSpecs) ||
+      typeof b.weightDataBase64 !== 'string'
+    ) {
+      throw new Error('Invalid backup field: modelBundle');
+    }
+  }
   return data;
 }
 

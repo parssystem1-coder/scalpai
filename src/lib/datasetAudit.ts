@@ -10,6 +10,7 @@
 
 import { TrainingSample } from '../db/types';
 import { FEATURE_KEYS } from './scalpFeatures';
+import { calculateHammingDistance, DHASH_TWIN_THRESHOLD } from './imageDedup';
 
 export interface FeatureStats {
   key: string;
@@ -30,6 +31,117 @@ export interface DatasetAuditReport {
   underSupportedLabels: string[];
   duplicates: DuplicateGroup[];
   featureStats: FeatureStats[];
+}
+
+export interface VisualTwinGroup {
+  /** شناسهٔ آیتم‌های گالری عضو گروه دوقلو */
+  galleryItemIds: string[];
+  /** شناسهٔ نمونه‌های آموزشی متأثر */
+  sampleIds: string[];
+  /** کمترین فاصلهٔ همینگ مشاهده‌شده داخل گروه */
+  minDistance: number;
+}
+
+/** آیتم گالری با متادیتا — فقط فیلد dhash از آن استفاده می‌شود */
+export interface GalleryDhashSource {
+  id: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * موج ۱ (W1-2) — گروه‌بندی «دوقلوهای بصری» استخر آموزشی بر اساس dHash.
+ *
+ * دوقلو = چند آیتم گالری متمایز (آپلود جداگانه، resize/فشرده‌سازی متفاوت)
+ * که فاصلهٔ همینگ dHash آن‌ها از آستانه کمتر است. چنین نمونه‌هایی ظرفیت
+ * آموزش را می‌سوزانند و معیارها را خوش‌بینانه می‌کنند.
+ *
+ * نکتهٔ طراحی: این تابع فقط «گزارش» می‌دهد و هیچ حذف خودکاری انجام نمی‌شود —
+ * عکس‌های قبل/بعد درمان عمداً بسیار شبیه‌اند و حذف خودکارشان دادهٔ ارزشمند
+ * بالینی می‌سوزاند. تصمیم نهایی با متخصص است.
+ * پیچیدگی: O(k²) روی آیتم‌های دارای dHash — با صدها تصویر محدودهٔ امن است.
+ */
+export function auditVisualTwins(
+  samples: TrainingSample[],
+  galleryItems: GalleryDhashSource[],
+  maxDistance = DHASH_TWIN_THRESHOLD,
+): VisualTwinGroup[] {
+  // نگاشت آیتم گالری → dHash
+  const dhashByItem = new Map<string, string>();
+  for (const item of galleryItems) {
+    const dh = item.metadata?.dhash;
+    if (typeof dh === 'string' && dh.length === 16) {
+      dhashByItem.set(item.id, dh);
+    }
+  }
+
+  // فقط نمونه‌هایی که تصویرشان dHash دارد؛ چند نمونه روی یک تصویر یک گره می‌شوند
+  const byItem = new Map<string, { dhash: string; sampleIds: string[] }>();
+  for (const s of samples) {
+    if (!s.galleryItemId) continue;
+    const dh = dhashByItem.get(s.galleryItemId);
+    if (!dh) continue;
+    const entry = byItem.get(s.galleryItemId) ?? { dhash: dh, sampleIds: [] };
+    entry.sampleIds.push(s.id);
+    byItem.set(s.galleryItemId, entry);
+  }
+
+  const ids = [...byItem.keys()];
+  if (ids.length < 2) return [];
+
+  // Union-Find روی آیتم‌هایی که فاصلهٔ همینگشان ≤ آستانه است
+  const parent = new Map<string, string>(ids.map(id => [id, id]));
+  const find = (x: string): string => {
+    const p = parent.get(x) ?? x;
+    if (p !== x) {
+      const root = find(p);
+      parent.set(x, root);
+      return root;
+    }
+    return p;
+  };
+  const union = (a: string, b: string) => {
+    parent.set(find(a), find(b));
+  };
+
+  const edgeMinDistance = new Map<string, number>(); // "a|b" → fاصله
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const a = byItem.get(ids[i])!.dhash;
+      const b = byItem.get(ids[j])!.dhash;
+      const distance = calculateHammingDistance(a, b);
+      if (distance <= maxDistance) {
+        union(ids[i], ids[j]);
+        edgeMinDistance.set(`${ids[i]}|${ids[j]}`, distance);
+      }
+    }
+  }
+
+  // تجمیع گره‌های هم‌ریشه
+  const groups = new Map<string, string[]>();
+  for (const id of ids) {
+    const root = find(id);
+    groups.set(root, [...(groups.get(root) ?? []), id]);
+  }
+
+  const result: VisualTwinGroup[] = [];
+  for (const memberIds of groups.values()) {
+    if (memberIds.length < 2) continue;
+    let minDistance = maxDistance;
+    const sampleIds: string[] = [];
+    for (const id of memberIds) {
+      sampleIds.push(...byItem.get(id)!.sampleIds);
+    }
+    for (let i = 0; i < memberIds.length; i++) {
+      for (let j = i + 1; j < memberIds.length; j++) {
+        const d = edgeMinDistance.get(`${memberIds[i]}|${memberIds[j]}`)
+          ?? edgeMinDistance.get(`${memberIds[j]}|${memberIds[i]}`);
+        if (d !== undefined && d < minDistance) minDistance = d;
+      }
+    }
+    result.push({ galleryItemIds: memberIds, sampleIds, minDistance });
+  }
+
+  return result.sort((a, b) => a.minDistance - b.minDistance);
 }
 
 const MIN_SAMPLES_SUPPORT = 5;

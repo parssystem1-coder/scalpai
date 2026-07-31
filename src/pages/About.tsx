@@ -1,4 +1,4 @@
-import { Heart, Globe, Mail, Phone, MapPin, Brain, Cpu, ShieldCheck, Layers, Sparkles } from 'lucide-react';
+import { Heart, Globe, Mail, Phone, MapPin, Brain, Cpu, ShieldCheck, Layers, Sparkles, Lock } from 'lucide-react';
 import { useSettingsStore } from '../store';
 
 export default function About() {
@@ -10,16 +10,16 @@ export default function About() {
       icon: Cpu,
       title: isRtl ? 'پردازش تصویر هوشمند' : 'Intelligent Image Processing',
       desc: isRtl 
-        ? 'سگمنتیشن Otsu بر روی کانال اشباع پوست سر به همراه CLAHE و کالیبراسیون لنز جهت حذف اثر تداخل مو بر روی محاسبات قرمزی و شوره.' 
-        : 'Otsu segmentation on saturation channel with CLAHE and lens calibration to eliminate hair interference on redness and dandruff.',
+        ? 'سگمنتیشن خودکار مو/پوست با آستانه‌یابی Otsu روی هیستوگرام روشنایی و ماسک پوست سر، جهت حذف اثر تداخل مو بر روی محاسبات قرمزی، شوره و پیگمنتاسیون.' 
+        : 'Automatic hair/scalp segmentation with Otsu thresholding on the brightness histogram and a scalp mask, eliminating hair interference on redness, dandruff and pigmentation metrics.',
       color: 'text-blue-400 bg-blue-500/10 border-blue-500/20'
     },
     {
       icon: Brain,
       title: isRtl ? 'هوش مصنوعی محلی پایدار' : 'Stable Local Machine Learning',
       desc: isRtl 
-        ? 'مدل محلی مجهز به ساختار Focal Loss جهت مهار عدم توازن کلاس‌های پزشکی و کالیبراسیون دما (Temperature Scaling) برای ارتقای ECE.' 
-        : 'Local model equipped with Focal Loss to handle clinical class imbalance and Temperature Scaling to optimize ECE.',
+        ? 'مدل محلی مجهز به Focal Loss جهت مهار عدم‌توازن کلاس‌های پزشکی و سنجش صادقانهٔ کالیبراسیون با ECE و Brier Score (کالیبراسیون دمایی پس از تأیید نیاز با دادهٔ واقعی اعمال می‌شود).' 
+        : 'Local model with Focal Loss to handle clinical class imbalance and honest calibration measurement via ECE and Brier Score (temperature scaling is applied only after real-world data proves it necessary).',
       color: 'text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/20'
     },
     {
@@ -45,6 +45,14 @@ export default function About() {
         ? 'تلفیق هش باینری فوق‌سریع نمونه‌برداری با الگوریتم dHash و فاصلهٔ همینگ جهت شناسایی دوقلوهای بصری فشرده یا ریسایز شده.' 
         : 'Combining sub-millisecond binary hash with perceptual dHash and Hamming distance to eliminate compressed or resized twins.',
       color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+    },
+    {
+      icon: Lock,
+      title: isRtl ? 'رمزنگاری دادهٔ در سکون' : 'Data-at-Rest Encryption',
+      desc: isRtl
+        ? 'در نسخهٔ دسکتاپ، دیتابیس بالینی با SQLCipher (AES-256) و تصاویر با AES-256-GCM رمز می‌شوند و کلیدها در گاوصندوق سیستم‌عامل (DPAPI/Keychain) محافظت می‌شوند؛ هر ارسال ابری در لاگ حسابرسی ثبت می‌شود (جزئیات و استثناها در docs/privacy.md).'
+        : 'In the desktop app, the clinical database is encrypted with SQLCipher (AES-256) and images with AES-256-GCM, with keys protected by the OS safeStorage (DPAPI/Keychain); every cloud send is recorded in the audit log (details and exceptions in docs/privacy.md).',
+      color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
     }
   ];
 

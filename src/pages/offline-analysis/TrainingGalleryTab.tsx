@@ -35,6 +35,7 @@ import {
   resolveCurrentAiRuntimeConfig,
 } from '../../lib/analysis-utils';
 import { useLang, useT } from '../../i18n';
+import { hasValidPrivacyConsent } from '../../lib/privacyConsent';
 import { offlineDict } from './strings';
 import { DEFAULT_LABEL_FORM } from './constants';
 import ExpertLabelingPanel from './ExpertLabelingPanel';
@@ -167,6 +168,11 @@ export default function TrainingGalleryTab() {
 
   const handleOnlineAnalysis = async (item: GalleryItem) => {
     setError('');
+    // موج ۲ (C3.1) — درگاه سخت رضایت حریم‌خصوصی، مشابه صفحهٔ تحلیل آنلاین
+    if (!hasValidPrivacyConsent(settings)) {
+      setError(t('privacyConsentRequired'));
+      return;
+    }
     if (!settings.hasApiKey && !settings.aiApiKey) {
       setError(t('apiKeyRequiredForOnline'));
       return;

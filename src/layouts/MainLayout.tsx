@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import NeuralBackground from '../components/NeuralBackground';
 import AIScreenSaver from '../components/AIScreenSaver';
+import PrivacyConsentModal from '../components/PrivacyConsentModal';
+import UpdateBanner from '../components/UpdateBanner';
 import { themeConfig, APP_THEME_IDS, type AppThemeId } from './themeConfig';
 import { sampleNotifications, type AppNotification } from './sampleNotifications';
 
@@ -106,6 +108,10 @@ export default function MainLayout({ children }: Props) {
 
   return (
     <div className={`min-h-screen ${theme.body} transition-all duration-500 relative ${settings.theme === 'mintAi' ? 'theme-mint-ai' : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* موج ۲ (C3.1) — رضایت‌نامهٔ حریم‌خصوصی؛ تا ثبت، کل اپ پوشیده می‌ماند */}
+      <PrivacyConsentModal />
+      {/* موج ۳ (O1) — بنر به‌روزرسانی خودکار؛ فقط وقتی رویداد واقعی برسد نمایان می‌شود */}
+      <UpdateBanner />
       {/* Animated backgrounds */}
       {(settings.theme === 'neural' || settings.theme === 'quantum' || settings.theme === 'mintAi') && <NeuralBackground />}
       {settings.theme === 'cyber' && (

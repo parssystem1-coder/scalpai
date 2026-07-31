@@ -233,7 +233,8 @@ describe('بخش B3 — تست‌های بکاپ نسخهٔ ۳ استریمی (S
     const newHandlers = createDbHandlers(newDb, newTmpDir, safeStorageMock);
 
     const importResult = await newHandlers.handleDbQuery('importData', { jsonData: backupString });
-    expect(importResult).toEqual({ success: true });
+    // موج ۳ (O3): importData گزارش برمی‌گرداند؛ بکاپ بدون مدل → importedModel=null
+    expect(importResult).toEqual({ success: true, importedModel: null });
 
     // بررسی اینکه رکوردها بازگردانی شده‌اند
     const importedClient = newDb.prepare("SELECT * FROM clients WHERE id = 'client-v3-test'").get() as { firstName: string };

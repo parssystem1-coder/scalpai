@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import { db, Client, GalleryItem, Session, Trichologist, Analysis, Settings, PaginationParams, TrainingSample, TrainingSampleUpdatePatch, LocalModelMetadata } from '../db';
+import { db, Client, GalleryItem, Session, Trichologist, Analysis, Settings, PaginationParams, TrainingSample, TrainingSampleUpdatePatch, LocalModelMetadata, ImportBackupReport } from '../db';
+import type { LocalModelBackupBundle } from '../lib/modelBundle';
 import { DEFAULT_AI_CONFIDENCE_THRESHOLD } from '../lib/heuristicConstants';
 import { errorMessage, withToastMutation, prependItem, replaceById, removeById } from './mutationHelpers';
 
@@ -624,8 +625,10 @@ interface SettingsState {
   loading: boolean;
   fetchSettings: () => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
-  exportData: () => Promise<string>;
-  importData: (json: string) => Promise<void>;
+  /** موج ۲ (C2.4): backupPassword فقط در Electron اثر دارد؛ موج ۳ (O3): modelBundle اختیاری */
+  exportData: (options?: { backupPassword?: string; modelBundle?: LocalModelBackupBundle | null }) => Promise<string>;
+  /** موج ۳: گزارش بازیابی برمی‌گردد (importedModel → پارک چلنجر در UI) */
+  importData: (json: string, options?: { backupPassword?: string }) => Promise<ImportBackupReport>;
 }
 
 const DEFAULT_SETTINGS: Settings = { language: 'fa', theme: 'mint', aiConfidenceThreshold: DEFAULT_AI_CONFIDENCE_THRESHOLD };
@@ -675,12 +678,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  exportData: async () => {
-    return db.exportData();
+  exportData: async (options) => {
+    return db.exportData(options);
   },
 
-  importData: async (json) => {
-    await db.importData(json);
+  importData: async (json, options) => {
+    const report = await db.importData(json, options);
     await get().fetchSettings();
+    return report;
   },
 }));

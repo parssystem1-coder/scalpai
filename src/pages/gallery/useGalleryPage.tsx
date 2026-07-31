@@ -4,6 +4,7 @@ import { useGalleryStore, useClientsStore } from '../../store';
 import { db, resolveGalleryItemUrl } from '../../db';
 import type { GalleryItem } from '../../db';
 import { generateMediaThumbnail } from '../../lib/mediaThumbnail';
+import { computeDHash, findDhashDuplicate } from '../../lib/imageDedup';
 import {
   SCALP_REGION_IDS,
   SCALP_REGION_META_KEY,
@@ -414,22 +415,52 @@ export function useGalleryPage() {
         const isVideo = file.type.startsWith('video/');
         const type = isVideo ? 'video' : 'photo';
         const dataUrl = await readFileAsDataUrl(file);
+
+        // موج ۱ (W1-2) — dHash ادراکی برای ① ضدتکرارِ همین آپلود و ② ممیزی
+        // دوقلوهای بصری استخر آموزشی. محاسبه سبک (کانوس ۹×۸) و فقط برای عکس‌ها.
+        let dhash: string | undefined;
+        if (type === 'photo') {
+          dhash = (await computeDHash(dataUrl)) || undefined;
+          if (dhash) {
+            const existingItems = await fetchByClient(filterClient);
+            const candidates = existingItems
+              .filter(i => i.type === 'photo')
+              .map(i => ({
+                id: i.id,
+                dhash: typeof i.metadata?.dhash === 'string' ? (i.metadata.dhash as string) : '',
+              }));
+            const duplicate = findDhashDuplicate(dhash, candidates);
+            if (duplicate) {
+              // مانند الگوی قبلی این ماژول: فقط تشخیص؛ تصمیم با کاربر است
+              // (عکس قبل/بعد درمان عمداً شبیه است و نباید کورکورانه رد شود).
+              const proceed = confirm(
+                isRtl
+                  ? 'تصویری بسیار مشابه (دوقلوی بصری) قبلاً برای این مشتری ثبت شده است. آیا باز هم ثبت شود؟'
+                  : 'A visually near-identical (visual twin) image already exists for this client. Add it anyway?',
+              );
+              if (!proceed) continue;
+            }
+          }
+        }
+
         const thumbnail = await generateMediaThumbnail(dataUrl, type);
-        const metadata =
-          regionId && type === 'photo'
+        const metadata = {
+          ...(regionId && type === 'photo'
             ? {
                 [SCALP_REGION_META_KEY]: regionId,
                 [SCALP_VISIT_META_KEY]: visitId,
                 [TRICHOSCOPE_MODE_META_KEY]: lensMode,
               }
-            : undefined;
+            : {}),
+          ...(dhash ? { dhash } : {}),
+        };
         const newItem = await addItem(filterClient, {
           clientId: filterClient,
           type,
           url: dataUrl,
           thumbnail,
           filename: file.name,
-          metadata,
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         });
         // Keep the currently selected client's scoped gallery in sync immediately.
         // The global page refresh does not necessarily change `total`, so relying

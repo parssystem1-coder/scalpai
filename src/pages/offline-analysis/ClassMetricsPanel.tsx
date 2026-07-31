@@ -10,6 +10,7 @@ import { BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 import type { LocalModelMetadata } from '../../db';
 import { observationLabel } from '../../lib/diagnosisCatalog';
 import { useLang, usePick } from '../../i18n';
+import CalibrationCard from './CalibrationCard';
 
 function pct(v: number) {
   return `${Math.round(v * 100)}%`;
@@ -28,7 +29,8 @@ export default function ClassMetricsPanel({
   const support = modelMetadata?.labelSupport ?? [];
   const suppressed = modelMetadata?.suppressedLabels ?? [];
 
-  if (!perClass.length && !support.length) return null;
+  // موج ۴: حتی اگر جدول per-class خالی باشد، کارت کالیبراسیون معنا دارد
+  if (!perClass.length && !support.length && !modelMetadata?.calibration) return null;
 
   // فقط کلاس‌هایی که در holdout نمونهٔ مثبت داشتند قابل ارزیابی‌اند
   const evaluated = perClass
@@ -93,6 +95,9 @@ export default function ClassMetricsPanel({
           'Macro F1 averages quality across individual diagnoses and is stricter than micro F1, which is dominated by a few frequent diagnoses and hides real quality on rare ones.',
         )}
       </p>
+
+      {/* موج ۴ (D1/D3) — کارت کالیبراسیون همیشه دیده می‌شود؛ سه حالت موجود/ناموجود/ارزیابی حداقلی */}
+      <CalibrationCard modelMetadata={modelMetadata} />
 
       {expanded && (
         <div className="mt-4 space-y-4">

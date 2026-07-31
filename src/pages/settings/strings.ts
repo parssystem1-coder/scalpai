@@ -41,6 +41,45 @@ export const settingsDict = {
   },
   restoreSuccess: { fa: 'بازیابی با موفقیت انجام شد', en: 'Restore completed successfully' },
   restoreError: { fa: 'خطا در بازیابی', en: 'Error restoring data' },
+  // موج ۲ (C2.4) — پشتیبان رمزدار با پسورد
+  backupUsePassword: {
+    fa: 'رمزدار کردن فایل پشتیبان با پسورد (توصیه برای انتقال به دستگاه دیگر)',
+    en: 'Password-protect the backup file (recommended when moving to another device)',
+  },
+  backupPasswordLabel: { fa: 'پسورد پشتیبان', en: 'Backup password' },
+  backupPasswordConfirmLabel: { fa: 'تکرار پسورد', en: 'Confirm password' },
+  backupPasswordMismatch: { fa: 'پسورد و تکرار آن یکسان نیستند', en: 'Passwords do not match' },
+  backupPasswordShort: { fa: 'پسورد پشتیبان باید حداقل ۸ کاراکتر باشد', en: 'Backup password must be at least 8 characters' },
+  backupPasswordNote: {
+    fa: 'بکاپ بدون پسورد حاوی کلید تصاویر است و معادل دادهٔ رمزنشده محسوب می‌شود؛ آن را امن نگه دارید.',
+    en: 'A backup without a password carries the image key and equals unencrypted data — keep it safe.',
+  },
+  enterBackupPassword: {
+    fa: 'این فایل پشتیبان رمزدار است؛ پسورد آن را وارد کنید',
+    en: 'This backup is password-protected; enter its password',
+  },
+  decryptAndRestore: { fa: 'رمزگشایی و بازیابی', en: 'Decrypt & restore' },
+  cancelEncryptedRestore: { fa: 'انصراف', en: 'Cancel' },
+  wrongBackupPassword: { fa: 'پسورد اشتباه است یا فایل خراب شده', en: 'Wrong password or corrupted file' },
+  // موج ۳ (O2/O3) — بکاپ فایل‌محور + مدل داخل بکاپ
+  backupExportError: { fa: 'تهیهٔ فایل پشتیبان ناموفق بود', en: 'Creating the backup failed' },
+  backupTransferBusy: { fa: 'در حال پردازش…', en: 'Working…' },
+  includeModelInBackup: {
+    fa: 'مدل محلی هوش مصنوعی هم داخل بکاپ قرار گیرد',
+    en: 'Include the local AI model in the backup',
+  },
+  backupModelHint: {
+    fa: 'وزن‌های مدل محلی (در صورت وجود) داخل فایل پشتیبان می‌نشینند. هنگام بازیابی، مدل به‌صورت «چلنجر غیرفعال» پیشنهاد می‌شود و فقط با تأیید شما در تب یادگیری ماشین فعال خواهد شد.',
+    en: 'Local model weights (if any) are embedded in the backup. On restore, the model is staged as an inactive “challenger” and is only activated with your approval in the Machine Learning tab.',
+  },
+  modelStagedAsChallenger: {
+    fa: 'مدل داخل بکاپ به‌عنوان «چلنجر» در تب یادگیری ماشین آمادهٔ بررسی است.',
+    en: 'The bundled model is staged as a “challenger” in the Machine Learning tab for your review.',
+  },
+  modelImportRejected: {
+    fa: 'مدل داخل بکاپ معتبر یا سازگار نبود و پارک نشد؛ خودِ داده‌ها بازیابی شدند.',
+    en: 'The bundled model was invalid/incompatible and was not staged; your data was still restored.',
+  },
 
   // پروفایل
   personalInfo: { fa: 'اطلاعات شخصی', en: 'Personal Information' },

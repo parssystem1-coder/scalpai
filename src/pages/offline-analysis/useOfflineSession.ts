@@ -290,6 +290,7 @@ export function useOfflineSession() {
             predictWithLocalModel,
             setCachedFeatureNorm,
             setCachedObsPolicy,
+            setCachedModelTemperature,
           } = await loadLocalModel();
           if (modelMetadata.featureMeans?.length && modelMetadata.featureStds?.length) {
             setCachedFeatureNorm({
@@ -302,6 +303,8 @@ export function useOfflineSession() {
             thresholds: modelMetadata.obsThresholds,
             suppressedLabels: modelMetadata.suppressedLabels,
           });
+          // موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شده (بدون مقدار → ۱ = بدون دما)
+          setCachedModelTemperature(modelMetadata.calibrationTemperature);
           const modelReady = await hasLocalModel();
           if (modelReady) {
             const extracted = await extractImageFeatures(imageUrl);
@@ -342,6 +345,8 @@ export function useOfflineSession() {
                 acquisitionContext,
                 // فاز ۴٫۳ — اگر تصویر خارج از توزیع آموزشی باشد، در UI هشدار داده می‌شود
                 ood: prediction.ood,
+                // موج ۱ (W1-1) — نمرهٔ عدم‌قطعیت MC-Dropout برای نمایش به پزشک
+                modelUncertainty: prediction.uncertainty,
               };
               setEngineInfo(t('engineLocalModel'));
             }

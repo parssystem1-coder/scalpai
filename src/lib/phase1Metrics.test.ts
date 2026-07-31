@@ -55,8 +55,9 @@ describe('فاز ۱٫۲ — فاصله اطمینان و K-Fold بر اساس م
       { id: 's7', clientId: 'c5' }
     ] as unknown[] as TrainingSample[];
 
-    const folds = splitByClientKFold(dummySamples, 3, 42);
+    const { folds, minimalFallback } = splitByClientKFold(dummySamples, 3, 42);
     expect(folds.length).toBeLessThanOrEqual(3);
+    expect(minimalFallback).toBe(false);
 
     // در هر لایه، هیچ مشتری نباید همزمان در train و holdout باشد
     for (const fold of folds) {
@@ -67,6 +68,22 @@ describe('فاز ۱٫۲ — فاصله اطمینان و K-Fold بر اساس م
         expect(holdoutClients.has(tc)).toBe(false);
       }
     }
+  });
+
+  it('با کمتر از ۳ مشتری باید پرچم «ارزیابی حداقلی» روشن شود', () => {
+    const fewClients = [
+      { id: 's1', clientId: 'c1' },
+      { id: 's2', clientId: 'c1' },
+      { id: 's3', clientId: 'c2' },
+      { id: 's4', clientId: 'c2' },
+      { id: 's5', clientId: 'c1' },
+    ] as unknown[] as TrainingSample[];
+
+    const { folds, minimalFallback } = splitByClientKFold(fewClients, 5, 42);
+    expect(minimalFallback).toBe(true);
+    expect(folds.length).toBe(1);
+    // در این حالت holdout همان validation است — به‌همین دلیل فلگ لازم بود
+    expect(folds[0].holdout).toBe(folds[0].val);
   });
 });
 

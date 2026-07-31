@@ -233,6 +233,11 @@ export interface OfflineAnalysisResult {
    * فقط وقتی پر است که پیش‌بینی با مدل محلی انجام شده باشد.
    */
   ood?: import('../lib/outOfDistribution').OodAssessment;
+  /**
+   * موج ۱ (W1-1) — عدم‌قطعیت مدل محلی: میانگین انحراف‌معیار پیش‌بینی‌های
+   * MC-Dropout (۱۰ استنتاج تصادفی). فقط وقتی پر است که engine = 'model' باشد.
+   */
+  modelUncertainty?: number;
   imageQuality?: {
     blurVariance: number;
     meanBrightness: number;
@@ -346,6 +351,8 @@ export type TrainingSampleUpdatePatch = Partial<Pick<TrainingSample,
   | 'galleryItemId'
   | 'originalAiLabel'
   | 'originalAiLabelAt'
+  // موج ۱ (W1-4) — بازمحاسبهٔ فیچر از تصویر خام، باید در هر سه بک‌اند قابل نوشتن باشد
+  | 'features'
 >>;
 
 export interface LocalModelMetricsSnapshot {
@@ -381,6 +388,15 @@ export interface LocalModelV4Experiment {
   imageOnlyHoldoutObsF1?: number;
   v4HoldoutMae?: number;
   v4HoldoutObsF1?: number;
+}
+
+/**
+ * موج ۳ (O3): گزارش نتیجهٔ بازیابی بکاپ.
+ * importedModel: اگر بکاپ مدل TF.js داشته باشد، این‌جا به‌صورت خام برمی‌گردد تا
+ * renderer آن را «به‌عنوان چلنجر» پارک کند — هرگز مستقیم فعال نمی‌شود.
+ */
+export interface ImportBackupReport {
+  importedModel: import('../lib/modelBundle').LocalModelBackupBundle | null;
 }
 
 export interface LocalModelMetadata {
@@ -423,6 +439,30 @@ export interface LocalModelMetadata {
     mae: import('../lib/mlEvaluation').RepeatedMetricSummary;
     macroF1: import('../lib/mlEvaluation').RepeatedMetricSummary;
   };
+  /** موج ۴ (D1) — ECE و Brier روی holdout مدل فعال (پیش از اعتماد به احتمال‌ها بخوانید) */
+  calibration?: import('../lib/mlEvaluation').CalibrationSummary;
+  /** موج ۴ (D1) — CI95 مربوط به K-Fold مشتری‌محور */
+  kFoldEvaluation?: {
+    mae: import('../lib/mlEvaluation').ConfidenceInterval;
+    macroF1: import('../lib/mlEvaluation').ConfidenceInterval;
+  };
+  /**
+   * موج ۴ (D1) — گفتار آماری صادق: با <۳ مشتری، K-Fold روی val=holdout
+   * چرخیده و CI95 خوش‌بینانه است. فقط وقتی true ذخیره می‌شود.
+   */
+  kFoldMinimalFallback?: boolean;
+  /** موج ۴ (D3) — گزارش تصمیم کالیبراسیون دما (فقط وقتی تلاش صورت گرفت) */
+  temperatureScaling?: {
+    attempted: boolean;
+    adopted: boolean;
+    reason: string;
+    fittedT?: number;
+    eceBefore?: number;
+    eceAfter?: number;
+    sampleSizes?: { validation: number; holdout: number };
+  };
+  /** موج ۴ (D3) — دمای پذیرفته‌شده برای calib هنگام predict (۱ یعنی بدون دما) */
+  calibrationTemperature?: number;
 }
 
 export interface Settings {
@@ -444,6 +484,12 @@ export interface Settings {
    * پیش‌فرض false — بدون رضایت فقط تصویر و زمینهٔ لنز/ناحیه ارسال می‌شود.
    */
   includeMedicalDataInAi?: boolean;
+  /**
+   * موج ۲ (C3.1): رضایت آگاهانهٔ حریم‌خصوصی — نسخه و زمان ثبت.
+   * تا وقتی با نسخهٔ جاری (src/lib/privacyConsent.ts) ثبت نشده باشد، تحلیل
+   * آنلاین (تنها مسیر خروج داده از دستگاه) در UI مسدود است.
+   */
+  privacyConsent?: { version: string; at: string };
   backupPath?: string;
   username?: string;
   password?: string;
@@ -452,6 +498,17 @@ export interface Settings {
   firstName?: string;
   lastName?: string;
   useLocalModel?: boolean; // استفاده از مدل محلی آموزش‌دیده در تحلیل آفلاین (در صورت وجود)
+  /**
+   * موج ۳ (O3): مدل «چلنجر» — مدلی که از داخل یک بکاپ بازیابی و در
+   * indexeddb://scalpai-local-model-challenger پارک شده است. تا وقتی کاربر
+   * دستی «فعال‌سازی» را در تب یادگیری ماشین نزند، هیچ‌اثری در تحلیل ندارد.
+   * خود وزن‌ها این‌جا ذخیره نمی‌شوند؛ فقط متادیتا برای نمایش کارت چلنجر.
+   */
+  localModelChallenger?: {
+    stagedAt: string;
+    featureVersion?: string | null;
+    metadata?: LocalModelMetadata | null;
+  } | null;
 }
 
 export interface Notification {
@@ -579,8 +636,15 @@ export interface DatabaseAdapter {
   updateSettings(patch: Partial<Settings>): Promise<Settings>;
 
   // Import/Export
-  exportData(): Promise<string>;
-  importData(jsonData: string): Promise<void>;
+  /**
+   * موج ۲ (C2.4): backupPassword اختیاری است و فقط در Electron پشتیبانی می‌شود —
+   * خروجی رمزدار v4 می‌سازد. بک‌اند وب فعلاً بدون رمز خروجی می‌دهد (مستند در privacy.md).
+   * موج ۳ (O3): modelBundle اختیاری — مدل محلی TF.js داخل بکاپ قرار می‌گیرد تا
+   * در بازیابی، به‌صورت «چلنجر» (غیرفعال) به کاربر پیشنهاد شود.
+   */
+  exportData(options?: { backupPassword?: string; modelBundle?: import('../lib/modelBundle').LocalModelBackupBundle | null }): Promise<string>;
+  /** موج ۳: به‌جای void گزارش بازیابی برمی‌گردد؛ importedModel یعنی بکاپ مدل داشته. */
+  importData(jsonData: string, options?: { backupPassword?: string }): Promise<ImportBackupReport>;
 
   // Auth
   verifyCredentials(username: string, password: string): Promise<boolean>;

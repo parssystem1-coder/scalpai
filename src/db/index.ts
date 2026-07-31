@@ -37,6 +37,74 @@ interface ElectronAPI {
   safeStorage: {
     isAvailable: () => Promise<boolean>;
   };
+  backup?: {
+    // موج ۳ (O2): هیچ payload باینری از IPC عبور نمی‌کند؛ main خودش دیالوگ را
+    // نشان می‌دهد و ZIP را می‌سازد/می‌خواند. پاسخ شامل canceled برای لغو کاربر است.
+    exportToPath: (options?: {
+      backupPassword?: string;
+      modelBundle?: import('../lib/modelBundle').LocalModelBackupBundle | null;
+      /** نقطهٔ شروع دیالوگ ذخیره (مثل پوشهٔ بکاپ انتخابی کاربر) — فقط UX */
+      defaultPath?: string;
+    }) => Promise<{
+      success?: boolean;
+      error?: string;
+      canceled?: boolean;
+      filePath?: string;
+      bytes?: number;
+      passwordProtected?: boolean;
+    }>;
+    importFromPath: (options?: { backupPassword?: string; retryLast?: boolean }) => Promise<{
+      success?: boolean;
+      error?: string;
+      canceled?: boolean;
+      /** فایل رمزدار v4 بود و پسورد داده نشد — renderer پنل پسورد را باز می‌کند */
+      passwordRequired?: boolean;
+      /** رمزگشایی v4 ناموفق بود (پسورد اشتباه/خرابی) */
+      passwordError?: boolean;
+      importedModel?: import('../lib/modelBundle').LocalModelBackupBundle | null;
+    }>;
+  };
+  updater?: {
+    getState: () => Promise<{
+      enabled: boolean;
+      checking: boolean;
+      updateAvailable: boolean;
+      updateDownloaded: boolean;
+      version: string | null;
+      error: string | null;
+    }>;
+    checkNow: () => Promise<{ ok: boolean; error?: string }>;
+    quitAndInstall: () => Promise<{ ok: boolean; error?: string }>;
+    onStatus: (callback: (status: {
+      type: 'checking' | 'available' | 'not-available' | 'downloaded' | 'error';
+      version?: string | null;
+      error?: string | null;
+    }) => void) => () => void;
+  };
+  encryption?: {
+    getStatus: () => Promise<{
+      driver: string;
+      keyStatus: string;
+      dbEncrypted: boolean;
+      imageEncryption: boolean;
+      migrationReport: { tables: number; rows: number } | null;
+    }>;
+    encryptLegacyImages: () => Promise<{
+      success: boolean;
+      error?: string;
+      scanned?: number;
+      alreadyEncrypted?: number;
+      encrypted?: number;
+      failed?: number;
+      failures?: Array<{ file: string; error: string }>;
+    }>;
+    revealRecoveryKey: (username: string, password: string) => Promise<{
+      success: boolean;
+      error?: string;
+      recoveryKey?: string;
+    }>;
+    onProgress: (callback: (progress: { done: number; total: number }) => void) => () => void;
+  };
   app: {
     getPath: (name: string) => Promise<string>;
     quit: () => Promise<void>;
@@ -254,12 +322,17 @@ const createElectronAdapter = (): DatabaseAdapter => ({
     return await callDb('updateSettings', patch as Record<string, unknown>) as Awaited<ReturnType<DatabaseAdapter['updateSettings']>>;
   },
 
-  async exportData() {
-    return await callDb('exportData') as string;
+  async exportData(options) {
+    // modelBundle (موج ۳) inline از IPC عبور می‌کند — چند صد کیلوبایت است نه
+    // مگابایت‌های تصاویر؛ مسیر اصلی بکاپِ بزرگ backup.exportToPath است.
+    const params: Record<string, unknown> = {};
+    if (options?.backupPassword) params.backupPassword = options.backupPassword;
+    if (options?.modelBundle) params.modelBundle = options.modelBundle;
+    return await callDb('exportData', Object.keys(params).length ? params : undefined) as string;
   },
 
-  async importData(jsonData) {
-    await callDb('importData', { jsonData });
+  async importData(jsonData, options) {
+    return await callDb('importData', { jsonData, backupPassword: options?.backupPassword }) as import('./types').ImportBackupReport;
   },
 
   async verifyCredentials(username, password) {
@@ -507,6 +580,34 @@ export const safeStorageUtils = {
   async isAvailable(): Promise<boolean> {
     if (!isElectron) return false;
     return await window.electronAPI!.safeStorage.isAvailable();
+  },
+};
+
+// Export Encryption utilities (موج ۲) — وضعیت لایهٔ رمز + ابزار مهاجرت تصاویر قدیمی
+export const encryptionUtils = {
+  isElectron,
+
+  async getStatus() {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    return await window.electronAPI.encryption.getStatus();
+  },
+
+  async encryptLegacyImages(
+    onProgress?: (progress: { done: number; total: number }) => void,
+  ) {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    const api = window.electronAPI.encryption;
+    const unsubscribe = onProgress ? api.onProgress(onProgress) : null;
+    try {
+      return await api.encryptLegacyImages();
+    } finally {
+      if (unsubscribe) unsubscribe();
+    }
+  },
+
+  async revealRecoveryKey(username: string, password: string) {
+    if (!isElectron || !window.electronAPI?.encryption) return null;
+    return await window.electronAPI.encryption.revealRecoveryKey(username, password);
   },
 };
 

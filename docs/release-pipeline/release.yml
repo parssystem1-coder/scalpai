@@ -1,0 +1,72 @@
+# Release — انتشار خودکار نسخهٔ ویندوز روی GitHub Releases (موج ۳ / O1)
+# -----------------------------------------------------------------------
+# تریگر: پوش تگ `v*` (مثلاً v1.1.0). این ورک‌فلو:
+#   ۱) قفل نسخه را برمی‌دارد: تگ = version در package.json = مدخل CHANGELOG.md
+#   ۲) همان بیلد electron:build:win را اجرا می‌کند ولی با `--publish always`
+#      تا خروجی (NSIS + portable + latest.yml) مستقیم روی GitHub Releases
+#      منتشر شود — همان منبعی که electron-updater از آن آپدیت می‌خواند.
+#
+# امضای کد (موج ۳ / O4):
+#   اگر سکرت‌های CSC_LINK (base64 فایل pfx) و CSC_KEY_PASSWORD ست شده باشند،
+#   electron-builder نصب‌کننده را امضا می‌کند (timestamp digicert از قبل در
+#   electron-builder.json هست). بدون سکرت‌ها بیلد «امضانشده» منتشر می‌شود —
+#   آپدیت خودکار همچنان کار می‌کند (دانلود + اطلاع) ولی کاربر هشدار SmartScreen
+#   آبی می‌بیند و نصب آپدیت باید دستی تأیید شود. این تفاوت در docs/release.md
+#   و گزارش موج ۳ شفاف مستند شده است.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # ساخت/به‌روزرسانی Release و آپلود asset
+
+jobs:
+  release:
+    name: ساخت و انتشار نسخهٔ ویندوز
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+
+      - name: نصب pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: راه‌اندازی Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: نصب وابستگی‌ها
+        run: pnpm install --frozen-lockfile
+
+      - name: قفل نسخه (تگ = package.json = CHANGELOG)
+        # یک انتشار با نسخهٔ اشتباه یا بدون CHANGELOG همین‌جا می‌ایستد، نه بعد از آپلود.
+        run: node scripts/check-changelog-version.cjs "${{ github.ref_name }}"
+
+      - name: دارایی‌های بستهٔ نصبی
+        run: node scripts/test-build-assets.cjs
+
+      - name: دارایی‌های آیکون + بیلد renderer
+        # build:assets همان خروجی‌های build/* را می‌سازد که test-build-assets سنجید
+        run: pnpm run build:assets && pnpm run build
+
+      - name: ساخت و انتشار نصب‌کنندهٔ ویندوز
+        run: pnpm exec electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # O4: اگر سکرت‌ها ست نشده باشند، electron-builder بدون امضا می‌سازد
+          # (خطا نمی‌دهد) — رفتار مورد انتظار تا خرید گواهی است.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: نسخهٔ منتشرشده
+        run: echo "Published ${{ github.ref_name }}"

@@ -3,6 +3,12 @@
 > این سند بعد از تحلیل واقعی مخزن نوشته شده: همهٔ فایل‌ها خوانده شدند و بیلد، تست‌ها، لینت و
 > تایپ‌چک **واقعاً اجرا شدند**. هر ادعایی در این سند با اجرای دستور تأیید شده، نه با حدس.
 
+> ⚠️ **نکتهٔ فازبندی (موج ۱):** مخزن **دو سری شماره‌گذاری فاز** دارد که به‌راحتی با هم
+> اشتباه می‌شوند: سری اول با گزارش‌های اعداد فارسی/لاتین (فاز ۰ تا ۴ + فاز A + فاز B) و
+> سری دوم با گزارش‌های اعداد عربی (فاز ۲ تا ۶). برای تصویر دقیق وضعیت هر فاز به
+> `docs/ممیزی-جامع-و-نقشه-راه-پیشنهادی.md` (بخش ۴) مراجعه کنید؛ روال اجرایی فعلی نیز
+> موج‌بندی `docs/نقشه-راه-تفصیلی-۵-موج.md` است.
+
 ---
 
 ## بخش ۱ — پروژه دقیقاً چیست؟
@@ -14,7 +20,7 @@
 | رابط کاربری | `src/` (۱۹۴ فایل، ~۲۷٬۵۰۰ خط) | React 18 + TypeScript + Tailwind 3 + HashRouter + Zustand + Recharts |
 | پوستهٔ دسکتاپ | `electron/*.cjs` | Electron 42، `contextIsolation`, `sandbox: true`, preload امن |
 | موتور تحلیل | `src/lib/scalpFeatures.ts` + `python/analyze.py` | TensorFlow.js + OpenCV، با fallback خودکار |
-| ذخیره‌سازی | `electron/db-handlers*.cjs` | better-sqlite3 → JSON → localforage (نسخهٔ وب) |
+| ذخیره‌سازی | `electron/db-handlers*.cjs` | better-sqlite3-multiple-ciphers (SQLCipher، موج ۲) → better-sqlite3 → JSON → localforage (نسخهٔ وب) |
 
 نکات معماری خوبی که در کد دیدم و باید حفظ شوند:
 
@@ -292,11 +298,17 @@ pnpm install && pnpm verify && pnpm electron:dev
 | خطا | علت | راه حل |
 |---|---|---|
 | `Failed to load better-sqlite3` | ABI ناسازگار | `pnpm run rebuild:native` |
+| `Failed to load a SQLite driver (tried better-sqlite3-multiple-ciphers...)` | ABI ناسازگار/نصب ناقص | `pnpm run rebuild:native` — موج ۲: درایور رسمی SQLCipher است؛ در صورت شکست، better-sqlite3 ساده fallback می‌شود (رمزنگاری دیتابیس غیرفعال) |
 | `gyp ERR! ... headers.tar.gz` | نبود اینترنت هنگام نصب | با VPN/mirror دوباره `pnpm install` |
+| `ECONNRESET` / `UND_ERR_SOCKET` / `ETIMEDOUT` به `registry.npmjs.org` هنگام `pnpm install` | مسدودی/اختلال registry در شبکهٔ ایران — خطای پروژه نیست | رجیستری موقت npmmirror (تنها روی همین ماشین، نه در مخزن): `pnpm config set registry https://registry.npmmirror.com` سپس `pnpm install`؛ پس از موفقیت با `pnpm config set registry https://registry.npmjs.org` برگردانید. جایگزین: روشن کردن VPN و `pnpm install` مستقیم. یک-install موفق کافی است؛ اجراهای بعدی شبکه نمی‌خواهند |
+| دانلود prebuilt native (`better-sqlite3-multiple-ciphers`) شکست خورد | GitHub releases به کندی/ناپایدانی می‌رسد | چون خودِ github.com کار می‌کند (clone/push سالم است) معمولاً retry داخل پکیج کفایت می‌کند؛ اگر نه، `pnpm install` را دوباره بزنید و در نهایت `pnpm run rebuild:native` (نیازمند VS Build Tools) |
 | `unable to verify the first certificate` | فیلترینگ/پروکسی | `ELECTRON_BUILDER_BINARIES_MIRROR` را ست کنید |
 | `cannot find specified resource "build/..."` | ✅ رفع شد | — |
 | صفحهٔ سفید در نسخهٔ بیلدشده | `dist/` ساخته نشده | اول `pnpm build` |
 | Python analyzer کار نمی‌کند | `cv2` نصب نیست | `pip install -r python/requirements.txt` (اختیاری) |
+| بنر آپدیت هرگز ظاهر نمی‌شود (نسخهٔ dev) | موج ۳: چک آپدیت فقط در نسخهٔ **نصب‌شده** فعال است؛ در dev عمداً غیرفعال است | انتشار تگ `v*` → نصب exe → بنر ظاهر می‌شود (جزئیات `docs/release.md`) |
+| SmartScreen آبی هنگام نصب/آپدیت | نصب‌کننده هنوز بدون امضای کد است (موج ۳: زیرساخت آماده، گواهی خریداری نشده) | «More info → Run anyway»؛ برای حذف دائمی: فعال‌سازی سکرت‌های `CSC_LINK`/`CSC_KEY_PASSWORD` طبق `docs/release.md` |
+| تگ زدید ولی ریلیز ساخته نشد | ورک‌فلوی ریلیز به دلیل مجوز GitHub App در `docs/release-pipeline/` آماده شده و هنوز به `.github/workflows/` کپی نشده | دو `cp` و یک کامیت مالک — §۰ از `docs/release.md` (همان الگوی موج ۱ برای `docs/ci/verify.yml`) |
 
 ---
 

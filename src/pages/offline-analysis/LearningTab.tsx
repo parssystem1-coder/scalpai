@@ -21,6 +21,9 @@ import EngineComparePanel from './EngineComparePanel';
 import ClassMetricsPanel from './ClassMetricsPanel';
 import AiAgreementPanel from './AiAgreementPanel';
 import DataMaturityPanel from './DataMaturityPanel';
+import HeuristicCalibrationPanel from './HeuristicCalibrationPanel';
+import DatasetAuditPanel from './DatasetAuditPanel';
+import FeatureRecomputePanel from './FeatureRecomputePanel';
 import TrainingGalleryTab from './TrainingGalleryTab';
 import TrainingPoolGalleryTab from './TrainingPoolGalleryTab';
 
@@ -118,6 +121,9 @@ export default function LearningTab() {
   /** فاز ۰٫۵ — وجود نسخهٔ پشتیبان قابل بازگردانی */
   const [canRollback, setCanRollback] = useState(false);
   const [rollbackBusy, setRollbackBusy] = useState(false);
+  /** موج ۳ (O3) — وزن‌های challenger واقعاً در IndexedDB پارک شده‌اند؟ (متادیتا از settings خوانده می‌شود) */
+  const [challengerStored, setChallengerStored] = useState(false);
+  const [challengerBusy, setChallengerBusy] = useState(false);
   const expertPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -126,6 +132,7 @@ export default function LearningTab() {
     fetchAnalyses();
     loadLocalModel().then(m => m.hasLocalModel()).then(setModelHasWeights);
     loadLocalModel().then(m => m.hasModelBackup()).then(setCanRollback);
+    loadLocalModel().then(m => m.hasChallengerModel()).then(setChallengerStored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -137,6 +144,8 @@ export default function LearningTab() {
         thresholds: modelMetadata.obsThresholds,
         suppressedLabels: modelMetadata.suppressedLabels,
       });
+      // موج ۴ (D3) — دمای کالیبراسیونِ پذیرفته‌شده (اگر چیزی ذخیره نشده → ۱ یعنی بدون دما)
+      m.setCachedModelTemperature(modelMetadata.calibrationTemperature);
       m.setCachedFeatureNorm({
         means: modelMetadata.featureMeans!,
         stds: modelMetadata.featureStds!,
@@ -386,6 +395,12 @@ export default function LearningTab() {
         labelSupport: trainResult.labelSupport,
         suppressedLabels: trainResult.suppressedLabels,
         repeatedHoldout: trainResult.repeatedHoldout,
+        // موج ۴ (D1/D3) — شاخص‌های کالیبراسیون، CI95 و تصمیم دما برای کارت «کالیبراسیون»
+        calibration: trainResult.calibration,
+        kFoldEvaluation: trainResult.kFoldEvaluation,
+        kFoldMinimalFallback: trainResult.kFoldMinimalFallback,
+        temperatureScaling: trainResult.temperatureScaling,
+        calibrationTemperature: trainResult.calibrationTemperature,
       });
       await markSamplesUsed(trainResult.trainedIds, nextVersion);
       setModelHasWeights(true);
@@ -445,6 +460,60 @@ export default function LearningTab() {
     await updateSettings({ useLocalModel: false });
   };
 
+  /**
+   * موج ۳ (O3) — فعال‌سازی challenger وارداتی با گیت دستی کاربر.
+   * همان قاعدهٔ امن آموزش: activateChallengerModel نخست از مدل فعال فعلی نسخهٔ
+   * پشتیبان (rollback) می‌گیرد؛ متادیتای challenger به‌عنوان متادیتای مدل فعال
+   * ثبت می‌شود تا پنل‌های متریک با وزن‌های جدید هم‌خوان بمانند.
+   */
+  const handleActivateChallenger = async () => {
+    setChallengerBusy(true);
+    setTrainError('');
+    try {
+      const mod = await loadLocalModel();
+      const ok = await mod.activateChallengerModel();
+      if (!ok) {
+        setTrainError(t('challengerActivateFailed'));
+        setChallengerStored(await mod.hasChallengerModel());
+        return;
+      }
+      const importedMeta = settings.localModelChallenger?.metadata;
+      if (importedMeta) {
+        await saveModelMetadata({ ...importedMeta });
+      } else {
+        await fetchModelMetadata();
+      }
+      await updateSettings({ localModelChallenger: null });
+      setChallengerStored(false);
+      setModelHasWeights(await mod.hasLocalModel());
+      setCanRollback(await mod.hasModelBackup());
+      setRetrainNotice({
+        replaced: true,
+        reason: t('challengerActivatedNotice'),
+      });
+    } catch (err) {
+      setTrainError((err as Error).message);
+    } finally {
+      setChallengerBusy(false);
+    }
+  };
+
+  /** موج ۳ (O3) — کنار گذاشتن challenger بدون فعال‌سازی */
+  const handleDiscardChallenger = async () => {
+    setChallengerBusy(true);
+    setTrainError('');
+    try {
+      const mod = await loadLocalModel();
+      await mod.discardChallengerModel();
+      await updateSettings({ localModelChallenger: null });
+      setChallengerStored(false);
+    } catch (err) {
+      setTrainError((err as Error).message);
+    } finally {
+      setChallengerBusy(false);
+    }
+  };
+
   const isRtl = settings.language === 'fa';
 
   const filteredSamples = trainingSamples.filter(s => {
@@ -483,6 +552,15 @@ export default function LearningTab() {
         />
       )}
 
+      {labelingSource !== 'poolGallery' && (
+        <HeuristicCalibrationPanel samples={trainingSamples} />
+      )}
+
+      {/* موج ۱ (W1-4) — بازمحاسبهٔ فیچر نمونه‌های قدیمی از تصویر خام */}
+      {labelingSource !== 'poolGallery' && (
+        <FeatureRecomputePanel samples={trainingSamples} />
+      )}
+
       {labelingSource !== 'poolGallery' && <ModelStatusPanel
         trainingSamples={trainingSamples}
         samplesBySource={stats.samplesBySource}
@@ -502,6 +580,10 @@ export default function LearningTab() {
         canRollback={canRollback}
         onRollback={handleRollbackModel}
         rollbackBusy={rollbackBusy}
+        challengerInfo={challengerStored ? (settings.localModelChallenger ?? { stagedAt: '', featureVersion: null, metadata: null }) : null}
+        onActivateChallenger={handleActivateChallenger}
+        onDiscardChallenger={handleDiscardChallenger}
+        challengerBusy={challengerBusy}
         onDeleteModel={handleDeleteModel}
         onToggleLocalModel={checked => updateSettings({ useLocalModel: checked })}
       />}
@@ -512,6 +594,11 @@ export default function LearningTab() {
 
       {labelingSource !== 'poolGallery' && (
         <AiAgreementPanel samples={trainingSamples} />
+      )}
+
+      {/* موج ۱ (W1-2) — ممیزی دیتاست: برچسب‌های کم‌نمونه، تکراری‌ها و دوقلوهای بصری */}
+      {labelingSource !== 'poolGallery' && (
+        <DatasetAuditPanel samples={trainingSamples} />
       )}
 
       {labelingSource !== 'poolGallery' && <EngineComparePanel

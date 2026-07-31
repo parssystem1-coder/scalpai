@@ -138,6 +138,41 @@ export function computeDHash(base64: string): Promise<string> {
   });
 }
 
+/** آستانهٔ فاصلهٔ همینگ برای «دوقلوی بصری» — محافظه‌کارانه؛ تصمیم نهایی با کاربر است */
+export const DHASH_TWIN_THRESHOLD = 4;
+
+export interface DhashCandidate {
+  id: string;
+  dhash: string;
+}
+
+export interface DhashDuplicateMatch {
+  id: string;
+  distance: number;
+}
+
+/**
+ * موج ۱ (W1-2) — نزدیک‌ترین تصویر موجود به dHash جدید را پیدا می‌کند
+ * (دوقلوی بصری بالقوه). مثل بقیهٔ این ماژول فقط «تشخیص» می‌دهد و
+ * تصمیم نهایی (ثبت یا استفاده از تصویر قبلی) با کاربر می‌ماند.
+ */
+export function findDhashDuplicate(
+  newDhash: string,
+  candidates: DhashCandidate[],
+  threshold = DHASH_TWIN_THRESHOLD,
+): DhashDuplicateMatch | null {
+  if (!newDhash || newDhash.length !== 16 || !candidates.length) return null;
+  let best: DhashDuplicateMatch | null = null;
+  for (const c of candidates) {
+    if (!c.dhash || c.dhash.length !== 16) continue;
+    const distance = calculateHammingDistance(newDhash, c.dhash);
+    if (distance <= threshold && (!best || distance < best.distance)) {
+      best = { id: c.id, distance };
+    }
+  }
+  return best;
+}
+
 /**
  * فاز ۵٫۱ — محاسبهٔ فاصلهٔ همینگ (Hamming Distance) بین دو dHash.
  * فاصلهٔ کمتر یا مساوی ۴ نشان‌دهندهٔ تشابه بصری به شدت بالا (دوقلو) است.

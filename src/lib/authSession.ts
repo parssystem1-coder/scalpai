@@ -1,6 +1,10 @@
 /**
  * مدیریت نشست ورود — Electron از توکن main-process استفاده می‌کند؛
  * وب همچنان یک توکن محلی تصادفی نگه می‌دارد (به‌جای فلگ loggedIn).
+ *
+ * موج ۲ (C4): ذخیرهٔ نشست از localStorage به sessionStorage منتقل شد —
+ * توکن وب دیگر پس از بستن تب/مرورگر زنده نمی‌ماند (کاهش ماندگاری اعتبارنامه
+ * روی ماشین مشترک). نشست‌های قدیمی localStorage در اولین خواندن پاک می‌شوند.
  */
 
 import { parseStoredJson } from './safeJson';
@@ -13,9 +17,19 @@ export interface AuthSession {
   token: string;
 }
 
+/** پاکسازی مهاجرتی نشست قدیمی localStorage (C4) — idempotent */
+function purgeLegacyLocalSession(): void {
+  try {
+    if (localStorage.getItem(AUTH_KEY) !== null) localStorage.removeItem(AUTH_KEY);
+  } catch {
+    /* حالت private mode — مهم نیست */
+  }
+}
+
 export function readAuthSession(): AuthSession | null {
   try {
-    const raw = parseStoredJson<Record<string, unknown>>(localStorage.getItem(AUTH_KEY), {});
+    purgeLegacyLocalSession();
+    const raw = parseStoredJson<Record<string, unknown>>(sessionStorage.getItem(AUTH_KEY), {});
     if (raw && typeof raw.username === 'string' && typeof raw.token === 'string' && raw.token) {
       return { username: raw.username, token: raw.token };
     }
@@ -30,11 +44,16 @@ export function readAuthSession(): AuthSession | null {
 }
 
 export function writeAuthSession(session: AuthSession): void {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  purgeLegacyLocalSession();
+  sessionStorage.setItem(AUTH_KEY, JSON.stringify(session));
 }
 
 export function clearAuthSession(): void {
-  localStorage.removeItem(AUTH_KEY);
+  try {
+    sessionStorage.removeItem(AUTH_KEY);
+  } finally {
+    purgeLegacyLocalSession();
+  }
 }
 
 export async function createAuthSession(username: string, password: string): Promise<AuthSession> {
