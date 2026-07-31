@@ -85,6 +85,21 @@ export function hashImagePayload(base64: string): string {
  * این الگوریتم برای تشخیص تصاویر بصری مشابه که فشرده یا تغییر اندازه داده شده‌اند،
  * به شدت قوی و مناسب ممانعت از تداخل نمونه‌ها در استخر یادگیری ماشین است.
  */
+/**
+ * سقف انتظار برای بارگذاری تصویر پیش از رها کردن محاسبهٔ هش.
+ *
+ * فاز ۴ (AUD-17) — چرا لازم است: این تابع فقط با `onload`/`onerror` تمام
+ * می‌شد. اگر مرورگر هیچ‌کدام را شلیک نکند (فایل خراب، فرمت پشتیبانی‌نشده، یا
+ * موتور رندری که آن نوع تصویر را نمی‌شناسد)، Promise **برای همیشه معلق**
+ * می‌ماند. مصرف‌کننده در `useGalleryPage.tsx:423` روی همین Promise `await`
+ * می‌کند و داخل حلقهٔ آپلود است — یعنی کل آپلود قفل می‌شود و کاربر تا ابد
+ * چرخندهٔ «در حال آپلود» می‌بیند، بدون هیچ پیام خطایی.
+ *
+ * ۵ ثانیه برای تغییر اندازه به ۹×۸ بسیار سخاوتمندانه است؛ هدف فقط شکستن
+ * حالت قفل ابدی است، نه محدود کردن کار عادی.
+ */
+const DHASH_LOAD_TIMEOUT_MS = 5000;
+
 export function computeDHash(base64: string): Promise<string> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof Image === 'undefined') {
@@ -92,6 +107,20 @@ export function computeDHash(base64: string): Promise<string> {
       resolve(hashImagePayload(base64).slice(0, 16).padEnd(16, '0'));
       return;
     }
+
+    // تضمین می‌کند Promise دقیقاً یک‌بار و حتماً تمام می‌شود
+    let settled = false;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    // رشتهٔ خالی یعنی «هش نداریم»؛ مصرف‌کننده با `|| undefined` آن را به
+    // «بدون دوقلو» ترجمه می‌کند و آپلود عادی ادامه می‌یابد — یعنی شکستِ
+    // تشخیص تکراری هرگز جلوی ثبت عکس بیمار را نمی‌گیرد.
+    const timer = setTimeout(() => finish(''), DHASH_LOAD_TIMEOUT_MS);
+
     const img = new Image();
     img.onload = () => {
       try {
@@ -100,7 +129,7 @@ export function computeDHash(base64: string): Promise<string> {
         canvas.height = 8;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve('');
+          finish('');
           return;
         }
         ctx.drawImage(img, 0, 0, 9, 8);
@@ -128,12 +157,12 @@ export function computeDHash(base64: string): Promise<string> {
           const nibble = binary.slice(i, i + 4);
           hex += parseInt(nibble, 2).toString(16);
         }
-        resolve(hex);
+        finish(hex);
       } catch {
-        resolve('');
+        finish('');
       }
     };
-    img.onerror = () => resolve('');
+    img.onerror = () => finish('');
     img.src = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
   });
 }
