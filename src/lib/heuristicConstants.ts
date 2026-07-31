@@ -10,6 +10,22 @@
  */
 import sharedConstants from '@shared/scalp-constants.json';
 
+/**
+ * AUD-18 — شناسهٔ نسخهٔ ضرایب نمره‌دهی.
+ *
+ * مشکلی که حل می‌کند: تحلیل‌های ذخیره‌شده نمی‌دانستند با کدام «خط‌کش» ساخته
+ * شده‌اند. اگر روزی ضرایب با دادهٔ واقعی کالیبره شوند، نمرهٔ همان بیمار عوض
+ * می‌شود و پزشک در نمودار روند فکر می‌کند «درمان جواب داده» — در حالی که فقط
+ * معیار سنجش تغییر کرده است. این یک خطای بالینی خاموش است.
+ *
+ * با ثبت این نسخه در هر تحلیل، UI می‌تواند هشدار دهد که دو نقطهٔ نمودار با
+ * معیارهای متفاوت سنجیده شده‌اند.
+ *
+ * **قانون:** هر تغییری در `shared/scalp-constants.json` باید این رشته را هم
+ * بالا ببرد. گارد `scripts/check-shared-constants.cjs` وجودش را الزامی می‌کند.
+ */
+export const CALIBRATION_VERSION: string = sharedConstants.CALIBRATION_VERSION;
+
 /** اندازهٔ شبکهٔ تحلیل ناحیه‌ای — باید با analyze.py یکی باشد */
 export const GRID_SIZE: number = sharedConstants.GRID_SIZE;
 

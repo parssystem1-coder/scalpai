@@ -1,5 +1,7 @@
 {
   "_comment": "SINGLE SOURCE OF TRUTH — generated-checked. See scripts/check-shared-constants.cjs",
+  "_calibrationVersionNote": "AUD-18 — هر بار که هر عددی در این فایل عوض شد، CALIBRATION_VERSION باید بالا برود. تحلیل‌های ذخیره‌شده این نسخه را در خود نگه می‌دارند تا نمودار روند بیمار بتواند هشدار دهد که دو نقطه با معیارهای متفاوت سنجیده شده‌اند.",
+  "CALIBRATION_VERSION": "v1-engineering-estimate",
   "GRID_SIZE": 4,
   "FEATURE_SCALE": {
     "dandruffFromWhiteFlake": 400,
