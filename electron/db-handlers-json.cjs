@@ -21,6 +21,7 @@ const {
   verifyLegacyPlaintextPassword,
   sanitizeSettings,
   sanitizeSettingsForBackup,
+  assertBackupPasswordWhenEncryptionActive,
   createBackupEnvelope,
   parseBackupPayload,
   createValueCrypto,
@@ -560,6 +561,9 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
 
           // =============== Export/Import ===============
           case 'exportData': {
+            // فاز ۱ (AUD-9) — گیت سخت: اگر فایل دادهٔ روی دیسک رمز است، خروجی
+            // بکاپ هم نباید متن ساده باشد. جزئیات در db-common.cjs.
+            assertBackupPasswordWhenEncryptionActive(jsonKeyOrNull(), params.backupPassword);
             const exportable = JSON.parse(JSON.stringify(data));
             exportable.settings = sanitizeSettingsForBackup(exportable.settings || {});
             // موج ۳ (O3) — مدل TF.js در کالبد envelope (بک‌اند JSON فایل‌محور ندارد)
@@ -578,6 +582,8 @@ function createJsonDbHandlers(userDataPath, safeStorage) {
           case 'exportDataToFile': {
             const targetPath = typeof params.targetPath === 'string' ? params.targetPath : '';
             if (!targetPath) throw new Error('exportDataToFile: targetPath is required');
+            // فاز ۱ (AUD-9) — همان گیت سخت برای مسیر فایل‌محور موج ۳ (O2)
+            assertBackupPasswordWhenEncryptionActive(jsonKeyOrNull(), params.backupPassword);
             const exportable = JSON.parse(JSON.stringify(data));
             exportable.settings = sanitizeSettingsForBackup(exportable.settings || {});
             if (params.modelBundle) exportable.modelBundle = params.modelBundle;

@@ -314,9 +314,49 @@ function toListAnalysisRow(analysis) {
   };
 }
 
+/**
+ * فاز ۱ / AUD-9 — گیت سخت «پسورد بکاپ اجباری»
+ * -----------------------------------------------------------------------
+ * مشکلی که این تابع حل می‌کند: وقتی رمزنگاری تصاویر فعال است، تصاویر داخل
+ * فایل پشتیبان به‌صورت ciphertext کپی می‌شوند — ولی برای اینکه بازیابی روی
+ * دستگاه دیگر ممکن باشد، **کلید مشتق تصاویر هم داخل همان بسته** قرار می‌گیرد
+ * (`mediaEncryption.key`). یعنی یک بکاپ بدون پسورد عملاً معادل دادهٔ کاملاً
+ * رمزنشده است: مثل قفل‌کردن صندوق و چسباندن کلید روی درش.
+ *
+ * تصمیم مالک (فاز ۱): پسورد در این حالت **اجباری** است، نه یک هشدار نرم.
+ *
+ * چرا این گیت در main-process است و نه در رابط کاربری: هر گیت امنیتی که فقط
+ * در UI باشد قابل دور زدن است (کافی است کسی مستقیم IPC را صدا بزند). UI فقط
+ * تجربهٔ کاربری را هماهنگ می‌کند؛ تصمیم واقعی این‌جا گرفته می‌شود.
+ *
+ * دامنهٔ عمدی و محدود:
+ *   - فقط مسیر **ساختن** بکاپ جدید را می‌بندد. مسیر **بازیابی** دست‌نخورده
+ *     می‌ماند تا فایل‌های v3 قدیمیِ کاربر قفل نشوند (سازگاری عقب‌رو).
+ *   - وقتی کلیدی وجود ندارد (رمزنگاری غیرفعال)، هیچ کلیدی برای نشت نیست، پس
+ *     رفتار قبلی بدون تغییر می‌ماند.
+ *
+ * دو مصداق فعال شدن گیت:
+ *   - بک‌اند SQLite: کلید تصاویر (`image-aes`) داخل envelope می‌رود → نشت کلید.
+ *   - بک‌اند JSON: فایل داده روی دیسک با کلید `json-store` رمز است، ولی خروجی
+ *     بکاپ متنِ ساده است → تنزل سطح حفاظت نسبت به دادهٔ در سکون.
+ * در هر دو حالت ورودی `activeKey` همان کلید فعال آن بک‌اند است.
+ *
+ * @param {Buffer|null|undefined} activeKey — کلید رمز فعال، یا null اگر رمز غیرفعال است
+ * @param {string|null|undefined} backupPassword — پسوردی که کاربر داده
+ * @throws {Error} با پیام `backup-password-required` وقتی گیت بسته است
+ */
+function assertBackupPasswordWhenEncryptionActive(activeKey, backupPassword) {
+  const hasKey = Boolean(activeKey);
+  const hasPassword = typeof backupPassword === 'string' && backupPassword.length > 0;
+  if (hasKey && !hasPassword) {
+    throw new Error('backup-password-required');
+  }
+}
+
 module.exports = {
   BACKUP_FORMAT,
   BACKUP_VERSION,
+  assertBackupPasswordWhenEncryptionActive,
   stripAnnotatedImage,
   toListAnalysisRow,
   MIN_PASSWORD_LENGTH,

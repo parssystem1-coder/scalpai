@@ -43,7 +43,16 @@ const { hashPassword, verifyPassword, parseStoredJson } = require('../electron/d
 // موج ۲ (C1.5): قرارداد روی «هر دو حالت» رمزشده/رمزنشده اجرا می‌شود — لایهٔ رمز
 // باید برای کل قرارداد شفاف باشد (هیچ assertionی نباید تغییر کند).
 const { initDek, _resetForTests } = require('../electron/dek.cjs');
-const { FILE_MAGIC } = require('../electron/file-crypto.cjs');
+const { FILE_MAGIC, decryptWithPassword } = require('../electron/file-crypto.cjs');
+
+/**
+ * فاز ۱ (AUD-9) — پسورد قراردادی این تست برای حالت‌های رمزنگاری‌شده.
+ * از این پس وقتی لایهٔ رمز فعال است، ساختن بکاپ بدون پسورد ممنوع است، چون کلید
+ * تصاویر داخل خودِ بسته می‌رود و فایل بی‌پسورد معادل دادهٔ باز است.
+ */
+const CONTRACT_BACKUP_PASSWORD = 'contract-mandatory-pass-123';
+const V4_PREFIX = 'scalpai-backup:v4:enc:base64:';
+const V3_PREFIX = 'scalpai-backup:v3:base64:';
 
 /**
  * قرارداد cascade از فایل دامنه خوانده می‌شود (نه کپی دستی).
@@ -128,6 +137,67 @@ async function runContract(harness) {
   const tag = harness.label;
   const isSqlite = harness.backend === 'sqlite';
   const isEncryptedMode = tag.endsWith('-encrypted');
+
+  /**
+   * فاز ۱ (AUD-9): در حالت رمزنگاری‌شده، هر export باید پسورد داشته باشد.
+   * این helper پارامترها را متناسب با حالت تکمیل می‌کند تا بقیهٔ قراردادهای
+   * تست (مدل، round-trip، audit) بدون بازنویسی معنادار بمانند.
+   */
+  const withMandatoryPassword = (params = {}) =>
+    (isEncryptedMode ? { ...params, backupPassword: CONTRACT_BACKUP_PASSWORD } : params);
+
+  /**
+   * خروجی export را به شکل قابل مصرف برای importData/بازرسی برمی‌گرداند.
+   * در حالت رمزنگاری‌شده خروجی یک پاکت v4 است؛ این‌جا با همان پسورد باز
+   * می‌شود تا assertionهای ساختاری (ZIP/JSON) دقیقاً مثل قبل کار کنند.
+   */
+  const unwrapExport = (payload, label) => {
+    if (!isEncryptedMode) return payload;
+    assert.ok(
+      typeof payload === 'string' && payload.startsWith(V4_PREFIX),
+      `${tag}: ${label} در حالت رمزنگاری‌شده باید پاکت v4 باشد`,
+    );
+    const bytes = Buffer.from(payload.slice(V4_PREFIX.length), 'base64');
+    const inner = decryptWithPassword(bytes, CONTRACT_BACKUP_PASSWORD);
+    // بک‌اند sqlite داخل پاکت یک ZIP دارد، بک‌اند JSON یک متن envelope
+    return isSqlite ? V3_PREFIX + inner.toString('base64') : inner.toString('utf-8');
+  };
+
+  /**
+   * فاز ۱ (AUD-9) — قرارداد جدید و صریح: با رمزنگاری فعال، export بدون پسورد
+   * باید رد شود. این آزمون منفی است؛ اگر روزی گیت برداشته شود همین‌جا قرمز
+   * می‌شود. در حالت غیر رمزنگاری‌شده رفتار قبلی باید دست‌نخورده بماند.
+   */
+  const gateProbe = await q('exportData', {});
+  if (isEncryptedMode) {
+    assert.ok(
+      gateProbe && typeof gateProbe === 'object' && String(gateProbe.error || '').includes('backup-password-required'),
+      `${tag}: با رمزنگاری فعال، exportData بدون پسورد باید backup-password-required بدهد`,
+    );
+    const fileGateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scalpai-gate-'));
+    try {
+      const gateFileProbe = await q('exportDataToFile', {
+        targetPath: path.join(fileGateDir, 'no-password.zip'),
+      });
+      assert.ok(
+        gateFileProbe && typeof gateFileProbe === 'object' && String(gateFileProbe.error || '').includes('backup-password-required'),
+        `${tag}: مسیر فایل‌محور هم بدون پسورد باید رد شود`,
+      );
+      assert.strictEqual(
+        fs.readdirSync(fileGateDir).length,
+        0,
+        `${tag}: گیت باید قبل از نوشتن هر بایتی روی دیسک عمل کند`,
+      );
+    } finally {
+      fs.rmSync(fileGateDir, { recursive: true, force: true });
+    }
+  } else {
+    assert.strictEqual(
+      typeof gateProbe,
+      'string',
+      `${tag}: بدون رمزنگاری، export بدون پسورد باید مثل قبل کار کند (سازگاری عقب‌رو)`,
+    );
+  }
 
   // --- settings default theme ---
   const settings = await assertOk(await q('getSettings'), `${tag} getSettings`);
@@ -431,7 +501,10 @@ async function runContract(harness) {
     auditAfterDelete.some((r) => r.event === 'client.delete'),
     `${tag}: audit_log must contain client.delete after deleteClient`,
   );
-  const exported = await assertOk(await q('exportData', {}), `${tag} exportData`);
+  const exported = unwrapExport(
+    await assertOk(await q('exportData', withMandatoryPassword({})), `${tag} exportData`),
+    'exportData',
+  );
   assert.strictEqual(typeof exported, 'string', `${tag}: exportData returns a string payload`);
   const auditAfterExport = await assertOk(await q('getAuditLog', {}), `${tag} getAuditLog after export`);
   assert.ok(
@@ -453,7 +526,10 @@ async function runContract(harness) {
     featureVersion: 'test-feature-v1',
     metadata: { version: 2, trainedAt: '2026-01-01T00:00:00.000Z', sampleCount: 10 },
   };
-  const exportedWithModel = await assertOk(await q('exportData', { modelBundle: sampleBundle }), `${tag} exportData + modelBundle`);
+  const exportedWithModel = unwrapExport(
+    await assertOk(await q('exportData', withMandatoryPassword({ modelBundle: sampleBundle })), `${tag} exportData + modelBundle`),
+    'exportData + modelBundle',
+  );
   assert.strictEqual(typeof exportedWithModel, 'string', `${tag}: exportData با مدل هم رشته برمی‌گرداند`);
 
   // اثبات حضور مدل داخل آرشیو/پاکت — برای sqlite داخل ZIP: model.json + model.weights.bin
@@ -503,7 +579,10 @@ async function runContract(harness) {
   );
 
   // سازگاری عقب‌رو: بکاپ بدون مدل → importedModel تهی است (نه خطا)
-  const exportedNoModel = await assertOk(await q('exportData', {}), `${tag} exportData بدون مدل`);
+  const exportedNoModel = unwrapExport(
+    await assertOk(await q('exportData', withMandatoryPassword({})), `${tag} exportData بدون مدل`),
+    'exportData بدون مدل',
+  );
   const importNoModel = await assertOk(await q('importData', { jsonData: exportedNoModel }), `${tag} import بدون مدل`);
   assert.ok(importNoModel && importNoModel.success === true, `${tag}: import بدون مدل موفق`);
   assert.strictEqual(importNoModel.importedModel ?? null, null, `${tag}: importedModel باید null باشد`);
@@ -513,28 +592,49 @@ async function runContract(harness) {
   try {
     const targetPath = path.join(fsOutDir, `contract-${harness.backend}.zip`);
     const fileResult = await assertOk(
-      await q('exportDataToFile', { targetPath, modelBundle: sampleBundle }),
+      await q('exportDataToFile', withMandatoryPassword({ targetPath, modelBundle: sampleBundle })),
       `${tag} exportDataToFile`,
     );
     assert.strictEqual(fileResult.success, true, `${tag}: exportDataToFile موفق`);
     assert.strictEqual(fileResult.filePath, targetPath, `${tag}: filePath برگشتی همان مقصد است`);
     assert.ok(fs.existsSync(targetPath), `${tag}: فایل روی دیسک ساخته شده`);
     assert.strictEqual(fileResult.bytes, fs.statSync(targetPath).size, `${tag}: bytes = اندازهٔ واقعی`);
-    assert.strictEqual(fileResult.passwordProtected, false, `${tag}: بدون پسورد → passwordProtected=false`);
-    // جادوی ZIP (PK\x03\x04) — نشانهٔ فایل آرشیو واقعی نه رشتهٔ JSON
-    const head = fs.readFileSync(targetPath).subarray(0, 4);
-    if (harness.backend === 'sqlite') {
+    assert.strictEqual(
+      fileResult.passwordProtected,
+      isEncryptedMode,
+      `${tag}: فاز ۱ (AUD-9) — با رمزنگاری فعال خروجی همیشه passwordProtected است`,
+    );
+
+    if (isEncryptedMode) {
+      // فاز ۱ (AUD-9): فایل روی دیسک باید پاکت رمزدار v4 باشد، نه ZIP/JSON خام.
+      // یعنی حتی اگر کسی فایل را برداشت، بدون پسورد کاربر بی‌ارزش است.
+      const encHead = fs.readFileSync(targetPath, 'utf-8').slice(0, V4_PREFIX.length);
+      assert.strictEqual(encHead, V4_PREFIX, `${tag}: فایل باید پاکت v4 رمزدار باشد`);
+      const payload = unwrapExport(fs.readFileSync(targetPath, 'utf-8'), 'exportDataToFile');
+      const roundTrip = await assertOk(
+        await q('importData', { jsonData: payload }),
+        `${tag} import از فایل رمزدار exportDataToFile`,
+      );
+      assert.ok(roundTrip.importedModel, `${tag}: مدل از فایل رمزدار هم round-trip می‌شود`);
+      assert.strictEqual(
+        roundTrip.importedModel.weightDataBase64,
+        sampleBundle.weightDataBase64,
+        `${tag}: وزن‌ها از فایل رمزدار هم ۱:۱`,
+      );
+    } else if (harness.backend === 'sqlite') {
+      // جادوی ZIP (PK\x03\x04) — نشانهٔ فایل آرشیو واقعی نه رشتهٔ JSON
+      const head = fs.readFileSync(targetPath).subarray(0, 4);
       assert.ok(head[0] === 0x50 && head[1] === 0x4b, `${tag}: خروجی sqlite با جادوی PK شروع می‌شود (ZIP واقعی)`);
       // رفت‌وبرگشت: همان فایل از دیسک به importData برمی‌گردد و مدل را هم می‌آورد
       const zipBase64 = fs.readFileSync(targetPath).toString('base64');
       const roundTrip = await assertOk(
-        await q('importData', { jsonData: `scalpai-backup:v3:base64:${zipBase64}` }),
+        await q('importData', { jsonData: `${V3_PREFIX}${zipBase64}` }),
         `${tag} import از فایل exportDataToFile`,
       );
       assert.ok(roundTrip.importedModel, `${tag}: مدل از فایل دیسک هم round-trip می‌شود`);
       assert.strictEqual(roundTrip.importedModel.weightDataBase64, sampleBundle.weightDataBase64, `${tag}: وزن‌ها از فایل هم ۱:۱`);
     } else {
-      // بک‌اند JSON: خروجی فایل، متن JSON envelope است (یا با پسورد prefix v4)
+      // بک‌اند JSON: خروجی فایل، متن JSON envelope است
       const text = fs.readFileSync(targetPath, 'utf-8');
       assert.ok(text.startsWith('{'), `${tag}: خروجی فایل JSON است`);
       const roundTrip = await assertOk(await q('importData', { jsonData: text }), `${tag} import از فایل JSON`);

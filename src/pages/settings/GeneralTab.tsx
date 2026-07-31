@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Globe, Palette, Database, Download, Upload, FolderOpen, Sparkles, Bot, Lock, BrainCircuit } from 'lucide-react';
 import { useSettingsStore } from '../../store';
-import { electronUtils, db } from '../../db';
+import { electronUtils, db, encryptionUtils } from '../../db';
 import type { LocalModelMetadata } from '../../db';
 import type { LocalModelBackupBundle } from '../../lib/modelBundle';
 import { useT, usePick } from '../../i18n';
@@ -84,6 +84,28 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
   // موج ۳ (O3): مدل محلی به‌صورت اختیاری داخل بکاپ قرار می‌گیرد
   const [includeModelInBackup, setIncludeModelInBackup] = useState(true);
   const [transferBusy, setTransferBusy] = useState(false);
+
+  /**
+   * فاز ۱ (AUD-9) — وقتی لایهٔ رمزنگاری فعال است، بکاپ بدون پسورد ممنوع است.
+   * دلیل: کلید تصاویر داخل خودِ بستهٔ پشتیبان قرار می‌گیرد، پس فایل بدون پسورد
+   * معادل دادهٔ کاملاً باز است. گیت واقعی در main-process است
+   * (`db-common.cjs::assertBackupPasswordWhenEncryptionActive`)؛ این پرچم فقط
+   * تجربهٔ کاربری را با آن هماهنگ می‌کند تا کاربر به خطای بعد از کلیک نخورد.
+   */
+  const [passwordMandatory, setPasswordMandatory] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    encryptionUtils.getStatus()
+      .then(status => {
+        if (!alive || !status) return;
+        const mandatory = Boolean(status.imageEncryption || status.dbEncrypted);
+        setPasswordMandatory(mandatory);
+        if (mandatory) setUseBackupPassword(true);
+      })
+      .catch(() => { /* وضعیت رمز در دسترس نیست — گیت main همچنان برقرار است */ });
+    return () => { alive = false; };
+  }, []);
 
   const validateBackupPassword = (): string | null => {
     if (!useBackupPassword) return null;
@@ -243,6 +265,13 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
         if (result?.canceled) return;
         if (!result?.success) {
           console.error('Export to path failed:', result?.error);
+          // فاز ۱ (AUD-9): گیت main-process رد کرده — پیام دقیق به‌جای خطای کلی
+          if (typeof result?.error === 'string' && result.error.includes('backup-password-required')) {
+            setPasswordMandatory(true);
+            setUseBackupPassword(true);
+            notify('error', t('backupPasswordMandatory'));
+            return;
+          }
           notify('error', t('backupExportError'));
           return;
         }
@@ -314,7 +343,14 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Backup export error:', error);
-      notify('error', t('backupExportError'));
+      // فاز ۱ (AUD-9): همان گیت در مسیر غیرفایل‌محور (exportData) هم اعمال می‌شود
+      if (error instanceof Error && error.message.includes('backup-password-required')) {
+        setPasswordMandatory(true);
+        setUseBackupPassword(true);
+        notify('error', t('backupPasswordMandatory'));
+      } else {
+        notify('error', t('backupExportError'));
+      }
     } finally {
       setTransferBusy(false);
     }
@@ -484,11 +520,16 @@ export default function GeneralTab({ notify }: { notify: Notify }) {
               <input
                 type="checkbox"
                 checked={useBackupPassword}
-                onChange={e => setUseBackupPassword(e.target.checked)}
-                className="w-4 h-4 accent-green-500"
+                // فاز ۱ (AUD-9): با رمزنگاری فعال، برداشتن این تیک مجاز نیست
+                disabled={passwordMandatory}
+                onChange={e => setUseBackupPassword(passwordMandatory ? true : e.target.checked)}
+                className="w-4 h-4 accent-green-500 disabled:opacity-60"
               />
               <span>{t('backupUsePassword')}</span>
             </label>
+            {passwordMandatory && (
+              <p className="text-xs text-emerald-200/70 leading-5">{t('backupPasswordMandatory')}</p>
+            )}
             {useBackupPassword && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input

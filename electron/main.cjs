@@ -8,7 +8,12 @@ const path = require('path');
 const fs = require('fs');
 const { createDbHandlers } = require('./db-handlers.cjs');
 const { createJsonDbHandlers } = require('./db-handlers-json.cjs');
-const { createOfflineHandlers } = require('./offline-handlers.cjs');
+const {
+  createOfflineHandlers,
+  setAnalyzeTempRoot,
+  cleanupStaleAnalyzeTemp,
+  cleanupLiveTempFiles,
+} = require('./offline-handlers.cjs');
 const { createAiHandlers } = require('./ai-handlers.cjs');
 const { createBaseTables, runMigrations } = require('./schema-migrations.cjs');
 const { SYSTEM_TRAINING_POOL_CLIENT_ID } = require('./db-common.cjs');
@@ -96,6 +101,13 @@ const userDataPath = app.getPath('userData');
 const { initLogger } = require('./logger.cjs');
 initLogger(userDataPath);
 const dbPath = path.join(userDataPath, 'scalpai.db');
+
+// فاز ۱ (AUD-8) — تصاویر موقت تحلیل آفلاین باید داخل userData بنشینند، نه در
+// پوشهٔ عمومی %TEMP% سیستم‌عامل. این تزریق باید پیش از هر تحلیلی انجام شود.
+setAnalyzeTempRoot(userDataPath);
+// لایهٔ سوم دفاع: اگر پروسه هنگام باز بودن یک فایل موقت خاتمه یافت، همان‌جا
+// پاک شود. (لایهٔ اول: finally در offline-handlers؛ لایهٔ دوم: پاک‌سازی استارت‌آپ)
+process.on('exit', cleanupLiveTempFiles);
 
 /**
  * موج ۱ (W1-6) — پوشهٔ اختصاصی فایل‌های موقت چاپ داخل userData.
@@ -1380,6 +1392,9 @@ app.whenReady().then(async () => {
   setupIpcHandlers();
   // موج ۱ (W1-6) — پاک‌سازی بقایای فایل‌های موقت چاپ از جلسات خراب قبلی
   cleanupStalePrintTemp();
+  // فاز ۱ (AUD-8) — همان کار برای تصاویر موقت تحلیل آفلاین: هر عکس بالینی که
+  // از یک جلسهٔ کرش‌کرده روی دیسک جا مانده، همین‌جا پاک می‌شود.
+  cleanupStaleAnalyzeTemp();
   // پس از ری‌استارت، پوشهٔ بکاپ ذخیره‌شده را دوباره به allowlist اضافه کن
   try {
     const settings = await dbHandlers.handleDbQuery('getSettings', {});
@@ -1551,4 +1566,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   closeDb();
+  // فاز ۱ (AUD-8) — خروج مرتب: هیچ تصویر بالینی موقتی نباید جا بماند
+  cleanupLiveTempFiles();
 });

@@ -30,6 +30,7 @@ const {
   verifyLegacyPlaintextPassword,
   sanitizeSettings,
   sanitizeSettingsForBackup,
+  assertBackupPasswordWhenEncryptionActive,
   createBackupEnvelope,
   parseBackupPayload,
   parseStoredJson,
@@ -880,6 +881,9 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             // این کلید، ZIP رمزشده معادل plaintext است؛ برای انتقال امن از
             // گزینهٔ پسورد بکاپ (همان پنل) استفاده کنید.
             const imageKey = imageKeyOrNull();
+            // فاز ۱ (AUD-9) — گیت سخت: تا وقتی کلید تصاویر داخل بسته می‌رود،
+            // ساختن بکاپ بدون پسورد ممنوع است. جزئیات در db-common.cjs.
+            assertBackupPasswordWhenEncryptionActive(imageKey, params.backupPassword);
             const data = {
               clients: db.prepare('SELECT * FROM clients').all(),
               gallery: galleryRows,
@@ -955,6 +959,8 @@ function createDbHandlers(db, userDataPath, safeStorage) {
             }));
             const questionnaireRows = db.prepare('SELECT * FROM questionnaire_revisions').all().map(mapQuestionnaireRevisionRow);
             const imageKey = imageKeyOrNull();
+            // فاز ۱ (AUD-9) — همان گیت سخت برای مسیر فایل‌محور موج ۳ (O2)
+            assertBackupPasswordWhenEncryptionActive(imageKey, params.backupPassword);
             const data = {
               clients: db.prepare('SELECT * FROM clients').all(),
               gallery: galleryRows,

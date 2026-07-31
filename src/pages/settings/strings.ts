@@ -54,6 +54,11 @@ export const settingsDict = {
     fa: 'بکاپ بدون پسورد حاوی کلید تصاویر است و معادل دادهٔ رمزنشده محسوب می‌شود؛ آن را امن نگه دارید.',
     en: 'A backup without a password carries the image key and equals unencrypted data — keep it safe.',
   },
+  // فاز ۱ (AUD-9) — پسورد پشتیبان وقتی رمزنگاری فعال است اجباری شد
+  backupPasswordMandatory: {
+    fa: 'چون رمزنگاری داده فعال است، تهیهٔ پشتیبان بدون پسورد ممکن نیست؛ کلید تصاویر داخل همین فایل قرار می‌گیرد. این پسورد تنها راه بازکردن فایل است — گم شدنش یعنی از دست رفتن داده.',
+    en: 'Because data encryption is active, a backup cannot be created without a password: the image key travels inside this file. This password is the only way to open it — losing it means losing the data.',
+  },
   enterBackupPassword: {
     fa: 'این فایل پشتیبان رمزدار است؛ پسورد آن را وارد کنید',
     en: 'This backup is password-protected; enter its password',
