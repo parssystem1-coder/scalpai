@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
@@ -11,12 +11,15 @@
     "test": "vitest run",
     "conformance": "tsx tools/conformance/run.ts",
     "graph": "tsx tools/graph/extract.ts",
+    "db:migrate": "tsx packages/db/src/migrate-cli.ts",
+    "db:seed": "tsx packages/db/src/seed.ts",
     "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^10.0.1",
+    "@swc/core": "^1.16.1",
     "@types/node": "^26.3.0",
     "eslint": "^10.9.1",
     "husky": "^9.1.7",
@@ -25,6 +28,7 @@
     "turbo": "^2.10.11",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.68.0",
+    "unplugin-swc": "^1.5.11",
     "vitest": "^4.1.11"
   }
 }
