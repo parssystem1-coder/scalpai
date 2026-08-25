@@ -5,6 +5,7 @@ loadEnv();
 
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
 
@@ -15,6 +16,19 @@ async function bootstrap(): Promise<void> {
   // Web dev server (:5173) and future desktop shell call the API cross-origin.
   app.enableCors({ origin: true, credentials: false });
   app.enableShutdownHooks();
+
+  // Playbook 1.5 — automatic OpenAPI (JSON + minimal UI). Enriched in phase 4.
+  const doc = SwaggerModule.createDocument(
+    app,
+    new DocumentBuilder()
+      .setTitle("ScalpAI API")
+      .setDescription("ScalpAI v2 clinic platform — core backbone API")
+      .setVersion("0.1.0")
+      .addBearerAuth()
+      .build(),
+  );
+  SwaggerModule.setup("api/v1/docs", app, doc);
+
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port, "0.0.0.0");
   console.log(`ScalpAI API ready on :${port}`);

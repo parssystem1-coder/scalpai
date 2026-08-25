@@ -22,6 +22,15 @@ export {
   resolveEntitlement,
   loginLookup,
   claimsById,
+  listPlans,
+  getPlanByCode,
+  getPlanWithFeatures,
+  upsertPlan,
+  deletePlan,
+  countEntitlementsByPlan,
+  getUsage,
+  incrementUsage,
   type ResolvedEntitlement,
+  type PlanUpsertInput,
 } from "./repos/users.repo.js";
 export { resetAll, seedMarkerClinicId } from "./migrate.js";

@@ -27,14 +27,14 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
       // Plans catalog — new plan = INSERT only (§9.1)
       await client.query(
         `INSERT INTO plans (code, name, price, interval, limits) VALUES
-         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1}'),
-         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3}')
+         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1,"monthly_sessions":5}'),
+         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3,"monthly_sessions":3}')
          ON CONFLICT (code) DO NOTHING`,
       );
       await client.query(
         `INSERT INTO plan_features (plan_code, feature) VALUES
          ('starter','portal'),('starter','aftercare'),
-         ('growth','portal'),('growth','aftercare'),('growth','scribe'),('growth','api'),('growth','ml_updates')
+         ('growth','portal'),('growth','aftercare'),('growth','scribe'),('growth','api'),('growth','ml_updates'),('growth','admin')
          ON CONFLICT DO NOTHING`,
       );
 
@@ -72,6 +72,10 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
          ($2, $3, 'جلسه PRP',         60, '4500000')`,
         [serviceA, serviceB, clinicA],
       );
+      await client.query(`INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES ($1, $2, 'مشاوره', 30, '500000')`, [
+        randomUUID(),
+        clinicB,
+      ]);
 
       await client.query(
         `INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES

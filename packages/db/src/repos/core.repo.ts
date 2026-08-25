@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { auditLog, patients, sessions } from "../schema.js";
+import { incrementUsage } from "./users.repo.js";
 import type { Tx } from "../tenant.js";
 
 /**
@@ -207,5 +208,7 @@ export async function createSession(
     entity: "session",
     entityId: created.id,
   });
+  // §9.1 metering: inline in the same tx until BullMQ workers take over (phase 5).
+  await incrementUsage(tx, input.clinicId, "monthly_sessions");
   return created;
 }

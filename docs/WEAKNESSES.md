@@ -17,13 +17,13 @@
 - [x] **W05 — API بدون CORS** — `apps/api/src/main.ts` هیچ `enableCors` ای ندارد؛ وب روی :5173 نمی‌تواند به :3001 صدا بزند → سناریوی e2e مرورگری بلاک است (تست‌های jsdom این را لو نمی‌دادند). — ✅ رفع: PR #6 (`0cc2b90`) `enableCors({origin:true})`
 - [ ] **W06 — ریسک fork زنجیره audit تحت همزمانی** — `appendAudit` آخرین row را می‌خواند و hash می‌سازد؛ دو تراکنش همزمان = prev_hash تکراری → `verifyChain` بعدها fail می‌شود. اقدام: `pg_advisory_xact_lock` قبل از خواندن prev + تست همزمانی. — ✅ رفع: Slice H (`3449845`) + تست همزمانی ۶-درخواستی
 - [ ] **W07 — `updated_at` هرگز bump نمی‌شود** — هیچ trigger ای نیست؛ سیاست LWW فاز ۳ (sync) به این ستون تکیه دارد → بمب ساعتی فاز ۳. اقدام: trigger روی patients/sessions در migration جدید. — ✅ رفع: migration 0004 (`3449845`) + تست bump روی soft-delete
-- [ ] **W08 — گپ پلی‌بوک 1.4: QuotaGuard موجود نیست** — چک `usage_counters` پیاده نشده.
-- [ ] **W09 — گپ پلی‌بوک 1.4: endpoint های admin-plan CRUD نیست** — «ایجاد plan فقط با INSERT» فعلاً فقط در سطح SQL ثابت شده، نه endpoint مدیریتی owner-only.
-- [ ] **W10 — گپ پلی‌بوک 1.5: OpenAPI خودکار تولید نمی‌شود.**
+- [x] **W08 — گپ پلی‌بوک 1.4: QuotaGuard موجود نیست** — چک `usage_counters` پیاده نشده. — ✅ رفع: Slice T6 — `@Quota` + metering داخل tx + تست‌های QUOTA_EXCEEDED
+- [x] **W09 — گپ پلی‌بوک 1.4: endpoint های admin-plan CRUD نیست** — «ایجاد plan فقط با INSERT» فعلاً فقط در سطح SQL ثابت شده، نه endpoint مدیریتی owner-only. — ✅ رفع: Slice T6 — `/plans` CRUD با @Roles(owner)+@RequireFeature(admin) + audit
+- [x] **W10 — گپ پلی‌بوک 1.5: OpenAPI خودکار تولید نمی‌شود.** — ✅ رفع: Slice T6 — @nestjs/swagger روی `/api/v1/docs` + JSON؛ غنی‌سازی schema فاز ۴
 
 ## 🟡 متوسط
 
-- [ ] **W11 — `exceptions.json` وجود ندارد** — ADR-21 و گیت چک‌پوینت آن را مرجع می‌دهند و PROGRESS قبلاً «آماده» اعلامش کرده بود؛ عدم تطابق سند/واقعیت.
+- [x] **W11 — `exceptions.json` وجود ندارد** — ADR-21 و گیت چک‌پوینت آن را مرجع می‌دهند و PROGRESS قبلاً «آماده» اعلامش کرده بود؛ عدم تطابق سند/واقعیت. — ✅ رفع: Slice T6 — فایل + موتور هارنس (ورودی بدون ADR = abort build) + ۳ self-test
 - [ ] **W12 — CI با `--no-frozen-lockfile` نصب می‌کند** — `.github/workflows/ci.yml:48`؛ lockfile عملاً قفل نیست.
 - [x] **W13 — e2e وارد CI نشده + ابهام Exit criteria #1** — تصمیم «@smoke فقط لوکال یا CI» مستند نشده؛ باید در completion فایل T3 حکم شود. — ✅ حکم ثبت شد در `docs/tasks/phase1-T3-playwright-smoke-completion.md`: browser-e2e تا فاز ۲ فقط لوکال (ADR-0024)
 - [ ] **W14 — drift نسخه Postgres** — لوکال native PG17 (ADR-0024) ↔ CI/ops روی `pgvector:pg16`.

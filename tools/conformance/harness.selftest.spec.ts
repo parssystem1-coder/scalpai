@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runRules } from "./run.js";
+import { applyExceptions, loadExceptions, runRules } from "./run.js";
 import { RULES } from "./rules/index.js";
 import { dbAccess, encodingGuard } from "./rules/v1.js";
-import type { Rule } from "./lib/types.js";
+import type { Rule, Violation } from "./lib/types.js";
 
 function fixtureRepo(): string {
   const root = mkdtempSync(join(tmpdir(), "scalpai-conf-"));
@@ -56,6 +56,43 @@ describe("conformance v1 rules", () => {
     expect(res.violations.some((v) => v.file.endsWith("moji.ts"))).toBe(true);
     expect(res.violations.some((v) => v.file.endsWith("repl.ts"))).toBe(true);
     expect(res.violations.some((v) => v.file.endsWith("clean.ts"))).toBe(false);
+  });
+
+  it("exceptions without a valid ADR ref abort the harness (ADR-21)", () => {
+    const root = fixtureRepo();
+    mkdirSync(join(root, "tools", "conformance"), { recursive: true });
+    writeFileSync(
+      join(root, "tools", "conformance", "exceptions.json"),
+      JSON.stringify({ exceptions: [{ file: "apps/api/src/bad.ts", reason: "no adr" }] }),
+      "utf8",
+    );
+    expect(() => loadExceptions(root)).toThrow(/valid ADR/);
+  });
+
+  it("exceptions with ADR ref suppress matching violations only", async () => {
+    const root = fixtureRepo();
+    const appDir = join(root, "apps", "api", "src");
+    mkdirSync(appDir, { recursive: true });
+    mkdirSync(join(root, "tools", "conformance"), { recursive: true });
+    writeFileSync(join(appDir, "bad.ts"), `import { Client } from "pg";\nexport const c = Client;`, "utf8");
+    writeFileSync(
+      join(root, "tools", "conformance", "exceptions.json"),
+      JSON.stringify({ exceptions: [{ rule: "db-access", file: "apps/api/src/bad.ts", adr: "ADR-0002", reason: "fixture" }] }),
+      "utf8",
+    );
+    const res = await runRules([dbAccess], { root });
+    expect(res.violations).toEqual([]);
+    expect(res.suppressed).toBe(1);
+  });
+
+  it("applyExceptions matches rule+file and leaves others intact", () => {
+    const violations: Violation[] = [
+      { rule: "db-access", file: "apps/api/src/a.ts", message: "", fix: "" },
+      { rule: "phi-logs", file: "apps/api/src/b.ts", message: "", fix: "" },
+    ];
+    const { kept, suppressed } = applyExceptions(violations, [{ rule: "db-access", adr: "ADR-0009" }]);
+    expect(suppressed).toBe(1);
+    expect(kept.map((v) => v.rule)).toEqual(["phi-logs"]);
   });
 
   it("every registered rule has name+source and returns an array", async () => {

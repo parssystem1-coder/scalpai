@@ -176,3 +176,98 @@ describe("feature gate (plans §9.1)", () => {
     expect(resB.body.code).toBe("FEATURE_DISABLED");
   });
 });
+
+describe("plans admin CRUD (playbook 1.4 / §9.1)", () => {
+  it("starter clinic without 'admin' feature gets FEATURE_DISABLED on write", async () => {
+    const b = await login(B);
+    const res = await http
+      .post("/api/v1/plans")
+      .set("Authorization", `Bearer ${b.accessToken}`)
+      .send({ code: "x_test", name: { fa: "ایکس", en: "X" }, price: 1000000 });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("FEATURE_DISABLED");
+  });
+
+  it("growth owner manages plan lifecycle via API only (INSERT/upsert, no deploy)", async () => {
+    const a = await login(A);
+    const auth = { Authorization: `Bearer ${a.accessToken}` };
+    const code = `pro_${Date.now().toString().slice(-6)}`;
+
+    const created = await http
+      .post("/api/v1/plans")
+      .set(auth)
+      .send({ code, name: { fa: "حرفه‌ای", en: "Pro" }, price: 9900000, features: ["portal"], limits: { monthly_sessions: 10 } });
+    expect(created.status).toBe(201);
+    expect(created.body.code).toBe(code);
+    expect(created.body.features).toEqual(["portal"]);
+
+    const list = await http.get("/api/v1/plans").set(auth);
+    expect(list.status).toBe(200);
+    expect(list.body.map((p: { code: string }) => p.code)).toContain(code);
+
+    const updated = await http
+      .put(`/api/v1/plans/${code}`)
+      .set(auth)
+      .send({ code, name: { fa: "حرفه‌ای", en: "Pro" }, price: 10900000, features: ["portal", "api"], limits: {} });
+    expect(updated.status).toBe(200);
+    expect([...updated.body.features].sort()).toEqual(["api", "portal"]);
+
+    const del = await http.delete(`/api/v1/plans/${code}`).set(auth);
+    expect(del.status).toBe(200);
+    const gone = await http.get(`/api/v1/plans/${code}`).set(auth);
+    expect(gone.status).toBe(404);
+
+    // a plan that clinics still sit on cannot be deleted
+    const used = await http.delete("/api/v1/plans/growth").set(auth);
+    expect(used.status).toBe(409);
+
+    // every plan mutation landed in the audit chain
+    const clinicId = await clinicAId();
+    expect(await db.withTenant(clinicId, null, (tx) => verifyChain(tx))).toBe(true);
+  });
+});
+
+describe("quota enforcement (§9.1 QuotaGuard)", () => {
+  it("growth allows monthly_sessions=3; the 4th is QUOTA_EXCEEDED", async () => {
+    const a = await login(A);
+    const auth = { Authorization: `Bearer ${a.accessToken}` };
+    const svcList = await http.get("/api/v1/services").set(auth);
+    const serviceId = String(svcList.body[0].id);
+    const pat = await http
+      .post("/api/v1/patients")
+      .set(auth)
+      .send({ firstName: "Q", lastName: "Uota", phone: `0912${Date.now()}`.slice(0, 11) });
+    const patientId = String(pat.body.id);
+    const startAt = new Date(Date.now() + 3_600_000).toISOString();
+    const mk = () => http.post("/api/v1/sessions").set(auth).send({ patientId, serviceId, startAt });
+
+    expect((await mk()).status).toBe(201);
+    expect((await mk()).status).toBe(201);
+    expect((await mk()).status).toBe(201);
+    const fourth = await mk();
+    expect(fourth.status).toBe(403);
+    expect(fourth.body.code).toBe("QUOTA_EXCEEDED");
+  });
+
+  it("starter plan has its own monthly budget", async () => {
+    const b = await login(B);
+    const auth = { Authorization: `Bearer ${b.accessToken}` };
+    const svcList = await http.get("/api/v1/services").set(auth);
+    const serviceId = String(svcList.body[0].id);
+    const pat = await http
+      .post("/api/v1/patients")
+      .set(auth)
+      .send({ firstName: "B", lastName: "Quota", phone: `0935${Date.now()}`.slice(0, 11) });
+    const patientId = String(pat.body.id);
+    const startAt = new Date(Date.now() + 3_600_000).toISOString();
+
+    // starter limit is monthly_sessions=5 — burn them all
+    for (let i = 0; i < 5; i++) {
+      const r = await http.post("/api/v1/sessions").set(auth).send({ patientId, serviceId, startAt });
+      expect(r.status).toBe(201);
+    }
+    const sixth = await http.post("/api/v1/sessions").set(auth).send({ patientId, serviceId, startAt });
+    expect(sixth.status).toBe(403);
+    expect(sixth.body.code).toBe("QUOTA_EXCEEDED");
+  });
+});

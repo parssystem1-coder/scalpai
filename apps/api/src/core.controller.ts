@@ -14,6 +14,7 @@ import {
 import { Roles } from "./common/roles.guard.js";
 import { Public } from "./auth/jwt-access.guard.js";
 import { RequireFeature } from "./common/feature.guard.js";
+import { Quota } from "./common/quota.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
@@ -64,6 +65,7 @@ export class CoreController {
   /** Booking lives behind the portal feature (§9.1 demo of feature gate). */
   @Post("sessions")
   @RequireFeature("portal")
+  @Quota("monthly_sessions")
   createSession(
     @Body(new ZodBodyPipe(SessionCreate)) dto: { patientId: string; serviceId: string; startAt: string },
   ) {
