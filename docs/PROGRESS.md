@@ -28,7 +28,7 @@
 - [x] Project Graph v0 (modules/deps) + --check در CI
 - [x] CI کامل: Postgres واقعی سرویس ابری + migration-from-empty + integration + guardrails — auto-merge فعال (PR #2، #3)
 - [x] apps/web شل (login + patients) — Slice T1 (completion: docs/tasks/phase1-T1-web-login-completion.md) · Slice T2 (PR #5 auto-merged، completion: phase1-T2-web-patients-completion.md)
-- [ ] pnpm e2e @smoke — 🔄 Slice T3 در جریان (برنچ feat/phase1-t3-playwright)؛ شامل رفع W04/W05
+- [x] pnpm e2e @smoke — Slice T3 ✅ (PR #6 auto-merged · completion: docs/tasks/phase1-T3-playwright-smoke-completion.md · شامل رفع W04/W05 و حکم W13)
 - [ ] Slice H — db-hardening: advisory-lock زنجیره audit + trigger updated_at + پاک‌سازی mojibake سورس (W02/W03/W06/W07/W15/W21)
 - [ ] Slice T6 — تکمیل گپ‌های پلی‌بوک: QuotaGuard + admin-plan CRUD + OpenAPI حداقلی + exceptions.json (W08..W11)
 - [ ] coverage gate ≥70% — Slice T4 (سنجش و قفل در CI)

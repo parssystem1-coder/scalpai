@@ -10,12 +10,12 @@
   - محل: `docs/PROGRESS.md` · اقدام: بازنویسی تمیز UTF-8
 - [ ] **W02 — انکودینگ: seed داده‌های فارسی garbage** — نام کلینیک/سرویس/بیمار دمو به‌صورت خراب seed می‌شد (`packages/db/src/seed.ts`).
 - [ ] **W03 — انکودینگ: کامنت‌های خراب در سورس کامیت‌شده** — `packages/db/src/repos/core.repo.ts` · `packages/db/src/repos/users.repo.ts` · `apps/api/test/core.integration.spec.ts`
-- [ ] **W04 — انکودینگ: playwright.config.ts (کار T3)** — کامنت‌ها mojibake؛ همان ابزار نوشتن فایل مقصر بود.
+- [x] **W04 — انکودینگ: playwright.config.ts (کار T3)** — کامنت‌ها mojibake؛ همان ابزار نوشتن فایل مقصر بود. — ✅ رفع: PR #6 (`0cc2b90`) بازنویسی تمیز
 
 ## 🟠 بالا
 
-- [ ] **W05 — API بدون CORS** — `apps/api/src/main.ts` هیچ `enableCors` ای ندارد؛ وب روی :5173 نمی‌تواند به :3001 صدا بزند → سناریوی e2e مرورگری بلاک است (تست‌های jsdom این را لو نمی‌دادند).
-- [ ] **W06 — ریسک fork زنجیره audit تحت همزمانی** — `appendAudit` آخرین row را می‌خواند و hash می‌سازد؛ دو تراکنش همزمان = prev_hash تکراری → `verifyChain` بعدها fail می‌شود. اقدام: `pg_advisory_xact_lock` قبل از خواندن prev + تست همزمانی.
+- [x] **W05 — API بدون CORS** — `apps/api/src/main.ts` هیچ `enableCors` ای ندارد؛ وب روی :5173 نمی‌تواند به :3001 صدا بزند → سناریوی e2e مرورگری بلاک است (تست‌های jsdom این را لو نمی‌دادند). — ✅ رفع: PR #6 (`0cc2b90`) `enableCors({origin:true})`
+- [ ] **W06 — ریسک fork زنجیره audit تحت همزمانی** — `appendAudit` آخرین row را می‌خواند و hash می‌سازد؛ دو تراکنش همزمان = prev_hash تکراری → `verifyChain` بعدها fail می‌شود. اقدام: `pg_advisory_xact_lock` قبل از خواندن prev + تست همزمانی. — 🔄 Slice H
 - [ ] **W07 — `updated_at` هرگز bump نمی‌شود** — هیچ trigger ای نیست؛ سیاست LWW فاز ۳ (sync) به این ستون تکیه دارد → بمب ساعتی فاز ۳. اقدام: trigger روی patients/sessions در migration جدید.
 - [ ] **W08 — گپ پلی‌بوک 1.4: QuotaGuard موجود نیست** — چک `usage_counters` پیاده نشده.
 - [ ] **W09 — گپ پلی‌بوک 1.4: endpoint های admin-plan CRUD نیست** — «ایجاد plan فقط با INSERT» فعلاً فقط در سطح SQL ثابت شده، نه endpoint مدیریتی owner-only.
@@ -25,7 +25,7 @@
 
 - [ ] **W11 — `exceptions.json` وجود ندارد** — ADR-21 و گیت چک‌پوینت آن را مرجع می‌دهند و PROGRESS قبلاً «آماده» اعلامش کرده بود؛ عدم تطابق سند/واقعیت.
 - [ ] **W12 — CI با `--no-frozen-lockfile` نصب می‌کند** — `.github/workflows/ci.yml:48`؛ lockfile عملاً قفل نیست.
-- [ ] **W13 — e2e وارد CI نشده + ابهام Exit criteria #1** — تصمیم «@smoke فقط لوکال یا CI» مستند نشده؛ باید در completion فایل T3 حکم شود.
+- [x] **W13 — e2e وارد CI نشده + ابهام Exit criteria #1** — تصمیم «@smoke فقط لوکال یا CI» مستند نشده؛ باید در completion فایل T3 حکم شود. — ✅ حکم ثبت شد در `docs/tasks/phase1-T3-playwright-smoke-completion.md`: browser-e2e تا فاز ۲ فقط لوکال (ADR-0024)
 - [ ] **W14 — drift نسخه Postgres** — لوکال native PG17 (ADR-0024) ↔ CI/ops روی `pgvector:pg16`.
 - [ ] **W15 — نبود گارد ماشینی ضد خطای انکودینگ** — ریشه W01..W04 سیستمیک است؛ قانون conformance (presence کاراکترهای CP1252-artifact / U+FFFD) با fixture نقض + self-test اضافه شود تا تکرار نشود.
 
