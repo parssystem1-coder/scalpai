@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { statSync } from "node:fs";
 import type { Rule, RuleContext, Violation } from "../lib/types.js";
 import { listFiles, readRoot } from "../lib/walk.js";
 
@@ -201,3 +202,46 @@ export const featureGate: Rule = {
     return out;
   },
 };
+
+/**
+ * Encoding guard — root cause of W01..W04: files written through a tool that
+ * double-encoded UTF-8 into CP1252 leave tell-tale Latin-1 artifact pairs
+ * (Ã/Â/Ø/Ù/â followed by another non-ASCII char) or U+FFFD replacement chars.
+ * Legit Persian text lives above U+0500 and never matches.
+ */
+export const encodingGuard: Rule = {
+  name: "encoding-guard",
+  source: "§14.3/ADR-21",
+  check(ctx: RuleContext): Violation[] {
+    const out: Violation[] = [];
+    const exts = [".ts", ".tsx", ".sql", ".md", ".yml", ".yaml", ".json"];
+    const scopes = ["apps", "packages", "docs", "tools", "e2e"];
+    const rootFiles = ["vitest.config.ts", "playwright.config.ts"];
+    const files = [
+      ...scopes.flatMap((s) => listFiles(ctx.root, s, exts)),
+      ...rootFiles.filter((f) => existsRoot(ctx.root, f)),
+    ];
+    for (const f of files) {
+      const src = readRoot(ctx.root, f);
+      // one violation per file keeps reports readable
+      if (/[\u00C2\u00C3\u00D8\u00D9\u00E2]\P{ASCII}/u.test(src) || src.includes("\uFFFD")) {
+        out.push({
+          rule: this.name,
+          file: f,
+          message: "نشانه انکودینگ خراب (mojibake/U+FFFD) در فایل",
+          fix: "فایل را UTF-8 تمیز بازنویسی کنید و ابزار نوشتن فایل را اصلاح کنید",
+        });
+      }
+    }
+    return out;
+  },
+};
+
+function existsRoot(root: string, rel: string): boolean {
+  try {
+    statSync(join(root, rel));
+    return true;
+  } catch {
+    return false;
+  }
+}

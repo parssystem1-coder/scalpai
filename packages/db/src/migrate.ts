@@ -4,7 +4,7 @@ import { Pool, type PoolClient } from "pg";
 
 /**
  * Minimal forward-only migrator (ADR-0004 style ownership).
- * - Runs as MIGRATE_DATABASE_URL (owner/superuser â€” RLS bootstrap needs it)
+ * - Runs as MIGRATE_DATABASE_URL (owner/superuser — RLS bootstrap needs it)
  * - Tracks applied files in __migrations
  * - Bootstraps the NOSUPERUSER/NOBYPASSRLS app role + grants (append-only audit_log!)
  *   using APP_ROLE_PASSWORD from env (never committed).
@@ -82,7 +82,7 @@ export async function applyGrants(client: PoolClient): Promise<void> {
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scalpai_app;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO scalpai_app;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO scalpai_app;
-    -- Append-only audit trail: the app can never rewrite history (Â§13)
+    -- Append-only audit trail: the app can never rewrite history (§13)
     REVOKE UPDATE, DELETE ON audit_log FROM scalpai_app;
     REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON __migrations FROM scalpai_app;
   `);

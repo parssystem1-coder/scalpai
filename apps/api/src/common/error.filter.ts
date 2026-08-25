@@ -4,8 +4,8 @@ import { ZodError } from "zod";
 import { ApiError } from "@scalpai/shared";
 
 /**
- * Single exit shape: {code, message, details?} (engineering-rules Â§3).
- * Logs stay PHI-free â€” no request bodies here, ever.
+ * Single exit shape: {code, message, details?} (engineering-rules §3).
+ * Logs stay PHI-free — no request bodies here, ever.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -14,7 +14,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: { code: string; message: string; details?: unknown } = {
       code: "INTERNAL",
-      message: "Ø®Ø·Ø§ÛŒ Ø¯Ø§Ø®Ù„ÛŒ Ø³Ø±ÙˆØ±",
+      message: "خطای داخلی سرور",
     };
 
     if (exception instanceof ApiError) {
@@ -31,14 +31,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (exception instanceof ZodError) {
       status = 400;
-      body = { code: "VALIDATION_ERROR", message: "ÙˆØ±ÙˆØ¯ÛŒ Ù†Ø§Ù…Ø¹ØªØ¨Ø±", details: exception.issues };
+      body = { code: "VALIDATION_ERROR", message: "ورودی نامعتبر", details: exception.issues };
     } else if (isPgError(exception)) {
       if ((exception as { code: string }).code === "23505") {
         status = 409;
-        body = { code: "CONFLICT", message: "Ø±Ú©ÙˆØ±Ø¯ ØªÚ©Ø±Ø§Ø±ÛŒ Ø§Ø³Øª" };
+        body = { code: "CONFLICT", message: "رکورد تکراری است" };
       } else if ((exception as { code: string }).code === "23503") {
         status = 400;
-        body = { code: "FK_VIOLATION", message: "Ø§Ø±Ø¬Ø§Ø¹ Ù†Ø§Ù…Ø¹ØªØ¨Ø±" };
+        body = { code: "FK_VIOLATION", message: "ارجاع نامعتبر" };
       }
     }
      

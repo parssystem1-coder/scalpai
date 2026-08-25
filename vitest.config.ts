@@ -9,7 +9,7 @@ export default defineConfig({
     hookTimeout: 30_000,
   },
   plugins: [
-    // NestJS DI relies on decorator metadata â€” esbuild can't emit it, SWC can.
+    // NestJS DI relies on decorator metadata (emitDecoratorMetadata) — esbuild can't emit it, SWC can.
     swc.vite({ module: { type: "es6" } }),
   ],
 });

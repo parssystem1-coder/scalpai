@@ -26,14 +26,14 @@ export class JwtAccessGuard implements CanActivate {
     const header = req.headers.authorization ?? "";
     const [scheme, token] = header.split(" ");
     if (scheme !== "Bearer" || !token) {
-      throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "ØªÙˆÚ©Ù† Ø§Ø±Ø³Ø§Ù„ Ù†Ø´Ø¯Ù‡" });
+      throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "توکن ارسال نشده" });
     }
     try {
       const claims = this.auth.verifyAccess(token);
       TenantScope.enter({ clinicId: claims.clinicId, userId: claims.sub, role: claims.role });
       return true;
     } catch {
-      throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "ØªÙˆÚ©Ù† Ù†Ø§Ù…Ø¹ØªØ¨Ø± ÛŒØ§ Ù…Ù†Ù‚Ø¶ÛŒ" });
+      throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "توکن نامعتبر یا منقضی" });
     }
   }
 }

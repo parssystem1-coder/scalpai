@@ -21,7 +21,7 @@ export interface ResolvedEntitlement {
   limits: Record<string, unknown>;
 }
 
-/** Single source of truth for what a clinic may do (Ãƒâ€šÃ‚Â§9.1). Cached at service layer. */
+/** Single source of truth for what a clinic may do (§9.1). Cached at service layer. */
 export async function resolveEntitlement(tx: Tx, clinicId: string): Promise<ResolvedEntitlement | null> {
   const ent = (
     await tx
@@ -41,7 +41,7 @@ export async function resolveEntitlement(tx: Tx, clinicId: string): Promise<Reso
   };
 }
 
-/** SECURITY DEFINER wrappers â€” the ONLY pre-auth doors into RLS'd tables. */
+/** SECURITY DEFINER wrappers — the ONLY pre-auth doors into RLS'd tables. */
 export async function loginLookup(tx: Tx, email: string) {
   const res = await tx.execute(sql`SELECT id, clinic_id, role::text AS role, password_hash FROM fn_auth_login(${email})`);
   const r = ((res as unknown) as { rows?: Array<{ id: string; clinic_id: string; role: string; password_hash: string }> }).rows?.[0];
