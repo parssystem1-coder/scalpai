@@ -42,7 +42,7 @@
 > ترتیب: M1 (storage+ADR-0026+ایندکس‌ها) → M2 (quality-gate) → M3 (آپلود) → M4 (گالری) → M5 (موتور+نتیجه) → M6 (i18n/autolock/سخت‌سازی)
 - [x] Slice M1 — بستر Storage + ADR-0026 + ایندکس‌های W20 ✅ (completion: docs/tasks/phase2-M1-storage-completion.md · W20 بسته شد)
 - [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip) — M3
-- [ ] Image quality-gate لوکال (blur/light/framing) — M2
+- [x] Image quality-gate لوکال (blur/light/framing) — Slice M2 ✅ (completion: docs/tasks/phase2-M2-quality-gate-completion.md · fixture «تار رد شود» پاس)
 - [ ] packages/analysis-engine: heuristic baseline + صفحه نتیجه (<۳ ثانیه) — M5
 - [ ] i18next کامل RTL-first + Auto-lock — M6 (+W16/W17 سخت‌سازی منتقله)
 
