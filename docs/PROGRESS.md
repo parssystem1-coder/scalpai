@@ -28,6 +28,8 @@
 - [ ] pnpm e2e @smoke (نیازمند نصب Playwright browsers)
 - [ ] coverage gate ≥70% (سنجش و قفل در CI)
 
+> **کادنس جدید (§12 قوانین):** باقی‌مانده به‌صورت ۵ slice در `brief-phase1-completion.md` اجرا می‌شود — بعد از هر slice: STOP & REPORT. T5 شامل ADR-0025 انحراف Audit-as-Service است.
+
 ## فاز 2 — رسانه و تحلیل
 - [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip)
 - [ ] Image quality-gate لوکال (blur/light/framing)

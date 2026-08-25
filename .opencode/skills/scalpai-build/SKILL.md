@@ -8,23 +8,39 @@ description: Execute ScalpAI v2 rebuild phases from docs/DESIGN-V2.md and docs/p
 ## منابع حقیقت (به همین ترتیب بخوان)
 
 1. `docs/DESIGN-V2.md` — معماری، ERD، ADR ها (تناقض = سند برنده است؛ تغییرش فقط با ADR جدید)
-2. `docs/playbooks/phase-N-*.md` — پلی‌بوک اجرایی فاز موردنظر (تسک‌ها + DoD)
-3. `docs/engineering-rules.md` — قوانین غیرقابل‌نقض کدنویسی
-4. `docs/PROGRESS.md` — وضعیت پیشرفت؛ پس از هر فاز آپدیت کن
+2. `docs/playbooks/brief-phaseN*.md` — Brief اجرایی فاز (slices + stop-points + exit criteria) — **فرمان روز**
+3. `docs/playbooks/phase-N-*.md` — پلی‌بوک مرجع فاز (تسک‌ها + DoD)
+4. `docs/engineering-rules.md` — قوانین غیرقابل‌نقض کدنویسی
+5. `docs/PROGRESS.md` — وضعیت پیشرفت؛ پس از هر slice آپدیت کن
 
-## پروتکل اجرای یک فاز
+## پروتکل اجرای یک فاز — کادنس Slice-based
 
-1. پلی‌بوک فاز را کامل بخوان + بخش‌های ارجاع‌شده از DESIGN-V2.md
-2. پیش‌نیاز: DoD فاز قبلی باید پاس باشد (دستورات verify در پلی‌بوک قبلی)
-3. تسک‌ها به ترتیب اجرا شوند:
-   - هر تسک = شاخه `feat/phaseN-*` + commit کوچک conventional (`feat(api): ...`)
-   - قرارداد جدید (zod schema / API shape / DB column) فقط در `packages/shared` و `packages/db`
-   - هر تسک با تست خودش بسته شود؛ کد بدون تست merge نمی‌شود
-4. پایان فاز: کل DoD پلی‌بوک را اجرا کن — سبز شدن DoD توسط سازنده فقط «آماده گیت» است، نه «تمام»
-5. **گیت اجباری:** سازنده حق اعلام پایان ندارد — کاربر را به اجرای «گیت فاز N را بگیر» هدایت کن و منتظر حکم ممیز مستقل بمان (`scalpai-gate`)
-6. فاز فقط پس از **PASS در گزارش GATE_REVIEW** تمام است؛ پس از FAIL: فهرست blocking items را برگرد، رفع کن، و گیت دوباره از صفر گرفته شود
-7. گزارش به کاربر: ساخته‌شده‌ها · انحراف از سند (→ ADR پیشنهادی) · نتیجه گیت · گام بعدی
-8. `docs/PROGRESS.md` آپدیت شود (✓ تسک‌های انجام‌شده)
+### 0. قفل فاز
+ورود به فاز N+1 فقط با GATE_REVIEW PASS فاز N. هیچ کار «جلوتر» ممنوع حتی اگر وسوسه‌کننده بود.
+
+### 1. Brief قبل از هر چیز
+ابتدای فاز (یا ادامه فاز نیمه‌کاره) یک `docs/playbooks/brief-phaseN-<topic>.md` بساز/به‌روز کن، فرمت Nexora:
+- §0 scope قفل‌شده («ساخت چیز دیگر = انحراف») · §1..k slices عمودی به ترتیب · بعد از هر slice: **STOP & REPORT** · §آخر Exit criteria تست‌محور (همه با CI اثبات)
+- هر slice باید در یک session قابل اتمام باشد؛ بزرگ‌تر بود = قبل از شروع بشکند (Time-box rule)
+
+### 2. کادرس اجرا — برای هر slice دقیقاً این چرخه:
+```
+checklist pre-change (§12 قوانین) → شاخه feat/phaseN-* → پیاده‌سازی
+→ mini-DoD: کد + تست همان لایه + typecheck/lint/test/build/conformance/graph سبز
+→ push → یادداشت completion در docs/tasks/phaseN-taskK-completion.md
+→ گزارش کوتاه به کاربر → ⛔ STOP — تا ack کاربر، slice بعدی شروع نمی‌شود
+```
+- قرارداد جدید فقط در packages/shared و packages/db
+- کد بدون تست merge نمی‌شود
+
+### 3. Golden Path
+ساختار مرجع = slice بیماران (`apps/api/src/core.controller.ts` + repos + integration spec). هر فیچر جدید عین آن را mirror کند؛ عدم امکان → توقف و مستندسازی mismatch، نه ساختار دوم.
+
+### 4. پایان فاز: گیت اجباری
+کل DoD/Brief سبز توسط سازنده فقط «آماده گیت» است. کاربر را به «گیت فاز N را بگیر» هدایت کن (`scalpai-gate`). پس از FAIL: رفع blocking items و گیت مجدد از صفر.
+
+### 5. گزارش پایانی session
+ساخته‌شده‌ها · انحرافات (→ ADR) · نتیجه گیت · وضعیت PROGRESS.md · گام بعدی دقیق.
 
 ## قوانین سخت (خلاصه — متن کامل engineering-rules.md الزامی است)
 

@@ -72,3 +72,26 @@
 - استثنا از هر قانون فقط با ورود در exceptions.json + ارجاع ADR — استثنای بدون ADR = شکست build
 - migration-from-empty روی هر push الزامی است — هیچ migration ای از تست عبور نکرده معتبر نیست
 - هیچ فاز بدون GATE_REVIEW با حکم PASS از ممیز مستقل (scalpai-gate) تمام‌شده نیست؛ تیک نهایی PROGRESS فقط پس از آن مجاز است
+- **قفل فاز:** ورود به فاز N+1 تا PASS گیت فاز N ممنوع — هیچ کار «جلوتر» حتی جزئی شروع نمی‌شود
+
+## 12. کادنس Slice-based و لایه‌بندی تست
+
+- واحد کار = **slice عمودی کامل** (یک قابلیت از قرارداد تا تست)، نه بلاک لایه‌ای
+- چرخه اجباری هر slice: pre-change checklist → پیاده‌سازی → mini-DoD (کد+تست+typecheck/lint/test/build/conformance/graph) → push → completion note (`docs/tasks/`) → گزارش و STOP
+- Time-box: slice بزرگ‌تر از یک session، قبل از شروع باید بشکند
+- **Golden Path:** ساختار مرجع = slice بیماران (core.controller + repos + integration spec)؛ فیچر جدید آن را mirror می‌کند یا mismatch را مستند می‌کند
+- Pre-Change Checklist سبک (در توضیح هر slice): ماژول/aggregate صاحب · scope tenant · نقش/فیچر لازم · مرز تراکنش · idempotency (یا «N/A») · ADRهای تأثیرپذیر · لایه تست هر قانون
+
+### جدول لایه‌بندی تست
+
+| قانون زندگی می‌کند در | تست باید باشد در |
+|---|---|
+| invariant دامنه | unit دامنه |
+| orchestration use-case / تراکنش / idempotency | integration اپلیکیشن |
+| نقش / entitlement / سهمیه | policy test |
+| ایزوله‌سازی tenant / RLS | integration روی PostgreSQL واقعی |
+| قرارداد HTTP / کد خطا | contract test |
+| مرز معماری | conformance test در CI |
+
+Mock کردن PostgreSQL هرگز الزام ایزوله‌سازی tenant را پوشش نمی‌دهد.
+- هیچ فاز بدون GATE_REVIEW با حکم PASS از ممیز مستقل (scalpai-gate) تمام‌شده نیست؛ تیک نهایی PROGRESS فقط پس از آن مجاز است
