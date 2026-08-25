@@ -655,6 +655,7 @@ on: pull_request  +  push:main
 | **21** | **Conformance Harness — قوانین engineering-rules به‌صورت ماشینی با fixture/self-test؛ استثنا فقط با ADR در exceptions.json** | قوانین فقط به‌صورت مستندات prose | قانون کاغذی قابل اجرا نیست؛ کدزنی AI بدون گارد ماشینی منحرف می‌شود |
 | **22** | **Project Graph مکانیکی (parse از سورس · خروجی md+json · --check در CI)** | مستندسازی دستی ساختار پروژه | سند نثرمحور drift می‌کند؛ گراف همچنین context ارزان برای عامل کدزن است |
 | **23** | **سیاست Merge دو لاین: Fast (docs) / Gated (داده‌محور) — auto-merge بعد از CI سبز؛ گزارش CI فقط artifact** | PR اجباری برای همه، یا push آزاد برای همه | تیم تک‌نفره: تشریفات PR بی‌ارزش است مگر تست ابری قبل از land شدن اجرا شود |
+| **24** | **توسعه لوکال با PostgreSQL 17 native — Docker فقط CI/استقرار** | نصب Docker Desktop در فاز توسعه | محدودیت منابع سیستم؛ env یکسان (`DATABASE_URL`) هر دو مسیر را پوشش می‌دهد |
 
 ---
 

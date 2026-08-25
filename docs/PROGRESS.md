@@ -7,9 +7,10 @@
 - [x] Monorepo skeleton (pnpm-workspace + turborepo) — 5 app + 9 package + tooling، همه build/typecheck سبز
 - [x] tooling مشترک (eslint/tsconfig/tailwind preset) + husky/lint-staged/commitlint فعال
 - [x] CI پایه (GitHub Actions): typecheck+lint+test+build+conformance+graph-check — اولین run سبز روی ابر (PR #1)
-- [ ] Branch protection + auto-merge — ⚠️ مسدود به پلن: GitHub Pro لازم است (ریپو خصوصی/رایگان)؛ auto-merge setting هم اعمال نشد. موقتاً جریان PR+CI+merge دستی
+- [x] Branch protection (required check `base`، strict، admin-bypass برای Fast lane) + auto-merge — پس از عمومی‌شدن ریپو فعال شد
 - [x] Scaffold tools/conformance + tools/graph — با self-test (5/5) و خروجی‌های کامیت‌شده
 - [x] ADR-0001..0004 ثبت شده (docs/adr/)
+- [x] ADR-0024: توسعه لوکال با PostgreSQL 17 native؛ Docker فقط CI/استقرار
 
 ## فاز 1 — ستون فقرات
 - [ ] apps/api: Auth (JWT+Refresh) + RBAC Guards
