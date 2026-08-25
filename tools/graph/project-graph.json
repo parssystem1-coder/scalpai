@@ -1,7 +1,7 @@
 {
   "generatedFrom": {
-    "commit": "818bc53",
-    "dirty": true
+    "commit": "689e763",
+    "dirty": false
   },
   "modules": [
     {
@@ -26,7 +26,10 @@
       "name": "@scalpai/app-api",
       "kind": "app",
       "dir": "apps/api",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/db",
+        "@scalpai/shared"
+      ]
     },
     {
       "name": "@scalpai/app-desktop",
@@ -92,6 +95,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 0
+    "dependencyEdges": 2
   }
 }

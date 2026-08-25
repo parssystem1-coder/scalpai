@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `pnpm graph` from commit `818bc53` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `pnpm graph` from commit `689e763`. **Do not hand-edit** — every row is parsed from source.
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 
-**At a glance:** 5 apps · 9 packages · 0 internal dependency edges
+**At a glance:** 5 apps · 9 packages · 2 internal dependency edges
 
 ## Modules
 
@@ -13,7 +13,7 @@ Descriptive only: answers *what exists*. Correctness is the conformance harness'
 | `@scalpai/analysis-core` | package | `packages/analysis-core` | — |
 | `@scalpai/analysis-engine` | package | `packages/analysis-engine` | — |
 | `@scalpai/app-admin` | app | `apps/admin` | — |
-| `@scalpai/app-api` | app | `apps/api` | — |
+| `@scalpai/app-api` | app | `apps/api` | `@scalpai/db`, `@scalpai/shared` |
 | `@scalpai/app-desktop` | app | `apps/desktop` | — |
 | `@scalpai/app-portal` | app | `apps/portal` | — |
 | `@scalpai/app-web` | app | `apps/web` | — |
