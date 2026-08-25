@@ -15,8 +15,8 @@
 - [x] ADR-0024: توسعه لوکال با PostgreSQL 17 native؛ Docker فقط CI/استقرار
 
 ## فاز 1 — ستون فقرات
-> ⏳ Gate: هنوز گرفته نشده — باقی‌مانده طبق `brief-phase1-completion.md`
-> ترتیب مصوب مالک (2026-08-25): T3 → H → T6 → T4 → T5 → گیت نهایی
+> 🔒 Gate: PASS — 2026-08-25 — docs/gates/GATE_REVIEW_phase-1-2026-08-25.md
+> ترتیب اجرا شده: T3 → H → T6 → T4 → T5 → گیت نهایی ✅
 
 - [x] apps/api: Auth (JWT 15m + refresh چرخشی با کشف استفاده مجدد + Argon2id) + RolesGuard
 - [x] Tenancy (SET LOCAL app.clinic_id + NOBYPASSRLS role) + RLS FORCE روی ۱۱ جدول + تست منفی cross-tenant (404)
