@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage.js";
 import PatientsPage from "./pages/PatientsPage.js";
 import PatientGalleryPage from "./pages/PatientGalleryPage.js";
+import AnalysisPage from "./pages/AnalysisPage.js";
 import { isMockPerf } from "./dev-perf.js";
 import "./i18n.js";
 
@@ -40,6 +41,16 @@ function App() {
         element={
           authed || isMockPerf() ? (
             <PatientGalleryPage onLoggedOut={() => setAuthedBoth(false)} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/patients/:pid/gallery/:gid"
+        element={
+          authed ? (
+            <AnalysisPage onLoggedOut={() => setAuthedBoth(false)} />
           ) : (
             <Navigate to="/login" replace />
           )

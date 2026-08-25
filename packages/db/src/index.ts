@@ -25,6 +25,12 @@ export {
   softDeleteGalleryItem,
 } from "./repos/gallery.repo.js";
 export {
+  createAnalysis,
+  getAnalysisById,
+  listAnalysesByPatient,
+  saveExpertReview,
+} from "./repos/analyses.repo.js";
+export {
   findUserByEmail,
   touchLogin,
   resolveEntitlement,

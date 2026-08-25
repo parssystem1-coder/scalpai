@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@scalpai/analysis-engine": "workspace:*",
     "@scalpai/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-virtual": "^3.14.10",

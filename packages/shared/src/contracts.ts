@@ -68,6 +68,30 @@ export const GalleryPageQuery = z.object({
   cursor: z.string().max(200).optional(),
 });
 
+/** Structured analysis output (§10) — heuristic baseline today, ONNX in phase 6. */
+export const AnalysisScores = z.object({
+  redness: z.number().min(0).max(100),
+  flakeTexture: z.number().min(0).max(100),
+  densityProxy: z.number().min(0).max(100),
+});
+
+export const AnalysisSubmit = z.object({
+  patientId: z.string().uuid(),
+  galleryItemId: z.string().uuid(),
+  result: z.object({
+    scores: AnalysisScores,
+    severity: z.number().min(0).max(100),
+    modelVersion: z.string().min(3).max(60),
+  }),
+});
+
+/** Gold-label capture (§10.2) — the expert is the source of truth. */
+export const ExpertReview = z.object({
+  verdict: z.enum(["confirm", "adjust"]),
+  adjustedScores: AnalysisScores.optional(),
+  note: z.string().max(500).optional(),
+});
+
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export type TokenPair = z.infer<typeof TokenPair>;
@@ -79,3 +103,8 @@ export type PlanUpsertDto = PlanUpsert;
 export type GalleryInit = z.infer<typeof GalleryInit>;
 export type GalleryInitDto = GalleryInit;
 export type GalleryPageQuery = z.infer<typeof GalleryPageQuery>;
+export type AnalysisScores = z.infer<typeof AnalysisScores>;
+export type AnalysisSubmit = z.infer<typeof AnalysisSubmit>;
+export type AnalysisSubmitDto = AnalysisSubmit;
+export type ExpertReview = z.infer<typeof ExpertReview>;
+export type ExpertReviewDto = ExpertReview;
