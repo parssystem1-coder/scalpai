@@ -32,7 +32,10 @@
 - [x] Slice H — db-hardening: advisory-lock زنجیره audit + trigger updated_at + پاک‌سازی mojibake سورس (W02/W03/W06/W07/W15/W21 بسته شدند) — completion: docs/tasks/phase1-H-db-hardening-completion.md
 - [x] Slice T6 — تکمیل گپ‌های پلی‌بوک: QuotaGuard + admin-plan CRUD + OpenAPI حداقلی + exceptions.json (W08..W11 بسته شدند) — completion: docs/tasks/phase1-T6-playbook-gaps-completion.md
 - [x] coverage gate ≥70% — Slice T4 ✅ (lines=81.06% قفل در CI؛ alias سورس در vitest) — completion: docs/tasks/phase1-T4-coverage-completion.md
-- [ ] Slice T5 — ADR-0025 انحراف Audit-as-Service + ثبت ردیف §17
+- [x] Slice T5 — ADR-0025 انحراف Audit-as-Service + ثبت ردیف §17 ✅ (docs/adr/ADR-0025-audit-in-tx-service.md)
+
+> **✅ همه slice های brief + الحاقات اجرا شدند (T1..T6, H) — فاز ۱ «آماده گیت» است.**
+> گام بعدی الزامی طبق engineering-rules §11: گیت مستقل پایان فاز («گیت فاز را بگیر» با scalpai-gate) — self-declare ممنوع.
 
 ## فاز 2 — رسانه و تحلیل
 - [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip)

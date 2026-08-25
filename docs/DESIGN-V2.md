@@ -657,6 +657,7 @@ on: pull_request  +  push:main
 | **22** | **Project Graph مکانیکی (parse از سورس · خروجی md+json · --check در CI)** | مستندسازی دستی ساختار پروژه | سند نثرمحور drift می‌کند؛ گراف همچنین context ارزان برای عامل کدزن است |
 | **23** | **سیاست Merge دو لاین: Fast (docs) / Gated (داده‌محور) — auto-merge بعد از CI سبز؛ گزارش CI فقط artifact** | PR اجباری برای همه، یا push آزاد برای همه | تیم تک‌نفره: تشریفات PR بی‌ارزش است مگر تست ابری قبل از land شدن اجرا شود |
 | **24** | **توسعه لوکال با PostgreSQL 17 native — Docker فقط CI/استقرار** | نصب Docker Desktop در فاز توسعه | محدودیت منابع سیستم؛ env یکسان (`DATABASE_URL`) هر دو مسیر را پوشش می‌دهد |
+| **25** | **Audit = AuditService داخل تراکنش + REVOKE سطح SQL (نه Interceptor)** | AuditLogInterceptor خارج از tx | اتمیک بودن mutation+audit؛ ضدبازنویسی حتی با نقص کد — ADR-0025 |
 
 ---
 
