@@ -67,7 +67,8 @@
 
 ## 11. CI و گیت Merge
 - هیچ خروجی تولیدی CI به main کامیت نمی‌شود — گزارش‌ها فقط artifact
-- مسیر Gated (packages/db · apps/api · sync-client · licensing · notify · shared/MCP Registry) فقط با CI کامل سبز land می‌شود (branch + auto-merge)؛ docs/* مستثناست
+- مسیر Gated (packages/db · apps/api · **apps/web · apps/portal** · sync-client · licensing · notify · shared/MCP Registry) فقط با CI کامل سبز land می‌شود (branch + auto-merge)؛ docs/* مستثناست
+- استثناهای مجاز push مستقیم به main: (۱) دستور صریح مالک (hotfix) — دلیل در completion file ثبت شود (۲) دو fail متوالی CI صرفاً زیرساختی برای تغییر بلاک‌کننده — با ثبت در گزارش. غیر از این دو، هیچ
 - هر قانون این فایل باید تا جای ممکن معادل ماشینی در tools/conformance داشته باشد (قانون + fixture نقض + self-test)؛ قانون بدون چکر = بدهی مستندشده
 - استثنا از هر قانون فقط با ورود در exceptions.json + ارجاع ADR — استثنای بدون ADR = شکست build
 - migration-from-empty روی هر push الزامی است — هیچ migration ای از تست عبور نکرده معتبر نیست

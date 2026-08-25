@@ -579,9 +579,10 @@ on: pull_request  +  push:main
 | لاین | محدوده | فرآیند |
 |---|---|---|
 | **Fast** | docs/* · PROGRESS · تغییرات صرفاً متنی | push مستقیم به main |
-| **Gated** | packages/db · apps/api · sync-client · licensing · notify · shared (MCP Registry) | branch ← CI کامل سبز ← **auto-merge خودکار** (بدون کلیک انسانی) |
+| **Gated** | packages/db · apps/api · **apps/web · apps/portal** · sync-client · licensing · notify · shared (MCP Registry) | branch ← CI کامل سبز ← **auto-merge خودکار** (بدون کلیک انسانی) |
 
 - Branch protection روی main با required checks (integration/conformance/graph/bundle-budget)
+- **دو استثنای رسمی و لاگ‌شونده:** (۱) Hotfix با دستور صریح مالک — دلیل در completion file ثبت شود (۲) دو اجرای متوالی CI fail صرفاً به‌دلیل زیرساخت، برای تغییر بلاک‌کننده — با ثبت در گزارش
 - منطق: reviewer انسانی دوم وجود ندارد ← تست ابری سنگین باید **دروازه قبل از land** باشد نه زنگ خطر بعد از آن
 - gate-review پایان هر فاز (DoD پلی‌بوک‌ها) = بازبینی انسانی دوره‌ای
 
