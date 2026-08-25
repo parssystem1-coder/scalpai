@@ -47,9 +47,21 @@ export const SessionCreate = z.object({
   startAt: z.string().datetime(),
 });
 
+/** §9.1 — plan = DB record; new plan ships with INSERT/upsert only, no deploy. */
+export const PlanUpsert = z.object({
+  code: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/),
+  name: z.record(z.string().min(1), z.string().min(1)),
+  price: z.coerce.number().int().min(0),
+  interval: z.enum(["month", "year"]).default("month"),
+  features: z.array(z.string().min(1)).default([]),
+  limits: z.record(z.string(), z.number()).default({}),
+});
+
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export type TokenPair = z.infer<typeof TokenPair>;
 export type PatientCreate = z.infer<typeof PatientCreate>;
 export type PatientCreateDto = PatientCreate;
 export type SessionCreate = z.infer<typeof SessionCreate>;
+export type PlanUpsert = z.infer<typeof PlanUpsert>;
+export type PlanUpsertDto = PlanUpsert;
