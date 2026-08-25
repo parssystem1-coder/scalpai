@@ -27,12 +27,15 @@ description: Safe Drizzle database migration workflow for ScalpAI v2 following e
 5. **Sync check:** اگر entity آفلاین sync می‌شود → آیا `schemaVersion` قرارداد sync تحت تأثیر است؟ سیاست تعارض per-entity (§8) هنوز معتبر است؟
 6. **Rollback:** بالای فایل migration در کامنت، SQL برگشت دقیق بنویس (برای expand: همان drop ستون/جدول؛ برای migrate: مسیر بازگشت داده)
 7. **آزمایش لوکال اجباری (PowerShell) — قبل از هر push:**
+   - مسیر اول (ADR-0024): PostgreSQL 17 native نصب‌شده — `DATABASE_URL` از `.env` خوانده شود (`localhost:5432`)
    ```powershell
-   docker compose -f ops/dev.yml down -v; docker compose -f ops/dev.yml up -d --wait
-   pnpm db:migrate          # از DB خالی — باید سبز شود
-   pnpm test                # شامل تست‌های RLS/cross-tenant
-   pnpm graph               # بخش Tables گراف عوض شده — همزمان کامیت شود
+   $env:DATABASE_URL = (Get-Content .env | Select-String '^DATABASE_URL').Line.Split('=')[1]
+   psql "$env:DATABASE_URL" -c "DROP DATABASE IF EXISTS scalpai_verify;" -c "CREATE DATABASE scalpai_verify;"
+   pnpm db:migrate            # از DB خالی — باید سبز شود (به scalpai_verify)
+   pnpm test
+   psql "$env:DATABASE_URL" -c "DROP DATABASE IF EXISTS scalpai_verify;"
    ```
+   - docker compose فقط در CI و پس از مهاجرت آینده استفاده می‌شود
 8. **کامیت:** لاین Gated (§14.5) — `feat(db): ...` شامل schema + migration + graph json + تست؛ CI ابری migration-from-empty را دوباره اثبات می‌کند
 9. **قرارداد contract:** اگر مرحله ۱ سه‌مرحله‌ای بود، تسک contract (drop ستون قدیمی) را به‌عنوان آیتم PROGRESS فازِ بعد ثبت کن — فراموشی contract = بدهی انباشته
 
