@@ -1,78 +1,84 @@
-# ScalpAI v2 Ã¢â‚¬â€ Progress Tracker
+# ScalpAI v2 — Progress Tracker
 
-> Ã˜ÂªÃ™Ë†Ã˜Â³Ã˜Â· skill Ã‚Â«scalpai-buildÃ‚Â» Ã™â€ ÃšÂ¯Ã™â€¡Ã˜Â¯Ã˜Â§Ã˜Â±Ã›Å’ Ã™â€¦Ã›Å’Ã¢â‚¬Å’Ã˜Â´Ã™Ë†Ã˜Â¯. Ã¢Å“â€œ = DoD Ã™Â¾Ã˜Â§Ã˜Â³ Ã˜Â´Ã˜Â¯Ã™â€¡
+> توسط skill «scalpai-build» نگهداری می‌شود. ✓ = DoD پاس شده
+> ضعف‌های شناسایی‌شده در تحلیل 2026-08-25: `docs/WEAKNESSES.md` (W01..W22) — رفع هر کدام آنجا تیک می‌خورد.
 
-## Ã™ÂÃ˜Â§Ã˜Â² 0 Ã¢â‚¬â€ Ã˜Â¢Ã™â€¦Ã˜Â§Ã˜Â¯Ã™â€¡Ã¢â‚¬Å’Ã˜Â³Ã˜Â§Ã˜Â²Ã›Å’
-> Ã°Å¸â€â€™ Gate: PASS Ã¢â‚¬â€ 2026-08-25 Ã¢â‚¬â€ docs/gates/GATE_REVIEW_phase-0-2026-08-25.md
-- [x] git init + .gitignore Ã™â€¦Ã™â€ Ã˜Â§Ã˜Â³Ã˜Â¨ + Ã˜Â§Ã˜ÂªÃ˜ÂµÃ˜Â§Ã™â€ž Ã˜Â¨Ã™â€¡ origin (`parssystem1-coder/scalpai`) Ã¢â‚¬â€ Ã™â€ ÃšÂ©Ã˜ÂªÃ™â€¡: ÃšÂ©Ã˜Â¯ legacy/v1 Ã˜Â¯Ã˜Â± Ã˜Â§Ã›Å’Ã™â€  Ã™Â¾Ã™Ë†Ã˜Â´Ã™â€¡ Ã™Ë†Ã˜Â¬Ã™Ë†Ã˜Â¯ Ã™â€ Ã˜Â¯Ã˜Â§Ã˜Â´Ã˜ÂªÃ˜â€º Ã˜Â¢Ã˜Â±Ã˜Â´Ã›Å’Ã™Ë† Ã˜Â¨Ã˜Â±Ã™â€ Ãšâ€  N/A
-- [x] Monorepo skeleton (pnpm-workspace + turborepo) Ã¢â‚¬â€ 5 app + 9 package + toolingÃ˜Å’ Ã™â€¡Ã™â€¦Ã™â€¡ build/typecheck Ã˜Â³Ã˜Â¨Ã˜Â²
-- [x] tooling Ã™â€¦Ã˜Â´Ã˜ÂªÃ˜Â±ÃšÂ© (eslint/tsconfig/tailwind preset) + husky/lint-staged/commitlint Ã™ÂÃ˜Â¹Ã˜Â§Ã™â€ž
-- [x] CI Ã™Â¾Ã˜Â§Ã›Å’Ã™â€¡ (GitHub Actions): typecheck+lint+test+build+conformance+graph-check Ã¢â‚¬â€ Ã˜Â§Ã™Ë†Ã™â€žÃ›Å’Ã™â€  run Ã˜Â³Ã˜Â¨Ã˜Â² Ã˜Â±Ã™Ë†Ã›Å’ Ã˜Â§Ã˜Â¨Ã˜Â± (PR #1)
-- [x] Branch protection (required check `base`Ã˜Å’ strictÃ˜Å’ admin-bypass Ã˜Â¨Ã˜Â±Ã˜Â§Ã›Å’ Fast lane) + auto-merge Ã¢â‚¬â€ Ã™Â¾Ã˜Â³ Ã˜Â§Ã˜Â² Ã˜Â¹Ã™â€¦Ã™Ë†Ã™â€¦Ã›Å’Ã¢â‚¬Å’Ã˜Â´Ã˜Â¯Ã™â€  Ã˜Â±Ã›Å’Ã™Â¾Ã™Ë† Ã™ÂÃ˜Â¹Ã˜Â§Ã™â€ž Ã˜Â´Ã˜Â¯
-- [x] Scaffold tools/conformance + tools/graph Ã¢â‚¬â€ Ã˜Â¨Ã˜Â§ self-test (5/5) Ã™Ë† Ã˜Â®Ã˜Â±Ã™Ë†Ã˜Â¬Ã›Å’Ã¢â‚¬Å’Ã™â€¡Ã˜Â§Ã›Å’ ÃšÂ©Ã˜Â§Ã™â€¦Ã›Å’Ã˜ÂªÃ¢â‚¬Å’Ã˜Â´Ã˜Â¯Ã™â€¡
-- [x] ADR-0001..0004 Ã˜Â«Ã˜Â¨Ã˜Âª Ã˜Â´Ã˜Â¯Ã™â€¡ (docs/adr/)
-- [x] ADR-0024: Ã˜ÂªÃ™Ë†Ã˜Â³Ã˜Â¹Ã™â€¡ Ã™â€žÃ™Ë†ÃšÂ©Ã˜Â§Ã™â€ž Ã˜Â¨Ã˜Â§ PostgreSQL 17 nativeÃ˜â€º Docker Ã™ÂÃ™â€šÃ˜Â· CI/Ã˜Â§Ã˜Â³Ã˜ÂªÃ™â€šÃ˜Â±Ã˜Â§Ã˜Â±
+## فاز 0 — آماده‌سازی
+> 🔒 Gate: PASS — 2026-08-25 — docs/gates/GATE_REVIEW_phase-0-2026-08-25.md
+- [x] git init + .gitignore مناسب + اتصال به origin (`parssystem1-coder/scalpai`) — نکته: کد legacy/v1 در این پوشه وجود نداشت؛ آرشیو برنچ N/A
+- [x] Monorepo skeleton (pnpm-workspace + turborepo) — 5 app + 9 package + tooling، همه build/typecheck سبز
+- [x] tooling مشترک (eslint/tsconfig/tailwind preset) + husky/lint-staged/commitlint فعال
+- [x] CI پایه (GitHub Actions): typecheck+lint+test+build+conformance+graph-check — اولین run سبز روی ابر (PR #1)
+- [x] Branch protection (required check `base`، strict، admin-bypass برای Fast lane) + auto-merge — پس از عمومی‌شدن ریپو فعال شد
+- [x] Scaffold tools/conformance + tools/graph — با self-test و خروجی‌های کامیت‌شده
+- [x] ADR-0001..0004 ثبت شده (docs/adr/)
+- [x] ADR-0024: توسعه لوکال با PostgreSQL 17 native؛ Docker فقط CI/استقرار
 
-## Ã™ÂÃ˜Â§Ã˜Â² 1 Ã¢â‚¬â€ Ã˜Â³Ã˜ÂªÃ™Ë†Ã™â€  Ã™ÂÃ™â€šÃ˜Â±Ã˜Â§Ã˜Âª
-> Ã¢ÂÂ³ Gate: Ã™â€¡Ã™â€ Ã™Ë†Ã˜Â² ÃšÂ¯Ã˜Â±Ã™ÂÃ˜ÂªÃ™â€¡ Ã™â€ Ã˜Â´Ã˜Â¯Ã™â€¡ Ã¢â‚¬â€ Ã˜Â¯Ã™Ë† Ã˜Â¢Ã›Å’Ã˜ÂªÃ™â€¦ Ã˜Â¨Ã˜Â§Ã™â€šÃ›Å’ Ã˜Â§Ã˜Â³Ã˜Âª (web shellÃ˜Å’ e2e smoke)
-- [x] apps/api: Auth (JWT 15m + refresh Ãšâ€ Ã˜Â±Ã˜Â®Ã˜Â´Ã›Å’ Ã˜Â¨Ã˜Â§ ÃšÂ©Ã˜Â´Ã™Â Ã˜Â§Ã˜Â³Ã˜ÂªÃ™ÂÃ˜Â§Ã˜Â¯Ã™â€¡ Ã™â€¦Ã˜Â¬Ã˜Â¯Ã˜Â¯ + Argon2id) + RolesGuard
-- [x] Tenancy (SET LOCAL app.clinic_id + NOBYPASSRLS role) + RLS FORCE Ã˜Â±Ã™Ë†Ã›Å’ Ã›Â±Ã›Â± Ã˜Â¬Ã˜Â¯Ã™Ë†Ã™â€ž + Ã˜ÂªÃ˜Â³Ã˜Âª Ã™â€¦Ã™â€ Ã™ÂÃ›Å’ cross-tenant (404)
-- [x] AuditLog append-only hash-chain (REVOKE UPDATE/DELETE Ã˜Â¯Ã˜Â± Ã˜Â³Ã˜Â·Ã˜Â­ SQL) + Ã˜ÂªÃ˜Â³Ã˜Âª verifyChain
-- [x] Plans/Entitlement Ã™â€¡Ã˜Â³Ã˜ÂªÃ™â€¡ (Ã‚Â§9.1): plans/features/entitlements + @RequireFeature + ÃšÂ©Ã˜Â´ 60s
-- [x] CRUD Ã˜Â¨Ã›Å’Ã™â€¦Ã˜Â§Ã˜Â±/Ã˜Â¬Ã™â€žÃ˜Â³Ã™â€¡ + pagination + soft-delete + Ã™â€šÃ˜Â±Ã˜Â§Ã˜Â±Ã˜Â¯Ã˜Â§Ã˜Â¯ zod Ã˜Â¯Ã˜Â± packages/shared
-- [x] fn_auth_login/fn_user_claims (SECURITY DEFINER) Ã˜Â¨Ã˜Â±Ã˜Â§Ã›Å’ Ã™â€¦Ã˜Â³Ã›Å’Ã˜Â±Ã™â€¡Ã˜Â§Ã›Å’ Ã™Â¾Ã›Å’Ã˜Â´ Ã˜Â§Ã˜Â² Ã˜Â§Ã˜Â­Ã˜Â±Ã˜Â§Ã˜Â² Ã™â€¡Ã™Ë†Ã›Å’Ã˜Âª
-- [x] Conformance Harness v1 (Ã›Â¶ Ã™â€šÃ˜Â§Ã™â€ Ã™Ë†Ã™â€  + self-test) + exceptions Ã˜Â¢Ã™â€¦Ã˜Â§Ã˜Â¯Ã™â€¡
-- [x] Project Graph v0 (modules/deps) + --check Ã˜Â¯Ã˜Â± CI
-- [x] CI ÃšÂ©Ã˜Â§Ã™â€¦Ã™â€ž: Postgres Ã™Ë†Ã˜Â§Ã™â€šÃ˜Â¹Ã›Å’ Ã˜Â³Ã˜Â±Ã™Ë†Ã›Å’Ã˜Â³ Ã˜Â§Ã˜Â¨Ã˜Â±Ã›Å’ + migration-from-empty + integration + guardrails Ã¢â‚¬â€ auto-merge Ã™ÂÃ˜Â¹Ã˜Â§Ã™â€ž (PR #2Ã˜Å’ #3)
-- [ ] apps/web Ã˜Â´Ã™â€ž (login + patients) Ã¢â‚¬â€ Ã™ÂÃ˜Â§Ã˜Â² Ã˜Â¨Ã˜Â¹Ã˜Â¯Ã›Å’ Ã™â€¡Ã™â€¦Ã›Å’Ã™â€  Ã™ÂÃ˜Â§Ã˜Â²
-- [ ] pnpm e2e @smoke (Ã™â€ Ã›Å’Ã˜Â§Ã˜Â²Ã™â€¦Ã™â€ Ã˜Â¯ Ã™â€ Ã˜ÂµÃ˜Â¨ Playwright browsers)
-- [ ] coverage gate Ã¢â€°Â¥70% (Ã˜Â³Ã™â€ Ã˜Â¬Ã˜Â´ Ã™Ë† Ã™â€šÃ™ÂÃ™â€ž Ã˜Â¯Ã˜Â± CI)
+## فاز 1 — ستون فقرات
+> ⏳ Gate: هنوز گرفته نشده — باقی‌مانده طبق `brief-phase1-completion.md`
+> ترتیب مصوب مالک (2026-08-25): T3 → H → T6 → T4 → T5 → گیت نهایی
 
-> **ÃšÂ©Ã˜Â§Ã˜Â¯Ã™â€ Ã˜Â³ Ã˜Â¬Ã˜Â¯Ã›Å’Ã˜Â¯ (Ã‚Â§12 Ã™â€šÃ™Ë†Ã˜Â§Ã™â€ Ã›Å’Ã™â€ ):** Ã˜Â¨Ã˜Â§Ã™â€šÃ›Å’Ã¢â‚¬Å’Ã™â€¦Ã˜Â§Ã™â€ Ã˜Â¯Ã™â€¡ Ã˜Â¨Ã™â€¡Ã¢â‚¬Å’Ã˜ÂµÃ™Ë†Ã˜Â±Ã˜Âª Ã›Âµ slice Ã˜Â¯Ã˜Â± `brief-phase1-completion.md` Ã˜Â§Ã˜Â¬Ã˜Â±Ã˜Â§ Ã™â€¦Ã›Å’Ã¢â‚¬Å’Ã˜Â´Ã™Ë†Ã˜Â¯ Ã¢â‚¬â€ Ã˜Â¨Ã˜Â¹Ã˜Â¯ Ã˜Â§Ã˜Â² Ã™â€¡Ã˜Â± slice: STOP & REPORT. T5 Ã˜Â´Ã˜Â§Ã™â€¦Ã™â€ž ADR-0025 Ã˜Â§Ã™â€ Ã˜Â­Ã˜Â±Ã˜Â§Ã™Â Audit-as-Service Ã˜Â§Ã˜Â³Ã˜Âª.
+- [x] apps/api: Auth (JWT 15m + refresh چرخشی با کشف استفاده مجدد + Argon2id) + RolesGuard
+- [x] Tenancy (SET LOCAL app.clinic_id + NOBYPASSRLS role) + RLS FORCE روی ۱۱ جدول + تست منفی cross-tenant (404)
+- [x] AuditLog append-only hash-chain (REVOKE UPDATE/DELETE در سطح SQL) + تست verifyChain
+- [x] Plans/Entitlement هسته (§9.1): plans/features/entitlements + @RequireFeature + کش 60s
+- [x] CRUD بیمار/جلسه + pagination + soft-delete + قرارداد zod در packages/shared
+- [x] fn_auth_login/fn_user_claims (SECURITY DEFINER) برای مسیرهای پیش از احراز هویت
+- [x] Conformance Harness v1 (۶ قانون + self-test) — یادداشت: `exceptions.json` هنوز ساخته نشده (W11 → T6)
+- [x] Project Graph v0 (modules/deps) + --check در CI
+- [x] CI کامل: Postgres واقعی سرویس ابری + migration-from-empty + integration + guardrails — auto-merge فعال (PR #2، #3)
+- [x] apps/web شل (login + patients) — Slice T1 (completion: docs/tasks/phase1-T1-web-login-completion.md) · Slice T2 (PR #5 auto-merged، completion: phase1-T2-web-patients-completion.md)
+- [ ] pnpm e2e @smoke — 🔄 Slice T3 در جریان (برنچ feat/phase1-t3-playwright)؛ شامل رفع W04/W05
+- [ ] Slice H — db-hardening: advisory-lock زنجیره audit + trigger updated_at + پاک‌سازی mojibake سورس (W02/W03/W06/W07/W15/W21)
+- [ ] Slice T6 — تکمیل گپ‌های پلی‌بوک: QuotaGuard + admin-plan CRUD + OpenAPI حداقلی + exceptions.json (W08..W11)
+- [ ] coverage gate ≥70% — Slice T4 (سنجش و قفل در CI)
+- [ ] Slice T5 — ADR-0025 انحراف Audit-as-Service + ثبت ردیف §17
 
-## Ã™ÂÃ˜Â§Ã˜Â² 2 Ã¢â‚¬â€ Ã˜Â±Ã˜Â³Ã˜Â§Ã™â€ Ã™â€¡ Ã™Ë† Ã˜ÂªÃ˜Â­Ã™â€žÃ›Å’Ã™â€ž
+## فاز 2 — رسانه و تحلیل
 - [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip)
-- [ ] Image quality-gate Ã™â€žÃ™Ë†ÃšÂ©Ã˜Â§Ã™â€ž (blur/light/framing)
-- [ ] packages/analysis-engine: ONNX loader + heuristic baseline + Ã˜ÂµÃ™ÂÃ˜Â­Ã™â€¡ Ã™â€ Ã˜ÂªÃ›Å’Ã˜Â¬Ã™â€¡
-- [ ] Ã˜Â¨Ã™Ë†Ã˜Â¯Ã˜Â¬Ã™â€¡ Ã˜ÂªÃ˜Â£Ã˜Â®Ã›Å’Ã˜Â± Ã˜ÂªÃ˜Â­Ã™â€žÃ›Å’Ã™â€ž < Ã›Â³ Ã˜Â«Ã˜Â§Ã™â€ Ã›Å’Ã™â€¡ Ã˜Â±Ã™Ë†Ã›Å’ Ã˜Â¯Ã˜Â³Ã˜ÂªÃšÂ¯Ã˜Â§Ã™â€¡ Ã™â€¦Ã˜Â±Ã˜Â¬Ã˜Â¹ mid-range
+- [ ] Image quality-gate لوکال (blur/light/framing)
+- [ ] packages/analysis-engine: ONNX loader + heuristic baseline + صفحه نتیجه
+- [ ] بودجه تأخیر تحلیل < ۳ ثانیه روی دستگاه مرجع mid-range
 - [ ] i18next RTL-first + Auto-lock
+- [ ] از فاز قبل منتقل: rate-limit/helmet (W16/W17) + مرور ایندکس‌ها (W20)
 
-## Ã™ÂÃ˜Â§Ã˜Â² 3 Ã¢â‚¬â€ Ã˜Â¢Ã™ÂÃ™â€žÃ˜Â§Ã›Å’Ã™â€  Ã™Ë† Ã™â€žÃ˜Â§Ã›Å’Ã˜Â³Ã™â€ Ã˜Â³
-- [ ] packages/sync-client (Outbox+Cursor+Ã˜Â³Ã›Å’Ã˜Â§Ã˜Â³Ã˜Âª Ã˜ÂªÃ˜Â¹Ã˜Â§Ã˜Â±Ã˜Â¶ per-entity+schemaVersion) + Sync API idempotent
-- [ ] Ã˜Â¢Ã™Â¾Ã™â€žÃ™Ë†Ã˜Â¯ resume + pending_upload badge
-- [ ] Licensing: Ã˜ÂµÃ˜Â¯Ã™Ë†Ã˜Â±/verify Ed25519 + Grace + Ã˜Â¶Ã˜Â¯tamper Ã˜Â³Ã˜Â§Ã˜Â¹Ã˜Âª
-- [ ] ops/: docker-compose self-hosted + Caddy + backup Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€žÃ›Å’
-- [ ] audit anchor worker Ã™â€¡Ã™ÂÃ˜ÂªÃšÂ¯Ã›Å’
-- [ ] Consent Ã˜Â¯Ã›Å’Ã˜Â¬Ã›Å’Ã˜ÂªÃ˜Â§Ã™â€ž (Ã™ÂÃ˜Â±Ã™â€¦+Ã˜Â§Ã™â€¦Ã˜Â¶Ã˜Â§+Ã˜Â°Ã˜Â®Ã›Å’Ã˜Â±Ã™â€¡ Ã™Â¾Ã˜Â±Ã™Ë†Ã™â€ Ã˜Â¯Ã™â€¡)
-- [ ] PWA manifest (Ã™Ë†Ã˜Â¨ ÃšÂ©Ã™â€žÃ›Å’Ã™â€ Ã›Å’ÃšÂ©)
+## فاز 3 — آفلاین و لایسنس
+- [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent
+- [ ] آپلود resume + pending_upload badge
+- [ ] Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت
+- [ ] ops/: docker-compose self-hosted + Caddy + بکاپ داخلی
+- [ ] audit anchor worker هفتگی
+- [ ] Consent دیجیتال (فرم+امضا+ذخیره پرونده)
+- [ ] PWA manifest (وب کلینیک)
 
-## Ã™ÂÃ˜Â§Ã˜Â² 4 Ã¢â‚¬â€ Ã˜ÂªÃ˜Â¬Ã˜Â±Ã˜Â¨Ã™â€¡
-- [ ] Education E1: Rive Ãƒâ€”Ã›Â¸ storyboard + mapper Ã˜Â¯Ã˜Â§Ã˜Â¯Ã™â€¡Ã¢â‚¬Å’Ã™â€¦Ã˜Â­Ã™Ë†Ã˜Â±
-- [ ] ÃšÂ¯Ã˜Â²Ã˜Â§Ã˜Â±Ã˜Â´ PDF Ã˜Â¨Ã˜Â§Ã™â€žÃ›Å’Ã™â€ Ã›Å’
-- [ ] Ã˜Â¯Ã˜Â§Ã˜Â´Ã˜Â¨Ã™Ë†Ã˜Â±Ã˜Â¯ Scalp Map + guided capture Ã™Â¾Ã˜Â±Ã˜Â§Ã™â€¦Ã™Â¾Ã˜Âª
-- [ ] Ã™Â¾Ã™Ë†Ã˜Â³Ã˜ÂªÃ™â€¡ Electron Ã™â€ Ã˜Â§Ã˜Â²ÃšÂ©
+## فاز 4 — تجربه
+- [ ] Education E1: Rive ×۸ storyboard + mapper داده‌محور
+- [ ] گزارش PDF بالینی
+- [ ] داشبورد Scalp Map + guided capture پرامپت
+- [ ] پوسته Electron نازک
+- [ ] Router وب + i18n کامل PatientsPage (W18/W19)
 
-## Ã™ÂÃ˜Â§Ã˜Â² 5 Ã¢â‚¬â€ Ã˜Â±Ã˜Â´Ã˜Â¯ Ã˜ÂªÃ˜Â¬Ã˜Â§Ã˜Â±Ã›Å’ (Aftercare-first)
-- [ ] Aftercare Engine (Ã˜ÂªÃ™Ë†Ã˜Â§Ã™â€žÃ›Å’ JSON) + Messaging Gateway adapter (SMS/Bale/Eitaa Ã¢â€ Â Telegram Ã¢â€ Â WhatsApp) + Ã™â€¦Ã˜Â§Ã˜ÂªÃ˜Â±Ã›Å’Ã˜Â³ ÃšÂ©Ã˜Â§Ã™â€ Ã˜Â§Ã™â€žÃ¢â‚¬Å’Ã™â€¡Ã˜Â§Ã›Å’ Ã˜Â§Ã›Å’Ã˜Â±Ã˜Â§Ã™â€ 
-- [ ] Ã›Å’Ã˜Â§Ã˜Â¯Ã˜Â¢Ã™Ë†Ã˜Â± no-show + inbound inbox
-- [ ] Ã™ÂÃ˜Â§ÃšÂ©Ã˜ÂªÃ™Ë†Ã˜Â±/POS Ã™Â¾Ã˜Â§Ã›Å’Ã™â€¡ (invoice_items Ã˜Â±Ã˜Â§Ã˜Â¨Ã˜Â·Ã™â€¡Ã¢â‚¬Å’Ã˜Â§Ã›Å’) + Ã˜Â¯Ã˜Â±ÃšÂ¯Ã˜Â§Ã™â€¡ Ã˜Â§Ã›Å’Ã˜Â±Ã˜Â§Ã™â€ Ã›Å’ adapter
-- [ ] Metering ÃšÂ©Ã˜Â§Ã™â€¦Ã™â€ž usage_counters
-- [ ] Patient Portal PWA: OTP auth + Ã˜Â±Ã˜Â²Ã˜Â±Ã™Ë† Ã˜Â¢Ã™â€ Ã™â€žÃ˜Â§Ã›Å’Ã™â€  + Ã™ÂÃ˜Â±Ã™â€¦ Ã™Â¾Ã›Å’Ã˜Â´Ã¢â‚¬Å’Ã˜Â§Ã˜Â²Ã™â€¦Ã˜Â±Ã˜Â§Ã˜Â¬Ã˜Â¹Ã™â€¡ (Ã™Â¾Ã˜Â³ Ã˜Â§Ã˜Â² Ã˜Â¨Ã˜Â§Ã˜Â²Ã˜Â®Ã™Ë†Ã˜Â±Ã˜Â¯ Ã™Ë†Ã˜Â§Ã™â€šÃ˜Â¹Ã›Å’ Aftercare)
-- [ ] Before/After Ã™â€ Ã™â€¦Ã˜Â§Ã›Å’ Ã˜Â¨Ã›Å’Ã™â€¦Ã˜Â§Ã˜Â±
+## فاز 5 — رشد تجاری (Aftercare-first)
+- [ ] Aftercare Engine (توالی JSON) + Messaging Gateway adapter (SMS/Bale/Eitaa ← Telegram ← WhatsApp) + ماتریس کانال‌های ایران
+- [ ] یادآور no-show + inbound inbox
+- [ ] فاکتور/POS پایه (invoice_items رابطه‌ای) + درگاه ایرانی adapter
+- [ ] Metering کامل usage_counters
+- [ ] Patient Portal PWA: OTP auth + رزرو آنلاین + فرم پیش‌ازمراجعه (بعد از بازخورد واقعی Aftercare)
+- [ ] Before/After نمای بیمار
 
-## Ã™ÂÃ˜Â§Ã˜Â² 6 Ã¢â‚¬â€ Ã™â€¡Ã™Ë†Ã˜Â´
-- [ ] Data Lake Ã˜Â¨Ã›Å’Ã¢â‚¬Å’Ã™â€ Ã˜Â§Ã™â€¦Ã¢â‚¬Å’Ã˜Â³Ã˜Â§Ã˜Â²Ã›Å’ + expert-review UI + Ã˜ÂµÃ™Â Active Learning
-- [ ] Grad-CAM overlay Ã˜Â¯Ã˜Â± Ã™â€ Ã˜ÂªÃ˜Â§Ã›Å’Ã˜Â¬
-- [ ] Ã™â€¦Ã˜Â¯Ã™â€ž Ã›Â±: Ã™ÂÃ™Ë†Ã™â€žÃ›Å’ÃšÂ©Ã™Ë†Ã™â€žÃ¢â‚¬Å’Ã˜Â´Ã™â€¦Ã˜Â§Ã˜Â± (YOLO) + Eval Gate pipeline + Ã˜ÂªÃ™Ë†Ã˜Â²Ã›Å’Ã˜Â¹ Ã˜Â¨Ã˜Â§Ã™â€ Ã˜Â¯Ã™â€ž Ã˜Â§Ã™â€¦Ã˜Â¶Ã˜Â§Ã˜Â´Ã˜Â¯Ã™â€¡
-- [ ] Scalp Explorer 3D (E2) + Evolution Tracker Ã˜Â¶Ã˜Â§Ã›Å’Ã˜Â¹Ã™â€¡
-- [ ] Ã˜Â¬Ã˜Â³Ã˜ÂªÃ˜Â¬Ã™Ë†Ã›Å’ Ã˜ÂªÃ˜ÂµÃ™Ë†Ã›Å’Ã˜Â±Ã›Å’ Ã˜Â§Ã˜Â·Ã™â€žÃ˜Â³ (pgvector embeddings)
-- [ ] Spike: Ã˜Â·Ã˜Â±Ã˜Â§Ã˜Â­Ã›Å’ Tool Registry MCP (zodÃ¢â€ â€™schema)
+## فاز 6 — هوش
+- [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
+- [ ] Grad-CAM overlay در نتایج
+- [ ] مدل ۱: فولیکول‌شمار (YOLO) + Eval Gate pipeline + توزیع باندل امضاشده
+- [ ] Scalp Explorer 3D (E2) + Evolution Tracker ضایعه
+- [ ] جستجوی تصویری اطلس (pgvector embeddings)
+- [ ] Spike: طراحی Tool Registry MCP (zod→schema)
 
-## Ã™ÂÃ˜Â§Ã˜Â² 7 Ã¢â‚¬â€ Ã˜Â¨Ã™â€žÃ™Ë†Ã˜Âº
+## فاز 7 — بلوغ
 - [ ] Segmentation + Norwood classifier
-- [ ] AI Scribe Ã™â€žÃ™Ë†ÃšÂ©Ã˜Â§Ã™â€ž native-first (WER-gate Ã™ÂÃ˜Â§Ã˜Â±Ã˜Â³Ã›Å’) + Copilot RAG (Ã˜Â¨Ã™â€¡Ã¢â‚¬Å’Ã˜Â¹Ã™â€ Ã™Ë†Ã˜Â§Ã™â€  MCP Client)
-- [ ] Ã˜Â±Ã˜Â¨Ã˜Â§Ã˜Âª Ã™Â¾Ã˜Â°Ã›Å’Ã˜Â±Ã˜Â´ Ã™Â¾Ã›Å’Ã˜Â§Ã™â€¦Ã¢â‚¬Å’Ã˜Â±Ã˜Â³Ã˜Â§Ã™â€  (Ã™Â¾Ã™Ë†Ã˜Â³Ã˜ÂªÃ™â€¡ Ã™â€ Ã˜Â§Ã˜Â²ÃšÂ© MCP) + Ã˜ÂªÃ˜Â´Ã˜Â®Ã›Å’Ã˜Âµ Ã™â€ ÃšÂ¯Ã˜Â±Ã˜Â§Ã™â€ Ã›Å’ Ã™Â¾Ã˜Â§Ã˜Â³Ã˜Â®
-- [ ] Ã˜Â¹Ã˜Â¶Ã™Ë†Ã›Å’Ã˜Âª/Ã˜Â§Ã™â€ Ã˜Â¨Ã˜Â§Ã˜Â± ÃšÂ©Ã˜Â§Ã™â€¦Ã™â€ž + Ãšâ€ Ã™â€ Ã˜Â¯Ã˜Â´Ã˜Â¹Ã˜Â¨Ã™â€¡ UI + Open API/webhooks
-- [ ] Ã˜Â³Ã˜Â±Ã™Ë†Ã˜Â± MCP: Tool Registry (zodÃ¢â€ â€™schema) + Ã˜Â¯Ã™Ë† Ã™â€¡Ã™Ë†Ã›Å’Ã˜Âª + audit + tools Ã™ÂÃ™â€šÃ˜Â·-Ã˜Â®Ã™Ë†Ã˜Â§Ã™â€ Ã˜Â¯Ã™â€ Ã›Å’ v1 (Ã™Â¾Ã›Å’Ã˜Â´Ã¢â‚¬Å’Ã™ÂÃ˜Â±Ã˜Â¶ Ã™ÂÃ˜Â¹Ã˜Â§Ã™â€ž)
-- [ ] Education E3: Ã˜Â¯Ã™Ë†Ã˜Â±Ã˜Â¨Ã›Å’Ã™â€  Ã˜Â±Ã™Ë†Ã›Å’ Ã˜Â¶Ã˜Â§Ã›Å’Ã˜Â¹Ã™â€¡ + Ã˜Â±Ã™Ë†Ã˜Â§Ã›Å’Ã˜Âª Ã˜ÂµÃ™Ë†Ã˜ÂªÃ›Å’ + snapshot Ã˜Â¯Ã˜Â± PDF
-- [ ] Ã˜Â­Ã˜Â°Ã™Â Ã˜ÂªÃ˜Â¯Ã˜Â±Ã›Å’Ã˜Â¬Ã›Å’ AI Ã˜Â§Ã˜Â¨Ã˜Â±Ã›Å’ Ã˜Â§Ã˜Â² Ã˜ÂªÃ˜Â­Ã™â€žÃ›Å’Ã™â€ž Ã¢â‚¬â€ provider Ã™â€¦Ã™â€ Ã˜ÂªÃ˜Â®Ã˜Â¨ Ã™ÂÃ™â€šÃ˜Â· Ã˜ÂªÃ™Ë†Ã™â€žÃ›Å’Ã˜Â¯ Ã™â€¦Ã˜ÂªÃ™â€  Ã˜Â§Ã˜Â®Ã˜ÂªÃ›Å’Ã˜Â§Ã˜Â±Ã›Å’ (ADR-18)
+- [ ] AI Scribe لوکال native-first (WER-gate فارسی) + Copilot RAG (به‌عنوان MCP Client)
+- [ ] ربات پذیرش پیام‌رسان (پوسته نازک MCP) + تشخیص نگرانی پاسخ
+- [ ] عضویت/انبار کامل + چندشعبه UI + Open API/webhooks
+- [ ] سرور MCP: Tool Registry (zod→schema) + دو هویت + audit + tools فقط-خواندنی v1 (پیش‌فرض فعال)
+- [ ] Education E3: دوربین روی ضایعه + روایت صوتی + snapshot در PDF
+- [ ] حذف تدریجی AI ابری از تحلیل — provider منتخب فقط تولید متن اختیاری (ADR-18)
