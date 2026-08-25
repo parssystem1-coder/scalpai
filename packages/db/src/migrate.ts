@@ -4,7 +4,7 @@ import { Pool, type PoolClient } from "pg";
 
 /**
  * Minimal forward-only migrator (ADR-0004 style ownership).
- * - Runs as MIGRATE_DATABASE_URL (owner/superuser — RLS bootstrap needs it)
+ * - Runs as MIGRATE_DATABASE_URL (owner/superuser â€” RLS bootstrap needs it)
  * - Tracks applied files in __migrations
  * - Bootstraps the NOSUPERUSER/NOBYPASSRLS app role + grants (append-only audit_log!)
  *   using APP_ROLE_PASSWORD from env (never committed).
@@ -82,8 +82,32 @@ export async function applyGrants(client: PoolClient): Promise<void> {
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO scalpai_app;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO scalpai_app;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO scalpai_app;
-    -- Append-only audit trail: the app can never rewrite history (§13)
+    -- Append-only audit trail: the app can never rewrite history (Â§13)
     REVOKE UPDATE, DELETE ON audit_log FROM scalpai_app;
     REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON __migrations FROM scalpai_app;
   `);
+}
+
+/** Dev/CI helper: wipe all business data for a deterministic re-seed. */
+export async function resetAll(migrateUrl: string): Promise<void> {
+  const { Pool } = await import("pg");
+  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
+  try {
+    await pool.query(`TRUNCATE audit_log, consents, analyses, gallery_items, sessions,
+      patients, services, usage_counters, entitlements, plan_features, plans,
+      refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`);
+  } finally {
+    await pool.end();
+  }
+}
+/** Id of the marker clinic created by seed() (used by integration tests). */
+export async function seedMarkerClinicId(migrateUrl: string): Promise<string> {
+  const { Pool } = await import("pg");
+  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
+  try {
+    const r = await pool.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
+    return String(r.rows[0].id);
+  } finally {
+    await pool.end();
+  }
 }

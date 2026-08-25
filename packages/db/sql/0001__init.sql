@@ -194,26 +194,45 @@ CREATE TABLE IF NOT EXISTS usage_counters (
 );
 
 -- ============================ RLS (ADR-0003) ============================
--- Every business table: ENABLE + FORCE + clinic isolation policy.
+-- Explicit per-table statements (greppable by conformance harness).
 -- The app role is NOSUPERUSER NOBYPASSRLS (bootstrap in migrate.ts), and
 -- transactions must SET LOCAL app.clinic_id before their first query.
 
-DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'branches','users','patients','services','sessions','gallery_items',
-    'analyses','consents','entitlements','usage_counters','audit_log'
-  ] LOOP
-    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
-    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
-    IF t = 'audit_log' THEN
-      EXECUTE format('CREATE POLICY %I ON %I FOR ALL TO scalpai_app USING (clinic_id = current_setting(''app.clinic_id'', true)::uuid) WITH CHECK (clinic_id = current_setting(''app.clinic_id'', true)::uuid)', t || '_clinic_isolation', t);
-    ELSE
-      EXECUTE format('CREATE POLICY %I ON %I FOR ALL TO scalpai_app USING (clinic_id = current_setting(''app.clinic_id'', true)::uuid) WITH CHECK (clinic_id = current_setting(''app.clinic_id'', true)::uuid)', t || '_clinic_isolation', t);
-    END IF;
-  END LOOP;
-END $$;
+ALTER TABLE branches      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patients      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gallery_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analyses      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consents      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entitlements  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usage_counters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log     ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE branches      FORCE ROW LEVEL SECURITY;
+ALTER TABLE users         FORCE ROW LEVEL SECURITY;
+ALTER TABLE patients      FORCE ROW LEVEL SECURITY;
+ALTER TABLE services      FORCE ROW LEVEL SECURITY;
+ALTER TABLE sessions      FORCE ROW LEVEL SECURITY;
+ALTER TABLE gallery_items FORCE ROW LEVEL SECURITY;
+ALTER TABLE analyses      FORCE ROW LEVEL SECURITY;
+ALTER TABLE consents      FORCE ROW LEVEL SECURITY;
+ALTER TABLE entitlements  FORCE ROW LEVEL SECURITY;
+ALTER TABLE usage_counters FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_log     FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY branches_clinic_isolation       ON branches      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY users_clinic_isolation          ON users         FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY patients_clinic_isolation       ON patients      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY services_clinic_isolation       ON services      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY sessions_clinic_isolation       ON sessions      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY gallery_clinic_isolation        ON gallery_items FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY analyses_clinic_isolation       ON analyses      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY consents_clinic_isolation       ON consents      FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY entitlements_clinic_isolation   ON entitlements  FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY usage_clinic_isolation          ON usage_counters FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
+CREATE POLICY audit_log_clinic_isolation      ON audit_log     FOR ALL TO scalpai_app USING (clinic_id = current_setting('app.clinic_id', true)::uuid) WITH CHECK (clinic_id = current_setting('app.clinic_id', true)::uuid);
 
 CREATE INDEX IF NOT EXISTS patients_clinic_idx ON patients (clinic_id);
 CREATE INDEX IF NOT EXISTS sessions_clinic_idx ON sessions (clinic_id);

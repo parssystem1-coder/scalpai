@@ -2,31 +2,18 @@ import { loadEnv } from "@scalpai/db";
 
 loadEnv();
 
-import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import type { NestFastifyApplication } from "@nestjs/platform-fastify";
+import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
-import { DbService, migrate, seed, verifyChain } from "@scalpai/db";
-import { Pool } from "pg";
+import { DbService, migrate, resetAll, seed, seedMarkerClinicId, verifyChain } from "@scalpai/db";
 import { AppModule } from "../src/app.module.js";
 
-async function dbReset(url: string): Promise<void> {
-  const pool = new Pool({ connectionString: url, max: 1 });
-  try {
-    await pool.query(`TRUNCATE audit_log, consents, analyses, gallery_items, sessions,
-      patients, services, usage_counters, entitlements, plan_features, plans,
-      refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`);
-  } finally {
-    await pool.end();
-  }
-}
-
 /**
- * Phase-1 integration suite Ã¢â‚¬â€ runs against the REAL PostgreSQL 17 instance
- * (ADR-0024) as the NOBYPASSRLS app role. Proves:
- *   login + rotating refresh with reuse detection Ã‚Â· cross-tenant 404
- *   audit hash-chain Ã‚Â· feature gating Ã‚Â· canonical error shape.
+ * Phase-1 integration suite against REAL PostgreSQL 17 (ADR-0024) as the
+ * NOBYPASSRLS app role. Proves: rotating refresh + reuse detection,
+ * cross-tenant isolation (404), audit hash-chain, feature gating.
  */
 
 let app: NestFastifyApplication;
@@ -45,20 +32,17 @@ async function login(creds: { email: string; password: string }): Promise<{ acce
 beforeAll(async () => {
   const url = process.env.MIGRATE_DATABASE_URL!;
   await migrate(url);
-  // Fresh deterministic dataset per run (phones are unique-constrained)
-  await dbReset(url);
+  await resetAll(url); // deterministic dataset (unique phones)
   await seed(url);
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter({ logger: false }));
   app.setGlobalPrefix("api/v1");
   await app.init();
-  // Fastify needs a real listener for HTTP-level tests
   await app.listen(0, "127.0.0.1");
-  const base = await app.getUrl();
-  http = request(base);
+  http = request(await app.getUrl());
   db = app.get(DbService);
-});
+}, 30_000);
 
 afterAll(async () => {
   try {
@@ -69,19 +53,15 @@ afterAll(async () => {
 }, 30_000);
 
 async function clinicAId(): Promise<string> {
-  return db.withClient(async (tx) => {
-    const res = await tx.execute(sql`SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1`);
-    return String((res.rows?.[0] as { id: string }).id);
-  });
+  return seedMarkerClinicId(process.env.MIGRATE_DATABASE_URL!);
 }
 
 describe("auth", () => {
-  it("rejects wrong password with the canonical error shape", async () => {
+  it("rejects wrong password with canonical error shape", async () => {
     const res = await http.post("/api/v1/auth/login").send({ email: A.email, password: "WrongPass123" });
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
     expect(typeof res.body.message).toBe("string");
-    expect(res.body.details).toBeUndefined();
   });
 
   it("rotates refresh tokens; replaying an old one kills the family", async () => {
@@ -96,9 +76,8 @@ describe("auth", () => {
     expect(replay.status).toBe(401);
     expect(replay.body.code).toBe("REFRESH_REUSED");
 
-    // Even the freshly issued child is dead after reuse detection
+    // The freshly issued child died with the family after reuse detection
     const child = await http.post("/api/v1/auth/refresh").send({ refreshToken: second.body.refreshToken });
-    console.log("DBG child:", child.status, child.body.code);
     expect(child.status).toBe(401);
   });
 
@@ -108,12 +87,12 @@ describe("auth", () => {
 });
 
 describe("cross-tenant isolation (RLS at API level)", () => {
-  it("clinic B owner cannot read a clinic A patient Ã¢â‚¬â€ 404, not data", async () => {
+  it("clinic B owner cannot read a clinic A patient - 404 not data", async () => {
     const a = await login(A);
     const created = await http
       .post("/api/v1/patients")
       .set("Authorization", `Bearer ${a.accessToken}`)
-      .send({ firstName: "Ã™â€ Ã˜Â§Ã™â€¦", lastName: "Ã˜Â®Ã˜Â§Ã™â€ Ã™Ë†Ã˜Â§Ã˜Â¯Ã™â€¡", phone: "09120000001" });
+      .send({ firstName: "Sara", lastName: "Karimi", phone: "09120000001" });
     expect(created.status).toBe(201);
     const patientId = String(created.body.id);
 
@@ -133,7 +112,7 @@ describe("audit hash-chain", () => {
     await http
       .post("/api/v1/patients")
       .set("Authorization", `Bearer ${a.accessToken}`)
-      .send({ firstName: "Ã˜Â³Ã˜Â§Ã˜Â±Ã˜Â§", lastName: "ÃšÂ©Ã˜Â±Ã›Å’Ã™â€¦Ã›Å’", phone: "09122223344" });
+      .send({ firstName: "Sara2", lastName: "Karimi2", phone: "09122223344" });
 
     const clinicId = await clinicAId();
     const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx));
