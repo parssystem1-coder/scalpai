@@ -17,6 +17,12 @@ export {
 } from "./repos/core.repo.js";
 export * from "./repos/refresh.repo.js";
 export {
+  createPendingGalleryItem,
+  getGalleryItem,
+  completeGalleryItem,
+  deletePendingGalleryItem,
+} from "./repos/gallery.repo.js";
+export {
   findUserByEmail,
   touchLogin,
   resolveEntitlement,

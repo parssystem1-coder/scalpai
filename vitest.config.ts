@@ -19,6 +19,8 @@ export default defineConfig({
     // Integration tests hit the real local PostgreSQL (ADR-0024)
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // Multiple suites share one dev database with resetAll() — files must not race.
+    fileParallelism: false,
     // Slice T4 — engineering-rules §6: coverage gate on logic packages.
     coverage: {
       provider: "v8",

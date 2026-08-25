@@ -47,10 +47,12 @@ jobs:
           chmod +x /usr/local/bin/minio
           MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin-dev-only \
             nohup /usr/local/bin/minio server /tmp/minio-data --address 127.0.0.1:9000 > /tmp/minio.log 2>&1 &
-          for i in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:9000/minio/health/live && break
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then ok=1; break; fi
             sleep 1
           done
+          if [ "$ok" != "1" ]; then echo "::error::MinIO failed to start"; cat /tmp/minio.log; exit 1; fi
 
       - uses: pnpm/action-setup@v4
         with:

@@ -30,4 +30,11 @@ export class TenantScope {
     if (!ctx) throw new Error("tenant scope missing — guard not applied?");
     return this.db.withTenant(ctx.clinicId, ctx.userId, (tx) => fn(tx, ctx));
   }
+
+  /** Context outside a tx (e.g. presigning) — guards against unauthenticated paths. */
+  requireCtx(): TenantCtx {
+    const ctx = als.getStore();
+    if (!ctx) throw new Error("tenant scope missing — guard not applied?");
+    return ctx;
+  }
 }

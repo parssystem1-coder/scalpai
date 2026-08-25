@@ -43,6 +43,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
      
     console.error(`[api] ${status} ${(exception as Error)?.message?.slice(0, 160) ?? "unknown"}`);
+    const cause = (exception as { cause?: unknown })?.cause;
+    if (cause) console.error(`[api] cause: ${String((cause as Error)?.message ?? cause).slice(0, 220)}`);
     void res.status(status).send(body);
   }
 }

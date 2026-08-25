@@ -89,6 +89,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.1.0
+      '@scalpai/analysis-core':
+        specifier: workspace:*
+        version: link:../../packages/analysis-core
       '@scalpai/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -110,6 +113,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@26.3.0)
       zod:
         specifier: ^4.1.13
         version: 4.4.3
