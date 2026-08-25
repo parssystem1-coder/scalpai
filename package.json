@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
@@ -11,6 +11,8 @@
     "test": "vitest run",
     "conformance": "tsx tools/conformance/run.ts",
     "graph": "tsx tools/graph/extract.ts",
+    "db:migrate": "tsx packages/db/src/migrate-cli.ts",
+    "db:seed": "tsx packages/db/src/seed.ts",
     "prepare": "husky"
   },
   "devDependencies": {
