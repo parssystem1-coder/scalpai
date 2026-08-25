@@ -3,6 +3,7 @@
 > توسط skill «scalpai-build» نگهداری می‌شود. ✓ = DoD پاس شده
 
 ## فاز 0 — آماده‌سازی
+> 🔒 Gate: PASS — 2026-08-25 — docs/gates/GATE_REVIEW_phase-0-2026-08-25.md
 - [x] git init + .gitignore مناسب + اتصال به origin (`parssystem1-coder/scalpai`) — نکته: کد legacy/v1 در این پوشه وجود نداشت؛ آرشیو برنچ N/A
 - [x] Monorepo skeleton (pnpm-workspace + turborepo) — 5 app + 9 package + tooling، همه build/typecheck سبز
 - [x] tooling مشترک (eslint/tsconfig/tailwind preset) + husky/lint-staged/commitlint فعال

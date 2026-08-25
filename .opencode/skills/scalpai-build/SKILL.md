@@ -20,9 +20,11 @@ description: Execute ScalpAI v2 rebuild phases from docs/DESIGN-V2.md and docs/p
    - هر تسک = شاخه `feat/phaseN-*` + commit کوچک conventional (`feat(api): ...`)
    - قرارداد جدید (zod schema / API shape / DB column) فقط در `packages/shared` و `packages/db`
    - هر تسک با تست خودش بسته شود؛ کد بدون تست merge نمی‌شود
-4. پایان فاز: کل DoD پلی‌بوک را اجرا کن — **فقط پاس کامل = تمام‌شده**
-5. گزارش به کاربر: ساخته‌شده‌ها · انحراف از سند (→ ADR پیشنهادی) · گام بعدی
-6. `docs/PROGRESS.md` آپدیت شود (✓ تسک‌های انجام‌شده)
+4. پایان فاز: کل DoD پلی‌بوک را اجرا کن — سبز شدن DoD توسط سازنده فقط «آماده گیت» است، نه «تمام»
+5. **گیت اجباری:** سازنده حق اعلام پایان ندارد — کاربر را به اجرای «گیت فاز N را بگیر» هدایت کن و منتظر حکم ممیز مستقل بمان (`scalpai-gate`)
+6. فاز فقط پس از **PASS در گزارش GATE_REVIEW** تمام است؛ پس از FAIL: فهرست blocking items را برگرد، رفع کن، و گیت دوباره از صفر گرفته شود
+7. گزارش به کاربر: ساخته‌شده‌ها · انحراف از سند (→ ADR پیشنهادی) · نتیجه گیت · گام بعدی
+8. `docs/PROGRESS.md` آپدیت شود (✓ تسک‌های انجام‌شده)
 
 ## قوانین سخت (خلاصه — متن کامل engineering-rules.md الزامی است)
 
@@ -31,6 +33,7 @@ description: Execute ScalpAI v2 rebuild phases from docs/DESIGN-V2.md and docs/p
 - Migration همیشه backward-compatible (expand→migrate→contract)
 - Gate محصول: هیچ فیچر Tier-B (سند §18) قبل از پایان فاز ۵ شروع نمی‌شود
 - Entitlement: endpoint محدودشده بدون `@RequireFeature` یا چک سهمیه ممنوع
+- **گیت پایان فاز اجباری:** هیچ فازی بدون GATE_REVIEW با حکم PASS از ممیز مستقل «تمام» نیست — self-declare ممنوع
 
 ## گیت — قاعده اجباری قبل از هر کامیت (خودکار)
 

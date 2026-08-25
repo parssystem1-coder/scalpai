@@ -71,3 +71,4 @@
 - هر قانون این فایل باید تا جای ممکن معادل ماشینی در tools/conformance داشته باشد (قانون + fixture نقض + self-test)؛ قانون بدون چکر = بدهی مستندشده
 - استثنا از هر قانون فقط با ورود در exceptions.json + ارجاع ADR — استثنای بدون ADR = شکست build
 - migration-from-empty روی هر push الزامی است — هیچ migration ای از تست عبور نکرده معتبر نیست
+- هیچ فاز بدون GATE_REVIEW با حکم PASS از ممیز مستقل (scalpai-gate) تمام‌شده نیست؛ تیک نهایی PROGRESS فقط پس از آن مجاز است
