@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  base:
+    # Phase 0 baseline: lint + typecheck + unit + build + guardrails.
+    # Phase 1 (§14.2) extends this with real Postgres, migration-from-empty
+    # and integration tests as required checks.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests (incl. harness self-tests)
+        run: pnpm test
+
+      - name: Build all workspaces
+        run: pnpm build
+
+      - name: Conformance harness
+        run: pnpm conformance
+
+      - name: Project graph up to date
+        run: pnpm graph -- --check

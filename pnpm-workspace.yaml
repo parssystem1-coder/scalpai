@@ -1,0 +1,12 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - esbuild
+
+# Supply-chain guard: reject packages younger than N minutes (pnpm 11 default was too strict at ~24h)
+minimumReleaseAge: 60
+
+allowBuilds:
+  esbuild: true
