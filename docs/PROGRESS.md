@@ -38,12 +38,13 @@
 > گام بعدی الزامی طبق engineering-rules §11: گیت مستقل پایان فاز («گیت فاز را بگیر» با scalpai-gate) — self-declare ممنوع.
 
 ## فاز 2 — رسانه و تحلیل
-- [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip)
-- [ ] Image quality-gate لوکال (blur/light/framing)
-- [ ] packages/analysis-engine: ONNX loader + heuristic baseline + صفحه نتیجه
-- [ ] بودجه تأخیر تحلیل < ۳ ثانیه روی دستگاه مرجع mid-range
-- [ ] i18next RTL-first + Auto-lock
-- [ ] از فاز قبل منتقل: rate-limit/helmet (W16/W17) + مرور ایندکس‌ها (W20)
+> ⏳ Gate: شروع شد — brief اجرایی: docs/playbooks/brief-phase2-media-analysis.md (slices M1..M6)
+> ترتیب: M1 (storage+ADR-0026+ایندکس‌ها) → M2 (quality-gate) → M3 (آپلود) → M4 (گالری) → M5 (موتور+نتیجه) → M6 (i18n/autolock/سخت‌سازی)
+- [ ] Slice M1 — بستر Storage + ADR-0026 + ایندکس‌های W20
+- [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip) — M3
+- [ ] Image quality-gate لوکال (blur/light/framing) — M2
+- [ ] packages/analysis-engine: heuristic baseline + صفحه نتیجه (<۳ ثانیه) — M5
+- [ ] i18next کامل RTL-first + Auto-lock — M6 (+W16/W17 سخت‌سازی منتقله)
 
 ## فاز 3 — آفلاین و لایسنس
 - [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent
