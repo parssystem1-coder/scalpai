@@ -26,7 +26,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
-      "content-type": "application/json",
+      // JSON header only when a body exists — bodyless POST/DELETE otherwise 400s on Fastify.
+      ...(init?.body ? { "content-type": "application/json" } : {}),
       ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       ...(init?.headers ?? {}),
     },

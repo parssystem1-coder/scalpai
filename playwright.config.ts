@@ -16,10 +16,10 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "pnpm --filter @scalpai/db build && pnpm --filter @scalpai/shared build && pnpm --filter @scalpai/app-api build && pnpm --filter @scalpai/app-api exec node dist/main.js",
+        "pnpm --filter @scalpai/db build && pnpm --filter @scalpai/shared build && pnpm --filter @scalpai/analysis-core build && pnpm --filter @scalpai/app-api build && pnpm --filter @scalpai/app-api exec node dist/main.js",
       url: "http://127.0.0.1:3001/api/v1/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      timeout: 90_000,
     },
     {
       command: "pnpm --filter @scalpai/app-web exec vite --port 5173 --strictPort --host 127.0.0.1",

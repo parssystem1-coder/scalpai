@@ -14,7 +14,12 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix("/api/v1");
   app.useGlobalFilters(new AllExceptionsFilter());
   // Web dev server (:5173) and future desktop shell call the API cross-origin.
-  app.enableCors({ origin: true, credentials: false });
+  // PATCH must be allowed explicitly (fastify-cors default omits it).
+  app.enableCors({
+    origin: true,
+    credentials: false,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
   app.enableShutdownHooks();
 
   // Playbook 1.5 — automatic OpenAPI (JSON + minimal UI). Enriched in phase 4.

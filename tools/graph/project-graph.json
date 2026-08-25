@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "7e376bc",
+    "commit": "c538150",
     "dirty": true
   },
   "modules": [
@@ -14,7 +14,10 @@
       "name": "@scalpai/analysis-engine",
       "kind": "package",
       "dir": "packages/analysis-engine",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/analysis-core",
+        "@scalpai/shared"
+      ]
     },
     {
       "name": "@scalpai/app-admin",
@@ -49,6 +52,7 @@
       "kind": "app",
       "dir": "apps/web",
       "dependsOn": [
+        "@scalpai/analysis-engine",
         "@scalpai/shared"
       ]
     },
@@ -98,6 +102,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 4
+    "dependencyEdges": 7
   }
 }

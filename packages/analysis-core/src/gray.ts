@@ -5,8 +5,11 @@ export interface GrayImage {
   height: number;
 }
 
-/** Convert a raw RGBA buffer (sharp .ensureAlpha().raw()) to luma grayscale. */
-export function rgbaToGray(rgba: Buffer, width: number, height: number): GrayImage {
+type RgbaView = Uint8ClampedArray | Uint8Array;
+
+/** Convert a raw RGBA plane (ImageData.data / sharp raw) to luma grayscale.
+ *  Accepts any RGBA typed-array view so the same code runs in Node and browser. */
+export function rgbaToGray(rgba: RgbaView, width: number, height: number): GrayImage {
   const expected = width * height * 4;
   if (rgba.length < expected) throw new Error(`rgba buffer too small: ${rgba.length} < ${expected}`);
   const data = new Float32Array(width * height);
