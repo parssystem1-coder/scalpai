@@ -102,6 +102,7 @@ export const galleryItems = pgTable("gallery_items", {
   quality: jsonb("quality"),
   sha256: text("sha256"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const analyses = pgTable("analyses", {

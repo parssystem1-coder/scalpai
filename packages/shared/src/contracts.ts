@@ -63,6 +63,11 @@ export const GalleryInit = z.object({
   sizeBytes: z.coerce.number().int().min(1024).max(52_428_800),
 });
 
+export const GalleryPageQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(60).default(24),
+  cursor: z.string().max(200).optional(),
+});
+
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export type TokenPair = z.infer<typeof TokenPair>;
@@ -73,3 +78,4 @@ export type PlanUpsert = z.infer<typeof PlanUpsert>;
 export type PlanUpsertDto = PlanUpsert;
 export type GalleryInit = z.infer<typeof GalleryInit>;
 export type GalleryInitDto = GalleryInit;
+export type GalleryPageQuery = z.infer<typeof GalleryPageQuery>;
