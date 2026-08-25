@@ -35,7 +35,7 @@
 - [ ] **W17 — helmet/CSP و هدرهای امنیتی غایب** (§13) — 🕒 فاز ۲
 - [ ] **W18 — web بدون router** (`main.tsx:11` state ساده authed) — 🕒 فاز ۴ (قبل از دیزاین‌سیستم)
 - [ ] **W19 — i18n ناسازگار** — LoginPage از `t()` استفاده می‌کند، PatientsPage رشته hardcode فارسی دارد — 🕒 فاز ۴ (با i18next کامل)
-- [ ] **W20 — مرور ایندکس‌های composite** — مثلاً `(clinic_id, start_at)` روی sessions — 🕒 فاز ۲ (همراه media/booking)
+- [x] **W20 — مرور ایندکس‌های composite** — مثلاً `(clinic_id, start_at)` روی sessions — ✅ رفع: Slice M1 فاز ۲ — migration 0005 سه ایندکس composite (sessions/gallery_items/analyses)
 - [x] **W21 — معناشناسی دوگانه زنجیره audit** — نوشتن per-clinic زیر RLS ولی `verifyChain` global را می‌گوید که از دید نقش اپ قابل اجرا نیست؛ نیاز به تصمیم+مستندسازی (کامنت/ADR کوچک) — همراه W06 در Slice H — ✅ حکم: زنجیره per-clinic است؛ کامنت رسمی در core.repo.ts (`3449845`)
 - [ ] **W22 — ریسک ظرفیت تک‌نفره در برابر وسعت ۸ فاز** — فرآیندی؛ دفاع: قید §15، Tier-B بعد از فاز ۵، کادنس slice — همیشه باز (پایشی)
 

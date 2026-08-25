@@ -11,6 +11,7 @@ import { RolesGuard } from "./common/roles.guard.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
 import { CoreController } from "./core.controller.js";
 import { EntitlementService } from "./entitlements/entitlement.service.js";
+import { StorageService } from "./media/storage.service.js";
 import { PlansController } from "./plans.controller.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
@@ -22,6 +23,7 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
     AuthService,
     TenantScope,
     EntitlementService,
+    StorageService,
     RolesGuard,
     FeatureGuard,
     QuotaGuard,
