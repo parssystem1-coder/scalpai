@@ -59,8 +59,8 @@ jobs:
       - name: Seed demo data
         run: pnpm db:seed
 
-      - name: Unit + integration tests (RLS / cross-tenant on real PG)
-        run: pnpm test
+      - name: Unit + integration tests + coverage gate >=70% (RLS / cross-tenant on real PG)
+        run: pnpm test:coverage
 
       - name: Build all workspaces
         run: pnpm build
