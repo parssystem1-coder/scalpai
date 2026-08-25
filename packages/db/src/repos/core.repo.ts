@@ -4,10 +4,15 @@ import { auditLog, patients, sessions } from "../schema.js";
 import type { Tx } from "../tenant.js";
 
 /**
- * Append-only audit (ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§13). Runs INSIDE the tenant transaction so the audit
- * row commits atomically with the mutation it records. Chain integrity:
- * row_hash = sha256(prev_hash || canonical payload). The app role has
- * UPDATE/DELETE revoked on audit_log at the SQL level ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â history is immutable.
+ * Append-only audit (engineering-rules §13 / DESIGN §13). Runs INSIDE the tenant
+ * transaction so the audit row commits atomically with the mutation it records.
+ * Chain integrity: row_hash = sha256(prev_hash || canonical payload). The app
+ * role has UPDATE/DELETE revoked on audit_log at the SQL level — history is immutable.
+ *
+ * Chain semantics (WEAKNESSES W21): the chain is PER-CLINIC by construction —
+ * the prev-hash lookup runs inside the tenant tx, so a clinic only ever links
+ * its own rows. `verifyChain` therefore verifies whatever rows are visible in
+ * the caller's tenant context (run it inside db.withTenant(clinicId, ...)).
  */
 export async function appendAudit(
   tx: Tx,
@@ -20,6 +25,11 @@ export async function appendAudit(
     meta?: unknown;
   },
 ): Promise<void> {
+  // W06: serialize same-clinic appends — two concurrent txns must never read
+  // the same prev_hash (that would fork the chain). Keyed per clinic, so
+  // different clinics keep writing in parallel. Released at COMMIT/ROLLBACK.
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${entry.clinicId}))`);
+
   const prev = await tx
     .select({ rowHash: auditLog.rowHash })
     .from(auditLog)
@@ -51,9 +61,8 @@ export async function appendAudit(
   });
 }
 
-/** Verify the full chain for one clinic (used by tests + future admin screen). */
+/** Verify the chain over all rows visible to the caller (per-clinic under RLS) in id order. */
 export async function verifyChain(tx: Tx): Promise<boolean> {
-  // Chain is a global ledger â€” verify over ALL rows in id order.
   const rows = await tx.select().from(auditLog).orderBy(auditLog.id);
   let prev: string | null = null;
   for (const r of rows) {
@@ -105,6 +114,12 @@ export async function getPatientById(tx: Tx, id: string) {
     .from(patients)
     .where(and(eq(patients.id, id), isNull(patients.deletedAt)))
     .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Test/admin view incl. soft-deleted rows (updated_at trigger proof, W07). */
+export async function getPatientIncludingDeleted(tx: Tx, id: string) {
+  const rows = await tx.select().from(patients).where(eq(patients.id, id)).limit(1);
   return rows[0] ?? null;
 }
 

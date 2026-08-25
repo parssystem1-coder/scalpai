@@ -19,7 +19,7 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
 
 /**
  * Patients + Sessions + Services (playbook 1.5). Every handler flows through
- * TenantScope.tx â†’ RLS key set â†’ scoped repos â†’ audit row in the same tx.
+ * TenantScope.tx → RLS key set → scoped repos → audit row in the same tx.
  */
 @Controller()
 export class CoreController {
@@ -61,7 +61,7 @@ export class CoreController {
     return this.scope.tx((tx, ctx) => listSessions(tx, ctx.clinicId, q.limit, q.offset));
   }
 
-  /** Booking lives behind the portal feature (Â§9.1 demo of feature gate). */
+  /** Booking lives behind the portal feature (§9.1 demo of feature gate). */
   @Post("sessions")
   @RequireFeature("portal")
   createSession(

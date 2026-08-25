@@ -7,7 +7,7 @@ import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DbService, migrate, resetAll, seed, seedMarkerClinicId, verifyChain } from "@scalpai/db";
+import { DbService, getPatientIncludingDeleted, migrate, resetAll, seed, seedMarkerClinicId, verifyChain } from "@scalpai/db";
 import { AppModule } from "../src/app.module.js";
 
 /**
@@ -118,9 +118,54 @@ describe("audit hash-chain", () => {
     const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx));
     expect(ok).toBe(true);
   });
+
+  // W06: concurrent same-clinic writes must not fork the chain — the advisory
+  // lock in appendAudit serializes prev-hash reads. Without the lock this test
+  // is flaky by design (two txns reading the same prev).
+  it("chain stays intact under concurrent same-clinic creates", async () => {
+    const a = await login(A);
+    const auth = { Authorization: `Bearer ${a.accessToken}` };
+    const stamp = Date.now().toString().slice(-7);
+    // 0912 + 6 digits + index = exactly 11 digits, unique per worker request
+    const creates = Array.from({ length: 6 }, (_, i) =>
+      http
+        .post("/api/v1/patients")
+        .set(auth)
+        .send({ firstName: "Conc", lastName: `Test${i}`, phone: `0912${stamp.slice(0, 6)}${i}` }),
+    );
+    const settled = await Promise.all(creates.map((p) => p.then((r) => r.status)));
+    expect(settled.every((s) => s === 201 || s === 409)).toBe(true); // 409 only if phone collision
+
+    const clinicId = await clinicAId();
+    const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx));
+    expect(ok).toBe(true);
+  });
 });
 
-describe("feature gate (plans Ã‚Â§9.1)", () => {
+describe("updated_at maintenance (W07 trigger)", () => {
+  it("bumps updated_at on soft delete", async () => {
+    const a = await login(A);
+    const created = await http
+      .post("/api/v1/patients")
+      .set("Authorization", `Bearer ${a.accessToken}`)
+      .send({ firstName: "Touch", lastName: "Trigger", phone: `0912${Date.now()}`.slice(0, 11) });
+    expect(created.status).toBe(201);
+    const id = String(created.body.id);
+    const before = new Date(String(created.body.updatedAt)).getTime();
+
+    const del = await http.delete(`/api/v1/patients/${id}`).set("Authorization", `Bearer ${a.accessToken}`);
+    expect(del.status).toBe(200);
+
+    const clinicId = await clinicAId();
+    const row = await db.withTenant(clinicId, null, (tx) => getPatientIncludingDeleted(tx, id));
+    expect(row).toBeTruthy();
+    expect(row!.deletedAt).not.toBeNull();
+    // timestamptz has µs precision — the trigger's now() must be strictly later
+    expect(new Date(row!.updatedAt).getTime()).toBeGreaterThan(before);
+  });
+});
+
+describe("feature gate (plans §9.1)", () => {
   it("growth passes ml_updates; starter gets FEATURE_DISABLED", async () => {
     const a = await login(A);
     expect((await http.get("/api/v1/ml/status").set("Authorization", `Bearer ${a.accessToken}`)).status).toBe(200);

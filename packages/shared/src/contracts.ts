@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Canonical API error shape (engineering-rules Â§3) â€” nothing else may leave the API. */
+/** Canonical API error shape (engineering-rules §3) — nothing else may leave the API. */
 export const ErrorBody = z.object({
   code: z.string(),
   message: z.string(),
@@ -30,7 +30,7 @@ export const TokenPair = z.object({
 export const PatientCreate = z.object({
   firstName: z.string().min(1).max(80),
   lastName: z.string().min(1).max(80),
-  phone: z.string().regex(/^0\d{10}$/, "ÙØ±Ù…Øª Ù…ÙˆØ¨Ø§ÛŒÙ„: 09xxxxxxxxx"),
+  phone: z.string().regex(/^0\d{10}$/, "فرمت موبایل: 09xxxxxxxxx"),
   gender: z.enum(["male", "female"]).optional(),
   birthDate: z.string().date().optional(),
 });

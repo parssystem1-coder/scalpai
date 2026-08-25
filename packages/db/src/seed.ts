@@ -24,11 +24,11 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
     try {
       await client.query("BEGIN");
 
-      // Plans catalog â€” new plan = INSERT only (Â§9.1)
+      // Plans catalog — new plan = INSERT only (§9.1)
       await client.query(
         `INSERT INTO plans (code, name, price, interval, limits) VALUES
-         ('starter', '{"fa":"Ù¾Ø§ÛŒÙ‡","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1}'),
-         ('growth',  '{"fa":"Ø±Ø´Ø¯","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3}')
+         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1}'),
+         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3}')
          ON CONFLICT (code) DO NOTHING`,
       );
       await client.query(
@@ -40,8 +40,8 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
 
       await client.query(
         `INSERT INTO clinics (id, name, settings) VALUES
-         ($1, 'Ú©Ù„ÛŒÙ†ÛŒÚ© Ø¯Ù…Ùˆ Ø§Ù„Ù', '{"seed":"v1"}'),
-         ($2, 'Ú©Ù„ÛŒÙ†ÛŒÚ© Ø¯Ù…Ùˆ Ø¨',   '{"seed":"other"}')`,
+         ($1, 'کلینیک دمو الف', '{"seed":"v1"}'),
+         ($2, 'کلینیک دمو ب',   '{"seed":"other"}')`,
         [clinicA, clinicB],
       );
       await client.query(
@@ -68,15 +68,15 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
       const serviceB = randomUUID();
       await client.query(
         `INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES
-         ($1, $3, 'Ù…Ø´Ø§ÙˆØ±Ù‡ ØªØ±ÛŒÚ©ÙˆÙ„ÙˆÚ˜ÛŒ', 30, '800000'),
-         ($2, $3, 'Ø¬Ù„Ø³Ù‡ PRP',         60, '4500000')`,
+         ($1, $3, 'مشاوره تریکولوژی', 30, '800000'),
+         ($2, $3, 'جلسه PRP',         60, '4500000')`,
         [serviceA, serviceB, clinicA],
       );
 
       await client.query(
         `INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES
-         ($1, $3, 'Ø²Ù‡Ø±Ø§', 'Ù…Ø­Ù…Ø¯ÛŒ',  '09121234567'),
-         ($2, $3, 'Ø¹Ù„ÛŒ',  'Ø±Ø¶Ø§ÛŒÛŒ',  '09359876543')`,
+         ($1, $3, 'زهرا', 'محمدی',  '09121234567'),
+         ($2, $3, 'علی',  'رضایی',  '09359876543')`,
         [randomUUID(), randomUUID(), clinicA],
       );
 

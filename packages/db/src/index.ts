@@ -8,6 +8,7 @@ export {
   verifyChain,
   listPatients,
   getPatientById,
+  getPatientIncludingDeleted,
   createPatient,
   softDeletePatient,
   listSessions,

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runRules } from "./run.js";
 import { RULES } from "./rules/index.js";
-import { dbAccess } from "./rules/v1.js";
+import { dbAccess, encodingGuard } from "./rules/v1.js";
 import type { Rule } from "./lib/types.js";
 
 function fixtureRepo(): string {
@@ -39,6 +39,23 @@ describe("conformance v1 rules", () => {
     writeFileSync(join(appDir, "bad.ts"), `import { Client } from "pg";\nexport const c = Client;`, "utf8");
     const res = await runRules([dbAccess], { root });
     expect(res.violations.some((v) => v.file === "apps/api/src/bad.ts")).toBe(true);
+  });
+
+  it("encoding-guard passes clean Persian text but flags CP1252 mojibake and U+FFFD", async () => {
+    const root = fixtureRepo();
+    const pkgDir = join(root, "packages", "db", "src");
+    mkdirSync(pkgDir, { recursive: true });
+    // legit Persian + guillemets must NOT be flagged
+    writeFileSync(join(pkgDir, "clean.ts"), `// سلام دنیای «تمیز» — RTL\nexport const ok = true;\n`, "utf8");
+    // classic double-encoded em-dash + Persian mojibake MUST be flagged
+    writeFileSync(join(pkgDir, "moji.ts"), `const s = "\u00D8\u00B2\u00D9\u2021\u00E2\u20AC\u201C";\n`, "utf8");
+    // replacement char MUST be flagged
+    writeFileSync(join(pkgDir, "repl.ts"), `// broken \uFFFD comment\n`, "utf8");
+
+    const res = await runRules([encodingGuard], { root });
+    expect(res.violations.some((v) => v.file.endsWith("moji.ts"))).toBe(true);
+    expect(res.violations.some((v) => v.file.endsWith("repl.ts"))).toBe(true);
+    expect(res.violations.some((v) => v.file.endsWith("clean.ts"))).toBe(false);
   });
 
   it("every registered rule has name+source and returns an array", async () => {
