@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "689e763",
+    "commit": "d8437f2",
     "dirty": false
   },
   "modules": [
@@ -47,7 +47,9 @@
       "name": "@scalpai/app-web",
       "kind": "app",
       "dir": "apps/web",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
     },
     {
       "name": "@scalpai/db",
@@ -95,6 +97,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 2
+    "dependencyEdges": 3
   }
 }
