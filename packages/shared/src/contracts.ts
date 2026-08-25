@@ -57,6 +57,12 @@ export const PlanUpsert = z.object({
   limits: z.record(z.string(), z.number()).default({}),
 });
 
+/** Gallery upload init (phase 2 media pipeline). 50MB hard cap per DoD. */
+export const GalleryInit = z.object({
+  mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  sizeBytes: z.coerce.number().int().min(1024).max(52_428_800),
+});
+
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export type TokenPair = z.infer<typeof TokenPair>;
@@ -65,3 +71,5 @@ export type PatientCreateDto = PatientCreate;
 export type SessionCreate = z.infer<typeof SessionCreate>;
 export type PlanUpsert = z.infer<typeof PlanUpsert>;
 export type PlanUpsertDto = PlanUpsert;
+export type GalleryInit = z.infer<typeof GalleryInit>;
+export type GalleryInitDto = GalleryInit;
