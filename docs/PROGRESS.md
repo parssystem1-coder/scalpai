@@ -3,13 +3,13 @@
 > توسط skill «scalpai-build» نگهداری می‌شود. ✓ = DoD پاس شده
 
 ## فاز 0 — آماده‌سازی
-- [ ] git init + .gitignore مناسب + آرشیو legacy در branch `legacy/v1`
-- [ ] Monorepo skeleton (pnpm-workspace + turborepo)
-- [ ] tooling مشترک (eslint/tsconfig/tailwind preset)
-- [ ] CI پایه (lint+typecheck+build)
-- [ ] Branch protection + auto-merge — دو لاین Fast/Gated (ADR-23)
-- [ ] Scaffold tools/conformance + tools/graph
-- [ ] ADR-0001..0004 ثبت شده
+- [x] git init + .gitignore مناسب + اتصال به origin (`parssystem1-coder/scalpai`) — نکته: کد legacy/v1 در این پوشه وجود نداشت؛ آرشیو برنچ N/A
+- [x] Monorepo skeleton (pnpm-workspace + turborepo) — 5 app + 9 package + tooling، همه build/typecheck سبز
+- [x] tooling مشترک (eslint/tsconfig/tailwind preset) + husky/lint-staged/commitlint فعال
+- [x] CI پایه (GitHub Actions): typecheck+lint+test+build+conformance+graph-check — اولین run سبز روی ابر (PR #1)
+- [ ] Branch protection + auto-merge — ⚠️ مسدود به پلن: GitHub Pro لازم است (ریپو خصوصی/رایگان)؛ auto-merge setting هم اعمال نشد. موقتاً جریان PR+CI+merge دستی
+- [x] Scaffold tools/conformance + tools/graph — با self-test (5/5) و خروجی‌های کامیت‌شده
+- [x] ADR-0001..0004 ثبت شده (docs/adr/)
 
 ## فاز 1 — ستون فقرات
 - [ ] apps/api: Auth (JWT+Refresh) + RBAC Guards
