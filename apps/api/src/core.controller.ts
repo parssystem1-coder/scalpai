@@ -12,6 +12,7 @@ import {
   softDeletePatient,
 } from "@scalpai/db";
 import { Roles } from "./common/roles.guard.js";
+import { Public } from "./auth/jwt-access.guard.js";
 import { RequireFeature } from "./common/feature.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
@@ -23,6 +24,12 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
 @Controller()
 export class CoreController {
   constructor(private scope: TenantScope) {}
+
+  @Public()
+  @Get("health")
+  health(): { ok: true } {
+    return { ok: true };
+  }
 
   @Get("patients")
   list(@Query(new ZodBodyPipe(PaginationQuery)) q: { q?: string; limit: number; offset: number }) {
