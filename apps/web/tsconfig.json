@@ -1,5 +1,14 @@
 {
   "extends": "../../tooling/tsconfig/base.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": "src", "types": ["node"] },
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
   "include": ["src"]
 }
