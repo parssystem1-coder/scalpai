@@ -6,23 +6,42 @@ import * as schema from "./schema.js";
 
 export type Tx = NodePgDatabase<typeof schema> & { client: PoolClient };
 
+function makeTx(client: PoolClient): Tx {
+  const t = drizzle(client, { schema }) as unknown as Tx;
+  t.client = client;
+  return t;
+}
+
 export class DbService {
   private pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   /**
    * The ONLY way application code touches data (engineering-rules §1).
-   * Opens a transaction, sets `app.clinic_id` (RLS key) as the very first
-   * statement, and hands a Drizzle tx to the callback.
+   * Opens a transaction and sets `app.clinic_id` (RLS key) as the very
+   * first statement — ADR-0003 layer 3.
    */
   async withTenant<T>(clinicId: string, userId: string | null, fn: (tx: Tx) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      // First statement of the transaction — RLS key (ADR-0003 layer 3)
       await client.query("SELECT set_config('app.clinic_id', $1, true)", [clinicId]);
-      const tx = drizzle(client, { schema }) as Tx;
-      tx.client = client;
-      const result = await fn(tx);
+      const result = await fn(makeTx(client));
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Tenant-free transaction — ONLY for pre-auth flows (login lookup, refresh rotation). */
+  async withClient<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn(makeTx(client));
       await client.query("COMMIT");
       return result;
     } catch (err) {

@@ -1,6 +1,7 @@
 ﻿export * from "./schema.js";
 export * from "./tenant.js";
 export * from "./migrate.js";
+export { loadEnv } from "./load-env.js";
 export { seed } from "./seed.js";
 export {
   appendAudit,

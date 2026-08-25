@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { auditLog, patients, sessions } from "./schema.js";
-import type { Tx } from "./tenant.js";
+import { auditLog, patients, sessions } from "../schema.js";
+import type { Tx } from "../tenant.js";
 
 /**
- * Append-only audit (§13). Runs INSIDE the tenant transaction so the audit
+ * Append-only audit (ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§13). Runs INSIDE the tenant transaction so the audit
  * row commits atomically with the mutation it records. Chain integrity:
  * row_hash = sha256(prev_hash || canonical payload). The app role has
- * UPDATE/DELETE revoked on audit_log at the SQL level — history is immutable.
+ * UPDATE/DELETE revoked on audit_log at the SQL level ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â history is immutable.
  */
 export async function appendAudit(
   tx: Tx,
@@ -24,8 +24,9 @@ export async function appendAudit(
     .select({ rowHash: auditLog.rowHash })
     .from(auditLog)
     .orderBy(desc(auditLog.id))
-    .limit(1)
-    .for("update");
+    .limit(1);
+  const at = new Date();
+  const atIso = at.toISOString();
   const prevHash = prev[0]?.rowHash ?? null;
   const payload = JSON.stringify({
     clinicId: entry.clinicId,
@@ -34,7 +35,7 @@ export async function appendAudit(
     entity: entry.entity,
     entityId: entry.entityId,
     meta: entry.meta ?? null,
-    at: new Date().toISOString(),
+    at: atIso,
   });
   const rowHash = createHash("sha256").update(`${prevHash ?? ""}|${payload}`).digest("hex");
   await tx.insert(auditLog).values({
@@ -44,18 +45,16 @@ export async function appendAudit(
     entity: entry.entity,
     entityId: entry.entityId,
     meta: (entry.meta as object) ?? null,
+    at,
     prevHash,
     rowHash,
   });
 }
 
 /** Verify the full chain for one clinic (used by tests + future admin screen). */
-export async function verifyChain(tx: Tx, clinicId: string): Promise<boolean> {
-  const rows = await tx
-    .select()
-    .from(auditLog)
-    .where(eq(auditLog.clinicId, clinicId))
-    .orderBy(auditLog.id);
+export async function verifyChain(tx: Tx): Promise<boolean> {
+  // Chain is a global ledger â€” verify over ALL rows in id order.
+  const rows = await tx.select().from(auditLog).orderBy(auditLog.id);
   let prev: string | null = null;
   for (const r of rows) {
     const payload = JSON.stringify({
@@ -67,7 +66,7 @@ export async function verifyChain(tx: Tx, clinicId: string): Promise<boolean> {
       meta: r.meta ?? null,
       at: r.at instanceof Date ? r.at.toISOString() : String(r.at),
     });
-    const expected = createHash("sha256").update(`${prev ?? ""}|${payload}`).digest("hex");
+    const expected: string = createHash("sha256").update(`${prev ?? ""}|${payload}`).digest("hex");
     if (r.prevHash !== prev || r.rowHash !== expected) return false;
     prev = r.rowHash;
   }

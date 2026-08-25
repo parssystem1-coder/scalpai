@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { entitlements, planFeatures, plans, users } from "./schema.js";
-import type { Tx } from "./tenant.js";
+import { entitlements, planFeatures, plans, users } from "../schema.js";
+import type { Tx } from "../tenant.js";
 
 export async function findUserByEmail(tx: Tx, email: string) {
   const rows = await tx
@@ -21,7 +21,7 @@ export interface ResolvedEntitlement {
   limits: Record<string, unknown>;
 }
 
-/** Single source of truth for what a clinic may do (§9.1). Cached at service layer. */
+/** Single source of truth for what a clinic may do (Â§9.1). Cached at service layer. */
 export async function resolveEntitlement(tx: Tx, clinicId: string): Promise<ResolvedEntitlement | null> {
   const ent = (
     await tx

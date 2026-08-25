@@ -1,2 +1,2 @@
-﻿export const PACKAGE_NAME = "@scalpai/shared";
-
+﻿export * from "./contracts.js";
+export * from "./errors.js";

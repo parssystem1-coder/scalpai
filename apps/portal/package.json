@@ -2,6 +2,7 @@
   "name": "@scalpai/app-portal",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
