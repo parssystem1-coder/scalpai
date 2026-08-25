@@ -46,3 +46,24 @@
 2. coverage ≥70% قفل‌شده در CI
 3. conformance PASS · graph --check سبز
 4. GATE_REVIEW نهایی فاز ۱ = PASS
+
+---
+
+## §الحاق — amendments مصوب مالک (2026-08-25، پس از تحلیل عمیق)
+
+> ثبت رسمی انحراف از scope قفل‌شده §0 با ack صریح مالک؛ ردیابی ضعف‌ها: `docs/WEAKNESSES.md`
+
+### Slice H — db-hardening (قبل از گیت)
+- `pg_advisory_xact_lock` در appendAudit + تست همزمانی زنجیره (W06)
+- migration جدید: trigger `updated_at` برای patients/sessions + تست bump (W07)
+- پاک‌سازی mojibake فایل‌های کامیت‌شده seed.ts · core.repo.ts · users.repo.ts · core.integration.spec.ts (W02/W03)
+- قانون conformance جدید «encoding-guard» با fixture نقض + self-test (W15) + حکم معناشناسی زنجیره audit در کامنت/تست (W21)
+
+### Slice T6 — تکمیل تعهدات پلی‌بوک 1.4/1.5
+- QuotaGuard روی usage_counters (W08) · admin-plan CRUD فقط owner (W09) · OpenAPI حداقلی (W10) · ساخت exceptions.json (W11)
+
+### ترتیب اجرای به‌روزشده
+T3 → H → T6 → T4 → T5 → گیت نهایی
+
+### حکم e2e در CI (حکم W13)
+@smoke در mini-DoD فقط لوکال اجرا می‌شود (ADR-0024)؛ ورود browser-e2e به CI تصمیم فاز ۲ است و در completion فایل T3 ثبت می‌شود — Exit criteria #1 با اجرای لوکال + گزارش artifact اثبات می‌شود.
