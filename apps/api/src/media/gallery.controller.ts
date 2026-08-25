@@ -1,15 +1,17 @@
 import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
-import { Body, Controller, HttpCode, HttpStatus, Param, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from "@nestjs/common";
 import sharp from "sharp";
 import { computeQuality, rgbaToGray } from "@scalpai/analysis-core";
-import { GalleryInit, type GalleryInitDto, errors } from "@scalpai/shared";
+import { GalleryInit, GalleryPageQuery, type GalleryInitDto, errors } from "@scalpai/shared";
 import {
   appendAudit,
   completeGalleryItem,
   createPendingGalleryItem,
   deletePendingGalleryItem,
   getGalleryItem,
+  listGalleryByPatient,
+  softDeleteGalleryItem,
 } from "@scalpai/db";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
@@ -143,5 +145,35 @@ export class GalleryController {
         });
       }
     });
+  }
+
+  @Get("patients/:pid/gallery")
+  @Roles("owner", "trichologist", "receptionist")
+  async list(
+    @Param("pid") pid: string,
+    @Query(new ZodBodyPipe(GalleryPageQuery)) q: { limit: number; cursor?: string },
+  ): Promise<unknown> {
+    const ctx = this.scope.requireCtx();
+    const page = await this.scope.tx((tx) => listGalleryByPatient(tx, ctx.clinicId, pid, { limit: q.limit, cursor: q.cursor }));
+    // Presigned view URLs are minted per-request and expire in minutes —
+    // images are never proxied through the API nor embedded as base64.
+    const items = await Promise.all(
+      page.items.map(async (it) => ({
+        id: it.id,
+        createdAt: it.createdAt,
+        quality: it.quality,
+        viewUrl: it.storageKey ? await this.storage.presignGet(ctx.clinicId, it.storageKey) : null,
+        thumbUrl: it.thumbKey ? await this.storage.presignGet(ctx.clinicId, it.thumbKey) : null,
+      })),
+    );
+    return { items, nextCursor: page.nextCursor };
+  }
+
+  @Delete("gallery/:gid")
+  @Roles("owner", "trichologist")
+  async remove(@Param("gid") gid: string): Promise<{ deleted: boolean }> {
+    const ok = await this.scope.tx((tx, ctx) => softDeleteGalleryItem(tx, ctx.clinicId, ctx.userId, gid));
+    if (!ok) throw errors.notFound();
+    return { deleted: true };
   }
 }

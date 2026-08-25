@@ -175,3 +175,50 @@ describe("media pipeline (playbook 2.1)", () => {
     expect((await http.post("/api/v1/patients/x/gallery/init").send({ mime: "image/jpeg", sizeBytes: 2000 })).status).toBe(401);
   });
 });
+
+describe("gallery list + soft delete (M4)", () => {
+  it("paginates with cursor, hides deleted, and isolates tenants", async () => {
+    const tokenA = await login(A);
+    const authA = { Authorization: `Bearer ${tokenA}` };
+    const patient = await http
+      .post("/api/v1/patients")
+      .set(authA)
+      .send({ firstName: "لیست", lastName: "گالری", phone: nextPhone() });
+    const pid = String(patient.body.id);
+
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const init = await initUpload(tokenA, pid);
+      await fetch(init.uploadUrl!, { method: "PUT", body: await healthyJpeg() });
+      const done = await http.post(`/api/v1/gallery/${init.id}/complete`).set(authA);
+      expect(done.status).toBe(200);
+      ids.push(String(done.body.id));
+    }
+
+    const page1 = await http.get(`/api/v1/patients/${pid}/gallery?limit=2`).set(authA);
+    expect(page1.status).toBe(200);
+    expect(page1.body.items).toHaveLength(2);
+    expect(page1.body.nextCursor).toBeTruthy();
+    for (const it of page1.body.items) {
+      expect(it.thumbUrl).toMatch(/^http/); // presigned, never base64
+    }
+
+    const page2 = await http
+      .get(`/api/v1/patients/${pid}/gallery?limit=2&cursor=${encodeURIComponent(page1.body.nextCursor)}`)
+      .set(authA);
+    expect(page2.body.items).toHaveLength(1);
+
+    // soft delete hides the item from listings but audit chain stays intact
+    const del = await http.delete(`/api/v1/gallery/${ids[0]}`).set(authA);
+    expect(del.status).toBe(200);
+    const after = await http.get(`/api/v1/patients/${pid}/gallery?limit=10`).set(authA);
+    expect(after.body.items.map((x: { id: string }) => x.id)).not.toContain(ids[0]);
+    expect(after.body.items).toHaveLength(2);
+
+    // clinic B sees an empty page for the same pid — never A's data
+    const tokenB = await login(B);
+    const leak = await http.get(`/api/v1/patients/${pid}/gallery?limit=10`).set("Authorization", `Bearer ${tokenB}`);
+    expect(leak.status).toBe(200);
+    expect(leak.body.items).toHaveLength(0);
+  });
+});

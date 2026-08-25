@@ -84,6 +84,9 @@ jobs:
       - name: Build all workspaces
         run: pnpm build
 
+      - name: Bundle budget (web <300KB gzip)
+        run: pnpm exec tsx tools/bundle-budget.ts
+
       - name: Conformance harness (ADR-21)
         run: pnpm conformance
 

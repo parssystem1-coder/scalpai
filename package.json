@@ -15,7 +15,9 @@
     "db:migrate": "tsx packages/db/src/migrate-cli.ts",
     "db:seed": "tsx packages/db/src/seed.ts",
     "e2e": "pnpm db:migrate && pnpm db:seed && playwright test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:seed:gallery": "tsx packages/db/scripts/seed-gallery.ts",
+    "budget:bundle": "tsx tools/bundle-budget.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "react-router-dom";
 import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 
@@ -94,7 +95,9 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
             {(query.data ?? []).map((p) => (
               <tr key={p.id}>
                 <td>
-                  {p.firstName} {p.lastName}
+                  <Link to={`/patients/${p.id}/gallery`}>
+                    {p.firstName} {p.lastName}
+                  </Link>
                 </td>
                 <td>{p.phone}</td>
               </tr>

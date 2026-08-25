@@ -21,6 +21,8 @@ export {
   getGalleryItem,
   completeGalleryItem,
   deletePendingGalleryItem,
+  listGalleryByPatient,
+  softDeleteGalleryItem,
 } from "./repos/gallery.repo.js";
 export {
   findUserByEmail,
