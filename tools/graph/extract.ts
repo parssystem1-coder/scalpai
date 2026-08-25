@@ -124,6 +124,10 @@ function stripGeneratedFrom(g: Graph): Omit<Graph, "generatedFrom"> {
   return rest;
 }
 
+function normalize(s: string): string {
+  return s.replaceAll("\r\n", "\n");
+}
+
 function checkStale(current: Graph): boolean {
   let stale = false;
   const expectedJson = JSON.stringify(stripGeneratedFrom(current), null, 2);
@@ -140,9 +144,14 @@ function checkStale(current: Graph): boolean {
     console.error(`${JSON_REL} is stale. Run \`pnpm graph\` and commit the result.`);
     stale = true;
   }
-  const expectedMd = render(current).split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n");
+  const expectedMd = normalize(render(current).split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n"));
   const actualMd = existsSync(MD_OUT)
-    ? readFileSync(MD_OUT, "utf8").split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n")
+    ? normalize(
+        readFileSync(MD_OUT, "utf8")
+          .split("\n")
+          .filter((l) => !l.startsWith("**Generated**"))
+          .join("\n"),
+      )
     : "";
   if (expectedMd !== actualMd) {
     console.error("PROJECT_GRAPH.md is stale. Run `pnpm graph` and commit the result.");
