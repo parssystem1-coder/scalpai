@@ -31,7 +31,7 @@
 - [x] pnpm e2e @smoke — Slice T3 ✅ (PR #6 auto-merged · completion: docs/tasks/phase1-T3-playwright-smoke-completion.md · شامل رفع W04/W05 و حکم W13)
 - [x] Slice H — db-hardening: advisory-lock زنجیره audit + trigger updated_at + پاک‌سازی mojibake سورس (W02/W03/W06/W07/W15/W21 بسته شدند) — completion: docs/tasks/phase1-H-db-hardening-completion.md
 - [x] Slice T6 — تکمیل گپ‌های پلی‌بوک: QuotaGuard + admin-plan CRUD + OpenAPI حداقلی + exceptions.json (W08..W11 بسته شدند) — completion: docs/tasks/phase1-T6-playbook-gaps-completion.md
-- [ ] coverage gate ≥70% — Slice T4 (سنجش و قفل در CI)
+- [x] coverage gate ≥70% — Slice T4 ✅ (lines=81.06% قفل در CI؛ alias سورس در vitest) — completion: docs/tasks/phase1-T4-coverage-completion.md
 - [ ] Slice T5 — ADR-0025 انحراف Audit-as-Service + ثبت ردیف §17
 
 ## فاز 2 — رسانه و تحلیل
