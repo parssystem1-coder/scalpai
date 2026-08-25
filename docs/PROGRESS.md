@@ -14,16 +14,19 @@
 - [x] ADR-0024: توسعه لوکال با PostgreSQL 17 native؛ Docker فقط CI/استقرار
 
 ## فاز 1 — ستون فقرات
-- [ ] apps/api: Auth (JWT+Refresh) + RBAC Guards
-- [ ] Tenancy Middleware + RLS فعال + تست منفی ایزوله‌سازی
-- [ ] AuditLog Interceptor (hash-chain)
-- [ ] Plans/Entitlement هسته (§9.1): plans/plan_features/entitlements + @RequireFeature
-- [ ] CRUD بیمار/جلسه + packages/db migrations
-- [ ] Partial unique indexes + pg_trgm جستجوی فارسی
-- [ ] apps/web: شل اپ + دیزاین‌سیستم پایه + فرم‌ها
-- [ ] CI کامل: Postgres واقعی + migration-from-empty + conformance + graph --check + bundle-budget + artifact (بدون کامیت گزارش)
-- [ ] Conformance Harness v1 (۶ قانون + fixture/self-test + exceptions با ADR)
-- [ ] Project Graph (extract مکانیکی + --check در CI)
+> ⏳ Gate: هنوز گرفته نشده — دو آیتم باقی است (web shell، e2e smoke)
+- [x] apps/api: Auth (JWT 15m + refresh چرخشی با کشف استفاده مجدد + Argon2id) + RolesGuard
+- [x] Tenancy (SET LOCAL app.clinic_id + NOBYPASSRLS role) + RLS FORCE روی ۱۱ جدول + تست منفی cross-tenant (404)
+- [x] AuditLog append-only hash-chain (REVOKE UPDATE/DELETE در سطح SQL) + تست verifyChain
+- [x] Plans/Entitlement هسته (§9.1): plans/features/entitlements + @RequireFeature + کش 60s
+- [x] CRUD بیمار/جلسه + pagination + soft-delete + قرارداد zod در packages/shared
+- [x] fn_auth_login/fn_user_claims (SECURITY DEFINER) برای مسیرهای پیش از احراز هویت
+- [x] Conformance Harness v1 (۶ قانون + self-test) + exceptions آماده
+- [x] Project Graph v0 (modules/deps) + --check در CI
+- [x] CI کامل: Postgres واقعی سرویس ابری + migration-from-empty + integration + guardrails — auto-merge فعال (PR #2، #3)
+- [ ] apps/web شل (login + patients) — فاز بعدی همین فاز
+- [ ] pnpm e2e @smoke (نیازمند نصب Playwright browsers)
+- [ ] coverage gate ≥70% (سنجش و قفل در CI)
 
 ## فاز 2 — رسانه و تحلیل
 - [ ] Media service (presigned URL, chunk upload, thumbnail, EXIF strip)
