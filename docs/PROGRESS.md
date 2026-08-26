@@ -54,9 +54,10 @@
 
 ## فاز 3 — آفلاین و لایسنس
 > ⏳ Gate: شروع شد — brief: docs/playbooks/brief-phase3-offline-licensing.md (slices P1..P7)
-> ترتیب: P1 (sync-core خالص) → P2 (Sync API) → P3 (وب آفلاین) → P4 (resume) → P5 (licensing) → P6 (self-hosted/بکاپ/anchor) → P7 (consent+PWA)
-- [ ] Slice P1 — packages/sync-client هسته خالص + ADR-0027
-- [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent — P2/P3
+> ترتیب: P1 (sync-core خالص) ✓ → P2 (Sync API) ✓ → P3 (وب آفلاین) → P4 (resume) → P5 (licensing) → P6 (self-hosted/بکاپ/anchor) → P7 (consent+PWA)
+- [x] Slice P1 — packages/sync-client هسته خالص + ADR-0027 (PR#17 merged, ۷۲ تست)
+- [x] Slice P2 — Sync API: mutations/treatment_plans migrations, POST /sync/push (idempotent), GET /sync/pull (cursor), field-LWW سمت سرور (PR#18 merged, ۷۷ تست)
+- [ ] Slice P3 — وب آفلاین: Dexie outbox + flush + badge pending + e2e @offline
 - [ ] آپلود resume + pending_upload badge
 - [ ] Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت
 - [ ] ops/: docker-compose self-hosted + Caddy + بکاپ داخلی
