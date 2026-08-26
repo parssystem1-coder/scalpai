@@ -151,12 +151,18 @@ importers:
       '@scalpai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@scalpai/sync-client':
+        specifier: workspace:*
+        version: link:../../packages/sync-client
       '@tanstack/react-query':
         specifier: ^5.90.0
         version: 5.102.3(react@19.2.8)
       '@tanstack/react-virtual':
         specifier: ^3.14.10
         version: 3.14.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      dexie:
+        specifier: ^4.4.5
+        version: 4.4.5
       i18next:
         specifier: ^25.6.0
         version: 25.10.10(typescript@5.9.3)
@@ -2136,6 +2142,9 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dexie@4.4.5:
+    resolution: {integrity: sha512-wWCHdihT3dmlUSuNhn5mMZDWSpG0suxjAni7YjjiZdzabZcKmy3uNZGZ7AeYYXBoLbpSXX35fikPLkPC44Osiw==}
 
   dezalgo@1.0.4:
     resolution: {integrity: sha512-rXSP0bf+5n0Qonsb+SVVfNfIsimO4HEtmnIpPHY8Q1UCzKlQrDMfdobr8nJOOsRgWCyMRqeSBQzmWUMq7zvVig==}
@@ -5272,6 +5281,8 @@ snapshots:
   dequal@2.0.3: {}
 
   detect-libc@2.1.2: {}
+
+  dexie@4.4.5: {}
 
   dezalgo@1.0.4:
     dependencies:

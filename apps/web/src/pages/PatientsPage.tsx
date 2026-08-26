@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
+import PendingBadge from "../components/PendingBadge.js";
+import { useSync } from "../offline/SyncProvider.js";
 import { toggleLang } from "../i18n.js";
 
 interface PatientRow {
@@ -29,6 +31,7 @@ function ErrorBox({ error }: { error: unknown }) {
 function AddPatientForm() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { isOnline, enqueue } = useSync();
   const {
     register,
     handleSubmit,
@@ -37,8 +40,13 @@ function AddPatientForm() {
   } = useForm<PatientDto>({ resolver: zodResolver(PatientCreate) });
 
   const mutation = useMutation({
-    mutationFn: (dto: PatientDto) =>
-      apiFetch<PatientRow>("/patients", { method: "POST", body: JSON.stringify(dto) }),
+    mutationFn: async (dto: PatientDto) => {
+      if (!isOnline) {
+        await enqueue("patients", "create", dto);
+        return { id: "pending", firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone } as PatientRow;
+      }
+      return apiFetch<PatientRow>("/patients", { method: "POST", body: JSON.stringify(dto) });
+    },
     onSuccess: () => {
       reset();
       void qc.invalidateQueries({ queryKey: ["patients"] });
@@ -65,6 +73,7 @@ function AddPatientForm() {
 
 export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { t, i18n } = useTranslation();
+  const { isOnline } = useSync();
   const query = useQuery({
     queryKey: ["patients"],
     queryFn: () => apiFetch<PatientRow[]>("/patients?limit=50"),
@@ -80,7 +89,15 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
   return (
     <main style={{ maxWidth: 720, margin: "8vh auto" }}>
       <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
-      <h1>{t("patients.title")}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h1 style={{ margin: 0 }}>{t("patients.title")}</h1>
+        <PendingBadge />
+        {!isOnline && (
+          <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>
+            {t("common.offline")}
+          </span>
+        )}
+      </div>
       <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
       <button type="button" onClick={() => { clearAccessToken(); onLoggedOut(); }}>
         {t("home.logout")}
