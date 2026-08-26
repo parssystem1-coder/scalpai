@@ -172,3 +172,27 @@ export const usageCounters = pgTable("usage_counters", {
   periodStart: date("period_start").notNull(),
   value: bigint("value", { mode: "number" }).notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.clinicId, t.metric, t.periodStart] })]);
+
+export const mutations = pgTable("mutations", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  clinicId: uuid("clinic_id").notNull(),
+  userId: uuid("user_id"),
+  clientMutationId: uuid("client_mutation_id").notNull(),
+  entity: text("entity").notNull(),
+  op: text("op").notNull(),
+  payload: jsonb("payload").notNull(),
+  serverSeq: bigserial("server_seq", { mode: "number" }).notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const treatmentPlans = pgTable("treatment_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  patientId: uuid("patient_id").notNull(),
+  items: jsonb("items").notNull().default([]),
+  startDate: date("start_date"),
+  reviewIntervals: jsonb("review_intervals"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
