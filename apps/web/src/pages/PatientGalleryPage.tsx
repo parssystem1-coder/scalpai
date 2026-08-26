@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-q
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
-import { toggleLang } from "../i18n.js";
+import { faNum, toggleLang } from "../i18n.js";
 
 interface GalleryItem {
   id: string;
@@ -21,6 +21,21 @@ interface GalleryPage {
 }
 
 const COLS = 4;
+
+/** Presigned PUT with real progress — fetch cannot report upload bytes. */
+function putWithProgress(url: string, file: File, onPct: (p: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("content-type", file.type || "image/jpeg");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onPct(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`PUT ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error("network error during upload"));
+    xhr.send(file);
+  });
+}
 
 /** Dev-only perf harness: ?mock=N renders N synthetic tiles without API (Lighthouse). */
 function useMockItems(): GalleryItem[] | null {
@@ -43,6 +58,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [pct, setPct] = useState<number | null>(null);
   const mockItems = useMockItems();
 
   const galleryQuery = useInfiniteQuery({
@@ -64,11 +80,11 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
         `/patients/${pid}/gallery/init`,
         { method: "POST", body: JSON.stringify({ mime: file.type || "image/jpeg", sizeBytes: file.size }) },
       );
-      const put = await fetch(init.uploadUrl, { method: "PUT", body: file, headers: { "content-type": file.type || "image/jpeg" } });
-      if (!put.ok) throw new Error(t("gallery.uploadFailed"));
+      await putWithProgress(init.uploadUrl, file, setPct);
       return apiFetch(`/gallery/${init.id}/complete`, { method: "POST" });
     },
     onSuccess: () => {
+      setPct(null);
       setError(null);
       void qc.invalidateQueries({ queryKey: ["gallery", pid] });
     },
@@ -145,6 +161,14 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
             }}
           />
           {upload.isPending && <span> {t("gallery.processing")}</span>}
+        {upload.isPending && pct !== null && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flexGrow: 1, height: 8, background: "#e5e7eb", borderRadius: 4 }}>
+              <div data-testid="upload-bar" style={{ width: `${pct}%`, height: "100%", background: "#10b981", borderRadius: 4, transition: "width .2s" }} />
+            </div>
+            <span data-testid="upload-pct">{faNum(pct)}٪</span>
+          </div>
+        )}
           {error && (
             <p role="alert" style={{ color: "crimson" }}>
               {error}
@@ -180,6 +204,14 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
           }}
         />
         {upload.isPending && <span> {t("gallery.processing")}</span>}
+        {upload.isPending && pct !== null && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flexGrow: 1, height: 8, background: "#e5e7eb", borderRadius: 4 }}>
+              <div data-testid="upload-bar" style={{ width: `${pct}%`, height: "100%", background: "#10b981", borderRadius: 4, transition: "width .2s" }} />
+            </div>
+            <span data-testid="upload-pct">{faNum(pct)}٪</span>
+          </div>
+        )}
         {error && (
           <p role="alert" style={{ color: "crimson" }}>
             {error}
