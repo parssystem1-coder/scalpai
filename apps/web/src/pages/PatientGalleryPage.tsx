@@ -111,7 +111,9 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const renderCell = (it: GalleryItem) => (
     <figure key={it.id} style={{ margin: 0 }}>
       {it.thumbUrl ? (
-        <img src={it.thumbUrl} alt="" loading="lazy" style={{ width: "100%", height: 160, objectFit: "cover" }} />
+        <Link to={`/patients/${pid}/gallery/${it.id}`} state={{ viewUrl: it.viewUrl }}>
+          <img src={it.thumbUrl} alt="" loading="lazy" style={{ width: "100%", height: 160, objectFit: "cover" }} />
+        </Link>
       ) : (
         <div style={{ width: "100%", height: 160, background: "#ddd" }} />
       )}

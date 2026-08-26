@@ -44,7 +44,7 @@
 - [x] Media service (presigned URL, chunk upload, thumbnail, EXIF strip) — Slice M3 ✅ (completion: docs/tasks/phase2-M3-upload-pipeline-completion.md)
 - [x] Image quality-gate لوکال (blur/light/framing) — Slice M2 ✅ (completion: docs/tasks/phase2-M2-quality-gate-completion.md · fixture «تار رد شود» پاس)
 - [x] Slice M4 — گالری کارآمد: cursor API + وب virtualized + seed 500 + budget CI ✅ (completion: docs/tasks/phase2-M4-gallery-completion.md · اثبات پرفورمنس @perf به‌جای Lighthouse — انحراف مستند)
-- [ ] packages/analysis-engine: heuristic baseline + صفحه نتیجه (<۳ ثانیه) — M5
+- [x] packages/analysis-engine: heuristic baseline + صفحه نتیجه — Slice M5 ✅ (completion: docs/tasks/phase2-M5-analysis-engine-completion.md · @analysis سبز، موتور کلاینت ۹۲ms <۳s)
 - [ ] i18next کامل RTL-first + Auto-lock — M6 (+W16/W17 سخت‌سازی منتقله)
 
 ## فاز 3 — آفلاین و لایسنس

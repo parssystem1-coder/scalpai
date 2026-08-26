@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { DbService } from "@scalpai/db";
+import { AnalysesController } from "./analyses.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
 import { AuthService } from "./auth/auth.service.js";
 import { LoginThrottleService } from "./auth/login-throttle.service.js";
@@ -19,7 +20,7 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
 
 @Module({
   imports: [JwtModule.register({ secret: process.env.JWT_SECRET ?? "dev_only_secret_change_me_0123456789abcdef" })],
-  controllers: [AuthController, CoreController, PlansController, GalleryController],
+  controllers: [AuthController, CoreController, PlansController, GalleryController, AnalysesController],
   providers: [
     DbService,
     AuthService,
