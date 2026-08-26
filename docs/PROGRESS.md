@@ -38,8 +38,8 @@
 > گام بعدی الزامی طبق engineering-rules §11: گیت مستقل پایان فاز («گیت فاز را بگیر» با scalpai-gate) — self-declare ممنوع.
 
 ## فاز 2 — رسانه و تحلیل
-> ⏳ Gate: شروع شد — brief اجرایی: docs/playbooks/brief-phase2-media-analysis.md (slices M1..M6)
-> ترتیب: M1 (storage+ADR-0026+ایندکس‌ها) → M2 (quality-gate) → M3 (آپلود) → M4 (گالری) → M5 (موتور+نتیجه) → M6 (i18n/autolock/سخت‌سازی)
+> 🔒 Gate: PASS — 2026-08-26 — docs/gates/GATE_REVIEW_phase-2-retry-2026-08-26.md (اجرای مجدد پس از رفع blocking آپلود؛ گزارش اول: GATE_REVIEW_phase-2-2026-08-26.md = FAIL)
+> ترتیب اجرا شده: M1 → M2 → M3 → M4 → M5 → M6 → fix-upload-progress → گیت نهایی ✅
 - [x] Slice M1 — بستر Storage + ADR-0026 + ایندکس‌های W20 ✅ (completion: docs/tasks/phase2-M1-storage-completion.md · W20 بسته شد)
 - [x] Media service (presigned URL, chunk upload, thumbnail, EXIF strip) — Slice M3 ✅ (completion: docs/tasks/phase2-M3-upload-pipeline-completion.md)
 - [x] Image quality-gate لوکال (blur/light/framing) — Slice M2 ✅ (completion: docs/tasks/phase2-M2-quality-gate-completion.md · fixture «تار رد شود» پاس)
