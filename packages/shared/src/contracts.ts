@@ -92,6 +92,28 @@ export const ExpertReview = z.object({
   note: z.string().max(500).optional(),
 });
 
+/** §8 sync — one queued client mutation (payload shape is entity-specific). */
+export const SyncMutation = z.object({
+  clientMutationId: z.string().uuid(),
+  entity: z.enum(["patients", "treatment_plans", "analyses"]),
+  op: z.enum(["create", "update"]),
+  schemaVersion: z.number().int(),
+  clientUpdatedAt: z.string().datetime(),
+  baseVersion: z.string().nullable().optional(),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+export const SyncPush = z.object({
+  mutations: z.array(SyncMutation).min(1).max(100),
+});
+
+/** §8 — per-mutation result returned by POST /sync/push. */
+export const SyncPushResultItem = z.object({
+  clientMutationId: z.string().uuid(),
+  status: z.enum(["applied", "duplicate", "rejected"]),
+  reason: z.string().optional(),
+});
+
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
 export type TokenPair = z.infer<typeof TokenPair>;
@@ -108,3 +130,5 @@ export type AnalysisSubmit = z.infer<typeof AnalysisSubmit>;
 export type AnalysisSubmitDto = AnalysisSubmit;
 export type ExpertReview = z.infer<typeof ExpertReview>;
 export type ExpertReviewDto = ExpertReview;
+export type SyncPush = z.infer<typeof SyncPush>;
+export type SyncPushDto = SyncPush;

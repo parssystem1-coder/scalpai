@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "d8c9968",
+    "commit": "6e9af36",
     "dirty": true
   },
   "modules": [
@@ -32,7 +32,8 @@
       "dependsOn": [
         "@scalpai/analysis-core",
         "@scalpai/db",
-        "@scalpai/shared"
+        "@scalpai/shared",
+        "@scalpai/sync-client"
       ]
     },
     {
@@ -60,7 +61,9 @@
       "name": "@scalpai/db",
       "kind": "package",
       "dir": "packages/db",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/sync-client"
+      ]
     },
     {
       "name": "@scalpai/education",
@@ -104,6 +107,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 8
+    "dependencyEdges": 10
   }
 }

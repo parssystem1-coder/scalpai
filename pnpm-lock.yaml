@@ -101,6 +101,9 @@ importers:
       '@scalpai/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@scalpai/sync-client':
+        specifier: workspace:*
+        version: link:../../packages/sync-client
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
@@ -218,6 +221,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.0.2
         version: 2.1.0
+      '@scalpai/sync-client':
+        specifier: workspace:*
+        version: link:../sync-client
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)

@@ -16,6 +16,8 @@ const RLS_TABLES = [
   "entitlements",
   "usage_counters",
   "audit_log",
+  "mutations",
+  "treatment_plans",
 ];
 
 /** engineering-rules §1 + §4: business tables need clinic_id + RLS ENABLE/FORCE (ADR-0003). */

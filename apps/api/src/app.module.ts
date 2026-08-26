@@ -16,11 +16,12 @@ import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
 import { StorageService } from "./media/storage.service.js";
 import { PlansController } from "./plans.controller.js";
+import { SyncController } from "./sync.controller.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
 @Module({
   imports: [JwtModule.register({ secret: process.env.JWT_SECRET ?? "dev_only_secret_change_me_0123456789abcdef" })],
-  controllers: [AuthController, CoreController, PlansController, GalleryController, AnalysesController],
+  controllers: [AuthController, CoreController, PlansController, GalleryController, AnalysesController, SyncController],
   providers: [
     DbService,
     AuthService,

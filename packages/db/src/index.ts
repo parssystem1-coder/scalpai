@@ -31,6 +31,11 @@ export {
   saveExpertReview,
 } from "./repos/analyses.repo.js";
 export {
+  processPushBatch,
+  pullSince,
+} from "./repos/sync.repo.js";
+export type { PushItemResult } from "@scalpai/sync-client";
+export {
   findUserByEmail,
   touchLogin,
   resolveEntitlement,
