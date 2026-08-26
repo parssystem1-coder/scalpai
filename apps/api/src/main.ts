@@ -8,13 +8,20 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
+import { registerSecurityHeaders } from "./common/security-headers.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: false }));
   app.setGlobalPrefix("/api/v1");
   app.useGlobalFilters(new AllExceptionsFilter());
   // Web dev server (:5173) and future desktop shell call the API cross-origin.
-  app.enableCors({ origin: true, credentials: false });
+  // PATCH must be allowed explicitly (fastify-cors default omits it).
+  app.enableCors({
+    origin: true,
+    credentials: false,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
+  await registerSecurityHeaders(app);
   app.enableShutdownHooks();
 
   // Playbook 1.5 — automatic OpenAPI (JSON + minimal UI). Enriched in phase 4.
