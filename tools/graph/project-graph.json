@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "c538150",
+    "commit": "d8c9968",
     "dirty": true
   },
   "modules": [
@@ -90,7 +90,9 @@
       "name": "@scalpai/sync-client",
       "kind": "package",
       "dir": "packages/sync-client",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
     },
     {
       "name": "@scalpai/ui",
@@ -102,6 +104,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 7
+    "dependencyEdges": 8
   }
 }
