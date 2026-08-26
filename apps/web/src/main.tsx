@@ -7,6 +7,7 @@ import PatientsPage from "./pages/PatientsPage.js";
 import PatientGalleryPage from "./pages/PatientGalleryPage.js";
 import AnalysisPage from "./pages/AnalysisPage.js";
 import { isMockPerf } from "./dev-perf.js";
+import { SyncProvider } from "./offline/SyncProvider.js";
 import "./i18n.js";
 
 const queryClient = new QueryClient();
@@ -19,45 +20,47 @@ function App() {
     setAuthed(v);
   };
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={authed ? <Navigate to="/patients" replace /> : <LoginPage onLoggedIn={() => setAuthedBoth(true)} />}
-      />
-      <Route
-        path="/patients"
-        element={
-          authed ? (
-            <PatientsPage
-              onLoggedOut={() => setAuthedBoth(false)}
-            />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/patients/:pid/gallery"
-        element={
-          authed || isMockPerf() ? (
-            <PatientGalleryPage onLoggedOut={() => setAuthedBoth(false)} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/patients/:pid/gallery/:gid"
-        element={
-          authed ? (
-            <AnalysisPage onLoggedOut={() => setAuthedBoth(false)} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to={authed ? "/patients" : "/login"} replace />} />
-    </Routes>
+    <SyncProvider>
+      <Routes>
+        <Route
+          path="/login"
+          element={authed ? <Navigate to="/patients" replace /> : <LoginPage onLoggedIn={() => setAuthedBoth(true)} />}
+        />
+        <Route
+          path="/patients"
+          element={
+            authed ? (
+              <PatientsPage
+                onLoggedOut={() => setAuthedBoth(false)}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/patients/:pid/gallery"
+          element={
+            authed || isMockPerf() ? (
+              <PatientGalleryPage onLoggedOut={() => setAuthedBoth(false)} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/patients/:pid/gallery/:gid"
+          element={
+            authed ? (
+              <AnalysisPage onLoggedOut={() => setAuthedBoth(false)} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to={authed ? "/patients" : "/login"} replace />} />
+      </Routes>
+    </SyncProvider>
   );
 }
 

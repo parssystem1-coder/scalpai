@@ -1,6 +1,6 @@
 {
   "generatedFrom": {
-    "commit": "6e9af36",
+    "commit": "346c3b0",
     "dirty": true
   },
   "modules": [
@@ -54,7 +54,8 @@
       "dir": "apps/web",
       "dependsOn": [
         "@scalpai/analysis-engine",
-        "@scalpai/shared"
+        "@scalpai/shared",
+        "@scalpai/sync-client"
       ]
     },
     {
@@ -107,6 +108,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 10
+    "dependencyEdges": 11
   }
 }

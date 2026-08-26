@@ -9,7 +9,7 @@ const fa = {
     submit: "ورود",
   },
   home: { title: "خوش آمدید", logout: "خروج" },
-  common: { loading: "در حال بارگذاری…", delete: "حذف", back: "بازگشت", langLabel: "زبان" },
+  common: { loading: "در حال بارگذاری…", delete: "حذف", back: "بازگشت", langLabel: "زبان", offline: "آفلاین" },
   patients: {
     title: "بیماران",
     name: "نام",
@@ -51,7 +51,7 @@ const fa = {
 const en = {
   login: { title: "Sign in to ScalpAI", email: "Email", password: "Password", submit: "Sign in" },
   home: { title: "Welcome", logout: "Sign out" },
-  common: { loading: "Loading…", delete: "Delete", back: "Back", langLabel: "Language" },
+  common: { loading: "Loading…", delete: "Delete", back: "Back", langLabel: "Language", offline: "Offline" },
   patients: {
     title: "Patients",
     name: "First name",
