@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
 import { faNum, toggleLang } from "../i18n.js";
+import { uploadChunked, getPendingUploads, type ChunkedUploadState } from "../offline/chunked-upload.js";
 
 interface GalleryItem {
   id: string;
@@ -21,21 +22,6 @@ interface GalleryPage {
 }
 
 const COLS = 4;
-
-/** Presigned PUT with real progress — fetch cannot report upload bytes. */
-function putWithProgress(url: string, file: File, onPct: (p: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("content-type", file.type || "image/jpeg");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onPct(Math.min(99, Math.round((e.loaded / e.total) * 100)));
-    };
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`PUT ${xhr.status}`)));
-    xhr.onerror = () => reject(new Error("network error during upload"));
-    xhr.send(file);
-  });
-}
 
 /** Dev-only perf harness: ?mock=N renders N synthetic tiles without API (Lighthouse). */
 function useMockItems(): GalleryItem[] | null {
@@ -59,7 +45,13 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [pct, setPct] = useState<number | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<ChunkedUploadState[]>([]);
   const mockItems = useMockItems();
+
+  // refresh pending uploads on mount and after uploads
+  useEffect(() => {
+    setPendingUploads(getPendingUploads());
+  }, []);
 
   const galleryQuery = useInfiniteQuery({
     queryKey: ["gallery", pid],
@@ -76,16 +68,13 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
-      const init = await apiFetch<{ id: string; uploadUrl: string }>(
-        `/patients/${pid}/gallery/init`,
-        { method: "POST", body: JSON.stringify({ mime: file.type || "image/jpeg", sizeBytes: file.size }) },
-      );
-      await putWithProgress(init.uploadUrl, file, setPct);
-      return apiFetch(`/gallery/${init.id}/complete`, { method: "POST" });
+      await uploadChunked(file, pid, setPct);
+      setPendingUploads(getPendingUploads());
     },
     onSuccess: () => {
       setPct(null);
       setError(null);
+      setPendingUploads(getPendingUploads());
       void qc.invalidateQueries({ queryKey: ["gallery", pid] });
     },
     onError: (e) => {
@@ -125,22 +114,43 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
     enabled: items.length > COLS,
   });
 
-  const renderCell = (it: GalleryItem) => (
-    <figure key={it.id} style={{ margin: 0 }}>
-      {it.thumbUrl ? (
-        <Link to={`/patients/${pid}/gallery/${it.id}`} state={{ viewUrl: it.viewUrl }}>
-          <img src={it.thumbUrl} alt="" loading="lazy" style={{ width: "100%", height: 160, objectFit: "cover" }} />
-        </Link>
-      ) : (
-        <div style={{ width: "100%", height: 160, background: "#ddd" }} />
-      )}
-      {!mockItems && (
-        <button type="button" onClick={() => remove.mutate(it.id)}>
-          {t("common.delete")}
-        </button>
-      )}
-    </figure>
-  );
+  const renderCell = (it: GalleryItem) => {
+    const pending = pendingUploads.find((p) => p.galleryItemId === it.id);
+    return (
+      <figure key={it.id} style={{ margin: 0, position: "relative" }}>
+        {it.thumbUrl ? (
+          <Link to={`/patients/${pid}/gallery/${it.id}`} state={{ viewUrl: it.viewUrl }}>
+            <img src={it.thumbUrl} alt="" loading="lazy" style={{ width: "100%", height: 160, objectFit: "cover" }} />
+          </Link>
+        ) : (
+          <div style={{ width: "100%", height: 160, background: "#ddd" }} />
+        )}
+        {pending && (
+          <span
+            data-testid="pending-upload-badge"
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              background: "#f59e0b",
+              color: "#fff",
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "2px 6px",
+              borderRadius: 8,
+            }}
+          >
+            {pending.completedParts.length}/{pending.totalParts}
+          </span>
+        )}
+        {!mockItems && (
+          <button type="button" onClick={() => remove.mutate(it.id)}>
+            {t("common.delete")}
+          </button>
+        )}
+      </figure>
+    );
+  };
 
   // Small galleries skip virtualization entirely (simpler DOM, better a11y).
   if (items.length <= COLS) {

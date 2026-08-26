@@ -1,6 +1,6 @@
 # Project Graph
 
-**Generated** by `pnpm graph` from commit `346c3b0` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `pnpm graph` from commit `935142b` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 
