@@ -244,7 +244,11 @@ importers:
         specifier: ^4.1.13
         version: 4.4.3
 
-  packages/sync-client: {}
+  packages/sync-client:
+    dependencies:
+      '@scalpai/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/ui: {}
 
