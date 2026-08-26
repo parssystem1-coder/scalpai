@@ -3,6 +3,9 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import { createEngine } from "@scalpai/analysis-engine";
+import { useTranslation } from "react-i18next";
+import { faNum, toggleLang } from "../i18n.js";
+import AutoLock from "../components/AutoLock.js";
 
 interface Scores {
   redness: number;
@@ -14,14 +17,15 @@ interface Saved {
   id: string;
 }
 
-const SCORE_LABELS: Array<{ key: keyof Scores; fa: string }> = [
-  { key: "redness", fa: "قرمزی" },
-  { key: "flakeTexture", fa: "بافت پوسته" },
-  { key: "densityProxy", fa: "شاخص تراکم" },
+const SCORE_LABELS: Array<{ key: keyof Scores }> = [
+  { key: "redness" },
+  { key: "flakeTexture" },
+  { key: "densityProxy" },
 ];
 
 export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { pid = "", gid = "" } = useParams();
+  const { t, i18n } = useTranslation();
   const location = useLocation() as { state?: { viewUrl?: string } };
   const viewUrlFromState = location.state?.viewUrl ?? null;
 
@@ -92,10 +96,12 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
   return (
     <main style={{ maxWidth: 720, margin: "4vh auto" }}>
-      <h1>نتیجه تحلیل</h1>
-      <Link to={`/patients/${pid}/gallery`}>بازگشت به گالری</Link>
+      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
+      <h1>{t("analysis.title")}</h1>
+      <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+      <Link to={`/patients/${pid}/gallery`}>{t("analysis.back")}</Link>
 
-      {!scores && !error && <p>در حال اجرای موتور تحلیل…</p>}
+      {!scores && !error && <p>{t("analysis.running")}</p>}
       {error && (
         <p role="alert" style={{ color: "crimson" }}>
           {error}
@@ -105,25 +111,26 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
       {scores && (
         <>
           <p>
-            زمان تحلیل: <strong data-testid="elapsed">{elapsedMs}</strong> میلی‌ثانیه · مدل heuristic-v0
+            {t("analysis.elapsed")} <strong data-testid="elapsed">{faNum(elapsedMs)}</strong> {t("analysis.msUnit")}
           </p>
           <ul style={{ listStyle: "none", padding: 0 }}>
-            {SCORE_LABELS.map(({ key, fa }) => (
+              {SCORE_LABELS.map(({ key }) => (
               <li key={key}>
-                {fa}: <strong data-testid={`score-${key}`}>{adjusted?.[key] ?? scores[key]}</strong> / ۱۰۰
+                {t(`analysis.${key}`)}:{" "}
+                <strong data-testid={`score-${key}`}>{faNum(adjusted?.[key] ?? scores[key])}</strong> / {faNum(100)}
               </li>
             ))}
           </ul>
           <p>
-            شدت کل: <strong>{severity}</strong> / ۱۰۰
+            {t("analysis.severity")} <strong>{faNum(severity)}</strong> / {faNum(100)}
           </p>
 
           {!reviewDone ? (
             <section>
-              <h2>بازبینی متخصص</h2>
-              {SCORE_LABELS.map(({ key, fa }) => (
+              <h2>{t("analysis.reviewTitle")}</h2>
+            {SCORE_LABELS.map(({ key }) => (
                 <label key={key} style={{ display: "block" }}>
-                  {fa}
+                  {t(`analysis.${key}`)}
                   <input
                     type="range"
                     min={0}
@@ -134,7 +141,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
                 </label>
               ))}
               <input
-                placeholder="یادداشت (اختیاری)"
+                placeholder={t("analysis.notePh")}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 style={{ width: "60%" }}
@@ -150,7 +157,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
                 }
                 disabled={!saved || review.isPending}
               >
-                ثبت اصلاح
+                {t("analysis.adjust")}
               </button>
               <button
                 type="button"
@@ -158,12 +165,12 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
                 disabled={!saved || review.isPending}
                 data-testid="confirm"
               >
-                تأیید نتیجه
+                {t("analysis.confirm")}
               </button>
               <span data-testid="review-status">{saved ? `saved:${saved.id.slice(0, 6)}` : "nosave"}:{review.status}</span>
             </section>
           ) : (
-            <p data-testid="saved">نتیجه ذخیره شد و بازبینی ثبت گردید ✓</p>
+            <p data-testid="saved">{t("analysis.saved")}</p>
           )}
         </>
       )}
