@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
+import AutoLock from "../components/AutoLock.js";
+import { toggleLang } from "../i18n.js";
 
 interface PatientRow {
   id: string;
@@ -24,6 +27,7 @@ function ErrorBox({ error }: { error: unknown }) {
 }
 
 function AddPatientForm() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const {
     register,
@@ -42,20 +46,25 @@ function AddPatientForm() {
   });
 
   return (
-    <form onSubmit={handleSubmit((dto) => mutation.mutate(dto))} noValidate aria-label="فرم ایجاد بیمار">
-      <input placeholder="نام" {...register("firstName")} />
-      <input placeholder="نام خانوادگی" {...register("lastName")} />
-      <input placeholder="09xxxxxxxxx" {...register("phone")} />
+    <form
+      onSubmit={handleSubmit((dto) => mutation.mutate(dto))}
+      noValidate
+      aria-label="فرم ایجاد بیمار"
+    >
+      <input placeholder={t("patients.name")} {...register("firstName")} />
+      <input placeholder={t("patients.family")} {...register("lastName")} />
+      <input placeholder={t("patients.phonePh")} {...register("phone")} />
       <button type="submit" disabled={mutation.isPending}>
-        افزودن
+        {t("patients.add")}
       </button>
       <ErrorBox error={mutation.error} />
-      {(errors.firstName || errors.lastName || errors.phone) && <p>ورودی را بررسی کنید</p>}
+      {(errors.firstName || errors.lastName || errors.phone) && <p>{t("patients.checkInput")}</p>}
     </form>
   );
 }
 
 export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const { t, i18n } = useTranslation();
   const query = useQuery({
     queryKey: ["patients"],
     queryFn: () => apiFetch<PatientRow[]>("/patients?limit=50"),
@@ -70,25 +79,22 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
 
   return (
     <main style={{ maxWidth: 720, margin: "8vh auto" }}>
-      <h1>بیماران</h1>
-      <button
-        onClick={() => {
-          clearAccessToken();
-          onLoggedOut();
-        }}
-      >
-        خروج
+      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
+      <h1>{t("patients.title")}</h1>
+      <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+      <button type="button" onClick={() => { clearAccessToken(); onLoggedOut(); }}>
+        {t("home.logout")}
       </button>
       <AddPatientForm />
       <ErrorBox error={query.error} />
       {query.isLoading ? (
-        <p>در حال بارگذاری…</p>
+        <p>{t("common.loading")}</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>نام</th>
-              <th>تلفن</th>
+              <th>{t("patients.colName")}</th>
+              <th>{t("patients.colPhone")}</th>
             </tr>
           </thead>
           <tbody>

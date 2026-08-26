@@ -8,6 +8,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
+import { registerSecurityHeaders } from "./common/security-headers.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: false }));
@@ -20,6 +21,7 @@ async function bootstrap(): Promise<void> {
     credentials: false,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
+  await registerSecurityHeaders(app);
   app.enableShutdownHooks();
 
   // Playbook 1.5 — automatic OpenAPI (JSON + minimal UI). Enriched in phase 4.

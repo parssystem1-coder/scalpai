@@ -20,4 +20,12 @@ export const errors = {
   validation: (details: unknown) => new ApiError(400, { code: "VALIDATION_ERROR", message: "ورودی نامعتبر", details }),
   quotaExceeded: () => new ApiError(403, { code: "QUOTA_EXCEEDED", message: "سهمیه پلن تکمیل شده است" }),
   featureDisabled: (f: string) => new ApiError(403, { code: "FEATURE_DISABLED", message: `فیچر فعال نیست: ${f}` }),
+  tooManyRequests: (msg = "تعداد تلاش‌ها بیش از حد مجاز است") =>
+    new ApiError(429, { code: "TOO_MANY_REQUESTS", message: msg }),
+  loginLocked: (retryAfterSecs: number) =>
+    new ApiError(429, {
+      code: "LOGIN_LOCKED",
+      message: `به‌دلیل تلاش‌های ناموفق، ورود موقتاً قفل شد. ${retryAfterSecs} ثانیه دیگر تلاش کنید`,
+      details: { retryAfterSecs },
+    }),
 };

@@ -5,6 +5,7 @@ import { DbService } from "@scalpai/db";
 import { AnalysesController } from "./analyses.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
 import { AuthService } from "./auth/auth.service.js";
+import { LoginThrottleService } from "./auth/login-throttle.service.js";
 import { JwtAccessGuard } from "./auth/jwt-access.guard.js";
 import { FeatureGuard } from "./common/feature.guard.js";
 import { QuotaGuard } from "./common/quota.guard.js";
@@ -25,6 +26,7 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
     AuthService,
     TenantScope,
     EntitlementService,
+    LoginThrottleService,
     StorageService,
     RolesGuard,
     FeatureGuard,

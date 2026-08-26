@@ -31,13 +31,15 @@
 
 ## 🕒 پایین / بدهی آینده (فاز مقصد مشخص)
 
-- [ ] **W16 — rate-limit لاگین / قفل تدریجی brute-force غایب** (§5/§13) — 🕒 فاز ۲ (قبل از اولین استقرار واقعی)
-- [ ] **W17 — helmet/CSP و هدرهای امنیتی غایب** (§13) — 🕒 فاز ۲
+- [x] **W16 — rate-limit لاگین / قفل تدریجی brute-force غایب** (§5/§13) — ✅ رفع: Slice M6 فاز ۲ — LoginThrottleService ‏(قفل تدریجی per-email + پنجره per-IP، 429 با کد صریح)
+- [x] **W17 — helmet/CSP و هدرهای امنیتی غایب** (§13) — ✅ رفع: Slice M6 فاز ۲ — helmet ‏(HSTS/nosniff/frame) روی API؛ CSP سند HTML به وب اپ فاز ۴
 - [ ] **W18 — web بدون router** (`main.tsx:11` state ساده authed) — 🕒 فاز ۴ (قبل از دیزاین‌سیستم)
 - [ ] **W19 — i18n ناسازگار** — LoginPage از `t()` استفاده می‌کند، PatientsPage رشته hardcode فارسی دارد — 🕒 فاز ۴ (با i18next کامل)
 - [x] **W20 — مرور ایندکس‌های composite** — مثلاً `(clinic_id, start_at)` روی sessions — ✅ رفع: Slice M1 فاز ۲ — migration 0005 سه ایندکس composite (sessions/gallery_items/analyses)
 - [x] **W21 — معناشناسی دوگانه زنجیره audit** — نوشتن per-clinic زیر RLS ولی `verifyChain` global را می‌گوید که از دید نقش اپ قابل اجرا نیست؛ نیاز به تصمیم+مستندسازی (کامنت/ADR کوچک) — همراه W06 در Slice H — ✅ حکم: زنجیره per-clinic است؛ کامنت رسمی در core.repo.ts (`3449845`)
 - [ ] **W22 — ریسک ظرفیت تک‌نفره در برابر وسعت ۸ فاز** — فرآیندی؛ دفاع: قید §15، Tier-B بعد از فاز ۵، کادنس slice — همیشه باز (پایشی)
+
+- [ ] **W23 — فرآیند: فایل‌ها از staging جامانده (۳ بار CI fail)** — ریشه: git add با لیست دستی در slice های چند-مخزنی + ساخت برنچ از main به‌روزنشده. قانون اصلاحی: `git add -A` سراسری + بازبینی `git status --short` پیش از push + **checkout main && pull قبل از هر برنچ جدید**
 
 ## نقشه اتصال به اجرا
 
@@ -47,6 +49,6 @@
 | T3 | W04 · W05 (+ حکم W13) |
 | H — db-hardening | W02 · W03 · W06 · W07 · W15 (+ حکم W21) |
 | T6 — playbook gaps | W08 · W09 · W10 · W11 |
-| فاز ۲+ | W12 · W14 · W16 · W17 · W18 · W19 · W20 |
+| فاز ۲ | W16 · W17 · W20 (بسته شدند) · W23 (فرآیندی، باز)
 
 > W22 هرگز «بسته» نمی‌شود؛ معیار پایش در هر گیت: هیچ کار Tier-B قبل از فاز ۵ شروع نشده باشد.

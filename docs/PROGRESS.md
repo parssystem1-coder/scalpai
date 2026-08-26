@@ -45,7 +45,12 @@
 - [x] Image quality-gate لوکال (blur/light/framing) — Slice M2 ✅ (completion: docs/tasks/phase2-M2-quality-gate-completion.md · fixture «تار رد شود» پاس)
 - [x] Slice M4 — گالری کارآمد: cursor API + وب virtualized + seed 500 + budget CI ✅ (completion: docs/tasks/phase2-M4-gallery-completion.md · اثبات پرفورمنس @perf به‌جای Lighthouse — انحراف مستند)
 - [x] packages/analysis-engine: heuristic baseline + صفحه نتیجه — Slice M5 ✅ (completion: docs/tasks/phase2-M5-analysis-engine-completion.md · @analysis سبز، موتور کلاینت ۹۲ms <۳s)
-- [ ] i18next کامل RTL-first + Auto-lock — M6 (+W16/W17 سخت‌سازی منتقله)
+- [x] Slice M6 — i18n کامل + Auto-lock + سخت‌سازی W16/W17 ✅ (completion: docs/tasks/phase2-M6-hardening-i18n-completion.md)
+- [x] i18next کامل RTL-first + Auto-lock — M6
+- [x] rate-limit/helmet منتقله — M6 (W16/W17 بسته شدند)
+
+> **✅ همه slice های brief فاز ۲ اجرا شدند (M1..M6) — فاز ۲ «آماده گیت» است.**
+> گام بعدی الزامی: گیت مستقل پایان فاز ۲ («گیت فاز را بگیر» با scalpai-gate).
 
 ## فاز 3 — آفلاین و لایسنس
 - [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent

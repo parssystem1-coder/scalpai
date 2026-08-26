@@ -1,8 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
+import AutoLock from "../components/AutoLock.js";
+import { toggleLang } from "../i18n.js";
 
 interface GalleryItem {
   id: string;
@@ -37,6 +40,7 @@ function useMockItems(): GalleryItem[] | null {
 
 export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { pid = "" } = useParams();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const mockItems = useMockItems();
@@ -61,7 +65,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
         { method: "POST", body: JSON.stringify({ mime: file.type || "image/jpeg", sizeBytes: file.size }) },
       );
       const put = await fetch(init.uploadUrl, { method: "PUT", body: file, headers: { "content-type": file.type || "image/jpeg" } });
-      if (!put.ok) throw new Error("آپلود به storage ناموفق بود");
+      if (!put.ok) throw new Error(t("gallery.uploadFailed"));
       return apiFetch(`/gallery/${init.id}/complete`, { method: "POST" });
     },
     onSuccess: () => {
@@ -116,7 +120,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
       )}
       {!mockItems && (
         <button type="button" onClick={() => remove.mutate(it.id)}>
-          حذف
+          {t("common.delete")}
         </button>
       )}
     </figure>
@@ -140,7 +144,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
               e.target.value = "";
             }}
           />
-          {upload.isPending && <span> در حال پردازش…</span>}
+          {upload.isPending && <span> {t("gallery.processing")}</span>}
           {error && (
             <p role="alert" style={{ color: "crimson" }}>
               {error}
@@ -158,14 +162,16 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
 
   return (
     <main style={{ maxWidth: 980, margin: "4vh auto" }}>
-      <h1>گالری بیمار</h1>
-      <Link to="/patients">بازگشت به بیماران</Link>
+      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
+      <h1>{t("gallery.title")}</h1>
+      <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+      <Link to="/patients">{t("gallery.back")}</Link>
 
       <div style={{ margin: "12px 0" }}>
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          aria-label="انتخاب تصویر"
+          aria-label={t("gallery.pick")}
           disabled={upload.isPending}
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -173,7 +179,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
             e.target.value = "";
           }}
         />
-        {upload.isPending && <span> در حال پردازش…</span>}
+        {upload.isPending && <span> {t("gallery.processing")}</span>}
         {error && (
           <p role="alert" style={{ color: "crimson" }}>
             {error}
@@ -182,9 +188,9 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
       </div>
 
       {galleryQuery.isLoading && !mockItems ? (
-        <p>در حال بارگذاری…</p>
+        <p>{t("common.loading")}</p>
       ) : items.length === 0 ? (
-        <p>تصویری ثبت نشده است.</p>
+        <p>{t("gallery.empty")}</p>
       ) : (
         <div
           ref={scrollRef}

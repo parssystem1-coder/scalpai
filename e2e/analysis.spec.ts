@@ -37,7 +37,9 @@ test("@analysis upload, analyze under 3s, expert review", async ({ page }) => {
   await tile.click();
   const elapsed = page.getByTestId("elapsed");
   await elapsed.waitFor({ timeout: 15_000 });
-  const ms = Number((await elapsed.textContent()) ?? "0");
+  // UI renders Persian digits (fa locale) — normalize before parsing
+  const raw = (await elapsed.textContent()) ?? "0";
+  const ms = Number(raw.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))));
   console.log(`[analysis] client engine elapsed: ${ms}ms`);
   expect(ms).toBeGreaterThan(0);
   expect(ms).toBeLessThan(3000); // §10.5 budget proxy
