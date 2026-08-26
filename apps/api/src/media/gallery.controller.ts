@@ -20,6 +20,7 @@ import { StorageService } from "./storage.service.js";
 import { MIME_TO_KIND, sniffImageMime } from "./magic.js";
 
 const MAX_EDGE = 2048;
+const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks for multipart upload
 
 /**
  * Media pipeline (playbook 2.1): init issues a tenant-prefixed presigned PUT,
@@ -47,6 +48,43 @@ export class GalleryController {
     );
     const uploadUrl = await this.storage.presignPut(this.scope.requireCtx().clinicId, rest, dto.mime);
     return { id: created.id, uploadUrl, key: rest };
+  }
+
+  /** §Multipart: init for large files (>8MB). Returns presigned URLs for each chunk. */
+  @Post("patients/:pid/gallery/init-multipart")
+  @Roles("owner", "trichologist", "receptionist")
+  async initMultipart(@Param("pid") pid: string, @Body(new ZodBodyPipe(GalleryInit)) dto: GalleryInitDto) {
+    const ext = MIME_TO_KIND[dto.mime];
+    const rest = `gallery/${randomUUID()}/original.${ext}`;
+    const created = await this.scope.tx(async (tx, ctx) =>
+      createPendingGalleryItem(tx, ctx.clinicId, {
+        patientId: pid,
+        storageKey: rest,
+        mime: dto.mime,
+        sizeBytes: dto.sizeBytes,
+        userId: ctx.userId,
+      }),
+    );
+    const totalParts = Math.ceil(dto.sizeBytes / CHUNK_SIZE);
+    const ctx = this.scope.requireCtx();
+    const { uploadId, partUrls } = await this.storage.initiateMultipartUpload(ctx.clinicId, rest, dto.mime, totalParts);
+    return { id: created.id, uploadId, partUrls, totalParts, key: rest };
+  }
+
+  /** §Multipart: complete with ETags from each part upload. */
+  @Post("gallery/:gid/complete-multipart")
+  @Roles("owner", "trichologist", "receptionist")
+  @HttpCode(HttpStatus.OK)
+  async completeMultipart(
+    @Param("gid") gid: string,
+    @Body() body: { uploadId: string; parts: { partNumber: number; etag: string }[] },
+  ): Promise<unknown> {
+    const ctx = this.scope.requireCtx();
+    const item = await this.scope.tx((tx) => getGalleryItem(tx, ctx.clinicId, gid));
+    if (!item || item.uploadState !== "pending") throw errors.notFound();
+    await this.storage.completeMultipartUpload(ctx.clinicId, item.storageKey, body.uploadId, body.parts);
+    // delegate to the existing complete pipeline (quality gate, thumbnail, etc.)
+    return this.complete(gid);
   }
 
   @Post("gallery/:gid/complete")

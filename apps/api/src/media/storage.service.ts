@@ -6,6 +6,10 @@ import {
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -77,5 +81,39 @@ export class StorageService implements OnModuleInit {
   async removeObject(clinicId: string, rest: string): Promise<void> {
     const key = StorageService.clinicKey(clinicId, rest);
     await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  /** §Multipart: Initiate multipart upload → { uploadId, partUrls } */
+  async initiateMultipartUpload(clinicId: string, rest: string, contentType: string, totalParts: number): Promise<{ uploadId: string; partUrls: string[] }> {
+    const key = StorageService.clinicKey(clinicId, rest);
+    const res = await this.s3.send(new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }));
+    const uploadId = res.UploadId!;
+    const partUrls: string[] = [];
+    for (let i = 1; i <= totalParts; i++) {
+      const url = await getSignedUrl(
+        this.s3,
+        new UploadPartCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId, PartNumber: i }),
+        { expiresIn: PUT_TTL_S },
+      );
+      partUrls.push(url);
+    }
+    return { uploadId, partUrls };
+  }
+
+  /** §Multipart: Complete multipart upload with ETags. */
+  async completeMultipartUpload(clinicId: string, rest: string, uploadId: string, parts: { partNumber: number; etag: string }[]): Promise<void> {
+    const key = StorageService.clinicKey(clinicId, rest);
+    await this.s3.send(new CompleteMultipartUploadCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
+    }));
+  }
+
+  /** §Multipart: Abort multipart upload (cleanup on failure). */
+  async abortMultipartUpload(clinicId: string, rest: string, uploadId: string): Promise<void> {
+    const key = StorageService.clinicKey(clinicId, rest);
+    await this.s3.send(new AbortMultipartUploadCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId })).catch(() => {});
   }
 }
