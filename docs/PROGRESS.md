@@ -53,7 +53,10 @@
 > گام بعدی الزامی: گیت مستقل پایان فاز ۲ («گیت فاز را بگیر» با scalpai-gate).
 
 ## فاز 3 — آفلاین و لایسنس
-- [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent
+> ⏳ Gate: شروع شد — brief: docs/playbooks/brief-phase3-offline-licensing.md (slices P1..P7)
+> ترتیب: P1 (sync-core خالص) → P2 (Sync API) → P3 (وب آفلاین) → P4 (resume) → P5 (licensing) → P6 (self-hosted/بکاپ/anchor) → P7 (consent+PWA)
+- [ ] Slice P1 — packages/sync-client هسته خالص + ADR-0027
+- [ ] packages/sync-client (Outbox+Cursor+سیاست تعارض per-entity+schemaVersion) + Sync API idempotent — P2/P3
 - [ ] آپلود resume + pending_upload badge
 - [ ] Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت
 - [ ] ops/: docker-compose self-hosted + Caddy + بکاپ داخلی
