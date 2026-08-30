@@ -44,5 +44,5 @@
     "packages/*",
     "tools/*"
   ],
-  "packageManager": "npm@10.8.2"
+  "packageManager": "pnpm@10.15.1"
 }
