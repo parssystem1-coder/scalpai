@@ -1,4 +1,4 @@
-﻿import { loadEnv } from "./load-env.js";
+import { loadEnv } from "./load-env.js";
 loadEnv();
 import { randomUUID } from "node:crypto";
 import { hash } from "@node-rs/argon2";
@@ -98,9 +98,9 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
 
 const isCli = process.argv[1]?.replace(/\\/g, "/").endsWith("seed.ts");
 if (isCli) {
-  const url = process.env.MIGRATE_DATABASE_URL;
+  const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
   if (!url) {
-    console.error("MIGRATE_DATABASE_URL is required");
+    console.error("MIGRATE_DATABASE_URL or DATABASE_URL is required");
     process.exit(1);
   }
   seed(url)

@@ -1,10 +1,10 @@
-﻿import { loadEnv } from "./load-env.js";
+import { loadEnv } from "./load-env.js";
 loadEnv();
 import { migrate } from "./migrate.js";
 
-const url = process.env.MIGRATE_DATABASE_URL;
+const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
 if (!url) {
-  console.error("MIGRATE_DATABASE_URL is required");
+  console.error("MIGRATE_DATABASE_URL or DATABASE_URL is required");
   process.exit(1);
 }
 
