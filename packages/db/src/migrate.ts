@@ -21,11 +21,12 @@ export function sqlDir(root = process.cwd()): string {
   return p;
 }
 
-export async function migrate(migrateUrl: string, opts?: { dir?: string }): Promise<MigrateResult> {
+export async function migrate(config: string | import("pg").PoolConfig, opts?: { dir?: string }): Promise<MigrateResult> {
   const dir = opts?.dir ?? sqlDir();
   const appRolePassword =
     process.env.APP_ROLE_PASSWORD ?? process.env.PGPASSWORD_APP ?? "scalpai_dev_only";
-  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
+  const poolConfig = typeof config === "string" ? { connectionString: config, max: 1 } : { ...config, max: 1 };
+  const pool = new Pool(poolConfig);
   const client = await pool.connect();
   const applied: string[] = [];
   const skipped: string[] = [];

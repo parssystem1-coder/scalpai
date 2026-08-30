@@ -9,8 +9,9 @@ import { Pool } from "pg";
  * one user per role for clinic A, starter+growth plans, entitlements.
  * Idempotent: skips when the marker clinic already exists.
  */
-export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; clinicA?: string; clinicB?: string }> {
-  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
+export async function seed(config: string | import("pg").PoolConfig): Promise<{ skipped?: boolean; clinicA?: string; clinicB?: string }> {
+  const poolConfig = typeof config === "string" ? { connectionString: config, max: 1 } : { ...config, max: 1 };
+  const pool = new Pool(poolConfig);
   const client = await pool.connect();
   try {
     const marker = await client.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
@@ -98,12 +99,26 @@ export async function seed(migrateUrl: string): Promise<{ skipped?: boolean; cli
 
 const isCli = process.argv[1]?.replace(/\\/g, "/").endsWith("seed.ts");
 if (isCli) {
-  const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
-  if (!url) {
-    console.error("MIGRATE_DATABASE_URL or DATABASE_URL is required");
-    process.exit(1);
+  let config: string | import("pg").PoolConfig;
+
+  if (process.env.SQL_HOST) {
+    config = {
+      host: process.env.SQL_HOST,
+      user: process.env.SQL_ADMIN_USER,
+      password: process.env.SQL_ADMIN_PASSWORD,
+      database: process.env.SQL_DB_NAME,
+      port: process.env.SQL_PORT ? Number(process.env.SQL_PORT) : undefined,
+    };
+  } else {
+    const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
+    if (!url) {
+      console.error("MIGRATE_DATABASE_URL or DATABASE_URL is required");
+      process.exit(1);
+    }
+    config = url;
   }
-  seed(url)
+  
+  seed(config)
     .then((r) => {
       console.log(r.skipped ? "seed: already seeded" : "seed: done (2 clinics)");
       process.exit(0);
