@@ -18,7 +18,7 @@ export class StorageService implements OnModuleInit {
   async ensureBucket(): Promise<void> {
   }
 
-  async presignPut(clinicId: string, rest: string, contentType: string): Promise<string> {
+  async presignPut(clinicId: string, rest: string, _contentType: string): Promise<string> {
     const key = StorageService.clinicKey(clinicId, rest);
     // Return a mock URL that we can intercept if we had an endpoint, but since it's signed URL, 
     // the frontend will try to PUT to it. We need a local API endpoint for it, or just return a dummy.
@@ -36,7 +36,7 @@ export class StorageService implements OnModuleInit {
     return MOCK_STORAGE.get(key) || Buffer.from('');
   }
 
-  async putBuffer(clinicId: string, rest: string, body: Buffer, contentType: string): Promise<void> {
+  async putBuffer(clinicId: string, rest: string, body: Buffer, _contentType: string): Promise<void> {
     const key = StorageService.clinicKey(clinicId, rest);
     MOCK_STORAGE.set(key, body);
   }
@@ -46,7 +46,7 @@ export class StorageService implements OnModuleInit {
     MOCK_STORAGE.delete(key);
   }
 
-  async initiateMultipartUpload(clinicId: string, rest: string, contentType: string, totalParts: number): Promise<{ uploadId: string; partUrls: string[] }> {
+  async initiateMultipartUpload(clinicId: string, rest: string, _contentType: string, totalParts: number): Promise<{ uploadId: string; partUrls: string[] }> {
     const key = StorageService.clinicKey(clinicId, rest);
     const uploadId = "mock-upload-id";
     const partUrls: string[] = [];
@@ -56,9 +56,9 @@ export class StorageService implements OnModuleInit {
     return { uploadId, partUrls };
   }
 
-  async completeMultipartUpload(clinicId: string, rest: string, uploadId: string, parts: { partNumber: number; etag: string }[]): Promise<void> {
+  async completeMultipartUpload(_clinicId: string, _rest: string, _uploadId: string, _parts: { partNumber: number; etag: string }[]): Promise<void> {
   }
 
-  async abortMultipartUpload(clinicId: string, rest: string, uploadId: string): Promise<void> {
+  async abortMultipartUpload(_clinicId: string, _rest: string, _uploadId: string): Promise<void> {
   }
 }

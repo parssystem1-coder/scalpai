@@ -50,7 +50,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const indexHtml = readFileSync(join(process.cwd(), '../web/dist/index.html'), 'utf-8');
         void res.type('text/html').send(indexHtml);
         return;
-      } catch (err) {
+      } catch {
         // Fallback if not built yet
       }
     }

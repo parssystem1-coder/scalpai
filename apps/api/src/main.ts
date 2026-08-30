@@ -1,13 +1,13 @@
 import "reflect-metadata";
 import { loadEnv } from "@scalpai/db";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
 
 loadEnv();
 
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
 import { registerSecurityHeaders } from "./common/security-headers.js";
@@ -38,13 +38,13 @@ async function bootstrap(): Promise<void> {
   );
   SwaggerModule.setup("api/v1/docs", app, doc);
 
-  const fastify = app.getHttpAdapter().getInstance() as any;
+  const fastify = app.getHttpAdapter().getInstance() as unknown as FastifyInstance;
 
-  fastify.get('/api/v1/mock-s3/*', async (req: any, reply: any) => {
-    reply.send({ success: true, message: "mock s3" });
+  fastify.get('/api/v1/mock-s3/*', async (_req: FastifyRequest, reply: FastifyReply) => {
+    void reply.send({ success: true, message: "mock s3" });
   });
-  fastify.put('/api/v1/mock-s3/*', async (req: any, reply: any) => {
-    reply.send({ success: true });
+  fastify.put('/api/v1/mock-s3/*', async (_req: FastifyRequest, reply: FastifyReply) => {
+    void reply.send({ success: true });
   });
 
   app.useStaticAssets({
