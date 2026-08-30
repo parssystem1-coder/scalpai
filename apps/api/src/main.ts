@@ -11,6 +11,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AppModule } from "./app.module.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
 import { registerSecurityHeaders } from "./common/security-headers.js";
+import { StorageService } from "./media/storage.service.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: false }));
@@ -40,11 +41,34 @@ async function bootstrap(): Promise<void> {
 
   const fastify = app.getHttpAdapter().getInstance() as unknown as FastifyInstance;
 
-  fastify.get('/api/v1/mock-s3/*', async (_req: FastifyRequest, reply: FastifyReply) => {
-    void reply.send({ success: true, message: "mock s3" });
+  const storage = app.get(StorageService);
+
+  // Parse raw binary data for mock-s3
+  fastify.addContentTypeParser('*', { parseAs: 'buffer' }, (req, body, done) => {
+    done(null, body);
   });
-  fastify.put('/api/v1/mock-s3/*', async (_req: FastifyRequest, reply: FastifyReply) => {
-    void reply.send({ success: true });
+
+  fastify.get('/api/v1/mock-s3/*', async (req: FastifyRequest<{ Params: { '*': string } }>, reply: FastifyReply) => {
+    const key = decodeURIComponent(req.params['*']);
+    const data = storage.inMemoryMap.get(key);
+    if (!data) return reply.status(404).send('Not found');
+    void reply.type('image/jpeg').send(data);
+  });
+
+  fastify.put('/api/v1/mock-s3/*', async (req: FastifyRequest<{ Params: { '*': string }; Querystring: { part?: string } }>, reply: FastifyReply) => {
+    const key = decodeURIComponent(req.params['*']);
+    let body = req.body as Buffer;
+    
+    // For multipart/chunked, if the client sends multiple parts, we append them in memory (simple mock)
+    // Real S3 multipart upload puts separate parts and then completes them, but this mock just accumulates
+    const partMatch = req.query.part;
+    if (partMatch) {
+      const existing = storage.inMemoryMap.get(key) || Buffer.alloc(0);
+      body = Buffer.concat([existing, body]);
+    }
+    
+    storage.inMemoryMap.set(key, body);
+    void reply.header('etag', `"mock-etag-${Date.now()}"`).send({ success: true });
   });
 
   app.useStaticAssets({

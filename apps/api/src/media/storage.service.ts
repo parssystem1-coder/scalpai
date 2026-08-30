@@ -17,7 +17,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 export class StorageService implements OnModuleInit {
   private s3: S3Client | null = null;
   private bucket: string;
-  private inMemoryMap = new Map<string, Buffer>();
+  public inMemoryMap = new Map<string, Buffer>();
 
   constructor() {
     this.bucket = process.env.S3_BUCKET ?? "scalpai-dev";
