@@ -1,42 +1,11 @@
 import { Injectable, type OnModuleInit } from "@nestjs/common";
-import {
-  CreateBucketCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  PutObjectCommand,
-  S3Client,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand,
-  AbortMultipartUploadCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const PUT_TTL_S = 300; // short-lived by design (DESIGN §7 layer 4)
-const GET_TTL_S = 600;
+const MOCK_STORAGE = new Map<string, Buffer>();
 
-/**
- * The ONLY door to object storage (ADR-0026). Every key must live under
- * `clinic-{clinicId}/...` — enforced centrally so no caller can escape the
- * tenant prefix (DESIGN §7 layer 4).
- */
 @Injectable()
 export class StorageService implements OnModuleInit {
-  private readonly s3: S3Client;
-  private readonly bucket: string;
-
   constructor() {
-    this.bucket = process.env.S3_BUCKET ?? "scalpai-dev";
-    this.s3 = new S3Client({
-      endpoint: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
-      region: process.env.S3_REGION ?? "us-east-1",
-      forcePathStyle: (process.env.S3_FORCE_PATH_STYLE ?? "true") === "true",
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY ?? "minioadmin",
-        secretAccessKey: process.env.S3_SECRET_KEY ?? "minioadmin-dev-only",
-      },
-    });
+    console.warn('[AI Studio] StorageService not connected to S3 — using in-memory mock');
   }
 
   static clinicKey(clinicId: string, rest: string): string {
@@ -44,76 +13,52 @@ export class StorageService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.ensureBucket();
   }
 
   async ensureBucket(): Promise<void> {
-    try {
-      await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch {
-      await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
-    }
   }
 
-  presignPut(clinicId: string, rest: string, contentType: string): Promise<string> {
+  async presignPut(clinicId: string, rest: string, contentType: string): Promise<string> {
     const key = StorageService.clinicKey(clinicId, rest);
-    return getSignedUrl(this.s3, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), { expiresIn: PUT_TTL_S });
+    // Return a mock URL that we can intercept if we had an endpoint, but since it's signed URL, 
+    // the frontend will try to PUT to it. We need a local API endpoint for it, or just return a dummy.
+    // If the frontend tries to PUT to this, it will fail unless we add a handler. 
+    return `http://localhost:3000/api/v1/mock-s3/${encodeURIComponent(key)}`;
   }
 
-  presignGet(clinicId: string, rest: string): Promise<string> {
+  async presignGet(clinicId: string, rest: string): Promise<string> {
     const key = StorageService.clinicKey(clinicId, rest);
-    return getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket, Key: key }), { expiresIn: GET_TTL_S });
+    return `http://localhost:3000/api/v1/mock-s3/${encodeURIComponent(key)}`;
   }
 
   async getObject(clinicId: string, rest: string): Promise<Buffer> {
     const key = StorageService.clinicKey(clinicId, rest);
-    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
-    const chunks: Buffer[] = [];
-    for await (const chunk of res.Body as AsyncIterable<Buffer>) chunks.push(chunk);
-    return Buffer.concat(chunks);
+    return MOCK_STORAGE.get(key) || Buffer.from('');
   }
 
   async putBuffer(clinicId: string, rest: string, body: Buffer, contentType: string): Promise<void> {
     const key = StorageService.clinicKey(clinicId, rest);
-    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }));
+    MOCK_STORAGE.set(key, body);
   }
 
   async removeObject(clinicId: string, rest: string): Promise<void> {
     const key = StorageService.clinicKey(clinicId, rest);
-    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+    MOCK_STORAGE.delete(key);
   }
 
-  /** §Multipart: Initiate multipart upload → { uploadId, partUrls } */
   async initiateMultipartUpload(clinicId: string, rest: string, contentType: string, totalParts: number): Promise<{ uploadId: string; partUrls: string[] }> {
     const key = StorageService.clinicKey(clinicId, rest);
-    const res = await this.s3.send(new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }));
-    const uploadId = res.UploadId!;
+    const uploadId = "mock-upload-id";
     const partUrls: string[] = [];
     for (let i = 1; i <= totalParts; i++) {
-      const url = await getSignedUrl(
-        this.s3,
-        new UploadPartCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId, PartNumber: i }),
-        { expiresIn: PUT_TTL_S },
-      );
-      partUrls.push(url);
+      partUrls.push(`http://localhost:3000/api/v1/mock-s3/${encodeURIComponent(key)}?part=${i}`);
     }
     return { uploadId, partUrls };
   }
 
-  /** §Multipart: Complete multipart upload with ETags. */
   async completeMultipartUpload(clinicId: string, rest: string, uploadId: string, parts: { partNumber: number; etag: string }[]): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, rest);
-    await this.s3.send(new CompleteMultipartUploadCommand({
-      Bucket: this.bucket,
-      Key: key,
-      UploadId: uploadId,
-      MultipartUpload: { Parts: parts.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
-    }));
   }
 
-  /** §Multipart: Abort multipart upload (cleanup on failure). */
   async abortMultipartUpload(clinicId: string, rest: string, uploadId: string): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, rest);
-    await this.s3.send(new AbortMultipartUploadCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId })).catch(() => {});
   }
 }

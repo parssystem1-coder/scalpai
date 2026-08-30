@@ -1,7 +1,9 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import { ApiError } from "@scalpai/shared";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 /**
  * Single exit shape: {code, message, details?} (engineering-rules §3).
@@ -11,6 +13,7 @@ import { ApiError } from "@scalpai/shared";
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<FastifyReply>();
+    const req = host.switchToHttp().getRequest<FastifyRequest>();
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: { code: string; message: string; details?: unknown } = {
       code: "INTERNAL",
@@ -39,6 +42,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
       } else if ((exception as { code: string }).code === "23503") {
         status = 400;
         body = { code: "FK_VIOLATION", message: "ارجاع نامعتبر" };
+      }
+    }
+
+    if (status === 404 && !req.url.startsWith("/api")) {
+      try {
+        const indexHtml = readFileSync(join(process.cwd(), '../web/dist/index.html'), 'utf-8');
+        void res.type('text/html').send(indexHtml);
+        return;
+      } catch (err) {
+        // Fallback if not built yet
       }
     }
      

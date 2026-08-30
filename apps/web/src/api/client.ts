@@ -1,6 +1,6 @@
 /** Minimal API client — access token lives in memory only (never localStorage). */
 
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:3001/api/v1";
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/v1";
 
 let accessToken: string | null = null;
 

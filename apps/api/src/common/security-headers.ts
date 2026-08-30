@@ -7,5 +7,5 @@ import helmet from "@fastify/helmet";
  * swagger UI only, so CSP stays off here while HSTS/frame/nosniff apply.
  */
 export async function registerSecurityHeaders(app: NestFastifyApplication): Promise<void> {
-  await app.register(helmet, { contentSecurityPolicy: false, hsts: { maxAge: 15_552_000 } });
+  await app.register(helmet as any, { contentSecurityPolicy: false, hsts: { maxAge: 15_552_000 } });
 }

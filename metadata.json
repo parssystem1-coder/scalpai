@@ -1,0 +1,6 @@
+{
+  "name": "ScalpAI",
+  "description": "پلتفرم جامع تریکولوژی، آنالیز پوست و مو، مدیریت پرونده بیماران و ثبت داده‌های کلینیکی",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

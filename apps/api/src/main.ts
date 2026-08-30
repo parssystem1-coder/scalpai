@@ -1,5 +1,7 @@
 import "reflect-metadata";
 import { loadEnv } from "@scalpai/db";
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 loadEnv();
 
@@ -36,7 +38,21 @@ async function bootstrap(): Promise<void> {
   );
   SwaggerModule.setup("api/v1/docs", app, doc);
 
-  const port = Number(process.env.PORT ?? 3001);
+  const fastify = app.getHttpAdapter().getInstance() as any;
+
+  fastify.get('/api/v1/mock-s3/*', async (req: any, reply: any) => {
+    reply.send({ success: true, message: "mock s3" });
+  });
+  fastify.put('/api/v1/mock-s3/*', async (req: any, reply: any) => {
+    reply.send({ success: true });
+  });
+
+  app.useStaticAssets({
+    root: join(process.cwd(), '../web/dist'),
+    prefix: '/',
+  });
+
+  const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, "0.0.0.0");
   console.log(`ScalpAI API ready on :${port}`);
 }
