@@ -46,7 +46,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
       <form onSubmit={onSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <div>
-          <label style={{ display: "block", marginBottom: "0.375rem", fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}>
+          <label htmlFor="login-email-input" style={{ display: "block", marginBottom: "0.375rem", fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}>
             {t("login.email")}
           </label>
           <input
@@ -60,7 +60,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         </div>
 
         <div>
-          <label style={{ display: "block", marginBottom: "0.375rem", fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}>
+          <label htmlFor="login-password-input" style={{ display: "block", marginBottom: "0.375rem", fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}>
             {t("login.password")}
           </label>
           <input
