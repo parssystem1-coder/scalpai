@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@scalpai/analysis-core": "*",
-    "@scalpai/shared": "*"
+    "@scalpai/analysis-core": "workspace:*",
+    "@scalpai/shared": "workspace:*"
   }
 }
