@@ -1,6 +1,7 @@
 import "reflect-metadata";
-import { loadEnv } from "@scalpai/db";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { loadEnv } from "@scalpai/db";
 
 loadEnv();
 
@@ -71,10 +72,17 @@ async function bootstrap(): Promise<void> {
     void reply.header('etag', `"mock-etag-${Date.now()}"`).send({ success: true });
   });
 
-  app.useStaticAssets({
-    root: join(process.cwd(), '../web/dist'),
-    prefix: '/',
-  });
+  let staticRoot = join(process.cwd(), "apps/web/dist");
+  if (!existsSync(staticRoot)) {
+    staticRoot = join(process.cwd(), "../web/dist");
+  }
+
+  if (existsSync(staticRoot)) {
+    app.useStaticAssets({
+      root: staticRoot,
+      prefix: "/",
+    });
+  }
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, "0.0.0.0");

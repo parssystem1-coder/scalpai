@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import { ApiError } from "@scalpai/shared";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
 /**
  * Single exit shape: {code, message, details?} (engineering-rules §3).
@@ -47,9 +47,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (status === 404 && !req.url.startsWith("/api")) {
       try {
-        const indexHtml = readFileSync(join(process.cwd(), '../web/dist/index.html'), 'utf-8');
-        void res.type('text/html').send(indexHtml);
-        return;
+        const p1 = join(process.cwd(), "apps/web/dist/index.html");
+        const p2 = join(process.cwd(), "../web/dist/index.html");
+        const filePath = existsSync(p1) ? p1 : existsSync(p2) ? p2 : null;
+        if (filePath) {
+          const indexHtml = readFileSync(filePath, "utf-8");
+          void res.type("text/html").send(indexHtml);
+          return;
+        }
       } catch {
         // Fallback if not built yet
       }

@@ -92,6 +92,15 @@ export const ExpertReview = z.object({
   note: z.string().max(500).optional(),
 });
 
+export const ConsentCreate = z.object({
+  patientId: z.string().uuid(),
+  serviceId: z.string().uuid().optional(),
+  templateVersion: z.string().min(1).default("v1.0-standard-trichology"),
+  signaturePayload: z.string().min(10, "امضای بیمار الزامی است"),
+});
+export type ConsentCreate = z.infer<typeof ConsentCreate>;
+export type ConsentCreateDto = ConsentCreate;
+
 /** §8 sync — one queued client mutation (payload shape is entity-specific). */
 export const SyncMutation = z.object({
   clientMutationId: z.string().uuid(),

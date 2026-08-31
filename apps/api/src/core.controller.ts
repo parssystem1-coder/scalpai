@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
-import { PaginationQuery, PatientCreate, SessionCreate } from "@scalpai/shared";
-import type { PatientCreateDto } from "@scalpai/shared";
+import { PaginationQuery, PatientCreate, SessionCreate, ConsentCreate } from "@scalpai/shared";
+import type { PatientCreateDto, ConsentCreateDto } from "@scalpai/shared";
 import { errors } from "@scalpai/shared";
 import {
   createPatient,
   createSession,
+  createConsent,
+  listConsentsForPatient,
   getPatientById,
   listPatients,
   listSessions,
@@ -83,6 +85,44 @@ export class CoreController {
   @Get("services")
   allServices() {
     return this.scope.tx(async (tx) => tx.select().from(services));
+  }
+
+  @Get("patients/:id/consents")
+  listConsents(@Param("id") patientId: string) {
+    return this.scope.tx((tx, ctx) => listConsentsForPatient(tx, ctx.clinicId, patientId));
+  }
+
+  @Post("consents")
+  @Roles("owner", "trichologist", "receptionist")
+  createConsent(@Body(new ZodBodyPipe(ConsentCreate)) dto: ConsentCreateDto) {
+    return this.scope.tx((tx, ctx) =>
+      createConsent(tx, {
+        clinicId: ctx.clinicId,
+        userId: ctx.userId,
+        patientId: dto.patientId,
+        serviceId: dto.serviceId,
+        templateVersion: dto.templateVersion,
+        signaturePayload: dto.signaturePayload,
+      }),
+    );
+  }
+
+  @Post("patients/:id/consents")
+  @Roles("owner", "trichologist", "receptionist")
+  createPatientConsent(
+    @Param("id") patientId: string,
+    @Body(new ZodBodyPipe(ConsentCreate.omit({ patientId: true }))) dto: Omit<ConsentCreateDto, "patientId">,
+  ) {
+    return this.scope.tx((tx, ctx) =>
+      createConsent(tx, {
+        clinicId: ctx.clinicId,
+        userId: ctx.userId,
+        patientId,
+        serviceId: dto.serviceId,
+        templateVersion: dto.templateVersion,
+        signaturePayload: dto.signaturePayload,
+      }),
+    );
   }
 
   /** Feature-gate probe for integration tests (starter plan lacks ml_updates). */

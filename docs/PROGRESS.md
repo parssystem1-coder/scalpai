@@ -53,17 +53,15 @@
 > گام بعدی الزامی: گیت مستقل پایان فاز ۲ («گیت فاز را بگیر» با scalpai-gate).
 
 ## فاز 3 — آفلاین و لایسنس
-> ⏳ Gate: شروع شد — brief: docs/playbooks/brief-phase3-offline-licensing.md (slices P1..P7)
-> ترتیب: P1 (sync-core خالص) ✓ → P2 (Sync API) ✓ → P3 (وب آفلاین) → P4 (resume) → P5 (licensing) → P6 (self-hosted/بکاپ/anchor) → P7 (consent+PWA)
+> ✅ Gate: تکمیل شد — brief: docs/playbooks/brief-phase3-offline-licensing.md (slices P1..P7)
+> ترتیب: P1 (sync-core خالص) ✓ → P2 (Sync API) ✓ → P3 (وب آفلاین) ✓ → P4 (resume) ✓ → P5 (licensing) ✓ → P6 (self-hosted/بکاپ/anchor) ✓ → P7 (consent+PWA) ✓
 - [x] Slice P1 — packages/sync-client هسته خالص + ADR-0027 (PR#17 merged, ۷۲ تست)
 - [x] Slice P2 — Sync API: mutations/treatment_plans migrations, POST /sync/push (idempotent), GET /sync/pull (cursor), field-LWW سمت سرور (PR#18 merged, ۷۷ تست)
-- [ ] Slice P3 — وب آفلاین: Dexie outbox + flush + badge pending + e2e @offline
-- [ ] آپلود resume + pending_upload badge
-- [ ] Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت
-- [ ] ops/: docker-compose self-hosted + Caddy + بکاپ داخلی
-- [ ] audit anchor worker هفتگی
-- [ ] Consent دیجیتال (فرم+امضا+ذخیره پرونده)
-- [ ] PWA manifest (وب کلینیک)
+- [x] Slice P3 — وب آفلاین: Dexie outbox + flush + badge pending + e2e @offline
+- [x] Slice P4 — آپلود resume + pending_upload badge (قطعات ۸MB + IndexedDB)
+- [x] Slice P5 — Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت (۵ تست واحد)
+- [x] Slice P6 — ops/: docker-compose self-hosted (prod.yml) + Caddy + بکاپ/بازیابی AES-256 + audit anchor worker
+- [x] Slice P7 — Consent دیجیتال (فرم+امضا لمسی/قلم+ذخیره پرونده+تست) + PWA manifest (وب کلینیک)
 
 ## فاز 4 — تجربه
 - [ ] Education E1: Rive ×۸ storyboard + mapper داده‌محور

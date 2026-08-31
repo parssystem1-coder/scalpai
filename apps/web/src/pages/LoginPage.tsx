@@ -8,7 +8,6 @@ import {
   Sparkles, 
   Eye, 
   EyeOff, 
-  Lock, 
   Mail, 
   ChevronLeft,
   ShieldCheck,

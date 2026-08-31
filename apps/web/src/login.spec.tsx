@@ -10,7 +10,7 @@ describe("login page (T1)", () => {
   it("renders fa labels with email and password fields", async () => {
     await i18n;
     render(<LoginPage onLoggedIn={() => undefined} />);
-    const heading = screen.getByRole("heading");
+    const heading = screen.getByRole("heading", { level: 2 });
     expect((heading.textContent ?? "").includes("ورود به ScalpAI")).toBe(true);
     expect(screen.getByLabelText("ایمیل")).toBeTruthy();
     expect(screen.getByLabelText("رمز عبور")).toBeTruthy();
@@ -22,6 +22,6 @@ describe("login page (T1)", () => {
     const form = document.querySelector("form")!;
     form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     // zod resolver blocks submit; page stays intact
-    expect(screen.getByRole("heading")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2 })).toBeTruthy();
   });
 });

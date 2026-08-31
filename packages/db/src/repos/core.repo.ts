@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { auditLog, patients, sessions } from "../schema.js";
+import { auditLog, consents, patients, sessions } from "../schema.js";
 import { incrementUsage } from "./users.repo.js";
 import type { Tx } from "../tenant.js";
 
@@ -212,3 +212,51 @@ export async function createSession(
   await incrementUsage(tx, input.clinicId, "monthly_sessions");
   return created;
 }
+
+// ---------------- Consents ----------------
+
+export interface CreateConsentInput {
+  clinicId: string;
+  userId: string;
+  patientId: string;
+  serviceId?: string | null;
+  templateVersion: string;
+  signaturePayload: string;
+  signedFromIp?: string | null;
+}
+
+export async function createConsent(tx: Tx, input: CreateConsentInput) {
+  const rows = await tx
+    .insert(consents)
+    .values({
+      clinicId: input.clinicId,
+      patientId: input.patientId,
+      serviceId: input.serviceId ?? null,
+      templateVersion: input.templateVersion,
+      signaturePayload: input.signaturePayload,
+      signedFromIp: input.signedFromIp ?? null,
+    })
+    .returning();
+  const created = rows[0]!;
+  await appendAudit(tx, {
+    clinicId: input.clinicId,
+    userId: input.userId,
+    action: "consent.create",
+    entity: "consent",
+    entityId: created.id,
+    meta: {
+      patientId: input.patientId,
+      templateVersion: input.templateVersion,
+    },
+  });
+  return created;
+}
+
+export async function listConsentsForPatient(tx: Tx, clinicId: string, patientId: string) {
+  return tx
+    .select()
+    .from(consents)
+    .where(and(eq(consents.clinicId, clinicId), eq(consents.patientId, patientId)))
+    .orderBy(desc(consents.signedAt));
+}
+

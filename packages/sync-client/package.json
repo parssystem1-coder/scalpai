@@ -10,6 +10,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@scalpai/shared": "workspace:*"
+    "@scalpai/shared": "*"
   }
 }

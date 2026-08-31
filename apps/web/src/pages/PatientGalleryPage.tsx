@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
+import DigitalConsentModal from "../components/DigitalConsentModal.js";
 import { faNum, toggleLang } from "../i18n.js";
 import { uploadChunked, getPendingUploads, type ChunkedUploadState } from "../offline/chunked-upload.js";
 
@@ -46,7 +47,14 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const [error, setError] = useState<string | null>(null);
   const [pct, setPct] = useState<number | null>(null);
   const [pendingUploads, setPendingUploads] = useState<ChunkedUploadState[]>([]);
+  const [isConsentOpen, setIsConsentOpen] = useState(false);
   const mockItems = useMockItems();
+
+  const patientQuery = useQuery({
+    queryKey: ["patient", pid],
+    enabled: Boolean(pid) && !mockItems,
+    queryFn: () => apiFetch<{ id: string; firstName: string; lastName: string; phone: string }>(`/patients/${pid}`),
+  });
 
   // refresh pending uploads on mount and after uploads
   useEffect(() => {
@@ -155,8 +163,27 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   // Small galleries skip virtualization entirely (simpler DOM, better a11y).
   if (items.length <= COLS) {
     return (
-      <main style={{ maxWidth: 980, margin: "4vh auto" }}>
-        <h1>گالری بیمار</h1>
+      <main style={{ maxWidth: 980, margin: "4vh auto", padding: "0 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <h1>گالری بیمار {patientQuery.data ? `(${patientQuery.data.firstName} ${patientQuery.data.lastName})` : ""}</h1>
+          <button
+            id="open-gallery-consent-btn"
+            type="button"
+            onClick={() => setIsConsentOpen(true)}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              padding: "6px 14px",
+              background: "#C9906A",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            ✍️ فرم رضایت دیجیتال بیمار
+          </button>
+        </div>
         <Link to="/patients">بازگشت به بیماران</Link>
         <div style={{ margin: "12px 0" }}>
           <input
@@ -190,16 +217,47 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
         </div>
         <span data-testid="qstatus">{galleryQuery.status}</span>
         {galleryQuery.error && <span data-testid="qerr">{String(galleryQuery.error)}</span>}
+
+        <DigitalConsentModal
+          patientId={pid}
+          patientName={patientQuery.data ? `${patientQuery.data.firstName} ${patientQuery.data.lastName}` : "بیمار"}
+          patientPhone={patientQuery.data?.phone ?? ""}
+          isOpen={isConsentOpen}
+          onClose={() => setIsConsentOpen(false)}
+        />
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 980, margin: "4vh auto" }}>
+    <main style={{ maxWidth: 980, margin: "4vh auto", padding: "0 16px" }}>
       <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
-      <h1>{t("gallery.title")}</h1>
-      <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
-      <Link to="/patients">{t("gallery.back")}</Link>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <h1 style={{ margin: 0 }}>
+          {t("gallery.title")} {patientQuery.data ? `(${patientQuery.data.firstName} ${patientQuery.data.lastName})` : ""}
+        </h1>
+        <button
+          id="open-gallery-consent-btn"
+          type="button"
+          onClick={() => setIsConsentOpen(true)}
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            padding: "6px 14px",
+            background: "#C9906A",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          ✍️ فرم رضایت دیجیتال بیمار
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+        <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+        <Link to="/patients">{t("gallery.back")}</Link>
+      </div>
 
       <div style={{ margin: "12px 0" }}>
         <input
@@ -267,6 +325,14 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
           <div ref={onSentinel} />
         </div>
       )}
+
+      <DigitalConsentModal
+        patientId={pid}
+        patientName={patientQuery.data ? `${patientQuery.data.firstName} ${patientQuery.data.lastName}` : "بیمار"}
+        patientPhone={patientQuery.data?.phone ?? ""}
+        isOpen={isConsentOpen}
+        onClose={() => setIsConsentOpen(false)}
+      />
     </main>
   );
 }

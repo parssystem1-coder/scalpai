@@ -2,6 +2,7 @@
   "name": "scalpai-v2",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "npm@10.8.2",
   "type": "module",
   "scripts": {
     "build": "turbo run build",
@@ -46,6 +47,5 @@
     "apps/*",
     "packages/*",
     "tools/*"
-  ],
-  "packageManager": "pnpm@10.15.1"
+  ]
 }

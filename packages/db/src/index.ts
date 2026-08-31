@@ -13,7 +13,10 @@ export {
   softDeletePatient,
   listSessions,
   createSession,
+  createConsent,
+  listConsentsForPatient,
   type PatientCreateInput,
+  type CreateConsentInput,
 } from "./repos/core.repo.js";
 export * from "./repos/refresh.repo.js";
 export {

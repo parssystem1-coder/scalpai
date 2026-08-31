@@ -22,14 +22,14 @@ export default function LuxuryScalp3D() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<VisualMode>("silk");
   const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0]);
-  const [isHovered, setIsHovered] = useState(false);
+  const [_isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let width = container.clientWidth || 600;
-    let height = container.clientHeight || 550;
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 550;
 
     // 1. Scene & Camera
     const scene = new THREE.Scene();
@@ -205,7 +205,7 @@ export default function LuxuryScalp3D() {
 
     // 7. Animation Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);

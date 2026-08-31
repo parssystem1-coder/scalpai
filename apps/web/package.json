@@ -12,9 +12,9 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@scalpai/analysis-engine": "workspace:*",
-    "@scalpai/shared": "workspace:*",
-    "@scalpai/sync-client": "workspace:*",
+    "@scalpai/analysis-engine": "*",
+    "@scalpai/shared": "*",
+    "@scalpai/sync-client": "*",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-virtual": "^3.14.10",
     "dexie": "^4.4.5",

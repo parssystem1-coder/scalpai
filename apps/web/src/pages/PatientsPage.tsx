@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,6 +8,7 @@ import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
 import PendingBadge from "../components/PendingBadge.js";
+import DigitalConsentModal from "../components/DigitalConsentModal.js";
 import { useSync } from "../offline/SyncProvider.js";
 import { toggleLang } from "../i18n.js";
 
@@ -74,6 +76,7 @@ function AddPatientForm() {
 export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { t, i18n } = useTranslation();
   const { isOnline } = useSync();
+  const [selectedPatientForConsent, setSelectedPatientForConsent] = useState<PatientRow | null>(null);
   const query = useQuery({
     queryKey: ["patients"],
     queryFn: () => apiFetch<PatientRow[]>("/patients?limit=50"),
@@ -87,7 +90,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: "8vh auto" }}>
+    <main style={{ maxWidth: 780, margin: "8vh auto", padding: "0 16px" }}>
       <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <h1 style={{ margin: 0 }}>{t("patients.title")}</h1>
@@ -112,6 +115,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
             <tr>
               <th>{t("patients.colName")}</th>
               <th>{t("patients.colPhone")}</th>
+              <th>فرم رضایت</th>
             </tr>
           </thead>
           <tbody>
@@ -123,10 +127,38 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
                   </Link>
                 </td>
                 <td>{p.phone}</td>
+                <td>
+                  <button
+                    id={`open-consent-btn-${p.id}`}
+                    type="button"
+                    onClick={() => setSelectedPatientForConsent(p)}
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 8px",
+                      background: "#F2EBE4",
+                      color: "#8B542E",
+                      border: "1px solid #D6C2B2",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✍️ رضایت‌نامه
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {selectedPatientForConsent && (
+        <DigitalConsentModal
+          patientId={selectedPatientForConsent.id}
+          patientName={`${selectedPatientForConsent.firstName} ${selectedPatientForConsent.lastName}`}
+          patientPhone={selectedPatientForConsent.phone}
+          isOpen={Boolean(selectedPatientForConsent)}
+          onClose={() => setSelectedPatientForConsent(null)}
+        />
       )}
     </main>
   );

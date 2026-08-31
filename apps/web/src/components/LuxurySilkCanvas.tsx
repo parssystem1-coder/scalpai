@@ -8,8 +8,8 @@ export default function LuxurySilkCanvas() {
     const container = mountRef.current;
     if (!container) return;
 
-    let width = container.clientWidth || 580;
-    let height = container.clientHeight || 580;
+    const width = container.clientWidth || 580;
+    const height = container.clientHeight || 580;
 
     // 1. Scene & Camera
     const scene = new THREE.Scene();
