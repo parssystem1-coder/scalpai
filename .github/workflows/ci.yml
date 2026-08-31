@@ -54,41 +54,37 @@ jobs:
           done
           if [ "$ok" != "1" ]; then echo "::error::MinIO failed to start"; cat /tmp/minio.log; exit 1; fi
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.15.1
-          run_install: false
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: npm install --no-audit
 
       - name: Type check
-        run: pnpm typecheck
+        run: npm run typecheck
 
       - name: Lint
-        run: pnpm lint
+        run: npm run lint
 
       - name: Apply migrations from empty database (proof)
-        run: pnpm db:migrate
+        run: npm run db:migrate
 
       - name: Seed demo data
-        run: pnpm db:seed
+        run: npm run db:seed
 
       - name: Unit + integration tests + coverage gate >=70% (RLS / cross-tenant on real PG)
-        run: pnpm test:coverage
+        run: npm run test:coverage
 
       - name: Build all workspaces
-        run: pnpm build
+        run: npm run build
 
       - name: Bundle budget (web <300KB gzip)
-        run: pnpm exec tsx tools/bundle-budget.ts
+        run: npm run budget:bundle
 
       - name: Conformance harness (ADR-21)
-        run: pnpm conformance
+        run: npm run conformance
 
       - name: Project graph up to date (ADR-22)
-        run: pnpm graph -- --check
+        run: npm run graph -- --check
