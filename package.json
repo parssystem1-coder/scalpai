@@ -18,7 +18,7 @@
     "prepare": "husky",
     "db:seed:gallery": "tsx packages/db/scripts/seed-gallery.ts",
     "budget:bundle": "tsx tools/bundle-budget.ts",
-    "dev": "npm run build --workspace=@scalpai/app-web && npm run dev --workspace=@scalpai/app-api"
+    "dev": "npm run build --workspace=@scalpai/app-web && npm run build --workspace=@scalpai/app-api && node apps/api/dist/main.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

@@ -72,19 +72,25 @@ async function bootstrap(): Promise<void> {
     void reply.header('etag', `"mock-etag-${Date.now()}"`).send({ success: true });
   });
 
-  let staticRoot = join(process.cwd(), "apps/web/dist");
-  if (!existsSync(staticRoot)) {
-    staticRoot = join(process.cwd(), "../web/dist");
-  }
+  const candidateStaticRoots = [
+    join(process.cwd(), "apps/web/dist"),
+    join(process.cwd(), "../web/dist"),
+    join(process.cwd(), "web/dist"),
+    join(process.cwd(), "dist"),
+  ];
 
-  if (existsSync(staticRoot)) {
-    app.useStaticAssets({
+  const staticRoot = candidateStaticRoots.find((dir) => existsSync(dir));
+
+  if (staticRoot && existsSync(staticRoot)) {
+    console.log(`Serving static web assets from: ${staticRoot}`);
+    await app.useStaticAssets({
       root: staticRoot,
       prefix: "/",
+      decorateReply: false,
     });
   }
 
-  const port = Number(process.env.PORT ?? 3000);
+  const port = 3000;
   await app.listen(port, "0.0.0.0");
   console.log(`ScalpAI API ready on :${port}`);
 }

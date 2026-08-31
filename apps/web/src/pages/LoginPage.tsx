@@ -1,27 +1,29 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest, type LoginRequest as LoginDto } from "@scalpai/shared";
-import { useTranslation } from "react-i18next";
 import { apiFetch, setAccessToken } from "../api/client.js";
-import { 
-  Sparkles, 
-  Eye, 
-  EyeOff, 
-  Mail, 
-  ChevronLeft,
-  ShieldCheck,
-  Sparkle
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  Droplets,
+  Fingerprint,
+  Crown,
+  Stethoscope,
+  AlertCircle,
 } from "lucide-react";
-import FigmaLuxuryBackground from "../components/FigmaLuxuryBackground.js";
+import LuxuryFeminineBackground from "../components/LuxuryFeminineBackground.js";
+import LuxuryTiltCard from "../components/LuxuryTiltCard.js";
 
 type TokenPair = { accessToken: string; refreshToken: string };
 
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const { t } = useTranslation();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [activeDemoRole, setActiveDemoRole] = useState<"owner" | "tricho">("owner");
+  const [activeRole, setActiveRole] = useState<"owner" | "tricho">("owner");
+  const [rememberMe, setRememberMe] = useState(true);
 
   const {
     register,
@@ -46,12 +48,12 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       setAccessToken(pair.accessToken);
       onLoggedIn();
     } catch (e) {
-      setServerError(e instanceof Error ? e.message : "خطای نامشخص در ورود");
+      setServerError(e instanceof Error ? e.message : "Authentication failed. Please check credentials.");
     }
   });
 
-  const setDemoAccount = (role: "owner" | "tricho") => {
-    setActiveDemoRole(role);
+  const handleQuickRole = (role: "owner" | "tricho") => {
+    setActiveRole(role);
     if (role === "owner") {
       setValue("email", "owner@clinic-a.test");
       setValue("password", "Dev12345!");
@@ -63,554 +65,654 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div
+      dir="ltr"
       style={{
         minHeight: "100vh",
         position: "relative",
         display: "flex",
-        flexDirection: "column",
+        alignItems: "center",
         justifyContent: "space-between",
+        padding: "2rem 4.5rem",
         overflow: "hidden",
+        backgroundColor: "#FAF6F0",
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        boxSizing: "border-box",
       }}
     >
-      {/* Figma Animated Luxury Canvas & SVG Background */}
-      <FigmaLuxuryBackground />
+      {/* 3D Dynamic Microscopic Follicle Background */}
+      <LuxuryFeminineBackground />
 
-      {/* Top Header */}
-      <header
-        style={{
-          position: "relative",
-          zIndex: 20,
-          width: "100%",
-          padding: "1.5rem 3rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#FAF7F2",
-              boxShadow: "0 6px 20px rgba(201, 144, 106, 0.35)",
-            }}
-          >
-            <Sparkles size={20} />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span
-                style={{
-                  fontSize: "1.4rem",
-                  fontWeight: 800,
-                  letterSpacing: "-0.02em",
-                  color: "#1A1614",
-                }}
-              >
-                Scalp<span style={{ color: "#C9906A" }}>AI</span>
-              </span>
-              <span
-                style={{
-                  fontSize: "0.65rem",
-                  fontWeight: 700,
-                  padding: "3px 10px",
-                  borderRadius: "100px",
-                  background: "rgba(250,247,242,0.85)",
-                  backdropFilter: "blur(12px)",
-                  border: "1px solid rgba(201,144,106,0.25)",
-                  color: "#C9906A",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                CLINICAL TRICHOLOGY
-              </span>
-            </div>
-            <span style={{ fontSize: "0.76rem", color: "#8A7A70", fontWeight: 500 }}>
-              فناوری هوشمند تریکولوژی و ماتریس عصبی فولیکول
-            </span>
-          </div>
-        </div>
-
-        {/* Clinical Quality Badge */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "6px 16px",
-            borderRadius: "100px",
-            border: "1px solid rgba(201,144,106,0.3)",
-            background: "rgba(250,247,242,0.75)",
-            backdropFilter: "blur(16px)",
-            fontSize: "0.78rem",
-            color: "#1A1614",
-            fontWeight: 600,
-            boxShadow: "0 4px 14px rgba(0,0,0,0.02)",
-          }}
-        >
-          <span
-            style={{
-              width: "7px",
-              height: "7px",
-              borderRadius: "50%",
-              background: "#C9906A",
-              boxShadow: "0 0 8px #C9906A",
-            }}
-          />
-          سامانه فعال و متصل
-        </div>
-      </header>
-
-      {/* Main Content: Hero Grid with Figma Aesthetics */}
+      {/* LEFT: Frosted Glass Login Card (Exact Replica of the Design) */}
       <div
         style={{
           position: "relative",
           zIndex: 10,
-          flex: 1,
-          maxWidth: "1340px",
           width: "100%",
-          margin: "0 auto",
-          padding: "1rem 2.5rem 2.5rem 2.5rem",
-          display: "grid",
-          gridTemplateColumns: "1.1fr 1fr",
-          gap: "4rem",
-          alignItems: "center",
+          maxWidth: "470px",
         }}
       >
-        {/* Right Side: Editorial Figma Hero Title & Clinical Stats */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "6px 16px",
-              borderRadius: "100px",
-              border: "1px solid rgba(201,144,106,0.3)",
-              background: "rgba(250,247,242,0.7)",
-              backdropFilter: "blur(12px)",
-              color: "#C9906A",
-              fontSize: "0.78rem",
-              fontWeight: 600,
-              width: "fit-content",
-              letterSpacing: "0.05em",
-            }}
-          >
-            <Sparkle size={14} />
-            فناوری ماتریس عصبی فولیکول (Neural Follicle Technology)
-          </div>
-
-          <h1
-            style={{
-              fontSize: "clamp(2.4rem, 4.2vw, 3.8rem)",
-              fontWeight: 800,
-              lineHeight: 1.15,
-              color: "#1A1614",
-              margin: 0,
-            }}
-          >
-            دقت کلینیکال،{" "}
-            <span
-              style={{
-                fontStyle: "italic",
-                background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 40%, #E8C88A 65%, #C9906A 100%)",
-                backgroundSize: "200% auto",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                display: "inline-block",
-              }}
-            >
-              درخشش ابریشمی
-            </span>
-          </h1>
-
-          <p
-            style={{
-              fontSize: "1rem",
-              color: "#5A4A42",
-              lineHeight: 1.8,
-              margin: 0,
-              maxWidth: "52ch",
-              fontWeight: 400,
-            }}
-          >
-            پلتفرم هوش مصنوعی تخصصی تحلیل تریکوسکوپی، نقشه‌برداری میکرومتری لایه‌های کوتیکول و ثبت پرونده‌های بالینی با بالاترین استانداردهای روز دنیا.
-          </p>
-
-          {/* Stats Bar from Figma */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "1.5rem",
-              borderTop: "1px solid rgba(201,144,106,0.2)",
-              paddingTop: "1.5rem",
-              marginTop: "0.5rem",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "1.8rem",
-                  fontWeight: 800,
-                  color: "#1A1614",
-                  lineHeight: 1,
-                  background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                ۹۹.۴٪
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#8A7A70", marginTop: "4px", fontWeight: 500 }}>
-                دقت اسکن کوتیکول
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: "1.8rem",
-                  fontWeight: 800,
-                  color: "#1A1614",
-                  lineHeight: 1,
-                  background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                ۰.۴ μm
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#8A7A70", marginTop: "4px", fontWeight: 500 }}>
-                تفکیک‌پذیری میکرومتری
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: "1.8rem",
-                  fontWeight: 800,
-                  color: "#1A1614",
-                  lineHeight: 1,
-                  background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                ۳۰۰k
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#8A7A70", marginTop: "4px", fontWeight: 500 }}>
-                نقشه‌برداری فولیکولی
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Left Side: Frosted Glass Login Form */}
-        <main
-          id="login-container"
+        <LuxuryTiltCard
+          maxTilt={5}
           style={{
-            width: "100%",
-            maxWidth: "440px",
-            margin: "0 auto",
-            padding: "2.4rem 2.2rem",
-            borderRadius: "24px",
-            background: "rgba(255, 255, 255, 0.72)",
-            backdropFilter: "blur(24px)",
-            border: "1.5px solid rgba(201, 144, 106, 0.28)",
+            background: "rgba(255, 255, 255, 0.45)",
+            backdropFilter: "blur(32px) saturate(160%)",
+            WebkitBackdropFilter: "blur(32px) saturate(160%)",
+            border: "1.5px solid rgba(255, 255, 255, 0.75)",
+            borderRadius: "32px",
+            padding: "2.8rem 2.6rem 2.2rem 2.6rem",
             boxShadow: `
-              0 30px 60px -15px rgba(201, 144, 106, 0.18),
-              0 10px 25px -5px rgba(0, 0, 0, 0.03),
-              inset 0 1px 0 rgba(255, 255, 255, 0.95)
+              0 28px 70px -15px rgba(184, 115, 126, 0.22),
+              0 14px 30px -8px rgba(130, 80, 95, 0.1),
+              inset 0 1.5px 2px rgba(255, 255, 255, 0.95),
+              inset 0 -1px 2px rgba(212, 160, 170, 0.25)
             `,
           }}
         >
-          {/* Header */}
-          <div style={{ marginBottom: "1.6rem" }}>
-            <h2
-              id="login-title"
+          {/* Logo & Monogram */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              marginBottom: "2.2rem",
+            }}
+          >
+            {/* Elegant Monogram 'S' */}
+            <div
               style={{
-                fontSize: "1.4rem",
-                fontWeight: 800,
-                color: "#1A1614",
-                margin: "0 0 0.3rem 0",
+                width: "42px",
+                height: "42px",
+                borderRadius: "50%",
+                border: "1.2px solid rgba(196, 125, 136, 0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255, 255, 255, 0.6)",
+                boxShadow: "0 4px 12px rgba(196, 125, 136, 0.15)",
               }}
             >
-              {t("login.title")}
-            </h2>
-            <p style={{ fontSize: "0.84rem", color: "#8A7A70", margin: 0 }}>
-              ورود کادر درمان و متخصصین کلینیک
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M16.5 7.5C16.5 5.5 14.5 4 12 4C9.5 4 7.5 5.5 7.5 7.5C7.5 11 16.5 10 16.5 14.5C16.5 17 14.5 19 12 19C9 19 7.5 17 7.5 15"
+                  stroke="#B8737D"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  color: "#3F2A2F",
+                  fontFamily: "'Playfair Display', serif",
+                }}
+              >
+                SCALP SCRUB
+              </div>
+              <div
+                style={{
+                  fontSize: "0.62rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.26em",
+                  color: "#8C6F76",
+                }}
+              >
+                RITUAL OF RENEWAL
+              </div>
+            </div>
+          </div>
+
+          {/* Heading */}
+          <div style={{ marginBottom: "2rem" }}>
+            <h1
+              id="login-welcome-title"
+              style={{
+                fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, serif",
+                fontSize: "2.4rem",
+                fontWeight: 500,
+                color: "#28191D",
+                margin: "0 0 0.4rem 0",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Welcome Back
+            </h1>
+            <p
+              style={{
+                fontSize: "0.88rem",
+                color: "#80666C",
+                margin: 0,
+                fontWeight: 400,
+              }}
+            >
+              Sign in to continue your scalp care journey
             </p>
           </div>
 
-          {/* Role Switcher */}
+          {/* Demo Account Switcher */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "6px",
-              padding: "4px",
-              borderRadius: "14px",
-              background: "rgba(240, 230, 212, 0.45)",
-              marginBottom: "1.5rem",
-              border: "1px solid rgba(201, 144, 106, 0.15)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "1.4rem",
             }}
           >
             <button
-              id="demo-account-owner-btn"
               type="button"
-              onClick={() => setDemoAccount("owner")}
+              onClick={() => handleQuickRole("owner")}
               style={{
-                padding: "8px 12px",
+                flex: 1,
+                padding: "6px 10px",
                 borderRadius: "10px",
-                border: "none",
-                background: activeDemoRole === "owner" ? "#ffffff" : "transparent",
-                color: activeDemoRole === "owner" ? "#1A1614" : "#8A7A70",
-                fontWeight: activeDemoRole === "owner" ? 700 : 500,
-                fontSize: "0.82rem",
+                border: activeRole === "owner" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
+                background: activeRole === "owner" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                color: activeRole === "owner" ? "#8A3D4B" : "#80666C",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
                 cursor: "pointer",
-                boxShadow: activeDemoRole === "owner" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
-                transition: "all 0.2s",
+                transition: "all 0.2s ease",
               }}
             >
-              مدیر کلینیک
+              <Crown size={13} />
+              Clinic Director
             </button>
             <button
-              id="demo-account-tricho-btn"
               type="button"
-              onClick={() => setDemoAccount("tricho")}
+              onClick={() => handleQuickRole("tricho")}
               style={{
-                padding: "8px 12px",
+                flex: 1,
+                padding: "6px 10px",
                 borderRadius: "10px",
-                border: "none",
-                background: activeDemoRole === "tricho" ? "#ffffff" : "transparent",
-                color: activeDemoRole === "tricho" ? "#1A1614" : "#8A7A70",
-                fontWeight: activeDemoRole === "tricho" ? 700 : 500,
-                fontSize: "0.82rem",
+                border: activeRole === "tricho" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
+                background: activeRole === "tricho" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                color: activeRole === "tricho" ? "#8A3D4B" : "#80666C",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
                 cursor: "pointer",
-                boxShadow: activeDemoRole === "tricho" ? "0 2px 8px rgba(0,0,0,0.06)" : "none",
-                transition: "all 0.2s",
+                transition: "all 0.2s ease",
               }}
             >
-              پزشک تریکولوژیست
+              <Stethoscope size={13} />
+              Trichologist
             </button>
           </div>
 
           {/* Form */}
-          <form onSubmit={onSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "1.15rem" }}>
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="login-email-input"
+          <form
+            onSubmit={onSubmit}
+            noValidate
+            style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+          >
+            {/* Input 1: Username or Email */}
+            <div style={{ position: "relative" }}>
+              <div
                 style={{
-                  display: "block",
-                  marginBottom: "0.4rem",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  color: "#2E2824",
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#9C7E85",
+                  pointerEvents: "none",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
-                {t("login.email")}
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  id="login-email-input"
-                  type="email"
-                  {...register("email")}
-                  autoComplete="username"
-                  placeholder="ایمیل پزشک یا کلینیک..."
-                  style={{
-                    width: "100%",
-                    padding: "0.78rem 1rem 0.78rem 2.5rem",
-                    borderRadius: "12px",
-                    border: errors.email ? "1.5px solid #ef4444" : "1.5px solid rgba(201, 144, 106, 0.25)",
-                    background: "rgba(255, 255, 255, 0.9)",
-                    fontSize: "0.9rem",
-                    color: "#1A1614",
-                    outline: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#C9906A",
-                  }}
-                >
-                  <Mail size={16} />
-                </div>
+                <User size={18} />
               </div>
+              <input
+                id="login-username-input"
+                type="text"
+                {...register("email")}
+                autoComplete="username"
+                placeholder="Username or Email"
+                style={{
+                  width: "100%",
+                  height: "52px",
+                  padding: "0 16px 0 46px",
+                  borderRadius: "14px",
+                  border: errors.email
+                    ? "1.5px solid #E11D48"
+                    : "1.2px solid rgba(255, 255, 255, 0.9)",
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  fontSize: "0.94rem",
+                  color: "#28191D",
+                  outline: "none",
+                  boxShadow: `
+                    0 4px 14px rgba(184, 115, 126, 0.08),
+                    inset 0 1px 2px rgba(255, 255, 255, 0.9)
+                  `,
+                  transition: "all 0.25s ease",
+                  boxSizing: "border-box",
+                }}
+              />
               {errors.email && (
-                <p role="alert" style={{ color: "#ef4444", fontSize: "0.75rem", margin: "0.3rem 0 0 0" }}>
+                <p style={{ color: "#E11D48", fontSize: "0.76rem", margin: "4px 0 0 4px" }}>
                   {errors.email.message}
                 </p>
               )}
             </div>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="login-password-input"
+            {/* Input 2: Password */}
+            <div style={{ position: "relative" }}>
+              <div
                 style={{
-                  display: "block",
-                  marginBottom: "0.4rem",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  color: "#2E2824",
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#9C7E85",
+                  pointerEvents: "none",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
-                {t("login.password")}
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  id="login-password-input"
-                  type={showPassword ? "text" : "password"}
-                  {...register("password")}
-                  autoComplete="current-password"
-                  placeholder="رمز عبور..."
-                  style={{
-                    width: "100%",
-                    padding: "0.78rem 1rem 0.78rem 2.5rem",
-                    borderRadius: "12px",
-                    border: errors.password ? "1.5px solid #ef4444" : "1.5px solid rgba(201, 144, 106, 0.25)",
-                    background: "rgba(255, 255, 255, 0.9)",
-                    fontSize: "0.9rem",
-                    color: "#1A1614",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    color: "#C9906A",
-                    cursor: "pointer",
-                    padding: "4px",
-                  }}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                <Lock size={18} />
               </div>
+              <input
+                id="login-password-input"
+                type={showPassword ? "text" : "password"}
+                {...register("password")}
+                autoComplete="current-password"
+                placeholder="Password"
+                style={{
+                  width: "100%",
+                  height: "52px",
+                  padding: "0 46px 0 46px",
+                  borderRadius: "14px",
+                  border: errors.password
+                    ? "1.5px solid #E11D48"
+                    : "1.2px solid rgba(255, 255, 255, 0.9)",
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  fontSize: "0.94rem",
+                  color: "#28191D",
+                  outline: "none",
+                  boxShadow: `
+                    0 4px 14px rgba(184, 115, 126, 0.08),
+                    inset 0 1px 2px rgba(255, 255, 255, 0.9)
+                  `,
+                  transition: "all 0.25s ease",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "14px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "#9C7E85",
+                  cursor: "pointer",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
               {errors.password && (
-                <p role="alert" style={{ color: "#ef4444", fontSize: "0.75rem", margin: "0.3rem 0 0 0" }}>
+                <p style={{ color: "#E11D48", fontSize: "0.76rem", margin: "4px 0 0 4px" }}>
                   {errors.password.message}
                 </p>
               )}
             </div>
 
-            {/* Server Error */}
-            {serverError && (
-              <div
-                id="login-error-message"
-                role="alert"
+            {/* Remember Me & Forgot Password */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "0.83rem",
+                color: "#6F555C",
+                margin: "0.1rem 0.2rem",
+              }}
+            >
+              <label
                 style={{
-                  color: "#b91c1c",
-                  backgroundColor: "#fef2f2",
-                  padding: "0.65rem 0.85rem",
-                  borderRadius: "10px",
-                  fontSize: "0.8rem",
-                  border: "1px solid #fecaca",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  userSelect: "none",
                 }}
               >
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{
+                    accentColor: "#B8737D",
+                    width: "15px",
+                    height: "15px",
+                    cursor: "pointer",
+                  }}
+                />
+                <span>Remember me</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => alert("Password reset link sent to registered clinic email.")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#A25C68",
+                  fontSize: "0.83rem",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                  padding: 0,
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {/* Server Error Alert */}
+            {serverError && (
+              <div
+                role="alert"
+                style={{
+                  color: "#9F1239",
+                  backgroundColor: "rgba(255, 241, 242, 0.8)",
+                  backdropFilter: "blur(10px)",
+                  padding: "0.7rem 0.9rem",
+                  borderRadius: "12px",
+                  fontSize: "0.8rem",
+                  border: "1px solid #FFE4E6",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <AlertCircle size={16} color="#E11D48" />
                 {serverError}
               </div>
             )}
 
-            {/* Submit Button */}
+            {/* Sign In Button */}
             <button
               id="login-submit-button"
               type="submit"
               disabled={isSubmitting}
               style={{
                 width: "100%",
-                padding: "0.9rem",
-                borderRadius: "100px",
-                background: "linear-gradient(135deg, #C9906A 0%, #D4A96A 60%, #C9906A 100%)",
-                backgroundSize: "200% auto",
-                color: "#FAF7F2",
-                border: "none",
-                fontWeight: 700,
-                fontSize: "0.95rem",
+                height: "50px",
+                borderRadius: "14px",
+                border: "1px solid rgba(255, 255, 255, 0.4)",
+                background: "linear-gradient(135deg, #B97682 0%, #A45F6C 100%)",
+                color: "#FFFFFF",
+                fontWeight: 600,
+                fontSize: "0.98rem",
                 cursor: isSubmitting ? "not-allowed" : "pointer",
-                opacity: isSubmitting ? 0.75 : 1,
-                boxShadow: "0 6px 24px rgba(201, 144, 106, 0.45)",
+                boxShadow: "0 8px 24px -2px rgba(164, 95, 108, 0.45)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px",
-                marginTop: "0.3rem",
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                marginTop: "0.2rem",
+                transition: "all 0.25s ease",
               }}
             >
-              {isSubmitting ? (
-                "در حال ورود به سامانه..."
-              ) : (
-                <>
-                  <span>ورود به پرونده‌های بالینی</span>
-                  <ChevronLeft size={18} />
-                </>
-              )}
+              {isSubmitting ? "Authenticating..." : "Sign In"}
             </button>
 
-            {/* Subtext */}
+            {/* Social Logins Divider */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                fontSize: "0.74rem",
-                color: "#8A7A70",
-                marginTop: "0.15rem",
+                gap: "12px",
+                margin: "0.4rem 0",
               }}
             >
-              <ShieldCheck size={14} color="#C9906A" />
-              اتصال امن با استاندارد رمزنگاری درمانی
+              <div style={{ flex: 1, height: "1px", background: "rgba(196, 125, 136, 0.25)" }} />
+              <span style={{ fontSize: "0.76rem", color: "#8C6F76" }}>or continue with</span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(196, 125, 136, 0.25)" }} />
+            </div>
+
+            {/* Social Icon Buttons (Google, Apple, Biometric) */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "14px",
+              }}
+            >
+              {/* Google */}
+              <button
+                type="button"
+                onClick={() => alert("Google Sign-In ready")}
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "14px",
+                  border: "1.2px solid rgba(255, 255, 255, 0.8)",
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(184, 115, 126, 0.08)",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              </button>
+
+              {/* Apple */}
+              <button
+                type="button"
+                onClick={() => alert("Apple Sign-In ready")}
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "14px",
+                  border: "1.2px solid rgba(255, 255, 255, 0.8)",
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(184, 115, 126, 0.08)",
+                  color: "#28191D",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.86c.66-.8 1.11-1.92.99-3.04-.96.04-2.12.64-2.8 1.44-.59.69-1.12 1.83-.98 2.92 1.07.08 2.16-.54 2.79-1.32" />
+                </svg>
+              </button>
+
+              {/* Biometric / Touch ID */}
+              <button
+                type="button"
+                onClick={() => alert("Biometric authentication initialized")}
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "14px",
+                  border: "1.2px solid rgba(255, 255, 255, 0.8)",
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(184, 115, 126, 0.08)",
+                  color: "#B8737D",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Fingerprint size={22} />
+              </button>
+            </div>
+
+            {/* Create Account Link */}
+            <div
+              style={{
+                textAlign: "center",
+                marginTop: "0.8rem",
+                fontSize: "0.84rem",
+                color: "#6F555C",
+              }}
+            >
+              New here?{" "}
+              <button
+                type="button"
+                onClick={() => alert("Clinic Registration & Consultation portal available.")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#A25C68",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  padding: 0,
+                  fontSize: "0.84rem",
+                }}
+              >
+                Create an account
+              </button>
             </div>
           </form>
-        </main>
+        </LuxuryTiltCard>
       </div>
 
-      {/* Footer */}
-      <footer
+      {/* RIGHT: Floating High-End Editorial Typography (Matching Image Exactly) */}
+      <div
         style={{
           position: "relative",
-          zIndex: 20,
-          width: "100%",
-          padding: "1rem 3rem",
+          zIndex: 10,
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
           justifyContent: "space-between",
-          fontSize: "0.78rem",
-          color: "#8A7A70",
-          borderTop: "1px solid rgba(201, 144, 106, 0.18)",
-          background: "rgba(250, 247, 242, 0.6)",
-          backdropFilter: "blur(12px)",
+          height: "82vh",
+          maxWidth: "380px",
+          textAlign: "left",
+          pointerEvents: "none",
         }}
       >
-        <div>
-          © ۱۴۰۵ ScalpAI — پلتفرم نسل جدید تحلیل تریکوسکوپی و مراقبت بالینی مو
+        {/* Top Right Headline */}
+        <div style={{ paddingTop: "1.5rem" }}>
+          <h2
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "1.18rem",
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              color: "#573B41",
+              margin: "0 0 0.8rem 0",
+              lineHeight: 1.4,
+            }}
+          >
+            HEALTHY SCALP.
+            <br />
+            BEAUTIFUL YOU.
+          </h2>
+
+          <p
+            style={{
+              fontSize: "0.86rem",
+              color: "#7E646A",
+              lineHeight: 1.65,
+              margin: "0 0 1.2rem 0",
+              maxWidth: "32ch",
+            }}
+          >
+            Advanced scalp exfoliation for a cleaner, healthier foundation for your hair.
+          </p>
+
+          {/* Water Droplet Badge */}
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              border: "1.2px solid rgba(196, 125, 136, 0.4)",
+              background: "rgba(255, 255, 255, 0.65)",
+              backdropFilter: "blur(12px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#B8737D",
+              boxShadow: "0 4px 14px rgba(196, 125, 136, 0.12)",
+            }}
+          >
+            <Droplets size={17} />
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "1.5rem" }}>
-          <span>فناوری ماتریس عصبی فولیکول</span>
-          <span>امنیت داده‌های بالینی</span>
+
+        {/* Bottom Right Tagline */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            paddingBottom: "1.5rem",
+          }}
+        >
+          <div
+            style={{
+              width: "2px",
+              height: "32px",
+              background: "rgba(196, 125, 136, 0.6)",
+              borderRadius: "2px",
+            }}
+          />
+          <div
+            style={{
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              color: "#6F5057",
+              lineHeight: 1.35,
+            }}
+          >
+            SCALP CARE
+            <br />
+            IS SELF CARE
+          </div>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }
