@@ -17,6 +17,8 @@ import {
 } from "@scalpai/db";
 import type { TokenPair } from "@scalpai/shared";
 
+const REFRESH_TTL_MS = 14 * 24 * 3600 * 1000;
+
 export interface AccessClaims {
   sub: string;
   clinicId: string;
@@ -55,7 +57,7 @@ export class AuthService {
       userId,
       tokenHash: sha256(token),
       familyId: randomUUID(),
-      expiresAt: new Date(Date.now() + REFRESH_TTL()),
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
     return token;
   }
@@ -109,26 +111,25 @@ export class AuthService {
       throw new UnauthorizedException({ code: "REFRESH_REUSED", message: "توکن باطل شده است" });
     }
 
+    // تایپ‌اسکریپت اکنون مطمئن است که outcome از نوع reused: false است
+    const { parent, user } = outcome;
+
     return db.withClient(async (tx) => {
       const { childId, token } = await insertChild(tx, {
-        userId: outcome.parent.userId,
-        familyId: outcome.parent.familyId,
+        userId: parent.userId,
+        familyId: parent.familyId,
       });
-      await markReplaced(tx, outcome.parent.id, childId);
+      await markReplaced(tx, parent.id, childId);
       const accessToken = this.signAccess({
-        sub: outcome.user.id,
-        clinicId: outcome.user.clinicId,
-        role: outcome.user.role,
+        sub: user.id,
+        clinicId: user.clinicId,
+        role: user.role,
       });
-      return { accessToken, refreshToken: token, user: outcome.user };
+      return { accessToken, refreshToken: token, user };
     });
   }
 
   verifyAccess(token: string): AccessClaims {
     return this.jwt.verify<AccessClaims>(token);
   }
-}
-
-function REFRESH_TTL(): number {
-  return 14 * 24 * 3600 * 1000;
 }
