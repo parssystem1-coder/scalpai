@@ -17,6 +17,8 @@ import {
 } from "@scalpai/db";
 import type { TokenPair } from "@scalpai/shared";
 
+const REFRESH_TTL_MS = 14 * 24 * 3600 * 1000;
+
 export interface AccessClaims {
   sub: string;
   clinicId: string;
@@ -31,10 +33,6 @@ export class AuthService {
     return this.jwt.sign(c, { expiresIn: "15m" });
   }
 
-  /**
-   * Login lookup goes through SECURITY DEFINER fn_auth_login (migration 0002):
-   * `users` sits behind FORCE RLS and login happens before any tenant is known.
-   */
   async login(tx: Tx, email: string, password: string): Promise<TokenPair> {
     const row = await loginLookup(tx, email);
     if (!row || !(await verify(row.password_hash, password))) {
@@ -55,12 +53,11 @@ export class AuthService {
       userId,
       tokenHash: sha256(token),
       familyId: randomUUID(),
-      expiresAt: new Date(Date.now() + REFRESH_TTL()),
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
     });
     return token;
   }
 
-  /** Logout: kill the presented token's family. */
   async revoke(db: DbService, presented: string): Promise<void> {
     await db.withClient(async (tx) => {
       const found = await findByHash(tx, presented);
@@ -69,11 +66,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * Rotating refresh with reuse detection (§13). On replay of an already-used
-   * token the WHOLE family is revoked in its own committed transaction — a
-   * rollback from the resulting 401 must never undo that revocation.
-   */
   async rotate(db: DbService, presented: string): Promise<TokenPair> {
     type Outcome =
       | { reused: true; familyId: string | null }
@@ -101,34 +93,34 @@ export class AuthService {
       };
     });
 
-    if (outcome.reused) {
+    // بررسی دقیق برای اطمینان کامل تایپ‌اسکریپت
+    if (outcome.reused === true) {
       if (outcome.familyId) {
-        // Security action commits independently of the 401 response.
         await db.withClient((tx) => revokeFamily(tx, outcome.familyId!));
       }
       throw new UnauthorizedException({ code: "REFRESH_REUSED", message: "توکن باطل شده است" });
     }
 
+    // در اینجا تایپ‌اسکریپت مطمئن است که outcome.reused برابر false است
+    const parentData = outcome.parent;
+    const userData = outcome.user;
+
     return db.withClient(async (tx) => {
       const { childId, token } = await insertChild(tx, {
-        userId: outcome.parent.userId,
-        familyId: outcome.parent.familyId,
+        userId: parentData.userId,
+        familyId: parentData.familyId,
       });
-      await markReplaced(tx, outcome.parent.id, childId);
+      await markReplaced(tx, parentData.id, childId);
       const accessToken = this.signAccess({
-        sub: outcome.user.id,
-        clinicId: outcome.user.clinicId,
-        role: outcome.user.role,
+        sub: userData.id,
+        clinicId: userData.clinicId,
+        role: userData.role,
       });
-      return { accessToken, refreshToken: token, user: outcome.user };
+      return { accessToken, refreshToken: token, user: userData };
     });
   }
 
   verifyAccess(token: string): AccessClaims {
     return this.jwt.verify<AccessClaims>(token);
   }
-}
-
-function REFRESH_TTL(): number {
-  return 14 * 24 * 3600 * 1000;
 }
