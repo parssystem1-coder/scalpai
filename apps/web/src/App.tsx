@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Volume2, VolumeX, Sparkles, Activity, Check } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, Activity, Check, Microscope } from "lucide-react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TabMode, MoleculeInfo } from "./types.js";
 import { DemoBanner } from "./components/DemoBanner.js";
 import { HairCanvas } from "./components/HairCanvas.js";
@@ -7,6 +8,16 @@ import { AmberOrbs } from "./components/AmberOrbs.js";
 import { SignInForm } from "./components/SignInForm.js";
 import { RegisterForm } from "./components/RegisterForm.js";
 import { ProPlansView } from "./components/ProPlansView.js";
+import { ClinicalDashboard } from "./components/ClinicalDashboard.js";
+import { SyncProvider } from "./offline/SyncProvider.js";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+    },
+  },
+});
 
 const MOLECULES: MoleculeInfo[] = [
   {
@@ -35,7 +46,9 @@ const MOLECULES: MoleculeInfo[] = [
   }
 ];
 
-export const App: React.FC = () => {
+export const AppContent: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("tricho@scalpai.clinic");
   const [activeTab, setActiveTab] = useState<TabMode>("signin");
   const [isDemoActive, setIsDemoActive] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -71,6 +84,18 @@ export const App: React.FC = () => {
       setScannerData("KERATIN CORTEX FIBER [DIAMETER: 78µm]");
     }
   };
+
+  if (isLoggedIn) {
+    return (
+      <ClinicalDashboard
+        userEmail={currentUserEmail}
+        onLogout={() => {
+          setIsLoggedIn(false);
+          showToast("خروج موفق", "از حساب کلینیک خارج شدید.");
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -136,6 +161,17 @@ export const App: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => {
+              setIsLoggedIn(true);
+              showToast("اتصال کلینیک", "وارد سامانه تخصصی تریکولوژی شدید.");
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-[oklch(62%_0.09_16/0.6)] bg-white/70 hover:bg-white text-[oklch(50%_0.095_12)] shadow-sm backdrop-blur-sm transition-all"
+          >
+            <Microscope className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
+            <span>ورود به پنل تریکولوژیست</span>
+          </button>
+
+          <button
             onClick={() => setScannerActive(!scannerActive)}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-white/40 backdrop-blur-sm transition-all ${
               scannerActive ? "bg-white/70 border-[oklch(62%_0.09_16)] shadow-md" : "bg-white/20"
@@ -200,10 +236,15 @@ export const App: React.FC = () => {
 
             {activeTab === "signin" && (
               <SignInForm
-                onSubmit={data => showToast("ورود موفق", `خوش آمدید ${data.username}. در حال اتصال...`)}
+                onSubmit={data => {
+                  setCurrentUserEmail(data.username.includes("@") ? data.username : `${data.username}@scalpai.clinic`);
+                  setIsLoggedIn(true);
+                  showToast("ورود موفق", `خوش آمدید ${data.username}. در حال انتقال به پنل بالینی...`);
+                }}
                 onDemoLogin={provider => {
-                  setIsDemoActive(true);
-                  showToast("حالت دمو", `شما از طریق ${provider} وارد محیط پیش‌نمایش شدید.`);
+                  setCurrentUserEmail(`demo.${provider.toLowerCase()}@scalpai.clinic`);
+                  setIsLoggedIn(true);
+                  showToast("حالت دمو", `شما از طریق ${provider} وارد داشبورد کلینیک شدید.`);
                 }}
                 onForgotPassword={() => showToast("بازیابی رمز", "لینک بازنشانی رمز به ایمیل ارسال شد.")}
               />
@@ -212,15 +253,19 @@ export const App: React.FC = () => {
             {activeTab === "register" && (
               <RegisterForm
                 onSubmit={data => {
-                  showToast("حساب ایجاد شد", `خوش آمدید ${data.fullName}. لطفاً پلن را انتخاب کنید.`);
-                  setTimeout(() => setActiveTab("plans"), 1200);
+                  setCurrentUserEmail(data.email || `${data.fullName}@scalpai.clinic`);
+                  setIsLoggedIn(true);
+                  showToast("حساب ایجاد شد", `خوش آمدید ${data.fullName}. وارد پنل بالینی شدید.`);
                 }}
               />
             )}
 
             {activeTab === "plans" && (
               <ProPlansView
-                onSelectPlan={() => showToast("اتصال به درگاه", "در حال انتقال به صفحه پرداخت امن...")}
+                onSelectPlan={() => {
+                  setIsLoggedIn(true);
+                  showToast("اتصال به درگاه", "پلن کلینیک فعال شد. انتقال به پنل...");
+                }}
               />
             )}
           </div>
@@ -274,6 +319,16 @@ export const App: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SyncProvider>
+        <AppContent />
+      </SyncProvider>
+    </QueryClientProvider>
   );
 };
 
