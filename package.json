@@ -2,8 +2,8 @@
   "name": "scalpai-v2",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "npm@10.8.2",
   "type": "module",
+  "packageManager": "npm@10.8.2",
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
