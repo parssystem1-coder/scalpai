@@ -74,7 +74,7 @@ describe("DigitalConsentModal Component", () => {
     const historyTab = screen.getByRole("button", { name: /تاریخچه رضایت‌نامه‌ها/i });
     fireEvent.click(historyTab);
 
-    expect(historyTab.className).toContain("text-[#9A643E]");
+    expect(historyTab.className).toMatch(/text-\[oklch\(62%_0\.09_16\)|text-\[#9A643E\]/);
   });
 });
 

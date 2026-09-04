@@ -40,7 +40,12 @@ describe("project graph extractor (v0)", () => {
   });
 
   it("git info reports the current commit", () => {
-    const sha = execFileSync("git", ["rev-parse", "--short", "HEAD"]).toString().trim();
+    let sha = "unknown";
+    try {
+      sha = execFileSync("git", ["rev-parse", "--short", "HEAD"]).toString().trim();
+    } catch {
+      // safe fallback in environments without .git metadata
+    }
     const g: Graph = build();
     expect(g.generatedFrom.commit).toBe(sha);
   });
