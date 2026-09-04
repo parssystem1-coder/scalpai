@@ -52,27 +52,27 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
   } ${height - padding} Z`;
 
   return (
-    <div className="p-6 rounded-3xl luxury-glass-card relative overflow-hidden">
+    <div className="p-6 rounded-3xl bg-white/55 border border-white/80 backdrop-blur-xl shadow-md relative overflow-hidden">
       {/* Background flare */}
-      <div className="absolute top-0 right-0 w-40 h-40 bg-rose-400/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-40 h-40 bg-[oklch(82%_0.14_58/0.08)] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex items-center justify-between mb-4 border-b border-rose-200/10 pb-3">
+      <div className="flex items-center justify-between mb-4 border-b border-black/5 pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-sm font-bold text-white">روند پویای تراکم و کالیبر ساقه</h4>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">روند پویای تراکم و کالیبر ساقه</h4>
           </div>
-          <p className="text-[0.68rem] text-rose-200/70 mt-0.5">
+          <p className="text-[0.68rem] text-[oklch(45%_0.02_20)] mt-0.5">
             روند افزایشی تراکم فولیکولی در ۴ نوبت ویزیت تریکوسکوپی اخیر
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-left">
-            <span className="text-[0.65rem] text-rose-300/80 block">ضخامت میانگین:</span>
-            <span className="text-xs font-mono font-black text-rose-100">{currentCaliber}</span>
+            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">ضخامت میانگین:</span>
+            <span className="text-xs font-mono font-black text-[oklch(20%_0.02_20)]">{currentCaliber}</span>
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-sm">
+          <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold shadow-xs">
             {densityTrend}
           </span>
         </div>
@@ -82,18 +82,18 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
       <div className="w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-44 overflow-visible drop-shadow-md"
+          className="w-full h-44 overflow-visible drop-shadow-sm"
         >
           <defs>
             <linearGradient id="waveformGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f472b6" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#f472b6" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#e07a91" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#e07a91" stopOpacity="0.0" />
             </linearGradient>
 
             <linearGradient id="strokeLine" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#fb7185" />
-              <stop offset="50%" stopColor="#f472b6" />
-              <stop offset="100%" stopColor="#34d399" />
+              <stop offset="0%" stopColor="#c46d7d" />
+              <stop offset="50%" stopColor="#e59b3c" />
+              <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
           </defs>
 
@@ -110,15 +110,15 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                   y1={y}
                   x2={width - padding}
                   y2={y}
-                  stroke="rgba(244, 175, 190, 0.15)"
+                  stroke="rgba(196, 109, 125, 0.18)"
                   strokeDasharray="3,3"
                 />
                 <text
                   x={padding - 6}
                   y={y + 3}
                   textAnchor="end"
-                  fill="#fecdd3"
-                  className="text-[0.6rem] font-mono opacity-70"
+                  fill="#785963"
+                  className="text-[0.6rem] font-mono opacity-80"
                 >
                   {val}
                 </text>
@@ -145,8 +145,8 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                 cx={p.x}
                 cy={p.y}
                 r="5"
-                fill="#ffe4e6"
-                stroke="#e11d48"
+                fill="#ffffff"
+                stroke="#c46d7d"
                 strokeWidth="2.5"
                 className="hover:scale-150 transition-transform cursor-pointer"
               />
@@ -155,7 +155,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                 x={p.x}
                 y={height - 10}
                 textAnchor="middle"
-                fill="#fed7aa"
+                fill="#5a4049"
                 className="text-[0.62rem] font-medium"
               >
                 {p.visitDate}
@@ -165,7 +165,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                 x={p.x}
                 y={p.y - 10}
                 textAnchor="middle"
-                fill="#fbcfe8"
+                fill="#9f2d48"
                 className="text-[0.68rem] font-mono font-bold"
               >
                 {p.density}

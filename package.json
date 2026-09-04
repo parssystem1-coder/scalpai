@@ -3,22 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "npm@10.8.2",
   "scripts": {
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
+    "dev": "npm run dev --workspace=@scalpai/app-web",
+    "build": "npm run build --workspace=@scalpai/app-web && rm -rf dist && cp -r apps/web/dist dist",
+    "typecheck": "npm run typecheck --workspace=@scalpai/app-web",
     "lint": "eslint .",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "conformance": "tsx tools/conformance/run.ts",
-    "graph": "tsx tools/graph/extract.ts",
-    "db:migrate": "tsx packages/db/src/migrate-cli.ts",
-    "db:seed": "tsx packages/db/src/seed.ts",
-    "e2e": "npm run db:migrate && npm run db:seed && playwright test",
-    "prepare": "husky",
-    "db:seed:gallery": "tsx packages/db/scripts/seed-gallery.ts",
-    "budget:bundle": "tsx tools/bundle-budget.ts",
-    "dev": "npm run build --workspace=@scalpai/app-web && npm run build --workspace=@scalpai/app-api && node apps/api/dist/main.js"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

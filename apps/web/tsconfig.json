@@ -14,7 +14,14 @@
       "vite/client"
     ],
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@scalpai/shared": ["../../packages/shared/src/index.ts"],
+      "@scalpai/analysis-engine": ["../../packages/analysis-engine/src/index.ts"],
+      "@scalpai/analysis-core": ["../../packages/analysis-core/src/index.ts"],
+      "@scalpai/sync-client": ["../../packages/sync-client/src/index.ts"]
+    }
   },
   "include": [
     "src"
