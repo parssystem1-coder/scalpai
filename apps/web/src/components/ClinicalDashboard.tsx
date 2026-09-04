@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import {
   Users,
   Camera,
@@ -29,7 +29,7 @@ import { AmberOrbs } from "./AmberOrbs.js";
 import { HairCanvas } from "./HairCanvas.js";
 import DigitalConsentModal from "./DigitalConsentModal.js";
 import LuxuryTiltCard from "./LuxuryTiltCard.js";
-import LuxuryScalp3D from "./LuxuryScalp3D.js";
+const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
 import TrichologyRadarChart, { RadarMetric } from "./TrichologyRadarChart.js";
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay.js";
 import FollicleCaliberWaveform from "./FollicleCaliberWaveform.js";
@@ -1058,7 +1058,15 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
             {/* Embed 3D Scalp Stage */}
             <div className="w-full rounded-[28px] overflow-hidden border border-white/80 shadow-2xl bg-white/40 backdrop-blur-xl">
-              <LuxuryScalp3D />
+              <Suspense
+                fallback={
+                  <div className="h-[450px] flex items-center justify-center text-xs font-bold text-stone-500">
+                    در حال بارگذاری شبیه‌ساز سه‌بعدی فولیکول...
+                  </div>
+                }
+              >
+                <LuxuryScalp3D />
+              </Suspense>
             </div>
           </div>
         </section>
