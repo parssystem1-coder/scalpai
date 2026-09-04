@@ -21,6 +21,7 @@ import {
   Droplets,
   Dna,
   Download,
+  ShieldCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, clearAccessToken } from "../api/client.js";
@@ -28,6 +29,8 @@ import { useSync } from "../offline/SyncProvider.js";
 import { AmberOrbs } from "./AmberOrbs.js";
 import { HairCanvas } from "./HairCanvas.js";
 import DigitalConsentModal from "./DigitalConsentModal.js";
+import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal.js";
+import SyncInspectorModal from "./SyncInspectorModal.js";
 import LuxuryTiltCard from "./LuxuryTiltCard.js";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
 import TrichologyRadarChart, { RadarMetric } from "./TrichologyRadarChart.js";
@@ -197,6 +200,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
   const [isConsentOpen, setIsConsentOpen] = useState(false);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
   const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(SAMPLE_IMAGES);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
@@ -431,6 +436,37 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
         {/* User profile & actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Sync & Offline Inspector Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsSyncModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs ${
+              isOnline
+                ? "bg-emerald-50/90 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                : "bg-amber-50/90 text-amber-800 border-amber-300 hover:bg-amber-100"
+            }`}
+            title="وضعیت همگام‌سازی و پایگاه داده آفلاین"
+          >
+            <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+            <span className="hidden sm:inline">{isOnline ? "همگام" : "آفلاین"}</span>
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-mono">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+
+          {/* License & Anti-Tamper Diagnostics Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsLicenseModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
+            title="بررسی اعتبار لایسنس و سلامت ساعت سیستم"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span className="hidden md:inline">لایسنس Ed25519</span>
+          </button>
+
           <button
             onClick={() => setIsConsentOpen(true)}
             className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-[oklch(48%_0.095_12)] shadow-xs backdrop-blur-sm transition-all"
@@ -1172,6 +1208,22 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           patientPhone={selectedPatient.phone}
           isOpen={isConsentOpen}
           onClose={() => setIsConsentOpen(false)}
+        />
+      )}
+
+      {/* Modal: License Diagnostics & Clock Anti-Tamper */}
+      {isLicenseModalOpen && (
+        <LicenseDiagnosticsModal
+          isOpen={isLicenseModalOpen}
+          onClose={() => setIsLicenseModalOpen(false)}
+        />
+      )}
+
+      {/* Modal: Sync & Conflict Inspector */}
+      {isSyncModalOpen && (
+        <SyncInspectorModal
+          isOpen={isSyncModalOpen}
+          onClose={() => setIsSyncModalOpen(false)}
         />
       )}
     </div>

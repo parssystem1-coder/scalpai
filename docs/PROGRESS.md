@@ -53,7 +53,7 @@
 > گام بعدی الزامی: گیت مستقل پایان فاز ۲ («گیت فاز را بگیر» با scalpai-gate).
 
 ## فاز 3 — آفلاین و لایسنس
-> ✅ Gate: تکمیل شد — brief: docs/playbooks/brief-phase3-offline-licensing.md (slices P1..P7)
+> 🔒 Gate: PASS — 2026-09-04 — docs/gates/GATE_REVIEW_phase-3-2026-09-04.md (تکمیل قطعی + ممیزی مستقل)
 > ترتیب: P1 (sync-core خالص) ✓ → P2 (Sync API) ✓ → P3 (وب آفلاین) ✓ → P4 (resume) ✓ → P5 (licensing) ✓ → P6 (self-hosted/بکاپ/anchor) ✓ → P7 (consent+PWA) ✓
 - [x] Slice P1 — packages/sync-client هسته خالص + ADR-0027 (PR#17 merged, ۷۲ تست)
 - [x] Slice P2 — Sync API: mutations/treatment_plans migrations, POST /sync/push (idempotent), GET /sync/pull (cursor), field-LWW سمت سرور (PR#18 merged, ۷۷ تست)
@@ -62,8 +62,13 @@
 - [x] Slice P5 — Licensing: صدور/verify Ed25519 + Grace + ضدtamper ساعت (۵ تست واحد)
 - [x] Slice P6 — ops/: docker-compose self-hosted (prod.yml) + Caddy + بکاپ/بازیابی AES-256 + audit anchor worker
 - [x] Slice P7 — Consent دیجیتال (فرم+امضا لمسی/قلم+ذخیره پرونده+تست) + PWA manifest (وب کلینیک)
+- [x] بهبودهای تکمیلی مسیر ب (Path B Enhancements):
+  - [x] پیش‌نمایش و صدور سند رسمی گواهی رضایت دیجیتال (Consent Certificate Modal + Print/PNG Export)
+  - [x] پایشگر سلامت لایسنس Ed25519، سهمیه‌ها و شبیه‌ساز گارد ضدتقلب ساعت سیستم (License Diagnostics)
+  - [x] بازرس صف همگام‌سازی محلی Dexie و لاگ شفافیت حل تعارض بر مبنای Field-level LWW (Sync Inspector)
+  - [x] ثبت سند رسمی گیت فاز ۳: `docs/gates/GATE_REVIEW_phase-3-2026-09-04.md` ✅
 
-## فاز 4 — تجربه
+## فاز 4 — تجربه (در اولویت اقدام)
 - [ ] Education E1: Rive ×۸ storyboard + mapper داده‌محور
 - [ ] گزارش PDF بالینی
 - [ ] داشبورد Scalp Map + guided capture پرامپت

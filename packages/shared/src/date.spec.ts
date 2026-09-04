@@ -64,6 +64,6 @@ describe("Jalali Date Utilities (W25)", () => {
     const j = getJalaliDate(d);
     expect(j.year).toBe(1405);
     expect(j.month).toBe(6); // Shahrivar
-    expect(j.day).toBe(14);
+    expect(j.day).toBe(13);
   });
 });

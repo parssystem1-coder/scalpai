@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Award } from "lucide-react";
 import { apiFetch, ApiError } from "../api/client.js";
 import { useSync } from "../offline/SyncProvider.js";
 import SignatureCanvas, { type SignatureCanvasRef } from "./SignatureCanvas.js";
+import ConsentCertificateModal from "./ConsentCertificateModal.js";
 
 export interface ConsentRecord {
   id: string;
@@ -41,6 +43,7 @@ export default function DigitalConsentModal({
   const [agreedDataPrivacy, setAgreedDataPrivacy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [selectedCertConsent, setSelectedCertConsent] = useState<ConsentRecord | null>(null);
 
   const consentsQuery = useQuery({
     queryKey: ["consents", patientId],
@@ -313,13 +316,23 @@ export default function DigitalConsentModal({
                     </div>
 
                     {c.signaturePayload ? (
-                      <div className="flex flex-col items-center">
-                        <span className="text-[10px] text-stone-500 mb-1">امضای ثبت شده</span>
-                        <img
-                          src={c.signaturePayload}
-                          alt="امضای بیمار"
-                          className="h-14 max-w-[140px] rounded border border-stone-200 bg-stone-50 object-contain p-1"
-                        />
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] text-stone-500 mb-1">امضای ثبت شده</span>
+                          <img
+                            src={c.signaturePayload}
+                            alt="امضای بیمار"
+                            className="h-14 max-w-[140px] rounded border border-stone-200 bg-stone-50 object-contain p-1"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCertConsent(c)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 transition-colors shadow-2xs"
+                        >
+                          <Award className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
+                          <span>مشاهده و چاپ گواهی</span>
+                        </button>
                       </div>
                     ) : null}
                   </div>
@@ -329,6 +342,16 @@ export default function DigitalConsentModal({
           )}
         </div>
       </div>
+
+      {selectedCertConsent && (
+        <ConsentCertificateModal
+          consent={selectedCertConsent}
+          patientName={patientName}
+          patientPhone={patientPhone}
+          isOpen={!!selectedCertConsent}
+          onClose={() => setSelectedCertConsent(null)}
+        />
+      )}
     </div>
   );
 }
