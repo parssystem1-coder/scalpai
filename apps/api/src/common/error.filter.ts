@@ -1,7 +1,7 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
-import { ApiError } from "@scalpai/shared";
+import { ApiError, resolveLocale, ERROR_MESSAGES } from "@scalpai/shared";
 import { join } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 
@@ -14,15 +14,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<FastifyReply>();
     const req = host.switchToHttp().getRequest<FastifyRequest>();
+    const locale = resolveLocale(req.headers["accept-language"] as string | undefined);
+
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: { code: string; message: string; details?: unknown } = {
       code: "INTERNAL",
-      message: "خطای داخلی سرور",
+      message: ERROR_MESSAGES[locale].internal,
     };
 
     if (exception instanceof ApiError) {
       status = exception.status;
       body = exception.body;
+      if (locale === "en" && body.code in ERROR_MESSAGES.en && !exception.message.match(/[a-zA-Z]/)) {
+        // Translate default message if client requested English and message is Persian default
+        const key = body.code.toLowerCase().replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()) as keyof typeof ERROR_MESSAGES.en;
+        const localized = ERROR_MESSAGES.en[key];
+        if (typeof localized === "string") {
+          body.message = localized;
+        }
+      }
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const payload = exception.getResponse();
@@ -30,18 +40,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         body = { code: "ERROR", message: payload };
       } else {
         const p = payload as { code?: string; message?: string; details?: unknown };
-        body = { code: p.code ?? "ERROR", message: p.message ?? "خطا", details: p.details };
+        body = { code: p.code ?? "ERROR", message: p.message ?? (locale === "en" ? "Error" : "خطا"), details: p.details };
       }
     } else if (exception instanceof ZodError) {
       status = 400;
-      body = { code: "VALIDATION_ERROR", message: "ورودی نامعتبر", details: exception.issues };
+      body = { code: "VALIDATION_ERROR", message: ERROR_MESSAGES[locale].validation, details: exception.issues };
     } else if (isPgError(exception)) {
       if ((exception as { code: string }).code === "23505") {
         status = 409;
-        body = { code: "CONFLICT", message: "رکورد تکراری است" };
+        body = { code: "CONFLICT", message: ERROR_MESSAGES[locale].conflict };
       } else if ((exception as { code: string }).code === "23503") {
         status = 400;
-        body = { code: "FK_VIOLATION", message: "ارجاع نامعتبر" };
+        body = { code: "FK_VIOLATION", message: locale === "en" ? "Foreign key violation" : "ارجاع نامعتبر" };
       }
     }
 

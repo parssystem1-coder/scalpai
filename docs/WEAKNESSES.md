@@ -24,22 +24,22 @@
 ## 🟡 متوسط
 
 - [x] **W11 — `exceptions.json` وجود ندارد** — ADR-21 و گیت چک‌پوینت آن را مرجع می‌دهند و PROGRESS قبلاً «آماده» اعلامش کرده بود؛ عدم تطابق سند/واقعیت. — ✅ رفع: Slice T6 — فایل + موتور هارنس (ورودی بدون ADR = abort build) + ۳ self-test
-- [ ] **W12 — CI با `--no-frozen-lockfile` نصب می‌کند** — `.github/workflows/ci.yml:48`؛ lockfile عملاً قفل نیست.
+- [x] **W12 — CI با `--no-frozen-lockfile` نصب می‌کند** — ✅ رفع: ایجاد package-lock.json و تنظیم `npm ci --legacy-peer-deps` در `.github/workflows/ci.yml`.
 - [x] **W13 — e2e وارد CI نشده + ابهام Exit criteria #1** — تصمیم «@smoke فقط لوکال یا CI» مستند نشده؛ باید در completion فایل T3 حکم شود. — ✅ حکم ثبت شد در `docs/tasks/phase1-T3-playwright-smoke-completion.md`: browser-e2e تا فاز ۲ فقط لوکال (ADR-0024)
-- [ ] **W14 — drift نسخه Postgres** — لوکال native PG17 (ADR-0024) ↔ CI/ops روی `pgvector:pg16`.
+- [x] **W14 — drift نسخه Postgres** — ✅ رفع: یکپارچه‌سازی CI روی `pgvector:pg17` منطبق با محیط لوکال و مشخصات ADR-0024.
 - [x] **W15 — نبود گارد ماشینی ضد خطای انکودینگ** — ریشه W01..W04 سیستمیک است؛ قانون conformance (presence کاراکترهای CP1252-artifact / U+FFFD) با fixture نقض + self-test اضافه شود تا تکرار نشود. — ✅ رفع: قانون `encoding-guard` در Slice H؛ اولین اجرا ۵ فایل آلوده دیگر را هم گرفت
 
 ## 🕒 پایین / بدهی آینده (فاز مقصد مشخص)
 
 - [x] **W16 — rate-limit لاگین / قفل تدریجی brute-force غایب** (§5/§13) — ✅ رفع: Slice M6 فاز ۲ — LoginThrottleService ‏(قفل تدریجی per-email + پنجره per-IP، 429 با کد صریح)
 - [x] **W17 — helmet/CSP و هدرهای امنیتی غایب** (§13) — ✅ رفع: Slice M6 فاز ۲ — helmet ‏(HSTS/nosniff/frame) روی API؛ CSP سند HTML به وب اپ فاز ۴
-- [ ] **W18 — web بدون router** (`main.tsx:11` state ساده authed) — 🕒 فاز ۴ (قبل از دیزاین‌سیستم)
-- [ ] **W19 — i18n ناسازگار** — LoginPage از `t()` استفاده می‌کند، PatientsPage رشته hardcode فارسی دارد — 🕒 فاز ۴ (با i18next کامل)
+- [x] **W18 — web بدون router** — ✅ رفع: یکپارچه‌سازی React Router (`react-router-dom`) در وب با مسیرهای `/`, `/login`, `/dashboard`, `/patients`, `/patients/:pid/gallery`, `/patients/:pid/gallery/:gid`, `/plans`.
+- [x] **W19 — i18n ناسازگار** — ✅ رفع: یکپارچه‌سازی i18next، حذف تمام رشته‌های هاردکد در کامپوننت‌ها و صفحات (`PatientsPage`, `PatientGalleryPage`, `DigitalConsentModal`)، و پشتیبانی کامل از جهت‌های RTL و LTR.
 - [x] **W20 — مرور ایندکس‌های composite** — مثلاً `(clinic_id, start_at)` روی sessions — ✅ رفع: Slice M1 فاز ۲ — migration 0005 سه ایندکس composite (sessions/gallery_items/analyses)
 - [x] **W21 — معناشناسی دوگانه زنجیره audit** — نوشتن per-clinic زیر RLS ولی `verifyChain` global را می‌گوید که از دید نقش اپ قابل اجرا نیست؛ نیاز به تصمیم+مستندسازی (کامنت/ADR کوچک) — همراه W06 در Slice H — ✅ حکم: زنجیره per-clinic است؛ کامنت رسمی در core.repo.ts (`3449845`)
 - [ ] **W22 — ریسک ظرفیت تک‌نفره در برابر وسعت ۸ فاز** — فرآیندی؛ دفاع: قید §15، Tier-B بعد از فاز ۵، کادنس slice — همیشه باز (پایشی)
-- [ ] **W24 — پیام‌های خطای API فقط فارسی هاردکد** — errors.ts بر اساس Accept-Language/زبان کاربر لوکال نمی‌شود؛ کلاینت EN هنوز پیام فارسی می‌بیند — 🕒 فاز ۴ (همراه دیزاین‌سیستم و i18n سمت کلاینت)
-- [ ] **W25 — تقویم جلالی (ADR-19) util واحد ندارد** — ذخیره UTC درست است اما نمایش تاریخ‌ها (createdAt گالری و…) هنوز Jalali/دوزبانه نیست؛ util واحد در packages/shared لازم است — 🕒 فاز ۴
+- [x] **W24 — پیام‌های خطای API فقط فارسی هاردکد** — ✅ رفع: ایجاد ساختار دوزبانه در `packages/shared/src/errors.ts` و تشخیص زبان درخواست کلاینت (`Accept-Language`) در فیلتر خطای سرور (`AllExceptionsFilter`).
+- [x] **W25 — تقویم جلالی (ADR-19) util واحد ندارد** — ✅ رفع: پیاده‌سازی ماژول متمرکز و بهینه `packages/shared/src/date.ts` شامل تبدیل دقیق تقویم میلادی و خورشیدی، فرمت تاریخ‌ها، زمان نسبی، اعداد فارسی و تست‌های واحد vitest.
 
 - [ ] **W23 — فرآیند: فایل‌ها از staging جامانده (۳ بار CI fail)** — ریشه: git add با لیست دستی در slice های چند-مخزنی + ساخت برنچ از main به‌روزنشده. قانون اصلاحی: `git add -A` سراسری + بازبینی `git status --short` پیش از push + **checkout main && pull قبل از هر برنچ جدید**
 

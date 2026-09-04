@@ -20,9 +20,10 @@ interface PatientRow {
 }
 
 function ErrorBox({ error }: { error: unknown }) {
+  const { t } = useTranslation();
   if (!error) return null;
   const code = error instanceof ApiError ? error.code : "ERROR";
-  const message = error instanceof Error ? error.message : "خطای نامشخص";
+  const message = error instanceof Error ? error.message : t("common.unknownError");
   return (
     <p role="alert" style={{ color: "crimson" }}>
       [{code}] {message}
@@ -59,7 +60,7 @@ function AddPatientForm() {
     <form
       onSubmit={handleSubmit((dto) => mutation.mutate(dto))}
       noValidate
-      aria-label="فرم ایجاد بیمار"
+      aria-label={t("patients.formAria")}
     >
       <input placeholder={t("patients.name")} {...register("firstName")} />
       <input placeholder={t("patients.family")} {...register("lastName")} />
@@ -115,7 +116,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
             <tr>
               <th>{t("patients.colName")}</th>
               <th>{t("patients.colPhone")}</th>
-              <th>فرم رضایت</th>
+              <th>{t("patients.consentCol")}</th>
             </tr>
           </thead>
           <tbody>
@@ -142,7 +143,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
                       cursor: "pointer",
                     }}
                   >
-                    ✍️ رضایت‌نامه
+                    {t("patients.consentBtn")}
                   </button>
                 </td>
               </tr>

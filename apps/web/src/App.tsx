@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Volume2, VolumeX, Sparkles, Activity, Check, Microscope } from "lucide-react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
+import { Volume2, VolumeX, Sparkles, Activity, Check, Microscope, Users } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TabMode, MoleculeInfo } from "./types.js";
 import { DemoBanner } from "./components/DemoBanner.js";
@@ -10,6 +11,12 @@ import { RegisterForm } from "./components/RegisterForm.js";
 import { ProPlansView } from "./components/ProPlansView.js";
 import { ClinicalDashboard } from "./components/ClinicalDashboard.js";
 import { SyncProvider } from "./offline/SyncProvider.js";
+import PatientsPage from "./pages/PatientsPage.js";
+import PatientGalleryPage from "./pages/PatientGalleryPage.js";
+import AnalysisPage from "./pages/AnalysisPage.js";
+import LoginPage from "./pages/LoginPage.js";
+import { clearAccessToken } from "./api/client.js";
+import { toggleLang } from "./i18n.js";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,55 +31,47 @@ const MOLECULES: MoleculeInfo[] = [
     name: "Keratin Microfibrils",
     formula: "Polypeptide Matrix",
     desc: "ماتریس پروتئینی کورتکس با فیلامنت‌های مارپیچی سه‌گانه جهت تقویت کشسانی ساقه مو.",
-    badge: "Cortex Matrix"
+    badge: "Cortex Matrix",
   },
   {
     name: "Ceramide-3 Barrier",
     formula: "C34H66NO3",
     desc: "سیمان لیپیدی بین‌سلولی کوتیکول مو جهت مهر و موم لایه‌های شاخی و جلوگیری از خروج رطوبت.",
-    badge: "Lipid Shield"
+    badge: "Lipid Shield",
   },
   {
     name: "Zinc Pyrithione Complex",
     formula: "C10H8N2O2S2Zn",
     desc: "کوفاکتور لایه‌بردار بیواکتیو جهت پاکسازی میکروآلودگی‌های تجمع‌یافته در روزنه فولیکول.",
-    badge: "Cellular Detox"
+    badge: "Cellular Detox",
   },
-  {
-    name: "Copper Tripeptide-1",
-    formula: "GHK-Cu Complex",
-    desc: "پپتید سیگنال‌دهنده محرک گردش خون مویرگی در پاپیلای پوستی برای رشد مجدد و تغذیه ریشه.",
-    badge: "Bulb Genesis"
-  }
 ];
 
-export const AppContent: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUserEmail, setCurrentUserEmail] = useState("tricho@scalpai.clinic");
+interface LandingProps {
+  onLoginSuccess: (email: string) => void;
+  showToast: (title: string, desc: string) => void;
+}
+
+const LandingView: React.FC<LandingProps> = ({ onLoginSuccess, showToast }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabMode>("signin");
   const [isDemoActive, setIsDemoActive] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [scannerActive, setScannerActive] = useState(true);
+  const [scannerActive] = useState(true);
   const [scannerData, setScannerData] = useState("SCANNING CORTEX...");
   const [scannerPos, setScannerPos] = useState({ x: 0, y: 0, visible: false });
-  const [toast, setToast] = useState<{ title: string; desc: string } | null>(null);
   const [currentMolIndex, setCurrentMolIndex] = useState(0);
-
-  const showToast = (title: string, desc: string) => {
-    setToast({ title, desc });
-    setTimeout(() => setToast(null), 3800);
-  };
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentMolIndex(prev => (prev + 1) % MOLECULES.length);
+      setCurrentMolIndex((prev) => (prev + 1) % MOLECULES.length);
     }, 5500);
     return () => clearInterval(timer);
   }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!scannerActive || e.clientX < window.innerWidth * 0.45 || e.clientY < 75) {
-      setScannerPos(prev => ({ ...prev, visible: false }));
+      setScannerPos((prev) => ({ ...prev, visible: false }));
       return;
     }
     setScannerPos({ x: e.clientX, y: e.clientY, visible: true });
@@ -85,36 +84,24 @@ export const AppContent: React.FC = () => {
     }
   };
 
-  if (isLoggedIn) {
-    return (
-      <ClinicalDashboard
-        userEmail={currentUserEmail}
-        onLogout={() => {
-          setIsLoggedIn(false);
-          showToast("خروج موفق", "از حساب کلینیک خارج شدید.");
-        }}
-      />
-    );
-  }
-
   return (
     <div
       onMouseMove={handleMouseMove}
       className="relative min-h-screen overflow-x-hidden bg-[oklch(85%_0.03_28)] font-sans antialiased text-[oklch(20%_0.02_20)]"
     >
-      {/* 1. Global Background Image */}
+      {/* Global Background Image */}
       <div
         className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04]"
         style={{ backgroundImage: `url('/images/scalp-bg.jpg')` }}
       />
 
-      {/* 2. Floating Amber Serum Spheres */}
+      {/* Floating Amber Serum Spheres */}
       <AmberOrbs />
 
-      {/* 3. Interactive Hair Canvas */}
+      {/* Interactive Hair Canvas */}
       <HairCanvas />
 
-      {/* 4. Scanner Reticle HUD */}
+      {/* Scanner Reticle HUD */}
       <div
         className={`fixed z-[100] w-36 h-36 rounded-full border border-dashed border-[oklch(80%_0.14_195/0.7)] shadow-[0_0_25px_oklch(80%_0.14_195/0.3),inset_0_0_15px_oklch(80%_0.14_195/0.2)] pointer-events-none transition-all duration-300 -translate-x-1/2 -translate-y-1/2 ${
           scannerPos.visible ? "opacity-100 scale-100" : "opacity-0 scale-75"
@@ -127,7 +114,7 @@ export const AppContent: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Demo Notification Banner */}
+      {/* Demo Banner */}
       {isDemoActive && (
         <DemoBanner
           onUpgrade={() => {
@@ -138,32 +125,43 @@ export const AppContent: React.FC = () => {
         />
       )}
 
-      {/* 6. Header */}
+      {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-5 backdrop-blur-md bg-[oklch(98%_0.01_28/0.18)] border-b border-white/20">
-        <a href="#home" className="flex items-center gap-3 text-inherit no-underline">
+        <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full border border-[oklch(62%_0.09_16/0.4)] grid place-items-center bg-white/30 shadow-md">
             <Sparkles className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
           </div>
           <span className="font-serif font-semibold text-lg tracking-[0.18em] uppercase">SCALP SCRUB</span>
-        </a>
+        </div>
 
-        <nav className="hidden lg:flex gap-8 list-none">
-          {["Pro Suite", "Cellular Science", "Subscription Plans", "For Hair Experts"].map(item => (
-            <a
-              key={item}
-              href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
-              className="text-xs tracking-[0.15em] uppercase font-medium text-[oklch(20%_0.02_20)] hover:text-[oklch(62%_0.09_16)] transition-colors"
-            >
-              {item}
-            </a>
-          ))}
+        <nav className="hidden lg:flex gap-6 list-none items-center">
+          <Link
+            to="/dashboard"
+            className="text-xs tracking-[0.15em] uppercase font-semibold text-[oklch(20%_0.02_20)] hover:text-[oklch(62%_0.09_16)] transition-colors"
+          >
+            داشبورد تریکولوژی
+          </Link>
+          <Link
+            to="/patients"
+            className="text-xs tracking-[0.15em] uppercase font-semibold text-[oklch(20%_0.02_20)] hover:text-[oklch(62%_0.09_16)] transition-colors"
+          >
+            پرونده بیماران
+          </Link>
+          <Link
+            to="/plans"
+            className="text-xs tracking-[0.15em] uppercase font-semibold text-[oklch(20%_0.02_20)] hover:text-[oklch(62%_0.09_16)] transition-colors"
+          >
+            تعرفه‌ها و اشتراک
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
           <button
+            id="quick-portal-btn"
+            type="button"
             onClick={() => {
-              setIsLoggedIn(true);
-              showToast("اتصال کلینیک", "وارد سامانه تخصصی تریکولوژی شدید.");
+              onLoginSuccess("tricho@scalpai.clinic");
+              navigate("/dashboard");
             }}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-[oklch(62%_0.09_16/0.6)] bg-white/70 hover:bg-white text-[oklch(50%_0.095_12)] shadow-sm backdrop-blur-sm transition-all"
           >
@@ -171,32 +169,38 @@ export const AppContent: React.FC = () => {
             <span>ورود به پنل تریکولوژیست</span>
           </button>
 
-          <button
-            onClick={() => setScannerActive(!scannerActive)}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-white/40 backdrop-blur-sm transition-all ${
-              scannerActive ? "bg-white/70 border-[oklch(62%_0.09_16)] shadow-md" : "bg-white/20"
-            }`}
+          <Link
+            to="/patients"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.72rem] font-semibold border border-white/60 bg-white/40 hover:bg-white/70 text-[oklch(30%_0.02_20)] transition-all"
           >
-            <span className="w-2 h-2 rounded-full bg-[oklch(62%_0.09_16)] animate-pulse" />
-            <span className="hidden sm:inline">{scannerActive ? "Cellular Lens: ON" : "Lens: Standby"}</span>
+            <Users className="w-3.5 h-3.5" />
+            <span>بیماران</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={toggleLang}
+            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white/50 border border-white/60 hover:bg-white/80 transition-all"
+          >
+            زبان / Lang
           </button>
+
           <button
+            type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-white/40 bg-white/30 hover:bg-white/50 backdrop-blur-sm transition-all"
+            className="w-9 h-9 rounded-full border border-white/60 bg-white/30 grid place-items-center text-[oklch(40%_0.02_20)] hover:bg-white/60 transition-all shadow-sm"
           >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{soundEnabled ? "Acoustics" : "Muted"}</span>
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
         </div>
       </header>
 
-      {/* 7. Main Portal Body */}
-      <main className="relative z-[5] grid grid-cols-1 lg:grid-cols-[minmax(420px,490px)_1fr] min-h-[calc(100vh-75px)] px-6 md:px-16 py-8 items-center gap-12">
-        <div className="w-full">
-          <div className="relative w-full p-8 md:p-9 rounded-[28px] bg-[oklch(98%_0.008_28/0.30)] border border-white/70 backdrop-blur-[34px] shadow-[0_32px_90px_oklch(30%_0.04_15/0.18)] overflow-hidden">
-            <div className="absolute -inset-[1.5px] rounded-[inherit] p-[1.5px] pointer-events-none bg-gradient-to-tr from-transparent via-[oklch(76%_0.085_24/0.4)] to-[oklch(62%_0.09_16/0.5)] opacity-80" />
-
-            <div className="flex items-center gap-3 mb-5">
+      {/* Main Hero & Auth Split View */}
+      <main className="relative z-10 grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-80px)] px-6 md:px-12 py-8 items-center gap-8">
+        {/* Left Col: Auth & Suite Controller */}
+        <section className="lg:col-span-5 flex flex-col justify-center">
+          <div className="w-full max-w-md mx-auto p-8 rounded-3xl bg-white/65 border border-white/80 backdrop-blur-2xl shadow-xl">
+            <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-full border border-[oklch(62%_0.09_16/0.4)] grid place-items-center bg-white/40">
                 <Sparkles className="w-5 h-5 text-[oklch(62%_0.09_16)]" />
               </div>
@@ -209,25 +213,34 @@ export const AppContent: React.FC = () => {
             {/* Tab Switcher */}
             <div className="flex gap-1 p-1 bg-white/25 rounded-xl border border-white/40 mb-5">
               <button
+                type="button"
                 onClick={() => setActiveTab("signin")}
                 className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === "signin" ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm" : "text-[oklch(60%_0.015_20)] hover:text-black"
+                  activeTab === "signin"
+                    ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm"
+                    : "text-[oklch(60%_0.015_20)] hover:text-black"
                 }`}
               >
                 Sign In
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("register")}
                 className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === "register" ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm" : "text-[oklch(60%_0.015_20)] hover:text-black"
+                  activeTab === "register"
+                    ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm"
+                    : "text-[oklch(60%_0.015_20)] hover:text-black"
                 }`}
               >
-                Open Sign Up
+                Sign Up
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("plans")}
                 className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === "plans" ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm" : "text-[oklch(60%_0.015_20)] hover:text-black"
+                  activeTab === "plans"
+                    ? "bg-white/90 text-[oklch(20%_0.02_20)] shadow-sm"
+                    : "text-[oklch(60%_0.015_20)] hover:text-black"
                 }`}
               >
                 Pro Plans 💎
@@ -236,15 +249,16 @@ export const AppContent: React.FC = () => {
 
             {activeTab === "signin" && (
               <SignInForm
-                onSubmit={data => {
-                  setCurrentUserEmail(data.username.includes("@") ? data.username : `${data.username}@scalpai.clinic`);
-                  setIsLoggedIn(true);
+                onSubmit={(data) => {
+                  const email = data.username.includes("@") ? data.username : `${data.username}@scalpai.clinic`;
+                  onLoginSuccess(email);
                   showToast("ورود موفق", `خوش آمدید ${data.username}. در حال انتقال به پنل بالینی...`);
+                  navigate("/dashboard");
                 }}
-                onDemoLogin={provider => {
-                  setCurrentUserEmail(`demo.${provider.toLowerCase()}@scalpai.clinic`);
-                  setIsLoggedIn(true);
+                onDemoLogin={(provider) => {
+                  onLoginSuccess(`demo.${provider.toLowerCase()}@scalpai.clinic`);
                   showToast("حالت دمو", `شما از طریق ${provider} وارد داشبورد کلینیک شدید.`);
+                  navigate("/dashboard");
                 }}
                 onForgotPassword={() => showToast("بازیابی رمز", "لینک بازنشانی رمز به ایمیل ارسال شد.")}
               />
@@ -252,30 +266,35 @@ export const AppContent: React.FC = () => {
 
             {activeTab === "register" && (
               <RegisterForm
-                onSubmit={data => {
-                  setCurrentUserEmail(data.email || `${data.fullName}@scalpai.clinic`);
-                  setIsLoggedIn(true);
+                onSubmit={(data) => {
+                  const email = data.email || `${data.fullName}@scalpai.clinic`;
+                  onLoginSuccess(email);
                   showToast("حساب ایجاد شد", `خوش آمدید ${data.fullName}. وارد پنل بالینی شدید.`);
+                  navigate("/dashboard");
                 }}
               />
             )}
 
             {activeTab === "plans" && (
-              <ProPlansView
-                onSelectPlan={() => {
-                  setIsLoggedIn(true);
-                  showToast("اتصال به درگاه", "پلن کلینیک فعال شد. انتقال به پنل...");
-                }}
-              />
+              <div className="space-y-4">
+                <ProPlansView
+                  onSelectPlan={() => {
+                    showToast("پلن فعال شد", "پلن تخصصی با موفقیت فعال گردید.");
+                    setActiveTab("signin");
+                  }}
+                />
+              </div>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Right Side Editorial */}
-        <section className="flex flex-col items-end text-right pl-0 lg:pl-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/35 border border-white/60 backdrop-blur-md text-xs font-semibold tracking-widest uppercase text-[oklch(48%_0.095_12)] mb-4 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-[oklch(82%_0.14_58)] animate-pulse" />
-            <span>Cellular Trichology Vol. IX</span>
+        {/* Right Col: Luxury Display Typography & Biological Focus */}
+        <section className="lg:col-span-7 flex flex-col justify-center items-start lg:pl-8 pointer-events-auto" dir="rtl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/50 border border-white/80 shadow-xs mb-4">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[0.65rem] font-bold tracking-widest uppercase text-[oklch(50%_0.095_12)]">
+              سیستم هوشمند تحلیل و پایش سلامت پوست سر
+            </span>
           </div>
 
           <h2 className="font-serif text-4xl lg:text-6xl font-normal leading-tight tracking-wide uppercase mb-4 text-[oklch(20%_0.02_20)]">
@@ -305,8 +324,83 @@ export const AppContent: React.FC = () => {
           </div>
         </section>
       </main>
+    </div>
+  );
+};
 
-      {/* 8. Toast Feedback */}
+function AppRoutes() {
+  const [currentUserEmail, setCurrentUserEmail] = useState("tricho@scalpai.clinic");
+  const [toast, setToast] = useState<{ title: string; desc: string } | null>(null);
+  const navigate = useNavigate();
+
+  const showToast = (title: string, desc: string) => {
+    setToast({ title, desc });
+    setTimeout(() => setToast(null), 3800);
+  };
+
+  const handleLogout = () => {
+    clearAccessToken();
+    showToast("خروج موفق", "از حساب کلینیک خارج شدید.");
+    navigate("/");
+  };
+
+  return (
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <LandingView
+              onLoginSuccess={(email) => {
+                setCurrentUserEmail(email);
+              }}
+              showToast={showToast}
+            />
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <LoginPage
+              onLoggedIn={() => {
+                navigate("/dashboard");
+              }}
+            />
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={<ClinicalDashboard userEmail={currentUserEmail} onLogout={handleLogout} />}
+        />
+        <Route path="/patients" element={<PatientsPage onLoggedOut={handleLogout} />} />
+        <Route path="/patients/:pid/gallery" element={<PatientGalleryPage onLoggedOut={handleLogout} />} />
+        <Route path="/patients/:pid/gallery/:gid" element={<AnalysisPage onLoggedOut={handleLogout} />} />
+        <Route
+          path="/plans"
+          element={
+            <div className="min-h-screen bg-[oklch(85%_0.03_28)] p-6" dir="rtl">
+              <div className="max-w-5xl mx-auto">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="mb-4 px-4 py-2 bg-white/80 rounded-xl text-sm font-bold shadow-xs border border-white cursor-pointer"
+                >
+                  ← بازگشت
+                </button>
+                <ProPlansView
+                  onSelectPlan={() => {
+                    showToast("پلن فعال شد", "پلن با موفقیت انتخاب شد.");
+                    navigate("/dashboard");
+                  }}
+                />
+              </div>
+            </div>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      {/* Global Toast Feedback */}
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] px-6 py-3 rounded-full bg-white/95 border border-[oklch(76%_0.085_24)] shadow-2xl backdrop-blur-xl flex items-center gap-3">
           <div className="w-5 h-5 rounded-full bg-emerald-500 text-white grid place-items-center text-xs font-bold">
@@ -318,15 +412,17 @@ export const AppContent: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
-};
+}
 
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <SyncProvider>
-        <AppContent />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </SyncProvider>
     </QueryClientProvider>
   );

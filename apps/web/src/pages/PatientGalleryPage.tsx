@@ -8,6 +8,7 @@ import AutoLock from "../components/AutoLock.js";
 import DigitalConsentModal from "../components/DigitalConsentModal.js";
 import { faNum, toggleLang } from "../i18n.js";
 import { uploadChunked, getPendingUploads, type ChunkedUploadState } from "../offline/chunked-upload.js";
+import { formatDate } from "@scalpai/shared";
 
 interface GalleryItem {
   id: string;
@@ -152,9 +153,14 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
           </span>
         )}
         {!mockItems && (
-          <button type="button" onClick={() => remove.mutate(it.id)}>
-            {t("common.delete")}
-          </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            <span style={{ fontSize: 11, color: "#666" }}>
+              {formatDate(it.createdAt, { locale: (i18n.language === "fa" ? "fa" : "en"), format: "short" })}
+            </span>
+            <button type="button" onClick={() => remove.mutate(it.id)}>
+              {t("common.delete")}
+            </button>
+          </div>
         )}
       </figure>
     );
@@ -165,7 +171,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
     return (
       <main style={{ maxWidth: 980, margin: "4vh auto", padding: "0 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <h1>گالری بیمار {patientQuery.data ? `(${patientQuery.data.firstName} ${patientQuery.data.lastName})` : ""}</h1>
+          <h1>{t("gallery.title")} {patientQuery.data ? `(${patientQuery.data.firstName} ${patientQuery.data.lastName})` : ""}</h1>
           <button
             id="open-gallery-consent-btn"
             type="button"
@@ -181,15 +187,18 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
               cursor: "pointer",
             }}
           >
-            ✍️ فرم رضایت دیجیتال بیمار
+            {t("gallery.consentBtn")}
           </button>
         </div>
-        <Link to="/patients">بازگشت به بیماران</Link>
+        <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+          <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+          <Link to="/patients">{t("gallery.back")}</Link>
+        </div>
         <div style={{ margin: "12px 0" }}>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            aria-label="انتخاب تصویر"
+            aria-label={t("gallery.pick")}
             disabled={upload.isPending}
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -220,7 +229,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
 
         <DigitalConsentModal
           patientId={pid}
-          patientName={patientQuery.data ? `${patientQuery.data.firstName} ${patientQuery.data.lastName}` : "بیمار"}
+          patientName={patientQuery.data ? `${patientQuery.data.firstName} ${patientQuery.data.lastName}` : t("gallery.patientLabel")}
           patientPhone={patientQuery.data?.phone ?? ""}
           isOpen={isConsentOpen}
           onClose={() => setIsConsentOpen(false)}
@@ -251,7 +260,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
             cursor: "pointer",
           }}
         >
-          ✍️ فرم رضایت دیجیتال بیمار
+          {t("gallery.consentBtn")}
         </button>
       </div>
       <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
