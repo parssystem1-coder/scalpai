@@ -13,6 +13,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@scalpai/analysis-engine": "*",
+    "@scalpai/education": "*",
     "@scalpai/shared": "*",
     "@scalpai/sync-client": "*",
     "@tanstack/react-query": "^5.90.0",

@@ -18,6 +18,7 @@ export default defineConfig({
       '@scalpai/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
       '@scalpai/analysis-engine': path.resolve(__dirname, '../../packages/analysis-engine/src/index.ts'),
       '@scalpai/analysis-core': path.resolve(__dirname, '../../packages/analysis-core/src/index.ts'),
+      '@scalpai/education': path.resolve(__dirname, '../../packages/education/src/index.ts'),
     },
   },
 });

@@ -229,6 +229,13 @@ export function formatDate(
   return result;
 }
 
+/**
+ * Convenient Jalali date formatter (ADR-19).
+ */
+export function formatToJalali(input: Date | string | number): string {
+  return formatDate(input, { locale: "fa", format: "medium", persianDigits: true });
+}
+
 export interface RelativeTimeOptions {
   locale?: "fa" | "en";
   now?: Date;

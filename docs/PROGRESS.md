@@ -68,14 +68,15 @@
   - [x] بازرس صف همگام‌سازی محلی Dexie و لاگ شفافیت حل تعارض بر مبنای Field-level LWW (Sync Inspector)
   - [x] ثبت سند رسمی گیت فاز ۳: `docs/gates/GATE_REVIEW_phase-3-2026-09-04.md` ✅
 
-## فاز 4 — تجربه (در اولویت اقدام)
-- [ ] Education E1: Rive ×۸ storyboard + mapper داده‌محور
-- [ ] گزارش PDF بالینی
-- [ ] داشبورد Scalp Map + guided capture پرامپت
-- [ ] پوسته Electron نازک
-- [ ] Router وب + i18n کامل PatientsPage (W18/W19)
+## فاز 4 — تجربه (تکمیل‌شده ✅)
+> 🔒 Gate: PASS — 2026-09-04 — پیاده‌سازی کامل استانداردهای DESIGN-V2 §11 و §12
+- [x] Education E1: پکیج `@scalpai/education` با ۸ استوری‌بورد/عارضه بالینی در ۳ سطح شدت + مودال تعاملی سه‌بعدی و استیت‌ماشین عوارض (DESIGN-V2 §11)
+- [x] گزارش PDF بالینی: ماژول رسمی تریکوسکوپی با تقویم جلالی، جدول متریک‌های بیومتریک، نسخه چاپی A4 و کد اصالت دیجیتال
+- [x] داشبورد Scalp Map + guided capture پرامپت: نقشه هیت‌مپ ۵ ناحیه آناتومیک + گیت ۴ زاویه استاندارد عکاسی درماتوسکوپی و اعتبارسنجی کیفیت تصویر
+- [x] پوسته Electron نازک: درایورهای ارتباط با سخت‌افزارهای تریکوسکوپی UVC و لایه کش محلی در `apps/desktop`
+- [x] Router وب + i18n کامل PatientsPage (W18/W19)
 
-## فاز 5 — رشد تجاری (Aftercare-first)
+## فاز 5 — رشد تجاری (Aftercare-first) — در اولویت اقدام بعدی
 - [ ] Aftercare Engine (توالی JSON) + Messaging Gateway adapter (SMS/Bale/Eitaa ← Telegram ← WhatsApp) + ماتریس کانال‌های ایران
 - [ ] یادآور no-show + inbound inbox
 - [ ] فاکتور/POS پایه (invoice_items رابطه‌ای) + درگاه ایرانی adapter

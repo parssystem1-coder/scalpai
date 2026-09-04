@@ -22,6 +22,8 @@ import {
   Dna,
   Download,
   ShieldCheck,
+  Activity,
+  FileText,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, clearAccessToken } from "../api/client.js";
@@ -31,6 +33,11 @@ import { HairCanvas } from "./HairCanvas.js";
 import DigitalConsentModal from "./DigitalConsentModal.js";
 import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal.js";
 import SyncInspectorModal from "./SyncInspectorModal.js";
+import ScalpMap, { type ZoneClinicalData } from "./ScalpMap.js";
+import EducationModal from "./EducationModal.js";
+import GuidedCaptureModal from "./GuidedCaptureModal.js";
+import ClinicalPdfReportModal from "./ClinicalPdfReportModal.js";
+import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard.js";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
 import TrichologyRadarChart, { RadarMetric } from "./TrichologyRadarChart.js";
@@ -136,7 +143,8 @@ const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
 };
 
 export const SECTIONS = [
-  { id: "patients", label: "پرونده و ماتریس مراجعین", icon: Users },
+  { id: "patients", label: "پرونده و مراجعین", icon: Users },
+  { id: "scalp-map", label: "نقشه زنده سر (Scalp Map)", icon: Activity },
   { id: "gallery", label: "ویژن تریکوسکوپی 4K", icon: Camera },
   { id: "ai-studio", label: "استودیوی محاسباتی AI", icon: Sparkles },
   { id: "3d-model", label: "هولوگرام ۳ بعدی ساقه مو", icon: Layers },
@@ -202,6 +210,11 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [isConsentOpen, setIsConsentOpen] = useState(false);
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isEducationOpen, setIsEducationOpen] = useState(false);
+  const [educationCondition, setEducationCondition] = useState<ConditionKey>("androgenetic_alopecia");
+  const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
+  const [isGuidedCaptureOpen, setIsGuidedCaptureOpen] = useState(false);
+  const [isPdfReportOpen, setIsPdfReportOpen] = useState(false);
   const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
   const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(SAMPLE_IMAGES);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
@@ -467,6 +480,39 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
             <span className="hidden md:inline">لایسنس Ed25519</span>
           </button>
 
+          {/* Education E1 3D Layer Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsEducationOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[oklch(62%_0.09_16/0.15)] hover:bg-[oklch(62%_0.09_16/0.25)] border border-[oklch(62%_0.09_16/0.4)] text-[oklch(48%_0.095_12)] shadow-2xs transition-all"
+            title="آموزش ۳ بعدی بالینی و استیت‌ماشین عوارض (DESIGN-V2 §11)"
+          >
+            <Sparkles className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
+            <span className="hidden xl:inline">آموزش سه‌بعدی (E1)</span>
+          </button>
+
+          {/* Guided Capture Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsGuidedCaptureOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
+            title="پروتکل عکس‌برداری هدایت‌شده و گیت کیفیت"
+          >
+            <Camera className="w-4 h-4 text-cyan-600" />
+            <span className="hidden lg:inline">ثبت هدایت‌شده</span>
+          </button>
+
+          {/* PDF Report Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsPdfReportOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
+            title="صدور گزارش رسمی بالینی تریکوسکوپی (PDF)"
+          >
+            <FileText className="w-4 h-4 text-stone-700" />
+            <span className="hidden sm:inline">گزارش PDF</span>
+          </button>
+
           <button
             onClick={() => setIsConsentOpen(true)}
             className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-[oklch(48%_0.095_12)] shadow-xs backdrop-blur-sm transition-all"
@@ -727,11 +773,32 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           </div>
         </section>
 
-        {/* Visual Divider: Section 1 to Section 2 */}
+        {/* Visual Divider: Section 1 to Section 2 (Scalp Map Hero) */}
         <div className="flex items-center gap-4 py-2 opacity-70">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
           <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            SECTION 02 • TRICHOSCOPY IMAGING
+            SECTION 02 • SCALP MAP & SUB-CUTANEOUS DIVE
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
+        </div>
+
+        {/* SECTION 2: SCALP MAP HERO & SIGNATURE DIVE TRANSITION */}
+        <section id="section-scalp-map" className="scroll-mt-28 space-y-6">
+          <ScalpMap
+            patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+            onDiveUnderSkin={(zone: ZoneClinicalData) => {
+              setEducationCondition(zone.primaryCondition);
+              setEducationSeverity(zone.severity);
+              setIsEducationOpen(true);
+            }}
+          />
+        </section>
+
+        {/* Visual Divider: Section 2 to Section 3 */}
+        <div className="flex items-center gap-4 py-2 opacity-70">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
+          <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
+            SECTION 03 • TRICHOSCOPY IMAGING
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
@@ -1226,6 +1293,32 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           onClose={() => setIsSyncModalOpen(false)}
         />
       )}
+
+      {/* Modal: Education E1 3D Layer (DESIGN-V2 §11) */}
+      <EducationModal
+        isOpen={isEducationOpen}
+        onClose={() => setIsEducationOpen(false)}
+        initialCondition={educationCondition}
+        initialSeverity={educationSeverity}
+        patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+      />
+
+      {/* Modal: Guided Capture & Quality Gate */}
+      <GuidedCaptureModal
+        isOpen={isGuidedCaptureOpen}
+        onClose={() => setIsGuidedCaptureOpen(false)}
+        patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+      />
+
+      {/* Modal: Clinical PDF Report */}
+      <ClinicalPdfReportModal
+        isOpen={isPdfReportOpen}
+        onClose={() => setIsPdfReportOpen(false)}
+        patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+        patientPhone={selectedPatient.phone}
+        patientId={selectedPatient.id}
+        density={selectedPatient.hairDensity}
+      />
     </div>
   );
 };

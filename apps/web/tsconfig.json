@@ -20,7 +20,8 @@
       "@scalpai/shared": ["../../packages/shared/src/index.ts"],
       "@scalpai/analysis-engine": ["../../packages/analysis-engine/src/index.ts"],
       "@scalpai/analysis-core": ["../../packages/analysis-core/src/index.ts"],
-      "@scalpai/sync-client": ["../../packages/sync-client/src/index.ts"]
+      "@scalpai/sync-client": ["../../packages/sync-client/src/index.ts"],
+      "@scalpai/education": ["../../packages/education/src/index.ts"]
     }
   },
   "include": [
