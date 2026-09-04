@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "npm run dev --workspace=@scalpai/app-web",
     "build": "npm run build --workspace=@scalpai/app-web && rm -rf dist && cp -r apps/web/dist dist",
