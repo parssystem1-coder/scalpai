@@ -61,7 +61,7 @@ export class AuthService {
   private signAccess(claims: AccessClaims): string {
     const cfg = resolveJwtConfig();
     return this.jwt.sign(claims, {
-      expiresIn: cfg.accessTtl,
+      expiresIn: cfg.accessTtl as any,
       issuer: cfg.issuer,
       audience: cfg.audience,
       keyid: cfg.kid,
