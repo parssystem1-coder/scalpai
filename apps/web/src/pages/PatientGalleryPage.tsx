@@ -31,12 +31,18 @@ function useMockItems(): GalleryItem[] | null {
   return useMemo(() => {
     if (!mock) return null;
     const n = Math.min(Number(mock) || 0, 2000);
+    const sampleUrls = [
+      "/trichoscopy/vertex.jpg",
+      "/trichoscopy/frontal.jpg",
+      "/trichoscopy/temporal.jpg",
+      "/trichoscopy/occiput.jpg",
+    ];
     return Array.from({ length: n }, (_, i) => ({
       id: `mock-${i}`,
       createdAt: new Date().toISOString(),
       quality: null,
-      thumbUrl: "/vite.svg",
-      viewUrl: "/vite.svg",
+      thumbUrl: sampleUrls[i % sampleUrls.length],
+      viewUrl: sampleUrls[i % sampleUrls.length],
     }));
   }, [mock]);
 }

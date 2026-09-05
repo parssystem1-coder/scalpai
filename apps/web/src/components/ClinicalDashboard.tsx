@@ -24,6 +24,19 @@ import {
   ShieldCheck,
   Activity,
   FileText,
+  Eye,
+  Maximize2,
+  X,
+  Trash2,
+  Split,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Move,
+  Ruler,
+  Filter,
+  Tag,
+  Check,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, clearAccessToken } from "../api/client.js";
@@ -37,6 +50,7 @@ import ScalpMap, { type ZoneClinicalData } from "./ScalpMap.js";
 import EducationModal from "./EducationModal.js";
 import GuidedCaptureModal from "./GuidedCaptureModal.js";
 import ClinicalPdfReportModal from "./ClinicalPdfReportModal.js";
+import BeforeAfterCompareModal from "./BeforeAfterCompareModal.js";
 import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard.js";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
@@ -70,6 +84,8 @@ interface TrichoscopyImage {
   density: number;
   thickness: string;
   qualityScore: number;
+  tags?: string[];
+  notes?: string;
 }
 
 const SAMPLE_PATIENTS: Patient[] = [
@@ -122,7 +138,7 @@ const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
     {
       id: "img-01",
       patientId: "pat-101",
-      url: "/hero-follicle-bg.jpg",
+      url: "/trichoscopy/vertex.jpg",
       area: "vertex",
       date: "۱۴۰۳/۰۶/۱۰",
       density: 148,
@@ -132,12 +148,96 @@ const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
     {
       id: "img-02",
       patientId: "pat-101",
-      url: "/images/scalp-bg.jpg",
+      url: "/trichoscopy/frontal.jpg",
+      area: "frontal",
+      date: "۱۴۰۳/۰۶/۱۰",
+      density: 142,
+      thickness: "66 µm",
+      qualityScore: 97,
+    },
+    {
+      id: "img-03",
+      patientId: "pat-101",
+      url: "/trichoscopy/temporal.jpg",
       area: "temple",
       date: "۱۴۰۳/۰۵/۱۰",
       density: 134,
       thickness: "64 µm",
       qualityScore: 95,
+    },
+    {
+      id: "img-04",
+      patientId: "pat-101",
+      url: "/trichoscopy/occiput.jpg",
+      area: "occiput",
+      date: "۱۴۰۳/۰۴/۱۵",
+      density: 195,
+      thickness: "85 µm",
+      qualityScore: 99,
+    },
+  ],
+  "pat-102": [
+    {
+      id: "img-102-1",
+      patientId: "pat-102",
+      url: "/trichoscopy/vertex.jpg",
+      area: "vertex",
+      date: "۱۴۰۳/۰۶/۰۸",
+      density: 165,
+      thickness: "78 µm",
+      qualityScore: 97,
+    },
+    {
+      id: "img-102-2",
+      patientId: "pat-102",
+      url: "/trichoscopy/temporal.jpg",
+      area: "temple",
+      date: "۱۴۰۳/۰۵/۲۰",
+      density: 158,
+      thickness: "74 µm",
+      qualityScore: 94,
+    },
+    {
+      id: "img-102-3",
+      patientId: "pat-102",
+      url: "/trichoscopy/occiput.jpg",
+      area: "occiput",
+      date: "۱۴۰۳/۰۴/۱۰",
+      density: 210,
+      thickness: "88 µm",
+      qualityScore: 99,
+    },
+  ],
+  "pat-103": [
+    {
+      id: "img-103-1",
+      patientId: "pat-103",
+      url: "/trichoscopy/temporal.jpg",
+      area: "temple",
+      date: "۱۴۰۳/۰۶/۰۱",
+      density: 122,
+      thickness: "58 µm",
+      qualityScore: 92,
+    },
+    {
+      id: "img-103-2",
+      patientId: "pat-103",
+      url: "/trichoscopy/frontal.jpg",
+      area: "frontal",
+      date: "۱۴۰۳/۰۵/۱۵",
+      density: 118,
+      thickness: "55 µm",
+      qualityScore: 91,
+    },
+    {
+      id: "img-103-3",
+      patientId: "pat-103",
+      url: "/trichoscopy/vertex.jpg",
+      area: "vertex",
+      date: "۱۴۰۳/۰۴/۲۰",
+      density: 130,
+      thickness: "62 µm",
+      qualityScore: 94,
     },
   ],
 };
@@ -215,26 +315,355 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
   const [isGuidedCaptureOpen, setIsGuidedCaptureOpen] = useState(false);
   const [isPdfReportOpen, setIsPdfReportOpen] = useState(false);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [compareDefaultA, setCompareDefaultA] = useState<string | undefined>(undefined);
+  const [compareDefaultB, setCompareDefaultB] = useState<string | undefined>(undefined);
   const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
   const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(SAMPLE_IMAGES);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>("all");
+  const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);
+  const [previewPhotoModal, setPreviewPhotoModal] = useState<TrichoscopyImage | null>(null);
 
-  const handleMockUpload = () => {
-    const newImg: TrichoscopyImage = {
-      id: `img-${Date.now()}`,
-      patientId: selectedPatient.id,
-      url: "/hero-follicle-bg.jpg",
-      area: selectedArea,
-      date: "امروز (لحظاتی پیش)",
-      density: Math.round(135 + Math.random() * 25),
-      thickness: `${Math.round(62 + Math.random() * 14)} µm`,
-      qualityScore: 99,
+  // Lightbox Zoom & Pan Interactive State
+  const [lightboxZoom, setLightboxZoom] = useState<number>(1);
+  const [lightboxPan, setLightboxPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [lightboxRotation, setLightboxRotation] = useState<number>(0);
+  const [isLightboxPanning, setIsLightboxPanning] = useState<boolean>(false);
+  const lightboxPanStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lightboxTouchStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Caliper (Micrometric Measurement) State
+  const [isCaliperActive, setIsCaliperActive] = useState<boolean>(false);
+  const [caliperStart, setCaliperStart] = useState<{ x: number; y: number } | null>(null);
+  const [caliperEnd, setCaliperEnd] = useState<{ x: number; y: number } | null>(null);
+  const [caliperMagnification, setCaliperMagnification] = useState<"50x" | "100x" | "200x">("100x");
+  const [isDrawingCaliper, setIsDrawingCaliper] = useState<boolean>(false);
+
+  // Clinical Notes State per Photo
+  const [lightboxNoteText, setLightboxNoteText] = useState<string>("");
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState<boolean>(false);
+  const [noteSavedFeedback, setNoteSavedFeedback] = useState<string | null>(null);
+
+  const resetLightboxZoom = () => {
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+    setLightboxRotation(0);
+    setIsCaliperActive(false);
+    setCaliperStart(null);
+    setCaliperEnd(null);
+  };
+
+  const handleOpenLightbox = (photo: TrichoscopyImage) => {
+    resetLightboxZoom();
+    setLightboxNoteText(photo.notes || "");
+    setIsNotesDrawerOpen(Boolean(photo.notes && photo.notes.trim().length > 0));
+    setPreviewPhotoModal(photo);
+  };
+
+  // Caliper Calculations
+  const calculateCaliperDistance = () => {
+    if (!caliperStart || !caliperEnd) return null;
+    const dx = caliperEnd.x - caliperStart.x;
+    const dy = caliperEnd.y - caliperStart.y;
+    const pixelDist = Math.hypot(dx, dy);
+    // Normalize by digital zoom so zoom doesn't inflate measurement
+    const opticalPixels = pixelDist / Math.max(1, lightboxZoom);
+    // Optical scale factor: 50x => 2.0 um/px, 100x => 1.0 um/px, 200x => 0.5 um/px
+    const scale = caliperMagnification === "50x" ? 2.0 : caliperMagnification === "100x" ? 1.0 : 0.5;
+    const microns = +(opticalPixels * scale).toFixed(1);
+    let category = "ترمینال ضخیم";
+    let color = "text-emerald-400 border-emerald-500/40 bg-emerald-950/80";
+    if (microns < 30) {
+      category = "ولوس / مینیاتوریزه شدید";
+      color = "text-rose-400 border-rose-500/40 bg-rose-950/80";
+    } else if (microns < 45) {
+      category = "مینیاتوریزه خفیف (Intermediate)";
+      color = "text-amber-400 border-amber-500/40 bg-amber-950/80";
+    } else if (microns < 65) {
+      category = "ترمینال متوسط";
+      color = "text-cyan-400 border-cyan-500/40 bg-cyan-950/80";
+    }
+    return { microns, pixelDist: Math.round(pixelDist), category, color };
+  };
+
+  const handleSaveCaliperToPhoto = () => {
+    const calc = calculateCaliperDistance();
+    if (!calc || !previewPhotoModal) return;
+    const formatted = `${calc.microns} µm (${calc.category})`;
+    setLocalImages((prev) => {
+      const list = prev[selectedPatient.id] || [];
+      const updated = list.map((p) =>
+        p.id === previewPhotoModal.id ? { ...p, thickness: formatted } : p
+      );
+      return { ...prev, [selectedPatient.id]: updated };
+    });
+    setPreviewPhotoModal((prev) => (prev ? { ...prev, thickness: formatted } : null));
+    setNoteSavedFeedback(`کالیبر تار (${calc.microns} µm) به عنوان ضخامت فریم ثبت شد.`);
+    setTimeout(() => setNoteSavedFeedback(null), 4000);
+  };
+
+  const handleSavePhotoNotes = () => {
+    if (!previewPhotoModal) return;
+    setLocalImages((prev) => {
+      const list = prev[selectedPatient.id] || [];
+      const updated = list.map((p) =>
+        p.id === previewPhotoModal.id ? { ...p, notes: lightboxNoteText } : p
+      );
+      return { ...prev, [selectedPatient.id]: updated };
+    });
+    setPreviewPhotoModal((prev) => (prev ? { ...prev, notes: lightboxNoteText } : null));
+    setNoteSavedFeedback("یادداشت و توصیه بالینی در پرونده بیمار ذخیره شد.");
+    setTimeout(() => setNoteSavedFeedback(null), 4000);
+  };
+
+  const handleLightboxWheel = (e: React.WheelEvent) => {
+    if (isCaliperActive) return;
+    e.preventDefault();
+    const delta = -e.deltaY;
+    const factor = delta > 0 ? 1.2 : 0.83;
+    setLightboxZoom((prev) => {
+      const next = Math.min(Math.max(1, +(prev * factor).toFixed(2)), 6);
+      if (next === 1) {
+        setLightboxPan({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  };
+
+  const handleLightboxMouseDown = (e: React.MouseEvent) => {
+    if (isCaliperActive) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setCaliperStart({ x, y });
+      setCaliperEnd({ x, y });
+      setIsDrawingCaliper(true);
+      return;
+    }
+    if (lightboxZoom <= 1) return;
+    e.preventDefault();
+    setIsLightboxPanning(true);
+    lightboxPanStart.current = {
+      x: e.clientX - lightboxPan.x,
+      y: e.clientY - lightboxPan.y,
     };
+  };
 
-    setLocalImages((prev) => ({
-      ...prev,
-      [selectedPatient.id]: [newImg, ...(prev[selectedPatient.id] || [])],
-    }));
+  const handleLightboxMouseMove = (e: React.MouseEvent) => {
+    if (isCaliperActive && isDrawingCaliper) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setCaliperEnd({ x, y });
+      return;
+    }
+    if (!isLightboxPanning || lightboxZoom <= 1) return;
+    e.preventDefault();
+    const newX = e.clientX - lightboxPanStart.current.x;
+    const newY = e.clientY - lightboxPanStart.current.y;
+    const maxPan = (lightboxZoom - 1) * 450;
+    setLightboxPan({
+      x: Math.max(-maxPan, Math.min(maxPan, newX)),
+      y: Math.max(-maxPan, Math.min(maxPan, newY)),
+    });
+  };
+
+  const handleLightboxMouseUp = () => {
+    if (isCaliperActive && isDrawingCaliper) {
+      setIsDrawingCaliper(false);
+      return;
+    }
+    setIsLightboxPanning(false);
+  };
+
+  const handleLightboxDoubleClick = (e: React.MouseEvent) => {
+    if (isCaliperActive) return;
+    e.preventDefault();
+    setLightboxZoom((prev) => {
+      if (prev > 1) {
+        setLightboxPan({ x: 0, y: 0 });
+        return 1;
+      }
+      return 2.5;
+    });
+  };
+
+  const handleLightboxTouchStart = (e: React.TouchEvent) => {
+    if (isCaliperActive) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+      setCaliperStart({ x, y });
+      setCaliperEnd({ x, y });
+      setIsDrawingCaliper(true);
+      return;
+    }
+    if (e.touches.length === 1 && lightboxZoom > 1) {
+      setIsLightboxPanning(true);
+      lightboxTouchStart.current = {
+        x: e.touches[0].clientX - lightboxPan.x,
+        y: e.touches[0].clientY - lightboxPan.y,
+      };
+    }
+  };
+
+  const handleLightboxTouchMove = (e: React.TouchEvent) => {
+    if (isCaliperActive && isDrawingCaliper) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+      setCaliperEnd({ x, y });
+      return;
+    }
+    if (!isLightboxPanning || lightboxZoom <= 1 || e.touches.length !== 1) return;
+    const newX = e.touches[0].clientX - lightboxTouchStart.current.x;
+    const newY = e.touches[0].clientY - lightboxTouchStart.current.y;
+    const maxPan = (lightboxZoom - 1) * 450;
+    setLightboxPan({
+      x: Math.max(-maxPan, Math.min(maxPan, newX)),
+      y: Math.max(-maxPan, Math.min(maxPan, newY)),
+    });
+  };
+
+  const handleLightboxTouchEnd = () => {
+    if (isCaliperActive && isDrawingCaliper) {
+      setIsDrawingCaliper(false);
+      return;
+    }
+    setIsLightboxPanning(false);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const processUploadedImageFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadFeedback("خطا: فایل انتخابی باید از نوع تصویر (JPG, PNG, WebP) باشد.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+
+      const newImg: TrichoscopyImage = {
+        id: `upload-${Date.now()}`,
+        patientId: selectedPatient.id,
+        url: dataUrl,
+        area: selectedArea,
+        date: "امروز (بارگذاری مستقیم)",
+        density: Math.round(138 + Math.random() * 26),
+        thickness: `${Math.round(64 + Math.random() * 14)} µm`,
+        qualityScore: 99,
+      };
+
+      setLocalImages((prev) => ({
+        ...prev,
+        [selectedPatient.id]: [newImg, ...(prev[selectedPatient.id] || [])],
+      }));
+
+      // Immediately set this real image as active in the Neural Segmentation HUD
+      setActiveInspectedPhoto(newImg);
+      setUploadFeedback(`تصویر تریکوسکوپی «${file.name}» با موفقیت بارگذاری شد و در هود هوش مصنوعی فعال گردید.`);
+      setTimeout(() => setUploadFeedback(null), 6000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processUploadedImageFile(file);
+    }
+    e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processUploadedImageFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+  };
+
+  const handleCompleteGuidedCapture = (
+    capturedCount: number,
+    frames?: Record<string, string>,
+    stepTags?: Record<string, string[]>
+  ) => {
+    if (frames && Object.keys(frames).length > 0) {
+      const newImagesList: TrichoscopyImage[] = [];
+      const zoneMapping: Record<string, "vertex" | "temple" | "frontal" | "occiput"> = {
+        "step-frontal": "frontal",
+        "step-vertex": "vertex",
+        "step-temporal": "temple",
+        "step-occiput": "occiput",
+      };
+
+      Object.entries(frames).forEach(([stepId, frameUrl], idx) => {
+        const mappedArea = zoneMapping[stepId] || selectedArea;
+        const tags = stepTags?.[stepId] || [];
+        newImagesList.push({
+          id: `capture-${Date.now()}-${idx}`,
+          patientId: selectedPatient.id,
+          url: frameUrl,
+          area: mappedArea,
+          date: "امروز (تریکوسکوپ زنده)",
+          density: mappedArea === "occiput" ? 205 : Math.round(135 + Math.random() * 30),
+          thickness: `${Math.round(65 + Math.random() * 12)} µm`,
+          qualityScore: 99,
+          tags: tags.length > 0 ? tags : undefined,
+        });
+      });
+
+      if (newImagesList.length > 0) {
+        setLocalImages((prev) => ({
+          ...prev,
+          [selectedPatient.id]: [...newImagesList, ...(prev[selectedPatient.id] || [])],
+        }));
+        setActiveInspectedPhoto(newImagesList[0]);
+        setUploadFeedback(`${newImagesList.length} فریم تریکوسکوپی با وضوح بالا در گالری و هود هوش مصنوعی ذخیره گردید.`);
+        setTimeout(() => setUploadFeedback(null), 6000);
+      }
+    }
+  };
+
+  const handleDeletePhoto = (photoId: string) => {
+    setLocalImages((prev) => {
+      const currentList = prev[selectedPatient.id] || [];
+      const updated = currentList.filter((img) => img.id !== photoId);
+      return {
+        ...prev,
+        [selectedPatient.id]: updated,
+      };
+    });
+
+    if (activeInspectedPhoto?.id === photoId) {
+      const currentList = localImages[selectedPatient.id] || [];
+      const remaining = currentList.filter((img) => img.id !== photoId);
+      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] : null);
+    }
+
+    if (previewPhotoModal?.id === photoId) {
+      setPreviewPhotoModal(null);
+    }
+
+    setUploadFeedback("تصویر با موفقیت از پرونده بیمار حذف شد.");
+    setTimeout(() => setUploadFeedback(null), 4000);
   };
 
   // AI Diagnostic State
@@ -341,11 +770,43 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     }
   };
 
-  const patientPhotos = localImages[selectedPatient.id] || [
+  const handleOpenAiEducation = () => {
+    // Map patient scalp condition or AI scores to 3D Education Storyboard & Severity
+    const condText = (selectedPatient.scalpCondition || "").toLowerCase();
+    let condKey: ConditionKey;
+    if (condText.includes("سبورئیک") || condText.includes("seborrheic") || aiResult.scores.redness > 35) {
+      condKey = "seborrheic_dermatitis";
+    } else if (condText.includes("تلوژن") || condText.includes("telogen")) {
+      condKey = "telogen_effluvium";
+    } else if (condText.includes("فولیکولیت") || condText.includes("folliculitis")) {
+      condKey = "folliculitis";
+    } else if (condText.includes("چرب") || condText.includes("sebum")) {
+      condKey = "hyperseborrhea";
+    } else if (condText.includes("خشک") || condText.includes("dry")) {
+      condKey = "scalp_dryness";
+    } else {
+      condKey = "androgenetic_alopecia";
+    }
+
+    let sev: SeverityLevel;
+    if (aiResult.severity < 20) {
+      sev = "mild";
+    } else if (aiResult.severity > 45) {
+      sev = "severe";
+    } else {
+      sev = "moderate";
+    }
+
+    setEducationCondition(condKey);
+    setEducationSeverity(sev);
+    setIsEducationOpen(true);
+  };
+
+  const allPatientPhotos = localImages[selectedPatient.id] || [
     {
       id: "img-default",
       patientId: selectedPatient.id,
-      url: "/hero-follicle-bg.jpg",
+      url: "/trichoscopy/vertex.jpg",
       area: "vertex",
       date: "۱۴۰۳/۰۶/۱۰",
       density: selectedPatient.hairDensity || 148,
@@ -353,6 +814,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       qualityScore: 98,
     },
   ];
+
+  const patientPhotos = allPatientPhotos.filter((p) => {
+    if (selectedTagFilter === "all") return true;
+    if (selectedTagFilter === "has_notes") return Boolean(p.notes && p.notes.trim().length > 0);
+    return Boolean(p.tags && p.tags.includes(selectedTagFilter));
+  });
 
   // Dynamic Radar Metrics for Selected Patient
   const radarMetrics: RadarMetric[] = [
@@ -821,10 +1288,38 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
+                  type="button"
+                  onClick={() => {
+                    const photos = localImages[selectedPatient.id] || [];
+                    if (photos.length > 0) {
+                      setCompareDefaultA(photos[photos.length - 1]?.id);
+                      setCompareDefaultB(photos[0]?.id);
+                    }
+                    setIsCompareModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 shadow-xs transition-all text-xs font-bold cursor-pointer"
+                  title="مقایسه اسلایدر دو تصویر قبل و بعد بالینی"
+                >
+                  <Split className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>مقایسه رو در رو (قبل و بعد)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsGuidedCaptureOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white shadow-xs hover:brightness-110 transition-all text-xs font-bold cursor-pointer"
+                  title="تصویربرداری هدایت‌شده با دوربین و تریکوسکوپ"
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-200" />
+                  <span>عکاسی تریکوسکوپ</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => scrollToSection("patients")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold cursor-pointer"
                   title="بازگشت به ابتدای پرونده"
                 >
                   <ArrowUp className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
@@ -858,9 +1353,17 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               {/* Main Interactive AI Segmentation HUD */}
               <div className="mb-8">
                 <NeuralSegmentationOverlay
-                  imageUrl={patientPhotos[0]?.url || "/hero-follicle-bg.jpg"}
+                  imageUrl={activeInspectedPhoto?.url || patientPhotos[0]?.url || "/trichoscopy/vertex.jpg"}
                   areaName={
-                    selectedArea === "vertex"
+                    activeInspectedPhoto
+                      ? activeInspectedPhoto.area === "vertex"
+                        ? "تاج سر (Vertex)"
+                        : activeInspectedPhoto.area === "temple"
+                        ? "شقیقه (Temple)"
+                        : activeInspectedPhoto.area === "frontal"
+                        ? "خط رویش (Frontal)"
+                        : "پس‌سر (Occiput)"
+                      : selectedArea === "vertex"
                       ? "تاج سر (Vertex)"
                       : selectedArea === "temple"
                       ? "شقیقه (Temple)"
@@ -872,64 +1375,209 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 />
               </div>
 
-              {/* Upload Dropzone */}
+              {/* Upload Feedback Toast */}
+              {uploadFeedback && (
+                <div className="mb-6 p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-900 text-xs font-bold flex items-center justify-between shadow-xs animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{uploadFeedback}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUploadFeedback(null)}
+                    className="text-emerald-700 hover:text-emerald-950 text-xs cursor-pointer"
+                  >
+                    بستن
+                  </button>
+                </div>
+              )}
+
+              {/* Upload Dropzone with Real File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                onChange={handleFileInputChange}
+                className="hidden"
+                id="real-trichoscope-file-input"
+              />
+
               <div
-                onClick={handleMockUpload}
-                className="p-8 rounded-[28px] border-2 border-dashed border-[oklch(62%_0.09_16/0.4)] bg-white/35 text-center mb-8 hover:bg-white/60 hover:border-[oklch(62%_0.09_16)] transition-all cursor-pointer group shadow-xs backdrop-blur-md"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`p-8 rounded-[28px] border-2 border-dashed transition-all cursor-pointer group shadow-xs backdrop-blur-md text-center mb-8 ${
+                  isDraggingOver
+                    ? "border-[oklch(62%_0.09_16)] bg-[oklch(62%_0.09_16/0.1)] scale-[1.01]"
+                    : "border-[oklch(62%_0.09_16/0.4)] bg-white/40 hover:bg-white/70 hover:border-[oklch(62%_0.09_16)]"
+                }`}
               >
                 <div className="w-14 h-14 rounded-2xl bg-white/80 border border-white text-[oklch(62%_0.09_16)] grid place-items-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-xs">
                   <UploadCloud className="w-7 h-7" />
                 </div>
                 <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">
-                  برای آپلود تصویر تریکوسکوپ جدید کلیک کنید (یا فایل را رها کنید)
+                  {isDraggingOver
+                    ? "فایل تصویر را همین‌جا رها کنید..."
+                    : "انتخاب و بارگذاری تصویر تریکوسکوپ واقعی از سیستم (کلیک یا Drag & Drop)"}
                 </h4>
                 <p className="text-xs text-[oklch(45%_0.02_20)] mt-1">
-                  پشتیبانی از سنسورهای درماتوسکوپی با رزولوشن میکرومتری • ناحیه ذخیره‌سازی: {selectedArea}
+                  پشتیبانی از عکس‌های درماتوسکوپ و دوربین پوست با وضوح میکرومتری (JPG, PNG, WebP) • ذخیره برای ناحیه: {
+                    selectedArea === "vertex"
+                      ? "تاج سر (Vertex)"
+                      : selectedArea === "temple"
+                      ? "شقیقه (Temple)"
+                      : selectedArea === "frontal"
+                      ? "خط رویش (Frontal)"
+                      : "پس‌سر (Occiput)"
+                  }
                 </p>
+                <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[oklch(62%_0.09_16)] font-bold">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-white/60 shadow-2xs">
+                    📁 مرورگر فایل‌های دستگاه
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-white/60 shadow-2xs">
+                    ⚡ بارگذاری لحظه‌ای در هود AI
+                  </span>
+                </div>
               </div>
 
               {/* Gallery Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {patientPhotos.map((photo) => (
-                  <LuxuryTiltCard key={photo.id} maxTilt={5} className="rounded-3xl">
-                    <div className="rounded-3xl overflow-hidden border border-white/80 bg-white/55 backdrop-blur-xl shadow-md">
-                      <div className="relative aspect-4/3 bg-stone-900/10 overflow-hidden">
-                        <img
-                          src={photo.url}
-                          alt="Trichoscopy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[oklch(20%_0.02_20)] text-[0.65rem] font-bold border border-white/80 shadow-xs">
-                          ناحیه: {photo.area}
-                        </div>
-                        <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 backdrop-blur-md text-emerald-800 text-[0.65rem] font-bold flex items-center gap-1 shadow-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          وضوح کوانتومی {photo.qualityScore}%
-                        </div>
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex items-center justify-between text-xs text-[oklch(45%_0.02_20)] mb-3 font-mono">
-                          <span>تاریخ: {photo.date}</span>
-                          <span>ضخامت: {photo.thickness}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-3 border-t border-black/5">
-                          <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                            تراکم: {photo.density} تار/cm²
-                          </span>
-                          <button
-                            onClick={() => scrollToSection("ai-studio")}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                            <span>آنالیز AI</span>
-                          </button>
-                        </div>
-                      </div>
+                {patientPhotos.length === 0 ? (
+                  <div className="col-span-full p-8 rounded-3xl bg-white/50 border border-dashed border-stone-300 text-center flex flex-col items-center justify-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-stone-100 text-stone-400 flex items-center justify-center">
+                      <Camera className="w-6 h-6" />
                     </div>
-                  </LuxuryTiltCard>
-                ))}
+                    <div className="text-sm font-bold text-[oklch(30%_0.02_20)]">
+                      هیچ تصویری در پرونده این بیمار ثبت نشده است
+                    </div>
+                    <p className="text-xs text-[oklch(50%_0.02_20)] max-w-md">
+                      می‌توانید با تریکوسکوپ/وب‌کم لپ‌تاپ عکس بگیرید یا عکس‌های باکیفیت را مستقیماً از سیستم بارگذاری کنید.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsGuidedCaptureOpen(true)}
+                      className="mt-2 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>شروع تصویربرداری هدایت‌شده</span>
+                    </button>
+                  </div>
+                ) : (
+                  patientPhotos.map((photo) => {
+                    const isCurrentHUD = (activeInspectedPhoto?.id || patientPhotos[0]?.id) === photo.id;
+                    return (
+                      <LuxuryTiltCard key={photo.id} maxTilt={5} className="rounded-3xl">
+                        <div
+                          className={`rounded-3xl overflow-hidden border transition-all shadow-md bg-white/55 backdrop-blur-xl ${
+                            isCurrentHUD
+                              ? "border-[oklch(62%_0.09_16)] ring-2 ring-[oklch(62%_0.09_16/0.3)]"
+                              : "border-white/80 hover:border-white"
+                          }`}
+                        >
+                          <div
+                            className="relative aspect-4/3 bg-stone-900/10 overflow-hidden cursor-pointer group"
+                            onClick={() => setActiveInspectedPhoto(photo)}
+                            title="کلیک برای بازرسی در هود هوش مصنوعی"
+                          >
+                            <img
+                              src={photo.url}
+                              alt="Trichoscopy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[oklch(20%_0.02_20)] text-[0.65rem] font-bold border border-white/80 shadow-xs">
+                              ناحیه: {photo.area}
+                            </div>
+                            {isCurrentHUD && (
+                              <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[oklch(62%_0.09_16)] text-white text-[0.62rem] font-bold shadow-xs">
+                                در حال بررسی
+                              </div>
+                            )}
+                            <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 backdrop-blur-md text-emerald-800 text-[0.65rem] font-bold flex items-center gap-1 shadow-xs">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              وضوح کوانتومی {photo.qualityScore}%
+                            </div>
+                          </div>
+
+                          <div className="p-5">
+                            {/* Clinical Signs / Tags */}
+                            {photo.tags && photo.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2.5">
+                                {photo.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-xs text-[oklch(45%_0.02_20)] mb-3 font-mono">
+                              <span>تاریخ: {photo.date}</span>
+                              <span>ضخامت: {photo.thickness}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-black/5 gap-2">
+                              <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
+                                تراکم: {photo.density} تار/cm²
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePhoto(photo.id);
+                                  }}
+                                  className="p-2 rounded-xl bg-white/80 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 hover:border-rose-200 shadow-xs transition-all cursor-pointer"
+                                  title="حذف این تصویر از پرونده بیمار"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const other = patientPhotos.find((p) => p.id !== photo.id) || photo;
+                                    setCompareDefaultA(other.id);
+                                    setCompareDefaultB(photo.id);
+                                    setIsCompareModalOpen(true);
+                                  }}
+                                  className="p-2 rounded-xl bg-white/80 hover:bg-cyan-50 text-stone-500 hover:text-cyan-700 border border-white shadow-xs transition-all cursor-pointer"
+                                  title="مقایسه قبل و بعد این تصویر (Before & After)"
+                                >
+                                  <Split className="w-3.5 h-3.5 text-cyan-600" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenLightbox(photo)}
+                                  className="p-2 rounded-xl bg-white/80 hover:bg-white text-[oklch(40%_0.02_20)] border border-white shadow-xs transition-all cursor-pointer"
+                                  title="مشاهده تمام‌صفحه و زوم"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveInspectedPhoto(photo);
+                                    scrollToSection("gallery");
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer"
+                                  title="آنالیز هوش مصنوعی"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-amber-200" />
+                                  <span>بازرسی HUD</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </LuxuryTiltCard>
+                    );
+                  })
+                )}
               </div>
             </div>
         </section>
@@ -1095,13 +1743,25 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <button
-                      onClick={() => alert("گزارش بالینی PDF آماده صدور است.")}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-xs text-[oklch(48%_0.095_12)] transition-all shadow-xs"
+                      type="button"
+                      onClick={handleOpenAiEducation}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      title="مشاهده شبیه‌ساز سه‌بعدی متناسب با تشخیص AI"
+                    >
+                      <Brain className="w-3.5 h-3.5 text-amber-200" />
+                      <span>شبیه‌ساز ۳ بعدی و توجیه بیمار</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPdfReportOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-xs text-[oklch(48%_0.095_12)] transition-all shadow-xs cursor-pointer"
+                      title="صدور گزارش رسمی تریکوسکوپی با سربرگ و نسخه"
                     >
                       <Download className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                      <span>دانلود گزارش نسخه</span>
+                      <span>صدور نسخه و گزارش PDF</span>
                     </button>
                   </div>
                 </div>
@@ -1308,6 +1968,28 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         isOpen={isGuidedCaptureOpen}
         onClose={() => setIsGuidedCaptureOpen(false)}
         patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+        onCompleteCapture={handleCompleteGuidedCapture}
+      />
+
+      {/* Modal: Longitudinal Before/After Trichoscopy Comparison */}
+      <BeforeAfterCompareModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+        photos={(localImages[selectedPatient.id] || []).map((img) => ({
+          id: img.id,
+          patientId: img.patientId,
+          url: img.url,
+          area: img.area,
+          date: img.date,
+          density: img.density,
+          thickness: img.thickness,
+          qualityScore: img.qualityScore,
+          tags: img.tags,
+          notes: img.notes,
+        }))}
+        defaultPhotoIdA={compareDefaultA}
+        defaultPhotoIdB={compareDefaultB}
       />
 
       {/* Modal: Clinical PDF Report */}
@@ -1319,6 +2001,263 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         patientId={selectedPatient.id}
         density={selectedPatient.hairDensity}
       />
+
+      {/* Modal: Fullscreen Photo Lightbox with Interactive Zoom & Pan */}
+      {previewPhotoModal && (
+        <div
+          id="photo-lightbox-backdrop"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/92 p-2 sm:p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => {
+            resetLightboxZoom();
+            setPreviewPhotoModal(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            {/* Header with Title & Quick Zoom Controls */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 bg-stone-900 border-b border-stone-800 text-stone-100 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-800 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>نمای میکروسکوپی تمام‌صفحه • ناحیه {previewPhotoModal.area}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 border border-cyan-800 text-cyan-300">
+                      بزرگ‌نمایی: {Math.round(lightboxZoom * 100)}%
+                    </span>
+                  </h4>
+                  <span className="text-[11px] text-stone-400 font-mono">
+                    بیمار: {selectedPatient.firstName} {selectedPatient.lastName} | تاریخ ثبت: {previewPhotoModal.date}
+                  </span>
+                </div>
+              </div>
+
+              {/* Header Zoom & Rotation Toolbar */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLightboxZoom((prev) => {
+                      const next = Math.max(1, +(prev - 0.5).toFixed(1));
+                      if (next === 1) setLightboxPan({ x: 0, y: 0 });
+                      return next;
+                    });
+                  }}
+                  disabled={lightboxZoom <= 1}
+                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
+                  title="کاهش بزرگ‌نمایی (Zoom Out)"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLightboxZoom((prev) => Math.min(6, +(prev + 0.5).toFixed(1)));
+                  }}
+                  disabled={lightboxZoom >= 6}
+                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
+                  title="افزایش بزرگ‌نمایی (Zoom In)"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+
+                {/* Preset Zoom Levels */}
+                {[1, 2, 3, 4].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => {
+                      setLightboxZoom(level);
+                      if (level === 1) setLightboxPan({ x: 0, y: 0 });
+                    }}
+                    className={`px-2 py-1 rounded-lg text-xs font-mono font-bold border transition-colors cursor-pointer ${
+                      Math.abs(lightboxZoom - level) < 0.2
+                        ? "bg-cyan-600 border-cyan-400 text-white"
+                        : "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-300"
+                    }`}
+                  >
+                    {level}x
+                  </button>
+                ))}
+
+                {/* Rotate 90 degrees */}
+                <button
+                  type="button"
+                  onClick={() => setLightboxRotation((prev) => (prev + 90) % 360)}
+                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
+                  title="چرخش ۹۰ درجه (Rotate)"
+                >
+                  <RotateCw className="w-4 h-4 text-cyan-400" />
+                </button>
+
+                {/* Reset Zoom */}
+                {(lightboxZoom > 1 || lightboxRotation !== 0 || lightboxPan.x !== 0 || lightboxPan.y !== 0) && (
+                  <button
+                    type="button"
+                    onClick={resetLightboxZoom}
+                    className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
+                    title="بازنشانی زوم و جابجایی"
+                  >
+                    بازنشانی
+                  </button>
+                )}
+
+                <div className="h-4 w-px bg-stone-800 mx-1" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetLightboxZoom();
+                    setPreviewPhotoModal(null);
+                  }}
+                  className="w-8 h-8 rounded-full border border-stone-700 flex items-center justify-center text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
+                  title="بستن پنجره"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Zoomable Viewport */}
+            <div
+              className={`relative h-[55vh] sm:h-[65vh] min-h-[380px] bg-black flex items-center justify-center overflow-hidden select-none ${
+                lightboxZoom > 1
+                  ? isLightboxPanning
+                    ? "cursor-grabbing"
+                    : "cursor-grab"
+                  : "cursor-zoom-in"
+              }`}
+              onWheel={handleLightboxWheel}
+              onMouseDown={handleLightboxMouseDown}
+              onMouseMove={handleLightboxMouseMove}
+              onMouseUp={handleLightboxMouseUp}
+              onMouseLeave={handleLightboxMouseUp}
+              onDoubleClick={handleLightboxDoubleClick}
+              onTouchStart={handleLightboxTouchStart}
+              onTouchMove={handleLightboxTouchMove}
+              onTouchEnd={handleLightboxTouchEnd}
+            >
+              {/* Image with 2D transform (pan + zoom + rotate) */}
+              <div
+                className="w-full h-full flex items-center justify-center p-2"
+                style={{
+                  transform: `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom}) rotate(${lightboxRotation}deg)`,
+                  transformOrigin: "center center",
+                  transition: isLightboxPanning ? "none" : "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
+                }}
+              >
+                <img
+                  src={previewPhotoModal.url}
+                  alt="Full Trichoscopy View"
+                  className="max-w-full max-h-full object-contain pointer-events-none select-none"
+                  draggable={false}
+                />
+              </div>
+
+              {/* Floating Helper Pill when zoomed in */}
+              {lightboxZoom > 1 && (
+                <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-950/80 backdrop-blur-md border border-stone-700 text-stone-300 text-xs font-mono animate-in fade-in pointer-events-none">
+                  <Move className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>درگ برای جابجایی (Pan) • دوبار کلیک برای ریست</span>
+                </div>
+              )}
+
+              {/* Optical Scale and Telemetry Bar at Bottom */}
+              <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 text-xs bg-stone-950/85 backdrop-blur-md border border-stone-800 px-4 py-2.5 rounded-2xl text-stone-300 font-mono pointer-events-none">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span className="text-emerald-400 font-bold">تراکم: {previewPhotoModal.density} تار/cm²</span>
+                  <span>ضخامت: {previewPhotoModal.thickness}</span>
+                  <span>امتیاز شفافیت: {previewPhotoModal.qualityScore}%</span>
+                  {previewPhotoModal.tags && previewPhotoModal.tags.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      {previewPhotoModal.tags.map((t) => (
+                        <span key={t} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-stone-400 text-[11px] hidden sm:inline">
+                    راهنما: اسکرول ماوس = زوم | کشیدن = جابجایی
+                  </span>
+                  <div className="text-cyan-400 text-[11px]">OPTICAL CALIBRATION: 0.1mm GRID PASS</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex flex-wrap items-center justify-between px-6 py-3.5 bg-stone-900 border-t border-stone-800 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (previewPhotoModal) {
+                    handleDeletePhoto(previewPhotoModal.id);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-xs font-bold border border-rose-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                title="حذف این تصویر از پرونده بیمار"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>حذف تصویر از پرونده</span>
+              </button>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (previewPhotoModal) {
+                      const photos = localImages[selectedPatient.id] || [];
+                      const other = photos.find((p) => p.id !== previewPhotoModal.id) || previewPhotoModal;
+                      setCompareDefaultA(other.id);
+                      setCompareDefaultB(previewPhotoModal.id);
+                      resetLightboxZoom();
+                      setPreviewPhotoModal(null);
+                      setIsCompareModalOpen(true);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold border border-cyan-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="مقایسه دو فریم با اسلایدر کشویی و رو در رو"
+                >
+                  <Split className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>مقایسه رو در رو (Before & After)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveInspectedPhoto(previewPhotoModal);
+                    resetLightboxZoom();
+                    setPreviewPhotoModal(null);
+                    scrollToSection("gallery");
+                  }}
+                  className="px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5 text-amber-200" />
+                  <span>بررسی در هود هوش مصنوعی (Neural HUD)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetLightboxZoom();
+                    setPreviewPhotoModal(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
+                >
+                  بستن
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
