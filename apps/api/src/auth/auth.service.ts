@@ -80,7 +80,7 @@ export class AuthService {
       await verify(await this.decoy(), password).catch(() => false);
       throw unauthorized("ایمیل یا رمز اشتباه است");
     }
-    const ok = await verify(row.passwordhash, password).catch(() => false);
+    const ok = await verify(row.password_hash, password).catch(() => false);
     if (!ok) {
       throw unauthorized("ایمیل یا رمز اشتباه است");
     }
