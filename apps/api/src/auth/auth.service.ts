@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
+import { JwtService, type JwtSignOptions } from "@nestjs/jwt";
 import { hash, verify } from "@node-rs/argon2";
 import {
   claimsById,
@@ -28,6 +28,8 @@ export interface AccessClaims {
   clinicId: string;
   role: Role;
 }
+
+type ExpiresIn = NonNullable<JwtSignOptions["expiresIn"]>;
 
 interface CachedPrincipal {
   until: number;
@@ -61,7 +63,7 @@ export class AuthService {
   private signAccess(claims: AccessClaims): string {
     const cfg = resolveJwtConfig();
     return this.jwt.sign(claims, {
-      expiresIn: cfg.accessTtl as any,
+      expiresIn: cfg.accessTtl as unknown as ExpiresIn,
       issuer: cfg.issuer,
       audience: cfg.audience,
       keyid: cfg.kid,
