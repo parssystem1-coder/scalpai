@@ -1,1 +1,49 @@
-{"name":"scalpai-v2","version":"0.0.0","private":true,"type":"module","scripts":{"dev":"npm run dev --workspace\u003d@scalpai/app-web","build":"npm run build --workspace\u003d@scalpai/app-web \u0026\u0026 rm -rf dist \u0026\u0026 cp -r apps/web/dist dist","typecheck":"npm run typecheck --workspace\u003d@scalpai/app-web","lint":"eslint .","test":"vitest run","test:coverage":"vitest run --coverage","db:migrate":"tsx packages/db/src/migrate-cli.ts","db:seed":"tsx packages/db/src/seed.ts","budget:bundle":"tsx tools/bundle-budget.ts","conformance":"tsx tools/conformance/run.ts","graph":"tsx tools/graph/extract.ts"},"devDependencies":{"@commitlint/cli":"^21.2.2","@commitlint/config-conventional":"^21.2.2","@eslint/js":"^10.0.1","@playwright/test":"^1.62.1","@swc/core":"^1.16.1","@testing-library/dom":"^10.4.1","@types/node":"^26.3.0","@types/three":"^0.185.4","eslint":"^10.9.1","husky":"^9.1.7","lint-staged":"^17.3.0","tsx":"^4.23.12","turbo":"^2.10.11","typescript":"~5.9.3","typescript-eslint":"^8.68.0","unplugin-swc":"^1.5.11","vitest":"^4.1.11"},"dependencies":{"@vitest/coverage-v8":"^4.1.11","lucide-react":"^1.37.0","three":"^0.185.1"},"workspaces":["apps/*","packages/*","tools/*"]}
+{
+  "name": "scalpai-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "dev": "npm run dev --workspace=@scalpai/app-web",
+    "build": "npm run build --workspace=@scalpai/app-web && rm -rf dist && cp -r apps/web/dist dist",
+    "typecheck": "npm run typecheck --workspace=@scalpai/app-web",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "db:migrate": "tsx packages/db/src/migrate-cli.ts",
+    "db:seed": "tsx packages/db/src/seed.ts",
+    "budget:bundle": "tsx tools/bundle-budget.ts",
+    "conformance": "tsx tools/conformance/run.ts",
+    "graph": "tsx tools/graph/extract.ts"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@swc/core": "^1.16.1",
+    "@testing-library/dom": "^10.4.1",
+    "@types/node": "^26.3.0",
+    "@types/three": "^0.185.4",
+    "eslint": "^10.9.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "tsx": "^4.23.12",
+    "turbo": "^2.10.11",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "unplugin-swc": "^1.5.11",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@vitest/coverage-v8": "^4.1.11",
+    "lucide-react": "^1.37.0",
+    "three": "^0.185.1"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ]
+}
