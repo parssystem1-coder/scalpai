@@ -9,6 +9,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DbService, getPatientIncludingDeleted, migrate, resetAll, seed, seedMarkerClinicId, verifyChain } from "@scalpai/db";
 import { AppModule } from "../src/app.module.js";
+import { REFRESH_COOKIE } from "../src/auth/refresh-cookie.js";
 
 /**
  * Phase-1 integration suite against REAL PostgreSQL 17 (ADR-0024) as the
@@ -23,10 +24,23 @@ let db: DbService;
 const A = { email: "owner@clinic-a.test", password: "Dev12345!" }; // growth plan
 const B = { email: "owner@clinic-b.test", password: "Dev12345!" }; // starter plan
 
-async function login(creds: { email: string; password: string }): Promise<{ accessToken: string; refreshToken: string }> {
+interface Session {
+  accessToken: string;
+  refreshCookie: string;
+}
+
+/** The refresh token is an HttpOnly cookie now (WEAKNESSES H1), not a body field. */
+function refreshCookieOf(raw: unknown): string {
+  const list = Array.isArray(raw) ? (raw as string[]) : typeof raw === "string" ? [raw] : [];
+  const cookie = list.find((c) => c.startsWith(`${REFRESH_COOKIE}=`));
+  expect(cookie).toBeTruthy();
+  return cookie!.split(";")[0]!;
+}
+
+async function login(creds: { email: string; password: string }): Promise<Session> {
   const res = await http.post("/api/v1/auth/login").send(creds);
   expect(res.status).toBe(201);
-  return res.body;
+  return { accessToken: String(res.body.accessToken), refreshCookie: refreshCookieOf(res.headers["set-cookie"]) };
 }
 
 beforeAll(async () => {
@@ -68,16 +82,17 @@ describe("auth", () => {
     const first = await login(A);
     expect(first.accessToken).toBeTruthy();
 
-    const second = await http.post("/api/v1/auth/refresh").send({ refreshToken: first.refreshToken });
+    const second = await http.post("/api/v1/auth/refresh").set("Cookie", first.refreshCookie);
     expect(second.status).toBe(201);
-    expect(second.body.refreshToken).not.toBe(first.refreshToken);
+    const secondCookie = refreshCookieOf(second.headers["set-cookie"]);
+    expect(secondCookie).not.toBe(first.refreshCookie);
 
-    const replay = await http.post("/api/v1/auth/refresh").send({ refreshToken: first.refreshToken });
+    const replay = await http.post("/api/v1/auth/refresh").set("Cookie", first.refreshCookie);
     expect(replay.status).toBe(401);
     expect(replay.body.code).toBe("REFRESH_REUSED");
 
     // The freshly issued child died with the family after reuse detection
-    const child = await http.post("/api/v1/auth/refresh").send({ refreshToken: second.body.refreshToken });
+    const child = await http.post("/api/v1/auth/refresh").set("Cookie", secondCookie);
     expect(child.status).toBe(401);
   });
 
