@@ -13,18 +13,34 @@ export const LoginRequest = z.object({
   password: z.string().min(8),
 });
 
+/** Kept for the offline sync client; the HTTP API reads refresh tokens from a cookie. */
 export const RefreshRequest = z.object({
   refreshToken: z.string().min(20),
 });
 
+/** Server-owned identity — the client never assembles this itself (WEAKNESSES C3). */
+export const SessionUser = z.object({
+  id: z.string(),
+  clinicId: z.string(),
+  role: z.enum(["owner", "trichologist", "receptionist"]),
+  email: z.string().email().optional(),
+});
+
+/** Internal service result: carries the refresh token that goes into the cookie. */
 export const TokenPair = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
-  user: z.object({
-    id: z.string(),
-    clinicId: z.string(),
-    role: z.enum(["owner", "trichologist", "receptionist"]),
-  }),
+  user: SessionUser,
+});
+
+/**
+ * What actually leaves the API on /auth/login and /auth/refresh. The refresh
+ * token travels ONLY in an HttpOnly/Secure/SameSite cookie (WEAKNESSES H1), so
+ * it is absent here by contract.
+ */
+export const AuthSession = z.object({
+  accessToken: z.string(),
+  user: SessionUser,
 });
 
 export const PatientCreate = z.object({
@@ -125,7 +141,9 @@ export const SyncPushResultItem = z.object({
 
 export type LoginRequest = z.infer<typeof LoginRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
+export type SessionUser = z.infer<typeof SessionUser>;
 export type TokenPair = z.infer<typeof TokenPair>;
+export type AuthSession = z.infer<typeof AuthSession>;
 export type PatientCreate = z.infer<typeof PatientCreate>;
 export type PatientCreateDto = PatientCreate;
 export type SessionCreate = z.infer<typeof SessionCreate>;
