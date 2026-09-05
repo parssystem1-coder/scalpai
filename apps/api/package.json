@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npx turbo run build --filter=@scalpai/app-api^... && npx tsc -p tsconfig.json && mkdir -p dist && echo '{\"status\":\"ok\",\"service\":\"scalpai-api\"}' > dist/index.html",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "npm run build && node dist/main.js",
     "start": "node dist/main.js"
