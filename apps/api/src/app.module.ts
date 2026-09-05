@@ -1,6 +1,6 @@
 import { Module, type OnModuleInit } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from "@nestjs/core";
-import { JwtModule } from "@nestjs/jwt";
+import { JwtModule, type JwtModuleOptions } from "@nestjs/jwt";
 import type { FastifyInstance } from "fastify";
 import { DbService } from "@scalpai/db";
 import { AnalysesController } from "./analyses.controller.js";
@@ -28,12 +28,14 @@ const jwt = resolveJwtConfig();
 // in production, where 'mock' is refused outright) the route does not exist.
 const mockStorage = isMockStorageEnabled();
 
+type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expiresIn"]>;
+
 @Module({
   imports: [
     JwtModule.register({
       secret: jwt.secret,
       signOptions: {
-        expiresIn: jwt.accessTtl as any,
+        expiresIn: jwt.accessTtl as unknown as ExpiresIn,
         issuer: jwt.issuer,
         audience: jwt.audience,
         keyid: jwt.kid,
