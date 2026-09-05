@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest, type LoginRequest as LoginDto } from "@scalpai/shared";
 import { apiFetch, setAccessToken } from "../api/client.js";
+import { useAuth } from "../context/AuthContext.js";
 import {
   User,
   Lock,
@@ -24,6 +25,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState<"owner" | "tricho">("owner");
   const [rememberMe, setRememberMe] = useState(true);
+  const { login } = useAuth();
 
   const {
     register,
@@ -45,7 +47,17 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         method: "POST",
         body: JSON.stringify(dto),
       });
-      setAccessToken(pair.accessToken);
+      setAccessToken(pair.accessToken, rememberMe);
+      login(
+        pair.accessToken,
+        {
+          email: dto.email,
+          name: activeRole === "owner" ? "مدیر کلینیک" : "دکتر تریکولوژیست",
+          role: activeRole,
+          clinicId: "clinic-a",
+        },
+        rememberMe,
+      );
       onLoggedIn();
     } catch (e) {
       setServerError(e instanceof Error ? e.message : "Authentication failed. Please check credentials.");

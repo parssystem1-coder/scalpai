@@ -1,4 +1,7 @@
 import { Injectable, type OnModuleInit } from "@nestjs/common";
+import { existsSync, mkdirSync } from "node:fs";
+import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
@@ -17,10 +20,20 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 export class StorageService implements OnModuleInit {
   private s3: S3Client | null = null;
   private bucket: string;
+  private localStorageDir: string;
   public inMemoryMap = new Map<string, Buffer>();
 
   constructor() {
     this.bucket = process.env.S3_BUCKET ?? "scalpai-dev";
+    this.localStorageDir = process.env.LOCAL_STORAGE_DIR ?? join(process.cwd(), ".local-storage");
+    if (!existsSync(this.localStorageDir)) {
+      try {
+        mkdirSync(this.localStorageDir, { recursive: true });
+      } catch (err) {
+        console.warn(`[StorageService] Could not create local storage dir ${this.localStorageDir}:`, err);
+      }
+    }
+
     if (process.env.S3_ENDPOINT) {
       this.s3 = new S3Client({
         endpoint: process.env.S3_ENDPOINT,
@@ -32,8 +45,28 @@ export class StorageService implements OnModuleInit {
         },
       });
     } else {
-      console.warn("[AI Studio] S3_ENDPOINT not set — using in-memory storage");
+      console.warn(`[StorageService] S3_ENDPOINT not set — using persistent disk storage at ${this.localStorageDir}`);
     }
+  }
+
+  private getLocalFilePath(key: string): string {
+    const sanitizedKey = key.replace(/\.\./g, "").replace(/^\/+/, "");
+    return join(this.localStorageDir, sanitizedKey);
+  }
+
+  async getLocalBuffer(key: string): Promise<Buffer | null> {
+    const filePath = this.getLocalFilePath(key);
+    try {
+      return await readFile(filePath);
+    } catch {
+      return this.inMemoryMap.get(key) ?? null;
+    }
+  }
+
+  async saveLocalBuffer(key: string, body: Buffer): Promise<void> {
+    const filePath = this.getLocalFilePath(key);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, body);
   }
 
   static clinicKey(clinicId: string, rest: string): string {
@@ -85,7 +118,7 @@ export class StorageService implements OnModuleInit {
   async getObject(clinicId: string, rest: string): Promise<Buffer> {
     const key = StorageService.clinicKey(clinicId, rest);
     if (!this.s3) {
-      const data = this.inMemoryMap.get(key);
+      const data = await this.getLocalBuffer(key);
       if (!data) {
         throw new Error(`Object not found: ${key}`);
       }
@@ -107,6 +140,7 @@ export class StorageService implements OnModuleInit {
   async putBuffer(clinicId: string, rest: string, body: Buffer, contentType: string): Promise<void> {
     const key = StorageService.clinicKey(clinicId, rest);
     if (!this.s3) {
+      await this.saveLocalBuffer(key, body);
       this.inMemoryMap.set(key, body);
       return;
     }
@@ -124,6 +158,12 @@ export class StorageService implements OnModuleInit {
     const key = StorageService.clinicKey(clinicId, rest);
     if (!this.s3) {
       this.inMemoryMap.delete(key);
+      const filePath = this.getLocalFilePath(key);
+      try {
+        await unlink(filePath);
+      } catch {
+        // File may not exist on disk
+      }
       return;
     }
     await this.s3.send(

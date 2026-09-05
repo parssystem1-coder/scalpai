@@ -1,15 +1,52 @@
-/** Minimal API client — access token lives in memory only (never localStorage). */
+/** Minimal API client with memory-first & secure session storage fallback */
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/v1";
 
-let accessToken: string | null = null;
+let accessToken: string | null = (() => {
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      const stored = sessionStorage.getItem("scalpai_access_token");
+      if (stored) return stored;
+    }
+    if (typeof localStorage !== "undefined") {
+      return localStorage.getItem("scalpai_access_token");
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+})();
 
-export function setAccessToken(token: string): void {
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function setAccessToken(token: string, remember = false): void {
   accessToken = token;
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("scalpai_access_token", token);
+    }
+    if (remember && typeof localStorage !== "undefined") {
+      localStorage.setItem("scalpai_access_token", token);
+    }
+  } catch {
+    // Storage might be unavailable in restricted environments
+  }
 }
 
 export function clearAccessToken(): void {
   accessToken = null;
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem("scalpai_access_token");
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("scalpai_access_token");
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export class ApiError extends Error {
