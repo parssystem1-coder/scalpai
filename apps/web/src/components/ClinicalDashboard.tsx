@@ -33,10 +33,6 @@ import {
   ZoomOut,
   RotateCw,
   Move,
-  Ruler,
-  Filter,
-  Tag,
-  Check,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, clearAccessToken } from "../api/client.js";
@@ -321,7 +317,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
   const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(SAMPLE_IMAGES);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
-  const [selectedTagFilter, setSelectedTagFilter] = useState<string>("all");
+  const [selectedTagFilter, _setSelectedTagFilter] = useState<string>("all");
   const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);
   const [previewPhotoModal, setPreviewPhotoModal] = useState<TrichoscopyImage | null>(null);
 
@@ -337,13 +333,13 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [isCaliperActive, setIsCaliperActive] = useState<boolean>(false);
   const [caliperStart, setCaliperStart] = useState<{ x: number; y: number } | null>(null);
   const [caliperEnd, setCaliperEnd] = useState<{ x: number; y: number } | null>(null);
-  const [caliperMagnification, setCaliperMagnification] = useState<"50x" | "100x" | "200x">("100x");
+  const [caliperMagnification, _setCaliperMagnification] = useState<"50x" | "100x" | "200x">("100x");
   const [isDrawingCaliper, setIsDrawingCaliper] = useState<boolean>(false);
 
   // Clinical Notes State per Photo
   const [lightboxNoteText, setLightboxNoteText] = useState<string>("");
-  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState<boolean>(false);
-  const [noteSavedFeedback, setNoteSavedFeedback] = useState<string | null>(null);
+  const [_isNotesDrawerOpen, setIsNotesDrawerOpen] = useState<boolean>(false);
+  const [_noteSavedFeedback, setNoteSavedFeedback] = useState<string | null>(null);
 
   const resetLightboxZoom = () => {
     setLightboxZoom(1);
@@ -387,7 +383,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     return { microns, pixelDist: Math.round(pixelDist), category, color };
   };
 
-  const handleSaveCaliperToPhoto = () => {
+  const _handleSaveCaliperToPhoto = () => {
     const calc = calculateCaliperDistance();
     if (!calc || !previewPhotoModal) return;
     const formatted = `${calc.microns} µm (${calc.category})`;
@@ -403,7 +399,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     setTimeout(() => setNoteSavedFeedback(null), 4000);
   };
 
-  const handleSavePhotoNotes = () => {
+  const _handleSavePhotoNotes = () => {
     if (!previewPhotoModal) return;
     setLocalImages((prev) => {
       const list = prev[selectedPatient.id] || [];

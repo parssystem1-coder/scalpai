@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `pnpm graph` from commit `935142b` (working tree dirty). **Do not hand-edit** — every row is parsed from source.
+**Generated** by `pnpm graph` from commit `unknown`. **Do not hand-edit** — every row is parsed from source.
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 
-**At a glance:** 5 apps · 9 packages · 11 internal dependency edges
+**At a glance:** 5 apps · 9 packages · 13 internal dependency edges
 
 ## Modules
 
@@ -16,9 +16,9 @@ Descriptive only: answers *what exists*. Correctness is the conformance harness'
 | `@scalpai/app-api` | app | `apps/api` | `@scalpai/analysis-core`, `@scalpai/db`, `@scalpai/shared`, `@scalpai/sync-client` |
 | `@scalpai/app-desktop` | app | `apps/desktop` | — |
 | `@scalpai/app-portal` | app | `apps/portal` | — |
-| `@scalpai/app-web` | app | `apps/web` | `@scalpai/analysis-engine`, `@scalpai/shared`, `@scalpai/sync-client` |
+| `@scalpai/app-web` | app | `apps/web` | `@scalpai/analysis-engine`, `@scalpai/education`, `@scalpai/shared`, `@scalpai/sync-client` |
 | `@scalpai/db` | package | `packages/db` | `@scalpai/sync-client` |
-| `@scalpai/education` | package | `packages/education` | — |
+| `@scalpai/education` | package | `packages/education` | `@scalpai/shared` |
 | `@scalpai/licensing` | package | `packages/licensing` | — |
 | `@scalpai/notify` | package | `packages/notify` | — |
 | `@scalpai/shared` | package | `packages/shared` | — |

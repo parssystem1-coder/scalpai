@@ -1,7 +1,7 @@
 {
   "generatedFrom": {
-    "commit": "935142b",
-    "dirty": true
+    "commit": "unknown",
+    "dirty": false
   },
   "modules": [
     {
@@ -54,6 +54,7 @@
       "dir": "apps/web",
       "dependsOn": [
         "@scalpai/analysis-engine",
+        "@scalpai/education",
         "@scalpai/shared",
         "@scalpai/sync-client"
       ]
@@ -70,7 +71,9 @@
       "name": "@scalpai/education",
       "kind": "package",
       "dir": "packages/education",
-      "dependsOn": []
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
     },
     {
       "name": "@scalpai/licensing",
@@ -108,6 +111,6 @@
   "counts": {
     "apps": 5,
     "packages": 9,
-    "dependencyEdges": 11
+    "dependencyEdges": 13
   }
 }
