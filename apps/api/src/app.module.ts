@@ -33,7 +33,7 @@ const mockStorage = isMockStorageEnabled();
     JwtModule.register({
       secret: jwt.secret,
       signOptions: {
-        expiresIn: jwt.accessTtl,
+        expiresIn: jwt.accessTtl as any,
         issuer: jwt.issuer,
         audience: jwt.audience,
         keyid: jwt.kid,
