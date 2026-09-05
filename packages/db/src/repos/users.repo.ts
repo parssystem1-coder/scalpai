@@ -48,9 +48,14 @@ export async function loginLookup(tx: Tx, email: string) {
   return r ?? null;
 }
 
+/**
+ * Server-side identity for a user id (revoked users are filtered inside the
+ * SQL function). Email is included so refresh responses can carry the whole
+ * identity and the client never has to invent one (WEAKNESSES C3).
+ */
 export async function claimsById(tx: Tx, userId: string) {
-  const res = await tx.execute(sql`SELECT id, clinic_id, role::text AS role FROM fn_user_claims(${userId})`);
-  const r = ((res as unknown) as { rows?: Array<{ id: string; clinic_id: string; role: string }> }).rows?.[0];
+  const res = await tx.execute(sql`SELECT id, clinic_id, role::text AS role, email FROM fn_user_claims(${userId})`);
+  const r = ((res as unknown) as { rows?: Array<{ id: string; clinic_id: string; role: string; email: string }> }).rows?.[0];
   return r ?? null;
 }
 

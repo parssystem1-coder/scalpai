@@ -1,10 +1,12 @@
-import { Module } from "@nestjs/common";
-import { APP_FILTER, APP_GUARD } from "@nestjs/core";
-import { JwtModule } from "@nestjs/jwt";
+import { Module, type OnModuleInit } from "@nestjs/common";
+import { APP_FILTER, APP_GUARD, HttpAdapterHost } from "@nestjs/core";
+import { JwtModule, type JwtModuleOptions } from "@nestjs/jwt";
+import type { FastifyInstance } from "fastify";
 import { DbService } from "@scalpai/db";
 import { AnalysesController } from "./analyses.controller.js";
 import { AuthController } from "./auth/auth.controller.js";
 import { AuthService } from "./auth/auth.service.js";
+import { resolveJwtConfig } from "./auth/jwt.config.js";
 import { LoginThrottleService } from "./auth/login-throttle.service.js";
 import { JwtAccessGuard } from "./auth/jwt-access.guard.js";
 import { FeatureGuard } from "./common/feature.guard.js";
@@ -14,14 +16,41 @@ import { AllExceptionsFilter } from "./common/error.filter.js";
 import { CoreController } from "./core.controller.js";
 import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
-import { StorageService } from "./media/storage.service.js";
+import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
+import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
 import { PlansController } from "./plans.controller.js";
 import { SyncController } from "./sync.controller.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
+const jwt = resolveJwtConfig();
+
+// The mock object store is a build-time opt-in: with STORAGE_DRIVER unset (or
+// in production, where 'mock' is refused outright) the route does not exist.
+const mockStorage = isMockStorageEnabled();
+
+type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expiresIn"]>;
+
 @Module({
-  imports: [JwtModule.register({ secret: process.env.JWT_SECRET ?? "dev_only_secret_change_me_0123456789abcdef" })],
-  controllers: [AuthController, CoreController, PlansController, GalleryController, AnalysesController, SyncController],
+  imports: [
+    JwtModule.register({
+      secret: jwt.secret,
+      signOptions: {
+        expiresIn: jwt.accessTtl as unknown as ExpiresIn,
+        issuer: jwt.issuer,
+        audience: jwt.audience,
+        keyid: jwt.kid,
+      },
+    }),
+  ],
+  controllers: [
+    AuthController,
+    CoreController,
+    PlansController,
+    GalleryController,
+    AnalysesController,
+    SyncController,
+    ...(mockStorage ? [MockStorageController] : []),
+  ],
   providers: [
     DbService,
     AuthService,
@@ -39,4 +68,12 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(private adapterHost: HttpAdapterHost) {}
+
+  onModuleInit(): void {
+    if (!mockStorage) return;
+    const fastify = this.adapterHost.httpAdapter?.getInstance<FastifyInstance>();
+    if (fastify) registerMockStorageParsers(fastify);
+  }
+}
