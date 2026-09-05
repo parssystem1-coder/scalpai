@@ -62,12 +62,13 @@ export class AuthService {
 
   private signAccess(claims: AccessClaims): string {
     const cfg = resolveJwtConfig();
-    return this.jwt.sign(claims, {
+    const signOpts: JwtSignOptions = {
       expiresIn: cfg.accessTtl as unknown as ExpiresIn,
       issuer: cfg.issuer,
       audience: cfg.audience,
       keyid: cfg.kid,
-    });
+    };
+    return this.jwt.sign(claims, signOpts);
   }
 
   async login(tx: Tx, rawEmail: string, password: string): Promise<TokenPair> {
@@ -79,7 +80,7 @@ export class AuthService {
       await verify(await this.decoy(), password).catch(() => false);
       throw unauthorized("ایمیل یا رمز اشتباه است");
     }
-    const ok = await verify(row.password_hash, password).catch(() => false);
+    const ok = await verify(row.passwordhash, password).catch(() => false);
     if (!ok) {
       throw unauthorized("ایمیل یا رمز اشتباه است");
     }
