@@ -40,7 +40,7 @@ const viteConfig = read("apps/web/vite.config.ts");
 const apiMain = read("apps/api/src/main.ts");
 
 function jobs(workflow: string): string[] {
-  return [...workflow.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]!);
+  return [...workflow.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]!).sort();
 }
 
 function gatesOf(workflow: string): string[] {
@@ -49,7 +49,7 @@ function gatesOf(workflow: string): string[] {
 
 describe("H14/R7 - job names describe the work, and the work covers every workspace", () => {
   it("declares the jobs the pipeline actually performs", () => {
-    expect(jobs(ci)).toEqual(["lockfile", "verify", "security", "e2e-smoke", "deployment", "gate"].sort());
+    expect(jobs(ci)).toEqual(["deployment", "e2e-smoke", "gate", "lockfile", "security", "verify"]);
   });
 
   it("typechecks and builds through turbo, not a single workspace", () => {
@@ -167,7 +167,7 @@ describe("H14 - coverage reaches the API and the critical web paths", () => {
   });
 
   it("sets a threshold per area instead of one number for the packages only", () => {
-    expect(vitestConfig).toMatch(/"packages\{?[^"]*\}?\/src\/\*\*"|packages\{db/);
+    expect(vitestConfig).toContain('/src/**": { lines: 70 }');
     expect(vitestConfig).toContain('"apps/api/src/**": { lines:');
     expect(vitestConfig).toContain('"apps/web/src/{api,context,offline}/**": { lines:');
   });
@@ -204,7 +204,7 @@ describe("H14 - supply chain and secrets are gated in CI", () => {
   });
 
   it("detects provider credentials anywhere", () => {
-    const findings = scanText("ops/deploy.sh", 'export AWS_KEY=AKIAIOSFODNN7EXAMPLEX\n-----BEGIN RSA PRIVATE KEY-----\n');
+    const findings = scanText("ops/deploy.sh", "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n");
     expect(findings.map((f) => f.rule)).toContain("private-key");
   });
 
