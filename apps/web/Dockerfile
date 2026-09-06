@@ -1,6 +1,6 @@
 # ScalpAI v2 - web image (ADR-0036)
 # Same rules as the API image: npm ci, no --ignore-scripts, turbo build.
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 
 COPY . .
