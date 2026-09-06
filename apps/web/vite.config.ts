@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // WEAKNESSES M15: the bundle budget measures the REAL initial payload by
+    // walking this manifest and its static import graph (tools/bundle-budget.ts).
+    manifest: true,
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
