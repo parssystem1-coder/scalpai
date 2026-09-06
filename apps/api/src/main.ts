@@ -29,6 +29,21 @@ function assertBootConfig(): void {
 }
 
 /**
+ * Listen port (WEAKNESSES H15): the browser suite and any local multi-instance
+ * setup need to move the API off the default. PORT wins, 3000 stays the default
+ * so the container healthcheck and ops/prod.yml keep working untouched.
+ */
+export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PORT?.trim();
+  if (!raw) return 3000;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`PORT must be an integer between 1 and 65535 (got ${raw})`);
+  }
+  return port;
+}
+
+/**
  * Graceful shutdown (WEAKNESSES M17): the container orchestrator sends SIGTERM
  * and waits `stop_grace_period`. Nest closes the HTTP server (draining
  * in-flight requests) and runs every onModuleDestroy/beforeApplicationShutdown
@@ -83,7 +98,7 @@ async function bootstrap(): Promise<void> {
     await app.useStaticAssets({ root: staticRoot, prefix: "/", decorateReply: false });
   }
 
-  const port = 3000;
+  const port = resolvePort();
   await app.listen(port, "0.0.0.0");
   console.log(`ScalpAI API ready on :${port}`);
 }

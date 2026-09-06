@@ -1,16 +1,62 @@
 name: CI
 
+# Phase 5 - CI/CD, tests and real gatekeeping (WEAKNESSES H14/H15/H16/M14/M15/M17/L1).
+#
+# Two rules govern this file:
+#
+#  1. NAMING: a job is named after the work it actually performs. No job called
+#     "tests" that only lints, no "deploy" that only renders a template.
+#  2. EVIDENCE (L1/W23): every gate runs through tools/ci/run-gate.sh, which
+#     records the exact command, its full output and its exit code under
+#     ci-evidence/<gate>.log. The final `gate` job re-checks those logs, so a
+#     PASS can never be self-certified: a missing log fails the build exactly
+#     like a failing command.
+#
+# npm is the only package manager on every executable surface (ADR-0036).
+
 on:
   pull_request:
   push:
     branches: [main]
 
+# A superseded push is dead work: cancel it instead of burning a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  base:
-    # Phase 1: real Postgres (docker service on runner), migrations from
-    # empty DB, integration suite with FORCE RLS, guardrails (§14.2/14.3).
-    # Phase 3 adds a real Redis: the shared throttle/entitlement/rate-limit
-    # state and the hand-rolled RESP client are proven against a live server.
+  lockfile:
+    name: lockfile review (npm only, manifest and lock in lockstep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: package-lock.json is the contract (H16)
+        run: bash tools/ci/run-gate.sh lockfile bash tools/ci/lockfile-review.sh
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-lockfile
+          path: ci-evidence
+          retention-days: 14
+
+  verify:
+    name: typecheck, lint, migrate, test+coverage, build, budget, conformance
+    # Real Postgres (docker service on the runner), migrations from an empty DB,
+    # integration suite with FORCE RLS. Phase 3 added a real Redis: the shared
+    # throttle/entitlement state and the hand-rolled RESP client are proven
+    # against a live server.
     runs-on: ubuntu-latest
 
     services:
@@ -55,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start MinIO (ADR-0026 — same native-binary pattern as local dev)
+      - name: Start MinIO (ADR-0026 - same native-binary pattern as local dev)
         run: |
           curl -fsSL -o /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
           chmod +x /usr/local/bin/minio
@@ -71,96 +117,235 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       # H16: the lockfile is the contract. No fallback that would silently
       # resolve fresh versions when the lockfile drifts.
       - name: Install dependencies (npm ci, lockfile enforced)
         run: npm ci --legacy-peer-deps
 
-      - name: Type check (every workspace, via turbo)
-        run: npm run typecheck
+      - name: Type check every workspace (turbo)
+        run: bash tools/ci/run-gate.sh typecheck npm run typecheck
 
       - name: Lint
-        run: npm run lint
+        run: bash tools/ci/run-gate.sh lint npm run lint
 
-      - name: Apply migrations from empty database (proof)
-        run: npm run db:migrate
+      - name: Apply migrations from an empty database (proof)
+        run: bash tools/ci/run-gate.sh db-migrate npm run db:migrate
 
       - name: Seed demo data
-        run: npm run db:seed
+        run: bash tools/ci/run-gate.sh db-seed npm run db:seed
 
-      - name: Unit + integration tests + coverage gate >=70% (RLS / cross-tenant on real PG)
-        run: npm run test:coverage
+      - name: Unit + integration tests with coverage thresholds (real PG + Redis)
+        run: bash tools/ci/run-gate.sh test-coverage npm run test:coverage
 
-      - name: Build all workspaces (turbo)
-        run: npm run build
+      - name: Build every workspace (turbo)
+        run: bash tools/ci/run-gate.sh build npm run build
 
-      - name: Bundle budget (web <300KB gzip)
-        run: npm run budget:bundle
+      - name: Bundle budget from the real Vite manifest (M15)
+        run: bash tools/ci/run-gate.sh bundle-budget npm run budget:bundle
 
       - name: Conformance harness (ADR-21)
-        run: npm run conformance
+        run: bash tools/ci/run-gate.sh conformance npm run conformance
 
       - name: Project graph up to date (ADR-22)
-        run: npm run graph -- --check
+        run: bash tools/ci/run-gate.sh graph npm run graph -- --check
 
-  deployment:
-    # Phase 4 (C8/M17/R10): the self-hosted stack is proven, not asserted.
-    # Images must really build, compose must refuse a missing secret, and
-    # migrate + api + web must come up on an empty volume.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 14
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-verify
+          path: ci-evidence
+          retention-days: 14
+
+  security:
+    name: dependency audit + repository secret scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Write a complete secret set
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      - name: Runtime dependencies carry no high or critical advisory (H14)
+        run: bash tools/ci/run-gate.sh audit npm run audit:ci
+
+      - name: Secret scan over every tracked file (H14/M7)
+        run: bash tools/ci/run-gate.sh secret-scan npm run scan:secrets
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-security
+          path: ci-evidence
+          retention-days: 14
+
+  e2e-smoke:
+    name: browser @smoke against the real API + web stack
+    # H15: the golden path runs on every PR. The full tagged suite
+    # (offline / analysis / upload-big / perf) runs nightly.
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: scalpai
+          POSTGRES_PASSWORD: scalpai_dev_only
+          POSTGRES_DB: scalpai
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U scalpai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      MIGRATE_DATABASE_URL: postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
+      DATABASE_URL: postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
+      APP_ROLE_PASSWORD: scalpai_dev_only
+      JWT_SECRET: ci_dev_only_secret_0123456789abcdef
+      API_PORT: "3001"
+      WEB_PORT: "5173"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      # The API entrypoint reads the repo .env through loadEnv (ADR-0024), so the
+      # server Playwright starts gets exactly this configuration.
+      - name: Write the .env the API under test boots with
+        run: |
+          cat > .env <<'ENV'
+          NODE_ENV=test
+          PORT=3001
+          MIGRATE_DATABASE_URL=postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
+          DATABASE_URL=postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
+          APP_ROLE_PASSWORD=scalpai_dev_only
+          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
+          STORAGE_DRIVER=mock
+          CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173
+          REDIS_URL=redis://127.0.0.1:6379
+          ENV
+
+      - name: Apply migrations and seed the demo clinic
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Install the Chromium browser Playwright drives
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright @smoke (login, create patient, see it listed)
+        run: bash tools/ci/run-gate.sh e2e-smoke npm run e2e:smoke
+
+      - name: Upload Playwright report and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-e2e-smoke
+          path: ci-evidence
+          retention-days: 14
+
+  deployment:
+    name: build images, scan them, boot the self-hosted stack
+    # Phase 4 (C8/M17/R10) proof, extended with the phase 5 image scan: images
+    # must really build, compose must refuse a missing secret, migrate + api +
+    # web must come up on an empty volume, and what was built gets scanned.
+    runs-on: ubuntu-latest
+    env:
+      CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a complete secret set (generated on the runner, never committed)
         working-directory: ops
         run: |
-          cat > ci.env <<'ENV'
+          umask 077
+          cat > ci.env <<ENV
           SCALPAI_DOMAIN=clinic.example.com
           ACME_EMAIL=admin@example.com
           POSTGRES_USER=scalpai_owner
-          POSTGRES_PASSWORD=ciOwnerPwd7Rq2XmT9
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
           POSTGRES_DB=scalpai
-          APP_ROLE_PASSWORD=ciAppPwd4Kd8ZbV3Ns
+          APP_ROLE_PASSWORD=$(openssl rand -hex 16)
           MINIO_ROOT_USER=scalpai_admin
-          MINIO_ROOT_PASSWORD=ciMinioPwd6Hf1QcY5
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
-          JWT_SECRET=9f14c7a35b8e02d6417ac9b53e8f21d0c46b7a9e3512f8d0ab74c6e19d2537f8
-          BACKUP_ENCRYPTION_PASSPHRASE=ciBackupPass2Wm9Tz
+          JWT_SECRET=$(openssl rand -hex 32)
+          BACKUP_ENCRYPTION_PASSPHRASE=$(openssl rand -hex 16)
           ENV
 
-      - name: prod.yml is valid with a full secret set
+      - name: prod.yml and dev.yml render with a full secret set
         working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env config -q
+        run: bash ../tools/ci/run-gate.sh compose-config bash -c 'docker compose -f prod.yml --env-file ci.env config -q && docker compose -f dev.yml config -q'
 
       - name: prod.yml REFUSES a missing secret set (negative proof)
         working-directory: ops
-        run: |
-          if docker compose -f prod.yml config -q 2>/dev/null; then
-            echo "::error::prod.yml accepted an empty secret set"; exit 1
-          fi
-          echo "compose correctly refused to render without secrets"
+        run: bash ../tools/ci/run-gate.sh compose-secrets-negative bash -c 'if docker compose -f prod.yml config -q 2>/dev/null; then echo "::error::prod.yml accepted an empty secret set"; exit 1; fi; echo "compose correctly refused to render without secrets"'
 
-      - name: dev.yml is valid
-        run: docker compose -f ops/dev.yml config -q
-
-      - name: Build api + web images (lockfile install, native modules, turbo)
+      - name: Build api + web images (lockfile, native modules, turbo)
         working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env build api web
+        run: bash ../tools/ci/run-gate.sh docker-build docker compose -f prod.yml --env-file ci.env build api web
+
+      - name: Scan the images that were just built (M17)
+        working-directory: ops
+        run: bash ../tools/ci/run-gate.sh image-scan bash ../tools/ci/image-scan.sh api web
 
       - name: Boot from an empty database (migration gate + healthy API)
         working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
+        run: bash ../tools/ci/run-gate.sh stack-boot docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
 
       - name: Migration ran exactly once, as the owner role
         working-directory: ops
-        run: |
-          docker compose -f prod.yml --env-file ci.env logs migrate
-          docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="
+        run: bash ../tools/ci/run-gate.sh migrate-once bash -c 'docker compose -f prod.yml --env-file ci.env logs migrate && docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="'
 
       - name: API answers on its own health route
         working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env exec -T api node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()).then(j=>{console.log(j);process.exit(j.ok?0:1)})"
+        run: bash ../tools/ci/run-gate.sh api-health docker compose -f prod.yml --env-file ci.env exec -T api node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()).then(j=>{console.log(j);process.exit(j.ok?0:1)})"
 
       - name: Diagnostics on failure
         if: failure()
@@ -171,3 +356,49 @@ jobs:
         if: always()
         working-directory: ops
         run: docker compose -f prod.yml --env-file ci.env down -v
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-deployment
+          path: ci-evidence
+          retention-days: 14
+
+  gate:
+    name: gate report (no PASS without a command log)
+    # L1/W23: this is the only job allowed to say PASS, and it says it by reading
+    # the recorded evidence of every other gate - never by trusting a green
+    # checkmark. It runs even when an upstream job failed, so the summary always
+    # names what was missing or red.
+    if: always()
+    needs: [lockfile, verify, security, e2e-smoke, deployment]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      - name: Collect the evidence of every job
+        uses: actions/download-artifact@v4
+        with:
+          pattern: evidence-*
+          path: ci-evidence
+          merge-multiple: true
+
+      - name: Every required gate has a log with exit=0
+        run: npm run ci:gate
+
+      - name: Upload the merged evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-bundle
+          path: ci-evidence
+          retention-days: 30

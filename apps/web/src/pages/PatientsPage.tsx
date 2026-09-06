@@ -25,7 +25,7 @@ function ErrorBox({ error }: { error: unknown }) {
   const code = error instanceof ApiError ? error.code : "ERROR";
   const message = error instanceof Error ? error.message : t("common.unknownError");
   return (
-    <p role="alert" style={{ color: "crimson" }}>
+    <p role="alert" data-testid="patients-error" style={{ color: "crimson" }}>
       [{code}] {message}
     </p>
   );
@@ -60,12 +60,13 @@ function AddPatientForm() {
     <form
       onSubmit={handleSubmit((dto) => mutation.mutate(dto))}
       noValidate
+      data-testid="patient-form"
       aria-label={t("patients.formAria")}
     >
-      <input placeholder={t("patients.name")} {...register("firstName")} />
-      <input placeholder={t("patients.family")} {...register("lastName")} />
-      <input placeholder={t("patients.phonePh")} {...register("phone")} />
-      <button type="submit" disabled={mutation.isPending}>
+      <input data-testid="patient-first-name" placeholder={t("patients.name")} {...register("firstName")} />
+      <input data-testid="patient-last-name" placeholder={t("patients.family")} {...register("lastName")} />
+      <input data-testid="patient-phone" placeholder={t("patients.phonePh")} {...register("phone")} />
+      <button data-testid="patient-add" type="submit" disabled={mutation.isPending}>
         {t("patients.add")}
       </button>
       <ErrorBox error={mutation.error} />
@@ -84,7 +85,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
     retry: false,
   });
 
-  // Session expired mid-use → drop token so login page returns.
+  // Session expired mid-use -> drop token so login page returns.
   if (query.error instanceof ApiError && query.error.status === 401) {
     clearAccessToken();
     onLoggedOut();
@@ -94,16 +95,16 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
     <main style={{ maxWidth: 780, margin: "8vh auto", padding: "0 16px" }}>
       <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <h1 style={{ margin: 0 }}>{t("patients.title")}</h1>
+        <h1 data-testid="patients-title" style={{ margin: 0 }}>{t("patients.title")}</h1>
         <PendingBadge />
         {!isOnline && (
-          <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>
+          <span data-testid="offline-badge" style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>
             {t("common.offline")}
           </span>
         )}
       </div>
-      <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
-      <button type="button" onClick={() => { clearAccessToken(); onLoggedOut(); }}>
+      <button type="button" data-testid="toggle-lang" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
+      <button type="button" data-testid="logout" onClick={() => { clearAccessToken(); onLoggedOut(); }}>
         {t("home.logout")}
       </button>
       <AddPatientForm />
@@ -111,7 +112,7 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
       {query.isLoading ? (
         <p>{t("common.loading")}</p>
       ) : (
-        <table>
+        <table data-testid="patients-table">
           <thead>
             <tr>
               <th>{t("patients.colName")}</th>
@@ -121,16 +122,17 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
           </thead>
           <tbody>
             {(query.data ?? []).map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} data-testid="patient-row">
                 <td>
-                  <Link to={`/patients/${p.id}/gallery`}>
+                  <Link data-testid="patient-gallery-link" to={`/patients/${p.id}/gallery`}>
                     {p.firstName} {p.lastName}
                   </Link>
                 </td>
-                <td>{p.phone}</td>
+                <td data-testid="patient-phone-cell">{p.phone}</td>
                 <td>
                   <button
                     id={`open-consent-btn-${p.id}`}
+                    data-testid="open-consent"
                     type="button"
                     onClick={() => setSelectedPatientForConsent(p)}
                     style={{

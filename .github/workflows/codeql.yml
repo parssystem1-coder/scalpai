@@ -1,0 +1,45 @@
+name: CodeQL
+
+# H14: static security analysis of every TypeScript surface.
+#
+# Code scanning needs GitHub Advanced Security on a private repository, so the
+# job carries ONE explicit condition instead of failing every single run: it
+# analyses public repositories, or any repository where the variable
+# ENABLE_CODEQL is set to "true". That opt-out is visible here and recorded in
+# ADR-0037 - it is not a silent skip.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "27 3 * * 1"
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: CodeQL analyze (javascript-typescript)
+    if: github.event.repository.private == false || vars.ENABLE_CODEQL == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"

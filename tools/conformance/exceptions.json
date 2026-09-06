@@ -5,7 +5,7 @@
       "rule": "tenant-safety",
       "file": "packages/db/sql/0001__init.sql:clinics",
       "adr": "ADR-0028",
-      "reason": "clinics is the tenant root — isolation is by its own id, enforced by clinics_self_select/update policies",
+      "reason": "clinics is the tenant root - isolation is by its own id, enforced by clinics_self_select/update policies",
       "since": "2026-09-06"
     },
     {
@@ -19,7 +19,7 @@
       "rule": "tenant-safety",
       "file": "sql:__migrations",
       "adr": "ADR-0028",
-      "reason": "migration ledger is owned by the migration role only — RLS would add nothing",
+      "reason": "migration ledger is owned by the migration role only - RLS would add nothing",
       "since": "2026-09-06"
     },
     {
@@ -34,6 +34,48 @@
       "file": "packages/db/sql/0001__init.sql:plan_features",
       "adr": "ADR-0031",
       "reason": "platform catalog shared by all tenants: read-only policy for the app role, writes only via platform CLI/migration",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "production-mocks",
+      "file": "apps/web/src/components/ClinicalDashboard.tsx",
+      "adr": "ADR-0037",
+      "reason": "SAMPLE_PATIENTS/SAMPLE_IMAGES demo data: separating it from the real provider is phase 10 M1. Registered so the rule stays enabled instead of being weakened",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "production-mocks",
+      "file": "apps/web/src/components/NeuralSegmentationOverlay.tsx",
+      "adr": "ADR-0037",
+      "reason": "SAMPLE_DETECTIONS overlay data: replaced by real detections in phase 10 M1/H13",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "production-mocks",
+      "file": "apps/web/src/components/LicenseDiagnosticsModal.tsx",
+      "adr": "ADR-0037",
+      "reason": "license state is still derived locally; wiring it to the Ed25519 verify endpoint is phase 10 M2",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "package-call-site",
+      "file": "packages/ui/package.json",
+      "adr": "ADR-0037",
+      "reason": "scaffold package with no call-site yet: keep-or-delete decision is phase 10 M4/M16",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "package-call-site",
+      "file": "packages/notify/package.json",
+      "adr": "ADR-0037",
+      "reason": "scaffold package with no call-site yet: keep-or-delete decision is phase 10 M4/M16",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "package-call-site",
+      "file": "packages/licensing/package.json",
+      "adr": "ADR-0037",
+      "reason": "covered by its own tests but not wired into the app yet; the licensing endpoint is phase 10 M2",
       "since": "2026-09-06"
     }
   ]
