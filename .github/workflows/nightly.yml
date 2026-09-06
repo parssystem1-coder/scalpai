@@ -1,0 +1,112 @@
+name: Nightly
+
+# H15: the FULL tagged Playwright suite (@smoke, @offline, @analysis,
+# @upload-big, @perf) is too slow for every PR, so it runs here every night and
+# on demand. Same evidence contract as CI (tools/ci/run-gate.sh) and the same
+# npm-only rule (ADR-0036). A red nightly is a signal to fix the suite - never a
+# reason to weaken the PR gate.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-full:
+    name: full Playwright suite on the real stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: scalpai
+          POSTGRES_PASSWORD: scalpai_dev_only
+          POSTGRES_DB: scalpai
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U scalpai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      MIGRATE_DATABASE_URL: postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
+      DATABASE_URL: postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
+      APP_ROLE_PASSWORD: scalpai_dev_only
+      JWT_SECRET: ci_dev_only_secret_0123456789abcdef
+      API_PORT: "3001"
+      WEB_PORT: "5173"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      - name: Write the .env the API under test boots with
+        run: |
+          cat > .env <<'ENV'
+          NODE_ENV=test
+          PORT=3001
+          MIGRATE_DATABASE_URL=postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
+          DATABASE_URL=postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
+          APP_ROLE_PASSWORD=scalpai_dev_only
+          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
+          STORAGE_DRIVER=mock
+          CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173
+          REDIS_URL=redis://127.0.0.1:6379
+          ENV
+
+      - name: Apply migrations and seed the demo clinic
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Install the Chromium browser Playwright drives
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright - every spec, every tag
+        run: bash tools/ci/run-gate.sh e2e-full npm run e2e
+
+      - name: Upload Playwright report, traces and videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 30
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-evidence
+          path: ci-evidence
+          retention-days: 30

@@ -1,0 +1,65 @@
+# H14: dependency updates arrive as reviewable PRs instead of drifting until an
+# advisory forces a rushed bump. Grouped so a weekly batch stays reviewable, and
+# every PR still has to pass the whole gate set (npm audit and secret scan
+# included).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - dependencies
+    groups:
+      dev-tooling:
+        patterns:
+          - "eslint*"
+          - "typescript*"
+          - "vitest"
+          - "@vitest/*"
+          - "turbo"
+          - "tsx"
+          - "@playwright/*"
+          - "@swc/*"
+          - "unplugin-swc"
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: docker
+    directory: "/apps/api"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ops
+
+  - package-ecosystem: docker
+    directory: "/apps/web"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ops
