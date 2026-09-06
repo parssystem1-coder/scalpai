@@ -181,6 +181,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           <div style={{ marginBottom: "2rem" }}>
             <h1
               id="login-welcome-title"
+              data-testid="login-title"
               style={{
                 fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, serif",
                 fontSize: "2.4rem",
@@ -204,7 +205,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             </p>
           </div>
 
-          {/* Quick Role Switcher — dev/test only */}
+          {/* Quick Role Switcher - dev/test only */}
           {isDev && (
             <div
               style={{
@@ -216,6 +217,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             >
               <button
                 type="button"
+                data-testid="login-role-owner"
                 onClick={() => handleQuickRole("owner")}
                 style={{
                   flex: 1,
@@ -239,6 +241,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               </button>
               <button
                 type="button"
+                data-testid="login-role-tricho"
                 onClick={() => handleQuickRole("tricho")}
                 style={{
                   flex: 1,
@@ -267,6 +270,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           <form
             onSubmit={onSubmit}
             noValidate
+            data-testid="login-form"
             style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
           >
             {/* Input 1: Username or Email */}
@@ -287,6 +291,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               </div>
               <input
                 id="login-username-input"
+                data-testid="login-email"
                 type="text"
                 {...register("email")}
                 autoComplete="username"
@@ -337,6 +342,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               </div>
               <input
                 id="login-password-input"
+                data-testid="login-password"
                 type={showPassword ? "text" : "password"}
                 {...register("password")}
                 autoComplete="current-password"
@@ -364,6 +370,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               />
               <button
                 type="button"
+                data-testid="login-toggle-password"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: "absolute",
@@ -411,6 +418,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               >
                 <input
                   type="checkbox"
+                  data-testid="login-remember"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   style={{
@@ -444,6 +452,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             {serverError && (
               <div
                 role="alert"
+                data-testid="login-error"
                 style={{
                   color: "#9F1239",
                   backgroundColor: "rgba(255, 241, 242, 0.8)",
@@ -465,6 +474,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             {/* Sign In Button */}
             <button
               id="login-submit-button"
+              data-testid="login-submit"
               type="submit"
               disabled={isSubmitting}
               style={{
