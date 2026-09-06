@@ -41,9 +41,18 @@ export {
   listAnalysesByPatient,
   saveExpertReview,
 } from "./repos/analyses.repo.js";
+/**
+ * Phase 7 (ADR-0039) — offline correctness. `pullMutations` is cursor-based and
+ * commit-safe (H5); `processPushBatch` isolates every item in its own savepoint
+ * and records only applied deltas in the ledger (H3/H4).
+ */
 export {
+  PULL_LIMIT_MAX,
+  SyncCursorError,
   processPushBatch,
-  pullSince,
+  pullMutations,
+  type SyncPullItem,
+  type SyncPullPage,
 } from "./repos/sync.repo.js";
 export type { PushItemResult } from "@scalpai/sync-client";
 /**
