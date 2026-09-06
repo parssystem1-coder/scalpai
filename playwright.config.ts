@@ -2,11 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 /**
  * Slice T3 - browser @smoke against REAL local stack:
- *   API  : node dist/main.js on :3001 (loadEnv reads .env -> native PG17, ADR-0024)
- *   Web  : vite dev on :5173 with VITE_API_URL pointed at the API
+ * API : node dist/main.js on :3001 (loadEnv reads .env -> native PG17, ADR-0024)
+ * Web : vite dev on :5173 with VITE_API_URL pointed at the API
  *
  * npm is the only package manager in this repo (ADR-0036): every command below
- * goes through npm/turbo, never pnpm.
+ * goes through npm/turbo exclusively.
  */
 export default defineConfig({
   testDir: "e2e",
