@@ -12,6 +12,9 @@ import { ZodBodyPipe } from "../common/zod.pipe.js";
  * Auth surface (WEAKNESSES H1 + R12). The refresh token is issued and read as
  * an HttpOnly/Secure/SameSite=Strict cookie only: it never appears in a
  * response body and the API does not accept it from one either.
+ *
+ * Phase 3: the throttle is backed by the shared store, so every call here is
+ * awaited (its budget is per-clinic-wide, not per-process).
  */
 @Public()
 @Controller("auth")
@@ -30,15 +33,15 @@ export class AuthController {
   ): Promise<AuthSession> {
     const ip = req.ip ?? "unknown";
     const email = normalizeEmail(dto.email);
-    this.throttle.assertBucketAllowed("login", ip);
-    this.throttle.assertEmailAllowed(email);
+    await this.throttle.assertBucketAllowed("login", ip);
+    await this.throttle.assertEmailAllowed(email);
     try {
       const pair = await this.db.withClient((tx) => this.auth.login(tx, email, dto.password));
-      this.throttle.noteSuccess(email);
+      await this.throttle.noteSuccess(email);
       void reply.header("set-cookie", buildRefreshCookie(pair.refreshToken));
       return { accessToken: pair.accessToken, user: pair.user };
     } catch (err) {
-      if ((err as { status?: number }).status === 401) this.throttle.noteFailure(email);
+      if ((err as { status?: number }).status === 401) await this.throttle.noteFailure(email);
       throw err;
     }
   }
@@ -48,13 +51,13 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<AuthSession> {
-    this.throttle.assertBucketAllowed("refresh", req.ip ?? "unknown");
+    await this.throttle.assertBucketAllowed("refresh", req.ip ?? "unknown");
     const presented = readRefreshCookie(req);
     if (!presented) {
       throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "نشست یافت نشد" });
     }
     const pair = await this.auth.rotate(this.db, presented);
-    this.auth.forgetPrincipal(pair.user.id);
+    await this.auth.forgetPrincipal(pair.user.id);
     void reply.header("set-cookie", buildRefreshCookie(pair.refreshToken));
     return { accessToken: pair.accessToken, user: pair.user };
   }
@@ -65,7 +68,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<{ ok: true }> {
-    this.throttle.assertBucketAllowed("logout", req.ip ?? "unknown");
+    await this.throttle.assertBucketAllowed("logout", req.ip ?? "unknown");
     const presented = readRefreshCookie(req);
     if (presented) await this.auth.revoke(this.db, presented);
     void reply.header("set-cookie", buildClearedRefreshCookie());

@@ -11,8 +11,10 @@ import { LoginThrottleService } from "./auth/login-throttle.service.js";
 import { JwtAccessGuard } from "./auth/jwt-access.guard.js";
 import { FeatureGuard } from "./common/feature.guard.js";
 import { QuotaGuard } from "./common/quota.guard.js";
+import { RateLimitGuard } from "./common/rate-limit.guard.js";
 import { RolesGuard } from "./common/roles.guard.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
+import { StateStore } from "./common/state/state.store.js";
 import { CoreController } from "./core.controller.js";
 import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
@@ -54,6 +56,7 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
   ],
   providers: [
     DbService,
+    StateStore,
     AuthService,
     TenantScope,
     EntitlementService,
@@ -62,7 +65,11 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     RolesGuard,
     FeatureGuard,
     QuotaGuard,
+    RateLimitGuard,
     { provide: APP_GUARD, useClass: JwtAccessGuard },
+    // L4: the per-clinic request budget runs right after authentication, before
+    // any handler work — a burst must be cheap to refuse.
+    { provide: APP_GUARD, useExisting: RateLimitGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useExisting: FeatureGuard },
     { provide: APP_GUARD, useExisting: QuotaGuard },

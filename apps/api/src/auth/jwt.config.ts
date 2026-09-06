@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { isProduction } from "../common/security.config.js";
 
 /**
- * JWT signing configuration (WEAKNESSES C6/R2 + R12).
+ * JWT signing configuration (WEAKNESSES C6/R2 + R12 — ADR-0035).
  *
  * There is no fallback secret: a missing or weak JWT_SECRET aborts boot. The
  * active secret gets a `kid` derived from its own digest, and JWT_SECRET_PREVIOUS
  * stays verifiable for one rotation window so secrets can be rotated without a
- * synchronized deploy.
+ * synchronized deploy. JWT_SECRET_PREVIOUS_UNTIL closes that window at a fixed
+ * instant — the old key stops being accepted even if the env var is still there
+ * and the process was never restarted.
  */
 
 const MIN_SECRET_LENGTH = 32;
@@ -20,6 +22,8 @@ export interface JwtConfig {
   previousSecret: string | null;
   kid: string;
   previousKid: string | null;
+  /** Hard deadline for the rotation window (null = open until the env var goes). */
+  previousAcceptedUntil: Date | null;
   issuer: string;
   audience: string;
   accessTtl: string;
@@ -57,10 +61,19 @@ export function resolveJwtConfig(): JwtConfig {
   assertUsable("JWT_SECRET", secret);
 
   const previousSecret = process.env.JWT_SECRET_PREVIOUS?.trim() ?? null;
+  let previousAcceptedUntil: Date | null = null;
   if (previousSecret) {
     assertUsable("JWT_SECRET_PREVIOUS", previousSecret);
     if (previousSecret === secret) {
       throw new Error("JWT_SECRET_PREVIOUS must differ from JWT_SECRET");
+    }
+    const deadline = process.env.JWT_SECRET_PREVIOUS_UNTIL?.trim();
+    if (deadline) {
+      const parsed = new Date(deadline);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("JWT_SECRET_PREVIOUS_UNTIL must be an ISO-8601 timestamp");
+      }
+      previousAcceptedUntil = parsed;
     }
   }
 
@@ -69,11 +82,22 @@ export function resolveJwtConfig(): JwtConfig {
     previousSecret,
     kid: keyId(secret),
     previousKid: previousSecret ? keyId(previousSecret) : null,
+    previousAcceptedUntil,
     issuer: process.env.JWT_ISSUER?.trim() ?? "scalpai",
     audience: process.env.JWT_AUDIENCE?.trim() ?? "scalpai-api",
     accessTtl: process.env.JWT_ACCESS_TTL?.trim() ?? "15m",
   };
   return cached;
+}
+
+/**
+ * Is the previous key still allowed to verify a token? Evaluated per request,
+ * not at boot, so the rotation window really does close on its own (R12).
+ */
+export function previousKeyUsable(cfg: JwtConfig, now: Date = new Date()): boolean {
+  if (!cfg.previousSecret) return false;
+  if (!cfg.previousAcceptedUntil) return true;
+  return now.getTime() <= cfg.previousAcceptedUntil.getTime();
 }
 
 /** Tests mutate env between cases; production never calls this. */
