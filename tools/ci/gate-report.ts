@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 
 /**
@@ -80,16 +80,24 @@ export function parseEvidence(file: string, text: string): GateEvidence {
 /** Collects every *.log below `dir` (artifacts may land in per-job subfolders). */
 export function collectEvidence(dir: string): GateEvidence[] {
   const out: GateEvidence[] = [];
-  if (!existsSync(dir)) return out;
   const walk = (current: string): void => {
-    for (const entry of readdirSync(current)) {
-      const full = join(current, entry);
-      if (statSync(full).isDirectory()) {
+    let entries: import("node:fs").Dirent[] = [];
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) {
         walk(full);
-        continue;
+      } else if (entry.isFile() && entry.name.endsWith(".log")) {
+        try {
+          out.push(parseEvidence(full, readFileSync(full, "utf8")));
+        } catch {
+          // Ignore unreadable files
+        }
       }
-      if (!entry.endsWith(".log")) continue;
-      out.push(parseEvidence(full, readFileSync(full, "utf8")));
     }
   };
   walk(dir);
