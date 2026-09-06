@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScalpAI - پلتفرم جامع تریکولوژی و آنالیز هوشمند پوست و مو</title>
+    <meta name="description" content="پلتفرم جامع تریکولوژی، آنالیز پوست و مو، مدیریت پرونده بیماران و ثبت داده‌های کلینیکی" />
+    <meta property="og:title" content="ScalpAI - پلتفرم جامع تریکولوژی و آنالیز هوشمند پوست و مو" />
+    <meta property="og:description" content="پلتفرم جامع تریکولوژی، آنالیز پوست و مو، مدیریت پرونده بیماران و ثبت داده‌های کلینیکی" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#C9906A" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        background-color: #FAF6F0;
+        color: #1A1614;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* Luxury Smooth Scrollbar */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(212, 148, 156, 0.4); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(201, 120, 136, 0.7); }
+
+      /* Keyframes for 3D and Luxury Silk Vibrancy */
+      @keyframes float-gentle {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-8px) rotate(0.5deg); }
+      }
+
+      @keyframes float-reverse {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(8px) rotate(-0.5deg); }
+      }
+
+      @keyframes glow-pulse {
+        0%, 100% { opacity: 0.45; transform: scale(1); }
+        50% { opacity: 0.85; transform: scale(1.08); }
+      }
+
+      @keyframes shimmer-sweep {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+
+      @keyframes orb-orbit {
+        0% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -40px) scale(1.1); }
+        66% { transform: translate(-20px, 25px) scale(0.95); }
+        100% { transform: translate(0, 0) scale(1); }
+      }
+
+      @keyframes prism-rainbow {
+        0% { filter: hue-rotate(0deg); }
+        50% { filter: hue-rotate(35deg); }
+        100% { filter: hue-rotate(0deg); }
+      }
+
+      /* 3D card tilt & lighting classes */
+      .glass-card-3d {
+        position: relative;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(28px) saturate(180%);
+        -webkit-backdrop-filter: blur(28px) saturate(180%);
+        border: 1.5px solid rgba(255, 255, 255, 0.85);
+        border-image: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(226, 172, 179, 0.5) 45%, rgba(255,255,255,0.8) 100%) 1;
+        box-shadow: 
+          0 24px 60px -12px rgba(184, 115, 126, 0.16),
+          0 12px 28px -6px rgba(130, 80, 95, 0.08),
+          inset 0 1px 2px rgba(255, 255, 255, 0.95),
+          inset 0 -1px 2px rgba(212, 160, 170, 0.2);
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
+      }
+
+      .glass-card-3d:hover {
+        box-shadow: 
+          0 32px 75px -12px rgba(184, 115, 126, 0.24),
+          0 16px 36px -6px rgba(130, 80, 95, 0.12),
+          inset 0 1px 3px rgba(255, 255, 255, 1);
+      }
+
+      .frosted-input-wrap {
+        position: relative;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .frosted-input-wrap:focus-within {
+        transform: translateY(-2px);
+      }
+
+      .btn-luxury-primary {
+        background: linear-gradient(135deg, #D48492 0%, #C46D7D 50%, #B8596B 100%);
+        background-size: 200% 200%;
+        color: #FFFFFF;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 8px 24px -4px rgba(196, 109, 125, 0.45);
+      }
+
+      .btn-luxury-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px -4px rgba(196, 109, 125, 0.6);
+        background-position: 100% 100%;
+      }
+
+      .btn-luxury-primary:active:not(:disabled) {
+        transform: translateY(0px);
+      }
+
+      .btn-luxury-primary::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 60%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+        transform: skewX(-20deg);
+        transition: 0.6s ease;
+      }
+
+      .btn-luxury-primary:hover:not(:disabled)::after {
+        left: 140%;
+      }
+
+      .feature-pill-hover {
+        transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .feature-pill-hover:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: rgba(255, 255, 255, 0.95) !important;
+        border-color: rgba(212, 132, 146, 0.4) !important;
+        box-shadow: 0 12px 28px -6px rgba(184, 115, 126, 0.18) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

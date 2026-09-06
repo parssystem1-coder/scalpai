@@ -1,0 +1,32 @@
+# ScalpAI Caddyfile — Production TLS reverse proxy for Self-Hosted Clinics
+{
+    email {$ACME_EMAIL:admin@clinic.local}
+    auto_https off
+}
+
+:80 {
+    # API endpoints
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy api:3000
+    }
+
+    # MinIO media storage direct presigned access
+    handle /media/* {
+        reverse_proxy minio:9000
+    }
+
+    # Web SPA frontend
+    handle {
+        reverse_proxy web:80
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=()"
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "ScalpAI Trichology Platform",
+  "short_name": "ScalpAI",
+  "description": "پلتفرم جامع تریکولوژی و آنالیز هوشمند پوست و مو",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#C9906A",
+  "dir": "rtl",
+  "lang": "fa",
+  "icons": [
+    {
+      "src": "/concepts/pearl_clinic_hero_ui_1788109051173.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

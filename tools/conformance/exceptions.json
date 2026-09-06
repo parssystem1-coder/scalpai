@@ -1,0 +1,4 @@
+{
+  "comment": "ADR-21 conformance exceptions. Every entry MUST reference a registered ADR (ADR-\\d{3,4}) or the harness fails the build. rule/file optional; both act as matchers.",
+  "exceptions": []
+}

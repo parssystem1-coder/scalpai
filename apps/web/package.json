@@ -1,0 +1,43 @@
+{
+  "name": "@scalpai/app-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "vite --host 0.0.0.0 --port 3000"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@scalpai/analysis-engine": "*",
+    "@scalpai/education": "*",
+    "@scalpai/shared": "*",
+    "@scalpai/sync-client": "*",
+    "@tanstack/react-query": "^5.90.0",
+    "@tanstack/react-virtual": "^3.14.10",
+    "dexie": "^4.4.5",
+    "i18next": "^25.6.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hook-form": "^7.65.0",
+    "react-i18next": "^16.0.0",
+    "react-router-dom": "^7.9.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.18",
+    "jsdom": "^27.0.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0"
+  }
+}

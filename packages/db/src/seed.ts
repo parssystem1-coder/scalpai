@@ -1,0 +1,130 @@
+import { loadEnv } from "./load-env.js";
+loadEnv();
+import { randomUUID } from "node:crypto";
+import { hash } from "@node-rs/argon2";
+import { Pool } from "pg";
+
+/**
+ * Dev/demo seed (phase 1): two clinics for cross-tenant negative tests,
+ * one user per role for clinic A, starter+growth plans, entitlements.
+ * Idempotent: skips when the marker clinic already exists.
+ */
+export async function seed(config: string | import("pg").PoolConfig): Promise<{ skipped?: boolean; clinicA?: string; clinicB?: string }> {
+  const poolConfig = typeof config === "string" ? { connectionString: config, max: 1 } : { ...config, max: 1 };
+  const pool = new Pool(poolConfig);
+  const client = await pool.connect();
+  try {
+    const marker = await client.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
+    if ((marker.rowCount ?? 0) > 0) return { skipped: true };
+
+    const password = process.env.SEED_PASSWORD ?? "Dev12345!";
+    const argon = await hash(password);
+    const clinicA = randomUUID();
+    const clinicB = randomUUID();
+
+    try {
+      await client.query("BEGIN");
+
+      // Plans catalog — new plan = INSERT only (§9.1)
+      await client.query(
+        `INSERT INTO plans (code, name, price, interval, limits) VALUES
+         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1,"monthly_sessions":5}'),
+         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3,"monthly_sessions":3}')
+         ON CONFLICT (code) DO NOTHING`,
+      );
+      await client.query(
+        `INSERT INTO plan_features (plan_code, feature) VALUES
+         ('starter','portal'),('starter','aftercare'),
+         ('growth','portal'),('growth','aftercare'),('growth','scribe'),('growth','api'),('growth','ml_updates'),('growth','admin')
+         ON CONFLICT DO NOTHING`,
+      );
+
+      await client.query(
+        `INSERT INTO clinics (id, name, settings) VALUES
+         ($1, 'کلینیک دمو الف', '{"seed":"v1"}'),
+         ($2, 'کلینیک دمو ب',   '{"seed":"other"}')`,
+        [clinicA, clinicB],
+      );
+      await client.query(
+        `INSERT INTO entitlements (clinic_id, plan_code, current_period_end)
+         VALUES ($1, 'growth',  now() + interval '30 days'),
+                ($2, 'starter', now() + interval '30 days')`,
+        [clinicA, clinicB],
+      );
+
+      const ownerA = randomUUID();
+      const trichologistA = randomUUID();
+      const receptionistA = randomUUID();
+      const ownerB = randomUUID();
+      await client.query(
+        `INSERT INTO users (id, clinic_id, role, email, password_hash) VALUES
+         ($1, $5, 'owner',        'owner@clinic-a.test',     $7),
+         ($2, $5, 'trichologist', 'tricho@clinic-a.test',    $7),
+         ($3, $5, 'receptionist', 'reception@clinic-a.test', $7),
+         ($4, $6, 'owner',        'owner@clinic-b.test',     $7)`,
+        [ownerA, trichologistA, receptionistA, ownerB, clinicA, clinicB, argon],
+      );
+
+      const serviceA = randomUUID();
+      const serviceB = randomUUID();
+      await client.query(
+        `INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES
+         ($1, $3, 'مشاوره تریکولوژی', 30, '800000'),
+         ($2, $3, 'جلسه PRP',         60, '4500000')`,
+        [serviceA, serviceB, clinicA],
+      );
+      await client.query(`INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES ($1, $2, 'مشاوره', 30, '500000')`, [
+        randomUUID(),
+        clinicB,
+      ]);
+
+      await client.query(
+        `INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES
+         ($1, $3, 'زهرا', 'محمدی',  '09121234567'),
+         ($2, $3, 'علی',  'رضایی',  '09359876543')`,
+        [randomUUID(), randomUUID(), clinicA],
+      );
+
+      await client.query("COMMIT");
+      return { clinicA, clinicB };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    }
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+const isCli = process.argv[1]?.replace(/\\/g, "/").endsWith("seed.ts");
+if (isCli) {
+  let config: string | import("pg").PoolConfig;
+
+  if (process.env.SQL_HOST) {
+    config = {
+      host: process.env.SQL_HOST,
+      user: process.env.SQL_ADMIN_USER,
+      password: process.env.SQL_ADMIN_PASSWORD,
+      database: process.env.SQL_DB_NAME,
+      port: process.env.SQL_PORT ? Number(process.env.SQL_PORT) : undefined,
+    };
+  } else {
+    const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL;
+    if (!url) {
+      console.error("MIGRATE_DATABASE_URL or DATABASE_URL is required");
+      process.exit(1);
+    }
+    config = url;
+  }
+  
+  seed(config)
+    .then((r) => {
+      console.log(r.skipped ? "seed: already seeded" : "seed: done (2 clinics)");
+      process.exit(0);
+    })
+    .catch((e: Error) => {
+      console.error("seed failed:", e.message);
+      process.exit(1);
+    });
+}

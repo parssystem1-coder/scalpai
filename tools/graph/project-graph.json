@@ -1,0 +1,116 @@
+{
+  "generatedFrom": {
+    "commit": "unknown",
+    "dirty": false
+  },
+  "modules": [
+    {
+      "name": "@scalpai/analysis-core",
+      "kind": "package",
+      "dir": "packages/analysis-core",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/analysis-engine",
+      "kind": "package",
+      "dir": "packages/analysis-engine",
+      "dependsOn": [
+        "@scalpai/analysis-core",
+        "@scalpai/shared"
+      ]
+    },
+    {
+      "name": "@scalpai/app-admin",
+      "kind": "app",
+      "dir": "apps/admin",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/app-api",
+      "kind": "app",
+      "dir": "apps/api",
+      "dependsOn": [
+        "@scalpai/analysis-core",
+        "@scalpai/db",
+        "@scalpai/shared",
+        "@scalpai/sync-client"
+      ]
+    },
+    {
+      "name": "@scalpai/app-desktop",
+      "kind": "app",
+      "dir": "apps/desktop",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/app-portal",
+      "kind": "app",
+      "dir": "apps/portal",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/app-web",
+      "kind": "app",
+      "dir": "apps/web",
+      "dependsOn": [
+        "@scalpai/analysis-engine",
+        "@scalpai/education",
+        "@scalpai/shared",
+        "@scalpai/sync-client"
+      ]
+    },
+    {
+      "name": "@scalpai/db",
+      "kind": "package",
+      "dir": "packages/db",
+      "dependsOn": [
+        "@scalpai/sync-client"
+      ]
+    },
+    {
+      "name": "@scalpai/education",
+      "kind": "package",
+      "dir": "packages/education",
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
+    },
+    {
+      "name": "@scalpai/licensing",
+      "kind": "package",
+      "dir": "packages/licensing",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/notify",
+      "kind": "package",
+      "dir": "packages/notify",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/shared",
+      "kind": "package",
+      "dir": "packages/shared",
+      "dependsOn": []
+    },
+    {
+      "name": "@scalpai/sync-client",
+      "kind": "package",
+      "dir": "packages/sync-client",
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
+    },
+    {
+      "name": "@scalpai/ui",
+      "kind": "package",
+      "dir": "packages/ui",
+      "dependsOn": []
+    }
+  ],
+  "counts": {
+    "apps": 5,
+    "packages": 9,
+    "dependencyEdges": 13
+  }
+}

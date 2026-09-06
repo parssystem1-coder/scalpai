@@ -1,0 +1,34 @@
+{
+  "extends": "../../tooling/tsconfig/base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "types": [
+      "vite/client"
+    ],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@scalpai/shared": ["../../packages/shared/src/index.ts"],
+      "@scalpai/analysis-engine": ["../../packages/analysis-engine/src/index.ts"],
+      "@scalpai/analysis-core": ["../../packages/analysis-core/src/index.ts"],
+      "@scalpai/sync-client": ["../../packages/sync-client/src/index.ts"],
+      "@scalpai/education": ["../../packages/education/src/index.ts"]
+    }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx"
+  ]
+}
