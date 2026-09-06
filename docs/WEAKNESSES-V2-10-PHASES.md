@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۲ با موفقیت مرج شد (PR #28). تمام گیت‌ها، RLS تنانسی و مرزهای دسترسی پیاده‌سازی شدند.**
+> وضعیت: **فاز ۳ با موفقیت مرج شد (PR #30). یکپارچگی تراکنش‌های احراز هویت، چرخش اتمیک رفرش توکن، کش توزیع‌شده ردیس و لیمیت‌های کلینیک پیاده‌سازی شدند.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -69,14 +69,14 @@
 
 **هدف خروج:** refresh rotation، revoke و claims در برابر race و replay اتمیک باشند.
 
-- [ ] **R4** `rotate()` را در یک transaction واحد اجرا کن؛ ردیف parent با `SELECT ... FOR UPDATE` قفل شود، child ساخته و parent همان‌جا replaced شود.
-- [ ] **R4/H1** دو refresh همزمان با یک token باید دقیقاً یک موفقیت و یک reuse/revoke نتیجه بدهد.
-- [ ] **R5** lookupهای login/refresh با least privilege و حداقل داده انجام شوند؛ clinic claim از DB بیاید، نه token ورودی.
-- [ ] **R12** revoked user، expired family، replaced parent و mismatch clinic در یک matrix کامل تست شوند.
-- [ ] **R11/M6** throttle و entitlement cache از Map درون‌پردازه به Redis با TTL، eviction و namespace tenant منتقل شوند.
-- [ ] **R11** نام env پنجره IP یکسان شود: مستندات و کد نباید `AUTH_IP_WINDOW_MS`/`IP_WINDOW_MS` متفاوت بخوانند.
-- [ ] **L4** rate-limit سراسری برای sync push، upload، analysis و endpointهای پرهزینه با quota tenant اضافه شود.
-- [ ] **R12** secret rotation بدون deploy هم‌زمان طراحی شود؛ key id و invalidation policy مستند شود.
+- [x] **R4** `rotate()` را در یک transaction واحد اجرا کن؛ ردیف parent با `SELECT ... FOR UPDATE` قفل شود، child ساخته و parent همان‌جا replaced شود. (بسته شده در PR #30، تابع اتمیک fn_refresh_rotate در migration 0011 و ADR-0033)
+- [x] **R4/H1** دو refresh همزمان با یک token باید دقیقاً یک موفقیت و یک reuse/revoke نتیجه بدهد. (بسته شده در PR #30، تست رگرسیون ۲۰ درخواست همزمان با یک توکن در phase3.session-rotation.spec.ts)
+- [x] **R5** lookupهای login/refresh با least privilege و حداقل داده انجام شوند؛ clinic claim از DB بیاید، نه token ورودی. (بسته شده در PR #30، استخراج ایمن claimsById از دیتابیس)
+- [x] **R12** revoked user، expired family، replaced parent و mismatch clinic در یک matrix کامل تست شوند. (بسته شده در PR #30، پوشش ماتریس امتناع کامل در phase3.session-rotation.spec.ts)
+- [x] **R11/M6** throttle و entitlement cache از Map درون‌پردازه به Redis با TTL، eviction و namespace tenant منتقل شوند. (بسته شده در PR #30، سرویس StateStore مبتنی بر درایورهای Redis/Memory با ایزولاسیون namespace و ADR-0034)
+- [x] **R11** نام env پنجره IP یکسان شود: مستندات و کد نباید `AUTH_IP_WINDOW_MS`/`IP_WINDOW_MS` متفاوت بخوانند. (بسته شده در PR #30، یکپارچه‌سازی با AUTH_IP_WINDOW_MS)
+- [x] **L4** rate-limit سراسری برای sync push، upload، analysis و endpointهای پرهزینه با quota tenant اضافه شود. (بسته شده در PR #30، گارد RateLimitGuard مبتنی بر باکت مشترک هر کلینیک)
+- [x] **R12** secret rotation بدون deploy هم‌زمان طراحی شود؛ key id و invalidation policy مستند شود. (بسته شده در PR #30، اشتقاق قطعی kid از کلید و انقضای پیشین با JWT_SECRET_PREVIOUS_UNTIL و ADR-0035)
 
 **شرط تکمیل فاز:** تست race با حداقل ۲۰ refresh همزمان، تست چند replica با Redis و گزارش عدم replay.
 
@@ -238,7 +238,7 @@
 - [x] ممیزی و ادغام یافته‌ها انجام شد.
 - [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (تکمیل — بک‌اند PR #25 + کلاینت وب + تست‌های منفی + .env.example)
 - [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی (تکمیل — پیاده‌سازی کامل در PR #28 با شواهد تست و مایگریشن)
-- [ ] فاز ۳: نشست، توکن و Auth transaction integrity
+- [x] فاز ۳: نشست، توکن و Auth transaction integrity (تکمیل — پیاده‌سازی کامل در PR #30 با مایگریشن 0011، رفرش اتمیک، ردیس و تست رگرسیون)
 - [ ] فاز ۴: زیرساخت self-hosted و استقرار امن
 - [ ] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی
 - [ ] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی
