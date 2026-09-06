@@ -55,4 +55,19 @@ export {
   type ResolvedEntitlement,
   type PlanUpsertInput,
 } from "./repos/users.repo.js";
-export { resetAll, seedMarkerClinicId } from "./migrate.js";
+/**
+ * Platform-admin catalog operations (ADR-0031). They connect as the migration
+ * role on purpose and are unreachable for tenant HTTP traffic — the conformance
+ * rule `platform-boundaries` fails the build if a controller imports them.
+ */
+export {
+  PLAN_LIMIT_MAX,
+  PLAN_PRICE_MAX,
+  listPlansAsPlatform,
+  upsertPlanAsPlatform,
+  deletePlanAsPlatform,
+} from "./plans-admin.js";
+/**
+ * WEAKNESSES H18: destructive test helpers (resetAll, …) are NOT part of this
+ * public surface. Import them from `@scalpai/db/testing` instead.
+ */

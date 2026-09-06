@@ -6,8 +6,12 @@ import { Pool, type PoolClient } from "pg";
  * Minimal forward-only migrator (ADR-0004 style ownership).
  * - Runs as MIGRATE_DATABASE_URL (owner/superuser — RLS bootstrap needs it)
  * - Tracks applied files in __migrations
- * - Bootstraps the NOSUPERUSER/NOBYPASSRLS app role + grants (append-only audit_log!)
- *   using APP_ROLE_PASSWORD from env (never committed).
+ * - Bootstraps the NOSUPERUSER/NOBYPASSRLS app role + the NOLOGIN auth role
+ *   (ADR-0029) with their grants, using APP_ROLE_PASSWORD from env.
+ *
+ * Phase 2: applyGrants() is also where the tenancy boundaries are re-asserted
+ * after every file, so a later `GRANT ... ON ALL TABLES` can never quietly hand
+ * refresh_tokens or the plan catalog back to the app role.
  */
 
 export interface MigrateResult {
@@ -32,7 +36,7 @@ export async function migrate(config: string | import("pg").PoolConfig, opts?: {
   const skipped: string[] = [];
   try {
     await client.query("CREATE TABLE IF NOT EXISTS __migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-    await bootstrapAppRole(client, appRolePassword);
+    await bootstrapRoles(client, appRolePassword);
     const files = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
@@ -63,7 +67,7 @@ export async function migrate(config: string | import("pg").PoolConfig, opts?: {
   return { applied, skipped };
 }
 
-async function bootstrapAppRole(client: PoolClient, password: string): Promise<void> {
+async function bootstrapRoles(client: PoolClient, password: string): Promise<void> {
   const pwd = password.replace(/'/g, "''");
   await client.query(`
     DO $bootstrap$
@@ -71,9 +75,19 @@ async function bootstrapAppRole(client: PoolClient, password: string): Promise<v
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scalpai_app') THEN
         EXECUTE format('CREATE ROLE scalpai_app LOGIN PASSWORD %L NOSUPERUSER NOBYPASSRLS NOINHERIT', '${pwd}');
       END IF;
+      -- ADR-0029: the pre-tenant auth surface runs as its own least-privilege
+      -- principal. NOLOGIN — reachable only through SECURITY DEFINER functions.
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scalpai_auth') THEN
+        CREATE ROLE scalpai_auth NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+      END IF;
     END
     $bootstrap$;
   `);
+}
+
+/** Kept for backwards compatibility with older call sites/scripts. */
+export async function bootstrapAppRole(client: PoolClient, password: string): Promise<void> {
+  await bootstrapRoles(client, password);
 }
 
 export async function applyGrants(client: PoolClient): Promise<void> {
@@ -87,28 +101,32 @@ export async function applyGrants(client: PoolClient): Promise<void> {
     REVOKE UPDATE, DELETE ON audit_log FROM scalpai_app;
     REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON __migrations FROM scalpai_app;
   `);
-}
 
-/** Dev/CI helper: wipe all business data for a deterministic re-seed. */
-export async function resetAll(migrateUrl: string): Promise<void> {
-  const { Pool } = await import("pg");
-  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
-  try {
-    await pool.query(`TRUNCATE audit_log, consents, analyses, gallery_items, sessions,
-      patients, services, usage_counters, entitlements, plan_features, plans,
-      refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`);
-  } finally {
-    await pool.end();
-  }
-}
-/** Id of the marker clinic created by seed() (used by integration tests). */
-export async function seedMarkerClinicId(migrateUrl: string): Promise<string> {
-  const { Pool } = await import("pg");
-  const pool = new Pool({ connectionString: migrateUrl, max: 1 });
-  try {
-    const r = await pool.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
-    return String(r.rows[0].id);
-  } finally {
-    await pool.end();
-  }
+  // Phase 2 boundaries — idempotent, and safe on a database where the tables do
+  // not exist yet (first migration file has not run).
+  await client.query(`
+    DO $tenancy$
+    BEGIN
+      IF to_regclass('public.refresh_tokens') IS NOT NULL THEN
+        EXECUTE 'REVOKE ALL ON refresh_tokens FROM scalpai_app';
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scalpai_auth') THEN
+          EXECUTE 'GRANT SELECT, INSERT, UPDATE ON refresh_tokens TO scalpai_auth';
+        END IF;
+      END IF;
+      IF to_regclass('public.users') IS NOT NULL
+         AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'scalpai_auth') THEN
+        EXECUTE 'GRANT SELECT ON users TO scalpai_auth';
+      END IF;
+      IF to_regclass('public.plans') IS NOT NULL THEN
+        EXECUTE 'REVOKE INSERT, UPDATE, DELETE ON plans FROM scalpai_app';
+      END IF;
+      IF to_regclass('public.plan_features') IS NOT NULL THEN
+        EXECUTE 'REVOKE INSERT, UPDATE, DELETE ON plan_features FROM scalpai_app';
+      END IF;
+      IF to_regclass('public.clinics') IS NOT NULL THEN
+        EXECUTE 'REVOKE INSERT, DELETE ON clinics FROM scalpai_app';
+      END IF;
+    END
+    $tenancy$;
+  `);
 }
