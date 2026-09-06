@@ -28,12 +28,12 @@ export function assertResettableTarget(target: string): void {
     throw new UnsafeDatabaseTargetError("refusing to wipe data with NODE_ENV=production");
   }
 
-  let host = "";
-  let database = "";
+  let host: string;
+  let database: string;
   try {
     const url = new URL(target);
     host = url.hostname.toLowerCase();
-    database = decodeURIComponent(url.pathname.replace(/^\//, "")).toLowerCase();
+    database = decodeURIComponent(url.pathname.replace(/^\\//, "")).toLowerCase();
   } catch {
     throw new UnsafeDatabaseTargetError("target must be a parseable postgres connection URL");
   }
