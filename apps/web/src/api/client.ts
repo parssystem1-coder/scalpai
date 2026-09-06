@@ -1,4 +1,4 @@
-/** Minimal API client with memory-first & secure session storage fallback */
+/** Minimal API client with memory-only access token (no localStorage persistence) */
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api/v1";
 
@@ -7,9 +7,6 @@ let accessToken: string | null = (() => {
     if (typeof sessionStorage !== "undefined") {
       const stored = sessionStorage.getItem("scalpai_access_token");
       if (stored) return stored;
-    }
-    if (typeof localStorage !== "undefined") {
-      return localStorage.getItem("scalpai_access_token");
     }
   } catch {
     // ignore
@@ -21,14 +18,11 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
-export function setAccessToken(token: string, remember = false): void {
+export function setAccessToken(token: string, _remember = false): void {
   accessToken = token;
   try {
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem("scalpai_access_token", token);
-    }
-    if (remember && typeof localStorage !== "undefined") {
-      localStorage.setItem("scalpai_access_token", token);
     }
   } catch {
     // Storage might be unavailable in restricted environments
@@ -40,9 +34,6 @@ export function clearAccessToken(): void {
   try {
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.removeItem("scalpai_access_token");
-    }
-    if (typeof localStorage !== "undefined") {
-      localStorage.removeItem("scalpai_access_token");
     }
   } catch {
     // ignore

@@ -22,7 +22,7 @@ const queryClient = new QueryClient({
 });
 
 function AppRoutes() {
-  const { user, logout, setDemoUser } = useAuth();
+  const { user, logout } = useAuth();
   const [toast, setToast] = useState<{ title: string; desc: string } | null>(null);
   const navigate = useNavigate();
 
@@ -37,7 +37,7 @@ function AppRoutes() {
     navigate("/");
   };
 
-  const userEmail = user?.email ?? "tricho@scalpai.clinic";
+  const userEmail = user?.email ?? "";
 
   return (
     <>
@@ -46,9 +46,6 @@ function AppRoutes() {
           path="/"
           element={
             <LandingPage
-              onLoginSuccess={(email) => {
-                setDemoUser(email);
-              }}
               showToast={showToast}
             />
           }
