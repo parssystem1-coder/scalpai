@@ -12,6 +12,10 @@ import { Pool, type PoolClient } from "pg";
  * Phase 2: applyGrants() is also where the tenancy boundaries are re-asserted
  * after every file, so a later `GRANT ... ON ALL TABLES` can never quietly hand
  * refresh_tokens or the plan catalog back to the app role.
+ *
+ * Phase 6 (ADR-0038): the same applies to the privacy boundaries — the audit
+ * anchor table stays append-only and the plaintext quarantine tables stay
+ * unreachable for the app role.
  */
 
 export interface MigrateResult {
@@ -128,5 +132,23 @@ export async function applyGrants(client: PoolClient): Promise<void> {
       END IF;
     END
     $tenancy$;
+  `);
+
+  // Phase 6 privacy boundaries (ADR-0038). Without this block the blanket
+  // GRANT above would hand UPDATE/DELETE on the anchor table straight back.
+  await client.query(`
+    DO $privacy$
+    BEGIN
+      IF to_regclass('public.audit_anchors') IS NOT NULL THEN
+        EXECUTE 'REVOKE UPDATE, DELETE ON audit_anchors FROM scalpai_app';
+      END IF;
+      IF to_regclass('public.phi_plaintext_quarantine') IS NOT NULL THEN
+        EXECUTE 'REVOKE ALL ON phi_plaintext_quarantine FROM scalpai_app';
+      END IF;
+      IF to_regclass('public.consent_signature_quarantine') IS NOT NULL THEN
+        EXECUTE 'REVOKE ALL ON consent_signature_quarantine FROM scalpai_app';
+      END IF;
+    END
+    $privacy$;
   `);
 }

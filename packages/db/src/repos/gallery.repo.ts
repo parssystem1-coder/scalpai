@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { galleryItems } from "../schema.js";
 import { appendAudit } from "./core.repo.js";
+import { enqueueStorageOrphans } from "./storage-orphans.repo.js";
 import type { Tx } from "../tenant.js";
 
 export interface GalleryInitInput {
@@ -76,13 +77,19 @@ export async function completeGalleryItem(tx: Tx, clinicId: string, id: string, 
   return rows[0];
 }
 
-/** Rejected by the pipeline — pending row is removed and the object deleted. */
+/**
+ * Rejected by the pipeline — the pending row goes away and its object is QUEUED
+ * for deletion (WEAKNESSES M22). Previously the caller deleted the object with a
+ * swallowed `.catch()`: when that failed, an unreferenced image stayed in the
+ * bucket forever with nothing recording its existence.
+ */
 export async function deletePendingGalleryItem(tx: Tx, clinicId: string, id: string): Promise<boolean> {
   const rows = await tx
     .delete(galleryItems)
     .where(and(eq(galleryItems.clinicId, clinicId), eq(galleryItems.id, id), eq(galleryItems.uploadState, "pending")))
-    .returning({ id: galleryItems.id });
+    .returning({ id: galleryItems.id, storageKey: galleryItems.storageKey, thumbKey: galleryItems.thumbKey });
   if (!rows[0]) return false;
+  await enqueueStorageOrphans(tx, clinicId, [rows[0].storageKey, rows[0].thumbKey], "gallery.rejected");
   return true;
 }
 
@@ -148,6 +155,10 @@ export async function listGalleryByPatient(
   };
 }
 
+/**
+ * Soft delete keeps the object: the retention policy owns when the bytes go
+ * away, and that path runs through `executePurge` (M21), which queues the keys.
+ */
 export async function softDeleteGalleryItem(tx: Tx, clinicId: string, userId: string, id: string): Promise<boolean> {
   const rows = await tx
     .update(galleryItems)

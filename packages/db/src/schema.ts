@@ -43,6 +43,11 @@ export const refreshTokens = pgTable("refresh_tokens", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("refresh_tokens_hash_uq").on(t.tokenHash)]);
 
+/**
+ * `notesEncrypted` is an AES-256-GCM envelope (`phi.v1.<kid>.…`) since phase 6 —
+ * a CHECK constraint in 0012 refuses anything else, and `notesKeyId` records
+ * which key wrapped it so rotation knows what to re-wrap (WEAKNESSES C2).
+ */
 export const patients = pgTable("patients", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
@@ -52,6 +57,8 @@ export const patients = pgTable("patients", {
   gender: text("gender"),
   birthDate: date("birth_date"),
   notesEncrypted: text("notes_encrypted"),
+  notesKeyId: text("notes_key_id"),
+  notesUpdatedAt: timestamp("notes_updated_at", { withTimezone: true }),
   tags: text("tags").array().default([]),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -121,16 +128,27 @@ export const analyses = pgTable("analyses", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Phase 6 (M8): the signature itself lives in the object store. The row keeps a
+ * key, a digest, its size/MIME and the request context that produced it — enough
+ * to prove authenticity, small enough that a consent list is not a 5MB download.
+ */
 export const consents = pgTable("consents", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   patientId: uuid("patient_id").notNull(),
   serviceId: uuid("service_id"),
   templateVersion: text("template_version").notNull(),
-  signaturePayload: text("signature_payload").notNull(),
+  signatureKey: text("signature_key"),
+  signatureSha256: text("signature_sha256"),
+  signatureBytes: integer("signature_bytes"),
+  signatureMime: text("signature_mime"),
   signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow(),
   signedFromIp: text("signed_from_ip"),
+  signedUserAgent: text("signed_user_agent"),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedBy: uuid("revoked_by"),
+  revokedReason: text("revoked_reason"),
 });
 
 export const auditLog = pgTable("audit_log", {
@@ -144,6 +162,61 @@ export const auditLog = pgTable("audit_log", {
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   prevHash: text("prev_hash"),
   rowHash: text("row_hash").notNull(),
+});
+
+/** Signed Merkle roots over the audit chain (H17). Insert-only at the RLS level. */
+export const auditAnchors = pgTable("audit_anchors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  treeSize: integer("tree_size").notNull(),
+  firstLogId: bigint("first_log_id", { mode: "number" }).notNull(),
+  lastLogId: bigint("last_log_id", { mode: "number" }).notNull(),
+  lastRowHash: text("last_row_hash").notNull(),
+  merkleRoot: text("merkle_root").notNull(),
+  keyId: text("key_id"),
+  signature: text("signature"),
+  wormUri: text("worm_uri"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Objects whose row is gone — a failed delete is queued, never swallowed (M22). */
+export const storageOrphans = pgTable("storage_orphans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  storageKey: text("storage_key").notNull(),
+  reason: text("reason").notNull(),
+  state: text("state").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
+/** Per-clinic retention windows (M21). */
+export const retentionPolicies = pgTable("retention_policies", {
+  clinicId: uuid("clinic_id").notNull(),
+  entity: text("entity").notNull(),
+  retainDays: integer("retain_days").notNull(),
+  graceDays: integer("grace_days").notNull().default(30),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.clinicId, t.entity] })]);
+
+/** Patient purge with two-person approval and a grace window (M21). */
+export const purgeRequests = pgTable("purge_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  patientId: uuid("patient_id").notNull(),
+  scope: text("scope").array().notNull(),
+  reason: text("reason").notNull(),
+  state: text("state").notNull().default("requested"),
+  requestedBy: uuid("requested_by").notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: uuid("approved_by"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  executableAt: timestamp("executable_at", { withTimezone: true }),
+  executedAt: timestamp("executed_at", { withTimezone: true }),
+  evidence: jsonb("evidence"),
 });
 
 export const plans = pgTable("plans", {
@@ -173,6 +246,11 @@ export const usageCounters = pgTable("usage_counters", {
   value: bigint("value", { mode: "number" }).notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.clinicId, t.metric, t.periodStart] })]);
 
+/**
+ * Sync ledger. Phase 6 (H3): `payload` is the REDACTED delta — field names and
+ * ciphertext only. A CHECK constraint in 0012 rejects readable PHI keys, so a
+ * future code path cannot quietly start broadcasting notes again.
+ */
 export const mutations = pgTable("mutations", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   clinicId: uuid("clinic_id").notNull(),
