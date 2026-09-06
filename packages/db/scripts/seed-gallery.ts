@@ -12,7 +12,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
  * so the web gallery can be perf-tested (Lighthouse / virtualization).
  * Idempotent: skips when the patient already has >= N done items.
  *
- *   pnpm --filter @scalpai/app-api seed:gallery [--force] [count]
+ *   npm exec -- tsx packages/db/scripts/seed-gallery.ts [--force] [count]
  */
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   if (!pid) {
     pid = randomUUID();
     await pool.query(
-      "INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES ($1,$2,'گالری','پرفورمنس',$3)",
+      "INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES ($1,$2,'گالری','پرفورمانس',$3)",
       [pid, clinicId, `09120000000${Math.floor(Math.random() * 9)}`],
     );
   }
