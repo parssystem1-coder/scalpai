@@ -10,11 +10,22 @@ import { describe, expect, it } from "vitest";
  * config file. Config rots silently, so it gets tests exactly like code does:
  * CI additionally BUILDS the images and boots migrate+api from an empty volume
  * (.github/workflows/ci.yml, job `deployment`).
+ *
+ * Negative assertions run against the file with comment lines removed: a
+ * comment that documents a banned pattern is not the banned pattern.
  */
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf8");
+}
+
+/** Drops whole-line `#` comments (Dockerfile, YAML, .dockerignore). */
+function code(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .join("\n");
 }
 
 const prod = read("ops/prod.yml");
@@ -82,7 +93,7 @@ describe("C8 - runtime never uses the database owner role", () => {
   });
 
   it("reserves the owner credentials for the migration and the server itself", () => {
-    for (const line of prod.split("\n")) {
+    for (const line of code(prod).split("\n")) {
       if (!line.includes("${POSTGRES_USER:?")) continue;
       const ownerUsage = /MIGRATE_DATABASE_URL|POSTGRES_USER: |POSTGRES_USER=/.test(line);
       expect(ownerUsage, `owner credentials leaked into: ${line.trim()}`).toBe(true);
@@ -117,11 +128,12 @@ describe("C8/H16 - images build from the lockfile with real native modules", () 
     ["web", webDockerfile],
   ] as const) {
     it(`${name}: npm ci, no --ignore-scripts, turbo build`, () => {
-      expect(dockerfile).toContain("npm ci");
-      expect(dockerfile).not.toContain("npm install");
-      expect(dockerfile).not.toContain("--ignore-scripts");
-      expect(dockerfile).not.toContain("npm run build --filter");
-      expect(dockerfile).toContain("npm exec -- turbo run build --filter");
+      const directives = code(dockerfile);
+      expect(directives).toContain("npm ci");
+      expect(directives).not.toContain("npm install");
+      expect(directives).not.toContain("--ignore-scripts");
+      expect(directives).not.toContain("npm run build --filter");
+      expect(directives).toContain("npm exec -- turbo run build --filter");
     });
 
     it(`${name}: ships a container healthcheck`, () => {
@@ -130,20 +142,21 @@ describe("C8/H16 - images build from the lockfile with real native modules", () 
   }
 
   it("keeps the libvips toolchain for sharp", () => {
-    expect(apiDockerfile).toContain("vips-dev");
+    expect(code(apiDockerfile)).toContain("vips-dev");
   });
 
   it("has a .dockerignore that excludes host artifacts and secrets", () => {
-    const ignore = read(".dockerignore");
+    const ignore = code(read(".dockerignore"));
     for (const entry of ["node_modules", ".git", "dist", ".env", "ops/prod.env"]) {
       expect(ignore).toContain(entry);
     }
   });
 
   it("installs with npm ci in CI, without an npm install fallback", () => {
-    expect(ci).toContain("npm ci --legacy-peer-deps");
-    expect(ci).not.toContain("npm install");
-    expect(ci).not.toContain("if [ -f package-lock.json ]");
+    const steps = code(ci);
+    expect(steps).toContain("npm ci --legacy-peer-deps");
+    expect(steps).not.toContain("npm install");
+    expect(steps).not.toContain("if [ -f package-lock.json ]");
   });
 });
 
@@ -193,23 +206,25 @@ describe("M17 - runtime healthchecks, limits and pinned images", () => {
 
 describe("C8/R10 - Caddy terminates TLS on a real domain", () => {
   it("has automatic HTTPS enabled", () => {
-    expect(caddy).not.toContain("auto_https off");
-    expect(caddy).not.toMatch(/^:80 \{/m);
-    expect(caddy).toContain("{$SCALPAI_DOMAIN}");
-    expect(caddy).toContain("{$ACME_EMAIL}");
+    const directives = code(caddy);
+    expect(directives).not.toContain("auto_https off");
+    expect(directives).not.toMatch(/^:80 \{/m);
+    expect(directives).toContain("{$SCALPAI_DOMAIN}");
+    expect(directives).toContain("{$ACME_EMAIL}");
   });
 
   it("redirects plain HTTP to HTTPS", () => {
-    expect(caddy).toMatch(/http:\/\/\{\$SCALPAI_DOMAIN\}\s*\{\s*redir https:\/\//);
+    expect(code(caddy)).toMatch(/http:\/\/\{\$SCALPAI_DOMAIN\}\s*\{\s*redir https:\/\//);
   });
 
   it("forwards the /api prefix untouched (the API serves /api/v1)", () => {
-    expect(caddy).not.toContain("strip_prefix /api");
-    expect(caddy).toContain("reverse_proxy api:3000");
+    const directives = code(caddy);
+    expect(directives).not.toContain("strip_prefix /api");
+    expect(directives).toContain("reverse_proxy api:3000");
   });
 
   it("sends HSTS", () => {
-    expect(caddy).toContain("Strict-Transport-Security");
+    expect(code(caddy)).toContain("Strict-Transport-Security");
   });
 });
 

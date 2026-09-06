@@ -7,36 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  d-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci --legacy-peer-deps
-      - run: npm run lint
-
-  d-typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci --legacy-peer-deps
-      - run: npm run typecheck
-
-  d-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci --legacy-peer-deps
-      - run: npm run build
-
   d-ops-spec:
     runs-on: ubuntu-latest
     steps:
@@ -47,22 +17,23 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm exec -- vitest run tools/ops/deployment.phase4.spec.ts
 
-  d-guards:
+  d-image-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm ci --legacy-peer-deps
-      - run: npm run conformance
-      - run: npm run graph -- --check
+      - run: docker build -f apps/api/Dockerfile -t scalpai-api:ci .
 
-  d-compose:
+  d-image-web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: prod.yml renders with a full secret set
+      - run: docker build -f apps/web/Dockerfile -t scalpai-web:ci .
+
+  d-boot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secret set
         working-directory: ops
         run: |
           cat > ci.env <<'ENV'
@@ -78,4 +49,20 @@ jobs:
           JWT_SECRET=ci_dev_only_secret_0123456789abcdef
           BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase
           ENV
-          docker compose -f prod.yml --env-file ci.env config
+      - name: Build images
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env build api web
+      - name: Boot migrate + api + web from an empty volume
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
+      - name: Migration log
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env logs migrate
+      - name: Diagnostics
+        if: failure()
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env ps -a && docker compose -f prod.yml --env-file ci.env logs --tail 300
+      - name: Tear down
+        if: always()
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env down -v
