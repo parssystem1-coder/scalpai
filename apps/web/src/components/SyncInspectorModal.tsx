@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, Wifi, WifiOff, CheckCircle2, AlertCircle, ArrowUpRight, Database, X, GitCompare, Layers } from "lucide-react";
 import { useSync } from "../offline/SyncProvider.js";
-import { db, type OutboxRecord } from "../offline/db.js";
+import { listOutbox } from "../offline/sync.js";
+import type { OutboxRecord } from "../offline/db.js";
 import { formatDate } from "@scalpai/shared";
 
 interface SyncInspectorModalProps {
@@ -43,8 +44,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
 
   const loadOutbox = async () => {
     try {
-      const records = await db.outbox.orderBy("createdAt").toArray();
-      setOutboxItems(records);
+      setOutboxItems(await listOutbox());
     } catch {
       setOutboxItems([]);
     }

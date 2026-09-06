@@ -181,16 +181,35 @@ export const ConsentRevoke = z.object({
 });
 export type ConsentRevokeDto = z.infer<typeof ConsentRevoke>;
 
-/** §8 sync — one queued client mutation (payload shape is entity-specific). */
-export const SyncMutation = z.object({
-  clientMutationId: z.string().uuid(),
-  entity: z.enum(["patients", "treatment_plans", "analyses"]),
-  op: z.enum(["create", "update"]),
-  schemaVersion: z.number().int(),
-  clientUpdatedAt: z.string().datetime(),
-  baseVersion: z.string().nullable().optional(),
-  payload: z.record(z.string(), z.unknown()),
-});
+/**
+ * §8 sync — one queued client mutation (payload shape is entity-specific).
+ *
+ * Phase 7 (H6):
+ *  - `baseVersion` is the SERVER `row_version` the edit was based on, and it is
+ *    MANDATORY for `op: "update"`. A blind update is a lost update.
+ *  - `clientUpdatedAt` and `clientClockOffsetMs` are metadata. Nothing on the
+ *    server orders, merges or rejects by a device clock any more.
+ */
+export const SyncMutation = z
+  .object({
+    clientMutationId: z.string().uuid(),
+    entity: z.enum(["patients", "treatment_plans", "analyses"]),
+    op: z.enum(["create", "update"]),
+    schemaVersion: z.number().int().min(1).max(1000),
+    clientUpdatedAt: z.string().datetime(),
+    clientClockOffsetMs: z.number().int().min(-86_400_000).max(86_400_000).optional(),
+    baseVersion: z.number().int().min(1).nullable().optional(),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .superRefine((mutation, ctx) => {
+    if (mutation.op === "update" && (mutation.baseVersion === null || mutation.baseVersion === undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["baseVersion"],
+        message: "baseVersion برای op=update الزامی است",
+      });
+    }
+  });
 
 export const SyncPush = z.object({
   mutations: z.array(SyncMutation).min(1).max(100),
@@ -201,7 +220,38 @@ export const SyncPushResultItem = z.object({
   clientMutationId: z.string().uuid(),
   status: z.enum(["applied", "duplicate", "rejected"]),
   reason: z.string().optional(),
+  /** Fields the server kept because they changed after `baseVersion` (H6). */
+  conflicts: z.array(z.string()).optional(),
+  /** Row version after the write — the client's next `baseVersion`. */
+  rowVersion: z.number().int().optional(),
 });
+
+/**
+ * §8 — GET /sync/pull. The cursor is OPAQUE by contract: it encodes the writing
+ * transaction id and the server sequence, which is what makes it commit-safe
+ * (H5). A client must send back exactly what it received.
+ */
+export const SyncPullQuery = z.object({
+  cursor: z.string().max(64).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
+export type SyncPullQueryDto = z.infer<typeof SyncPullQuery>;
+
+export const SyncPullItem = z.object({
+  entity: z.string(),
+  op: z.string(),
+  payload: z.unknown(),
+  serverSeq: z.number().int(),
+  at: z.string(),
+  cursor: z.string(),
+});
+
+export const SyncPullPage = z.object({
+  items: z.array(SyncPullItem),
+  cursor: z.string(),
+  hasMore: z.boolean(),
+});
+export type SyncPullPageDto = z.infer<typeof SyncPullPage>;
 
 /**
  * Retention & purge (phase 6 / M21). `scope` is explicit on purpose: "delete the
@@ -247,5 +297,6 @@ export type AnalysisSubmit = z.infer<typeof AnalysisSubmit>;
 export type AnalysisSubmitDto = AnalysisSubmit;
 export type ExpertReview = z.infer<typeof ExpertReview>;
 export type ExpertReviewDto = ExpertReview;
+export type SyncMutationDto = z.infer<typeof SyncMutation>;
 export type SyncPush = z.infer<typeof SyncPush>;
 export type SyncPushDto = SyncPush;

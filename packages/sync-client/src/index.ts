@@ -1,18 +1,57 @@
-﻿export {
+export {
+  ENTITY_NAMES,
+  FLUSH_BATCH_SIZE,
+  FLUSH_MAX_ROUNDS,
+  OPS,
+  OUTBOX_MAX_ATTEMPTS,
+  PULL_INTERVAL_MS,
+  PULL_MAX_ROUNDS,
+  PULL_PAGE_SIZE,
+  RETRY_BASE_DELAY_MS,
+  RETRY_MAX_DELAY_MS,
   SCHEMA_VERSION_CURRENT,
   SUPPORTED_SCHEMA_VERSIONS,
+  isEntityName,
+  isOp,
   policyFor,
+  pullBackoffMs,
+  retryDelayMs,
+  type ConflictPolicy,
   type EntityName,
   type Op,
-  type ConflictPolicy,
 } from "./contract.js";
 export {
+  CURSOR_ZERO,
+  decodeCursor,
+  encodeCursor,
+  isCursorAhead,
+  type SyncCursor,
+} from "./cursor.js";
+export {
+  MutationContractError,
+  PermanentPushError,
+  assertEnvelope,
+  isBaseVersion,
+  isSchemaVersionSupported,
   makeMutation,
   newMutationId,
-  isSchemaVersionSupported,
   type MutationEnvelope,
   type PushItemResult,
   type PushItemStatus,
 } from "./mutation.js";
-export { mergeFieldLww, outboxPriority, type ServerRow, type FieldPatch, type MergeOutcome } from "./lww.js";
-export { Outbox } from "./outbox.js";
+export {
+  mergeFieldLww,
+  outboxPriority,
+  type FieldPatch,
+  type MergeOutcome,
+  type MergeRejection,
+  type ServerRow,
+} from "./lww.js";
+export {
+  Outbox,
+  flushOutbox,
+  type FlushReport,
+  type FlushStop,
+  type OutboxItem,
+  type OutboxStore,
+} from "./outbox.js";

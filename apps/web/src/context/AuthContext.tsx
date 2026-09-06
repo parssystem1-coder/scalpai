@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { getAccessToken, setAccessToken, clearAccessToken } from "../api/client.js";
+import { closeOfflineScope, purgeLegacyOfflineDb } from "../offline/db.js";
 
 export interface AuthUser {
   email: string;
@@ -59,6 +60,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
+    // WEAKNESSES H8: the offline database is per clinic+user and must not survive
+    // a logout — the next person at this terminal is a different clinician.
+    // Both helpers swallow their own errors, so a logout can never fail on this.
+    void closeOfflineScope({ wipe: true });
+    void purgeLegacyOfflineDb();
   };
 
   return (

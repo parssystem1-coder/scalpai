@@ -1,50 +1,59 @@
-import type { MutationEnvelope } from "./mutation.js";
 import { policyFor } from "./contract.js";
+import { isBaseVersion, type MutationEnvelope } from "./mutation.js";
 
+/**
+ * Field-level merge for patients / treatment_plans (§8).
+ *
+ * WEAKNESSES H6: the previous implementation compared `clientUpdatedAt` with the
+ * server's `updated_at`. That made data loss a function of device clocks — a
+ * phone an hour ahead won every conflict, and a phone an hour behind silently
+ * lost every edit it made.
+ *
+ * The only ordering input now is a SERVER counter:
+ *  - `row_version`    — bumped by a database trigger on every update
+ *  - `field_versions` — per field, the row_version at which the server last
+ *                       changed that field
+ *
+ * A field applies when the server has not touched it since the client's base
+ * version. Anything else stays server-owned and is REPORTED as a conflict, so
+ * neither side's field is lost and the client can re-apply on a fresh base.
+ */
 export interface ServerRow {
-  /** server-side updatedAt — the ONLY clock LWW trusts (DESIGN §8) */
-  updatedAt: string;
-  [field: string]: unknown;
+  rowVersion: number;
+  fieldVersions: Record<string, number>;
 }
 
 export interface FieldPatch {
   [field: string]: unknown;
 }
 
-export type MergeOutcome =
-  | { action: "apply"; fields: FieldPatch } // server accepts client patch
-  | { action: "server-wins"; fields: FieldPatch } // conflicting fields stay server-owned
-  | { action: "rejected-stale-base" }; // baseVersion mismatch → pull & re-apply
+export type MergeRejection = "missing-base-version" | "unknown-base-version";
 
-/**
- * Field-level LWW merge (§8) for patients / treatment_plans.
- * - stale base ⇒ rejected-stale-base (client must pull & retry)
- * - per field: newer clientUpdatedAt wins; ties/unknown ⇒ server keeps
- * The result NEVER loses a non-conflicting field from either side.
- */
-export function mergeFieldLww(
-  serverRow: ServerRow,
-  mutation: MutationEnvelope<FieldPatch>,
-): MergeOutcome {
+export type MergeOutcome =
+  | { action: "apply"; fields: FieldPatch; conflicts: string[] }
+  | { action: "rejected"; reason: MergeRejection };
+
+export function mergeFieldLww(serverRow: ServerRow, mutation: MutationEnvelope<FieldPatch>): MergeOutcome {
   if (policyFor(mutation.entity) !== "field-lww") {
     throw new Error(`mergeFieldLww is not applicable to ${mutation.entity}`);
   }
-  if (mutation.baseVersion && mutation.baseVersion !== serverRow.updatedAt) {
-    return { action: "rejected-stale-base" };
-  }
+  const base = mutation.baseVersion;
+  if (!isBaseVersion(base)) return { action: "rejected", reason: "missing-base-version" };
+  // A base the server never issued means the client invented a version.
+  if (base > serverRow.rowVersion) return { action: "rejected", reason: "unknown-base-version" };
 
-  const patch = mutation.payload;
-  const fields: FieldPatch = { ...patch };
-  const clientAt = Date.parse(mutation.clientUpdatedAt);
-  const serverAt = Date.parse(serverRow.updatedAt);
-
-  for (const key of Object.keys(patch)) {
-    if (!(key in serverRow)) continue; // new field → client wins trivially
-    if (!Number.isFinite(clientAt) || !Number.isFinite(serverAt) || serverAt >= clientAt) {
-      delete fields[key]; // server copy is equal/newer → keep server value
+  const fields: FieldPatch = {};
+  const conflicts: string[] = [];
+  for (const [key, value] of Object.entries(mutation.payload)) {
+    const fieldVersion = serverRow.fieldVersions[key] ?? 0;
+    if (fieldVersion > base) {
+      conflicts.push(key);
+      continue;
     }
+    fields[key] = value;
   }
-  return { action: "apply", fields };
+  conflicts.sort();
+  return { action: "apply", fields, conflicts };
 }
 
 /** Outbox ordering: mutations first, then heavy media — encoded as priority. */

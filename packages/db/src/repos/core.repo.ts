@@ -109,7 +109,14 @@ export async function verifyChain(tx: Tx, clinicId?: string): Promise<boolean> {
 
 // ---------------- Patients ----------------
 
-/** Columns a patient read may return. `notes_encrypted` is deliberately absent. */
+/**
+ * Columns a patient read may return. `notes_encrypted` is deliberately absent.
+ *
+ * Phase 7 (H6): `rowVersion` IS part of a read. A sync update must declare the
+ * version it was based on, so a client that cannot see the version cannot write
+ * safely — it would have to guess, which is exactly the bug the version counter
+ * replaced.
+ */
 const PATIENT_COLUMNS = {
   id: patients.id,
   clinicId: patients.clinicId,
@@ -119,6 +126,7 @@ const PATIENT_COLUMNS = {
   gender: patients.gender,
   birthDate: patients.birthDate,
   tags: patients.tags,
+  rowVersion: patients.rowVersion,
   notesKeyId: patients.notesKeyId,
   notesUpdatedAt: patients.notesUpdatedAt,
   createdBy: patients.createdBy,
@@ -140,6 +148,7 @@ export async function listPatients(
       firstName: patients.firstName,
       lastName: patients.lastName,
       phone: patients.phone,
+      rowVersion: patients.rowVersion,
       createdAt: patients.createdAt,
     })
     .from(patients)
