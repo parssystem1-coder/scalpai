@@ -26,6 +26,15 @@ const webDockerfile = read("apps/web/Dockerfile");
 const rootPkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
 const apiPkg = JSON.parse(read("apps/api/package.json")) as { scripts: Record<string, string> };
 
+const SERVICES = ["caddy", "web", "migrate", "api", "postgres", "minio", "redis", "backup-cron"];
+
+/** Everything between `services:` and the trailing `volumes:` block. */
+function servicesBlock(text: string): string {
+  const start = text.indexOf("\nservices:");
+  const end = text.indexOf("\nvolumes:");
+  return text.slice(start, end === -1 ? undefined : end);
+}
+
 /** Every `${VAR...}` reference in a compose file, with its default/error suffix. */
 function composeVars(text: string): { name: string; raw: string }[] {
   return [...text.matchAll(/\$\{([A-Z0-9_]+)([^}]*)\}/g)].map((m) => ({ name: m[1]!, raw: m[2]! }));
@@ -57,9 +66,8 @@ describe("C8 - production secrets have no fallbacks", () => {
     ]);
     for (const { name, raw } of composeVars(prod)) {
       if (!mustBeRequired.has(name)) continue;
-      expect(raw.startsWith(":?"), `${name} must be declared as \${${name}:?...}, got \${${name}${raw}}`).toBe(true);
+      expect(raw.startsWith(":?"), `${name} must be declared as \${${name}:?...}`).toBe(true);
     }
-    // and each of them is actually referenced somewhere
     for (const name of mustBeRequired) expect(prod).toContain(`\${${name}:?`);
   });
 });
@@ -73,7 +81,7 @@ describe("C8 - runtime never uses the database owner role", () => {
     for (const url of runtime) expect(url).toContain("postgres://scalpai_app:");
   });
 
-  it("reserves the owner credentials for MIGRATE_DATABASE_URL only", () => {
+  it("reserves the owner credentials for the migration and the server itself", () => {
     for (const line of prod.split("\n")) {
       if (!line.includes("${POSTGRES_USER:?")) continue;
       const ownerUsage = /MIGRATE_DATABASE_URL|POSTGRES_USER: |POSTGRES_USER=/.test(line);
@@ -149,10 +157,10 @@ describe("M17 - runtime healthchecks, limits and pinned images", () => {
   });
 
   it("gives every service a resource ceiling", () => {
-    const services = [...prod.matchAll(/^ {2}([a-z-]+):$/gm)].map((m) => m[1]!).filter((s) => s !== "volumes");
-    expect(services.length).toBeGreaterThanOrEqual(7);
-    const limits = [...prod.matchAll(/limits:/g)].length;
-    expect(limits).toBe(services.length);
+    const block = servicesBlock(prod);
+    const services = [...block.matchAll(/^ {2}([a-z][a-z-]*):$/gm)].map((m) => m[1]!);
+    expect(services).toEqual(SERVICES);
+    expect([...block.matchAll(/limits:/g)]).toHaveLength(SERVICES.length);
   });
 
   it("pins every image (no :latest, no bare repository)", () => {
@@ -171,7 +179,6 @@ describe("M17 - runtime healthchecks, limits and pinned images", () => {
       }),
     );
     expect([...majors]).toHaveLength(1);
-    // pg_dump in the backup container must match the server major
     const backupMajor = /postgres:(\d+)-alpine/.exec(prod)?.[1];
     expect(backupMajor).toBe([...majors][0]);
   });
@@ -193,7 +200,7 @@ describe("C8/R10 - Caddy terminates TLS on a real domain", () => {
   });
 
   it("redirects plain HTTP to HTTPS", () => {
-    expect(caddy).toMatch(/http:\/\/\{\$SCALPAI_DOMAIN\}\s*\{\s*\n\s*redir https:\/\//);
+    expect(caddy).toMatch(/http:\/\/\{\$SCALPAI_DOMAIN\}\s*\{\s*redir https:\/\//);
   });
 
   it("forwards the /api prefix untouched (the API serves /api/v1)", () => {
