@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۶ پیاده‌سازی شد (PR #42 — phi-crypto, merkle, report-seal, canonical-json, PHI privacy, retention/purge, orphan reconciliation, scrubbed logging). مایگریشن 0012 اعمال شد، تست‌های phi-crypto/merkle/report-seal/canonical-json/phi/audit-anchor همه سبز.**
+> وضعیت: **فاز ۷ پیاده‌سازی شد (PR #43 — sync contract، مایگریشن 0013، cursor پایدار commit-safe، ledger فقط applied، ایزولاسیون SAVEPOINT، dedupe کلینیک‌محور، LWW سروری، Dexie اتمیک، dead-letter و پاک‌سازی logout). فاز ۶ پیش‌تر در PR #42 بسته شد.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -149,17 +149,17 @@
 
 **هدف خروج:** push/pull، retry، dedupe و conflict resolution داده را از دست ندهند.
 
-- [ ] **H2** کلاینت `sync/pull` را با cursor پایدار، mount، online event و polling/backoff پیاده کند.
-- [ ] **H3** mutation ledger فقط applied و delta واقعی فیلترشده را ثبت کند؛ payload ردشده پخش نشود.
-- [ ] **H4** هر mutation با SAVEPOINT یا transaction مستقل isolate شود؛ خطای یک آیتم کل batch را rollback نکند.
-- [ ] **H4** unique index به `(clinic_id, client_mutation_id)` اصلاح و dedupe cross-tenant تست شود.
-- [ ] **H5** cursor بر مبنای commit-safe ordering طراحی شود؛ sequence قبل از commit نباید باعث skip شود.
-- [ ] **H6** baseVersion الزامی و schema version محدود به نسخه موجود شود؛ clock skew فقط metadata باشد.
-- [ ] **H6** LWW به version/counter سروری متکی شود، نه clock کلاینت؛ conflict test چند دستگاه اضافه شود.
-- [ ] **C9** Dexie از `clear()+bulkAdd` جداگانه به transaction اتمیک/put تکی منتقل شود.
-- [ ] **C9** rejectedها dead-letter، retry count، backoff و maxRounds داشته باشند؛ while نامحدود حذف شود.
-- [ ] **H8** DB آفلاین per clinic/user باشد و logout آن را پاک یا invalidate کند.
-- [ ] **M6** sync با token کاربر فعلی و clinic queue تطبیق دهد.
+- [x] **H2** کلاینت `sync/pull` را با cursor پایدار، mount، online event و polling/backoff پیاده کند.
+- [x] **H3** mutation ledger فقط applied و delta واقعی فیلترشده را ثبت کند؛ payload ردشده پخش نشود.
+- [x] **H4** هر mutation با SAVEPOINT یا transaction مستقل isolate شود؛ خطای یک آیتم کل batch را rollback نکند.
+- [x] **H4** unique index به `(clinic_id, client_mutation_id)` اصلاح و dedupe cross-tenant تست شود.
+- [x] **H5** cursor بر مبنای commit-safe ordering طراحی شود؛ sequence قبل از commit نباید باعث skip شود.
+- [x] **H6** baseVersion الزامی و schema version محدود به نسخه موجود شود؛ clock skew فقط metadata باشد.
+- [x] **H6** LWW به version/counter سروری متکی شود، نه clock کلاینت؛ conflict test چند دستگاه اضافه شود.
+- [x] **C9** Dexie از `clear()+bulkAdd` جداگانه به transaction اتمیک/put تکی منتقل شود.
+- [x] **C9** rejectedها dead-letter، retry count، backoff و maxRounds داشته باشند؛ while نامحدود حذف شود.
+- [x] **H8** DB آفلاین per clinic/user باشد و logout آن را پاک یا invalidate کند.
+- [x] **M6** sync با token کاربر فعلی و clinic queue تطبیق دهد.
 
 **شرط تکمیل فاز:** تست دو دستگاه، قطع برق/تب، conflict، rejected mutation، duplicate mutation و cursor pagination.
 
@@ -242,7 +242,7 @@
 - [x] فاز ۴: زیرساخت self-hosted و استقرار امن (تکمیل — ADR-0036، سرویس migrate یک‌باره، secretهای اجباری، TLS واقعی، pin ایمیج‌ها، تست رگرسیون tools/ops/deployment.phase4.spec.ts و job `deployment` در CI که ایمیج‌ها را build و استک را از DB خالی بوت می‌کند)
 - [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی (تکمیل — ADR-0037، زنجیره شواهد `ci-evidence` و job `gate` که PASS بدون لاگ را رد می‌کند، coverage اپ‌ها علاوه بر پکیج‌ها، e2e smoke روی هر PR + nightly کامل، audit/CodeQL/Dependabot/secret-scan، image scan و تست رگرسیون tools/ci/pipeline.phase5.spec.ts)
 - [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی (تکمیل — PR #42، مایگریشن 0012، phi-crypto AES-256-GCM با key ring و AAD binding، Merkle tree واقعی با inclusion proof، report seal Ed25519، canonical JSON، PHI scrubbing در لاگ و ledger، retention/purge با دو نفر امضا، orphan reconciliation، privacy controller و boot gate)
-- [ ] فاز ۷: sync چنددستگاهی و offline correctness
+- [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [ ] فاز ۸: مدیا، آپلود و سهمیه
 - [ ] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد
 - [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی
