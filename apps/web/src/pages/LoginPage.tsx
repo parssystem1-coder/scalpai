@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest, type LoginRequest as LoginDto } from "@scalpai/shared";
-import { apiFetch, setAccessToken } from "../api/client.js";
+import { apiFetch } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.js";
 import {
   User,
@@ -18,13 +18,15 @@ import {
 import LuxuryFeminineBackground from "../components/LuxuryFeminineBackground.js";
 import LuxuryTiltCard from "../components/LuxuryTiltCard.js";
 
-type TokenPair = { accessToken: string; refreshToken: string };
+type TokenPair = { accessToken: string; user: { id: string; clinicId: string; role: string; email?: string } };
+
+const isDev = import.meta.env.DEV;
 
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState<"owner" | "tricho">("owner");
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
 
   const {
@@ -34,10 +36,9 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     formState: { errors, isSubmitting },
   } = useForm<LoginDto>({
     resolver: zodResolver(LoginRequest),
-    defaultValues: {
-      email: "owner@clinic-a.test",
-      password: "Dev12345!",
-    },
+    defaultValues: isDev
+      ? { email: "owner@clinic-a.test", password: "Dev12345!" }
+      : { email: "", password: "" },
   });
 
   const onSubmit = handleSubmit(async (dto) => {
@@ -47,14 +48,12 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         method: "POST",
         body: JSON.stringify(dto),
       });
-      setAccessToken(pair.accessToken, rememberMe);
       login(
         pair.accessToken,
         {
-          email: dto.email,
-          name: activeRole === "owner" ? "مدیر کلینیک" : "دکتر تریکولوژیست",
-          role: activeRole,
-          clinicId: "clinic-a",
+          email: pair.user.email ?? dto.email,
+          role: pair.user.role,
+          clinicId: pair.user.clinicId,
         },
         rememberMe,
       );
@@ -205,62 +204,64 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             </p>
           </div>
 
-          {/* Demo Account Switcher */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "1.4rem",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => handleQuickRole("owner")}
+          {/* Quick Role Switcher — dev/test only */}
+          {isDev && (
+            <div
               style={{
-                flex: 1,
-                padding: "6px 10px",
-                borderRadius: "10px",
-                border: activeRole === "owner" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
-                background: activeRole === "owner" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
-                color: activeRole === "owner" ? "#8A3D4B" : "#80666C",
-                fontSize: "0.75rem",
-                fontWeight: 600,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: "5px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
+                gap: "8px",
+                marginBottom: "1.4rem",
               }}
             >
-              <Crown size={13} />
-              Clinic Director
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickRole("tricho")}
-              style={{
-                flex: 1,
-                padding: "6px 10px",
-                borderRadius: "10px",
-                border: activeRole === "tricho" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
-                background: activeRole === "tricho" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
-                color: activeRole === "tricho" ? "#8A3D4B" : "#80666C",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "5px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <Stethoscope size={13} />
-              Trichologist
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => handleQuickRole("owner")}
+                style={{
+                  flex: 1,
+                  padding: "6px 10px",
+                  borderRadius: "10px",
+                  border: activeRole === "owner" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
+                  background: activeRole === "owner" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                  color: activeRole === "owner" ? "#8A3D4B" : "#80666C",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "5px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Crown size={13} />
+                Clinic Director
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickRole("tricho")}
+                style={{
+                  flex: 1,
+                  padding: "6px 10px",
+                  borderRadius: "10px",
+                  border: activeRole === "tricho" ? "1px solid rgba(196, 125, 136, 0.6)" : "1px solid rgba(255, 255, 255, 0.6)",
+                  background: activeRole === "tricho" ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.4)",
+                  color: activeRole === "tricho" ? "#8A3D4B" : "#80666C",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "5px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Stethoscope size={13} />
+                Trichologist
+              </button>
+            </div>
+          )}
 
           {/* Form */}
           <form

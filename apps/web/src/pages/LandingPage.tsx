@@ -32,11 +32,10 @@ const MOLECULES: MoleculeInfo[] = [
 ];
 
 export interface LandingProps {
-  onLoginSuccess: (email: string) => void;
   showToast: (title: string, desc: string) => void;
 }
 
-export const LandingPage: React.FC<LandingProps> = ({ onLoginSuccess, showToast }) => {
+export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabMode>("signin");
   const [isDemoActive, setIsDemoActive] = useState(false);
@@ -140,18 +139,14 @@ export const LandingPage: React.FC<LandingProps> = ({ onLoginSuccess, showToast 
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
+          <Link
             id="quick-portal-btn"
-            type="button"
-            onClick={() => {
-              onLoginSuccess("tricho@scalpai.clinic");
-              navigate("/dashboard");
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-[oklch(62%_0.09_16/0.6)] bg-white/70 hover:bg-white text-[oklch(50%_0.095_12)] shadow-sm backdrop-blur-sm transition-all cursor-pointer"
+            to="/login"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.72rem] tracking-wider uppercase font-semibold border border-[oklch(62%_0.09_16/0.6)] bg-white/70 hover:bg-white text-[oklch(50%_0.095_12)] shadow-sm backdrop-blur-sm transition-all"
           >
             <Microscope className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-            <span>ورود به پنل تریکولوژیست</span>
-          </button>
+            <span>ورود به پنل</span>
+          </Link>
 
           <Link
             to="/patients"
@@ -233,16 +228,11 @@ export const LandingPage: React.FC<LandingProps> = ({ onLoginSuccess, showToast 
 
             {activeTab === "signin" && (
               <SignInForm
-                onSubmit={(data) => {
-                  const email = data.username.includes("@") ? data.username : `${data.username}@scalpai.clinic`;
-                  onLoginSuccess(email);
-                  showToast("ورود موفق", `خوش آمدید ${data.username}. در حال انتقال به پنل بالینی...`);
-                  navigate("/dashboard");
+                onSubmit={() => {
+                  navigate("/login");
                 }}
-                onDemoLogin={(provider) => {
-                  onLoginSuccess(`demo.${provider.toLowerCase()}@scalpai.clinic`);
-                  showToast("حالت دمو", `شما از طریق ${provider} وارد داشبورد کلینیک شدید.`);
-                  navigate("/dashboard");
+                onDemoLogin={() => {
+                  navigate("/login");
                 }}
                 onForgotPassword={() => showToast("بازیابی رمز", "لینک بازنشانی رمز به ایمیل ارسال شد.")}
               />
@@ -250,11 +240,8 @@ export const LandingPage: React.FC<LandingProps> = ({ onLoginSuccess, showToast 
 
             {activeTab === "register" && (
               <RegisterForm
-                onSubmit={(data) => {
-                  const email = data.email || `${data.fullName}@scalpai.clinic`;
-                  onLoginSuccess(email);
-                  showToast("حساب ایجاد شد", `خوش آمدید ${data.fullName}. وارد پنل بالینی شدید.`);
-                  navigate("/dashboard");
+                onSubmit={() => {
+                  navigate("/login");
                 }}
               />
             )}
