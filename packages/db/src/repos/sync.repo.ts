@@ -1,5 +1,12 @@
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { mergeFieldLww, isSchemaVersionSupported, type MutationEnvelope, type PushItemResult } from "@scalpai/sync-client";
+import {
+  canonicalObject,
+  isPhiCiphertext,
+  isSensitiveKey,
+  payloadFieldNames,
+  redactPhiPayload,
+} from "@scalpai/shared";
 import { analyses, mutations, patients, treatmentPlans } from "../schema.js";
 import { appendAudit } from "./core.repo.js";
 import type { Tx } from "../tenant.js";
@@ -13,8 +20,27 @@ interface PushCtx {
 
 /* ── Safe patch whitelist (prevents payload from touching clinic_id, id, etc.) */
 
+/**
+ * Phase 6 (C2/H3): `notesEncrypted` stays patchable because it is CIPHERTEXT —
+ * a device that can read a note already holds the plaintext, and the server
+ * never sees it. Readable note fields are not on the list at all, and a mutation
+ * that carries one is REJECTED rather than silently stripped: a client that
+ * tries is broken, and the operator should find out.
+ */
 const SAFE_PATIENT_FIELDS = new Set(["firstName", "lastName", "phone", "gender", "birthDate", "notesEncrypted", "tags"]);
 const SAFE_PLAN_FIELDS = new Set(["items", "startDate", "reviewIntervals"]);
+
+/** Keys that must never appear in a mutation payload (mirrors the 0012 CHECK). */
+function findForbiddenPhi(payload: Record<string, unknown>): string | null {
+  for (const [key, value] of Object.entries(payload)) {
+    if (key === "notesEncrypted") {
+      if (value !== null && !isPhiCiphertext(value)) return key;
+      continue;
+    }
+    if (isSensitiveKey(key) && !isPhiCiphertext(value)) return key;
+  }
+  return null;
+}
 
 /* ── Per-entity apply ────────────────────────────────────────────────────── */
 
@@ -30,7 +56,7 @@ async function applyPatientCreate(ctx: PushCtx, env: MutationEnvelope): Promise<
       birthDate: (env.payload.birthDate as string) ?? null,
       createdBy: ctx.userId,
     })
-    .returning();
+    .returning({ id: patients.id });
   await appendAudit(ctx.tx, { clinicId: ctx.clinicId, userId: ctx.userId, action: "sync.patients.create", entity: "patient", entityId: row[0]!.id });
   return { clientMutationId: env.clientMutationId, status: "applied" };
 }
@@ -52,11 +78,16 @@ async function applyPatientUpdate(ctx: PushCtx, env: MutationEnvelope): Promise<
 
   const fields: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(merge.fields)) {
-    if (SAFE_PATIENT_FIELDS.has(k)) fields[k] = v;
+    if (!SAFE_PATIENT_FIELDS.has(k)) continue;
+    // Belt and braces: the DB CHECK would reject the ledger row anyway.
+    if (k === "notesEncrypted" && v !== null && !isPhiCiphertext(v)) {
+      return { clientMutationId: env.clientMutationId, status: "rejected", reason: "notesEncrypted must be a phi.v1 ciphertext" };
+    }
+    fields[k] = v;
   }
   if (Object.keys(fields).length === 0) return { clientMutationId: env.clientMutationId, status: "applied" };
   await ctx.tx.update(patients).set(fields).where(and(eq(patients.clinicId, ctx.clinicId), eq(patients.id, id)));
-  await appendAudit(ctx.tx, { clinicId: ctx.clinicId, userId: ctx.userId, action: "sync.patients.update", entity: "patient", entityId: id, meta: { fields: Object.keys(fields) } });
+  await appendAudit(ctx.tx, { clinicId: ctx.clinicId, userId: ctx.userId, action: "sync.patients.update", entity: "patient", entityId: id, meta: { fields: Object.keys(fields).sort() } });
   return { clientMutationId: env.clientMutationId, status: "applied" };
 }
 
@@ -72,7 +103,7 @@ async function applyPlanCreate(ctx: PushCtx, env: MutationEnvelope): Promise<Pus
       startDate: (env.payload.startDate as string) ?? null,
       reviewIntervals: env.payload.reviewIntervals ?? null,
     })
-    .returning();
+    .returning({ id: treatmentPlans.id });
   await appendAudit(ctx.tx, { clinicId: ctx.clinicId, userId: ctx.userId, action: "sync.treatment_plans.create", entity: "treatment_plan", entityId: row[0]!.id });
   return { clientMutationId: env.clientMutationId, status: "applied" };
 }
@@ -128,6 +159,10 @@ async function applyEntity(ctx: PushCtx, env: MutationEnvelope): Promise<PushIte
 /**
  * §8 push: apply a batch of client mutations. Each item is independent —
  * one failure doesn't abort the rest. Deduped by clientMutationId.
+ *
+ * Phase 6 (H3): the LEDGER row is not the client payload any more. It is the
+ * redacted delta — field names, ids and ciphertext. The ledger is replayed to
+ * every other device on pull, so anything readable stored here is a broadcast.
  */
 export async function processPushBatch(
   ctx: PushCtx,
@@ -150,6 +185,16 @@ export async function processPushBatch(
       results.push({ clientMutationId: env.clientMutationId, status: "rejected", reason: `unsupported schemaVersion ${env.schemaVersion}` });
       continue;
     }
+    const forbidden = findForbiddenPhi(env.payload);
+    if (forbidden) {
+      results.push({
+        clientMutationId: env.clientMutationId,
+        status: "rejected",
+        reason: `field '${forbidden}' carries plaintext PHI — encrypt it before syncing`,
+      });
+      continue;
+    }
+
     const res = await applyEntity(ctx, env);
     await ctx.tx.insert(mutations).values({
       clinicId: ctx.clinicId,
@@ -157,7 +202,11 @@ export async function processPushBatch(
       clientMutationId: env.clientMutationId,
       entity: env.entity,
       op: env.op,
-      payload: env.payload,
+      payload: canonicalObject<object>({
+        ...redactPhiPayload(env.payload),
+        // Peers need to know WHICH fields changed even when a value was dropped.
+        _fields: payloadFieldNames(env.payload),
+      }),
     });
     results.push(res);
   }
