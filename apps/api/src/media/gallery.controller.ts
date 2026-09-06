@@ -13,6 +13,7 @@ import {
   listGalleryByPatient,
   softDeleteGalleryItem,
 } from "@scalpai/db";
+import { RateLimit } from "../common/rate-limit.guard.js";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
 import { TenantScope } from "../tenancy/tenant.scope.js";
@@ -27,6 +28,10 @@ const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks for multipart upload
  * the client uploads directly to MinIO, and `complete` runs the server-side
  * gauntlet — magic bytes, EXIF-strip/auto-orient, resolution cap, thumbnail,
  * quality gate — before the item ever becomes `done`.
+ *
+ * Every upload entry point carries a per-clinic rate budget (WEAKNESSES L4):
+ * `complete` runs sharp on a full-size image, so an unbounded burst is an OOM,
+ * not just a slow response.
  */
 @Controller()
 export class GalleryController {
@@ -34,6 +39,7 @@ export class GalleryController {
 
   @Post("patients/:pid/gallery/init")
   @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload", 120)
   async init(@Param("pid") pid: string, @Body(new ZodBodyPipe(GalleryInit)) dto: GalleryInitDto) {
     const ext = MIME_TO_KIND[dto.mime];
     const rest = `gallery/${randomUUID()}/original.${ext}`;
@@ -53,6 +59,7 @@ export class GalleryController {
   /** §Multipart: init for large files (>8MB). Returns presigned URLs for each chunk. */
   @Post("patients/:pid/gallery/init-multipart")
   @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload", 120)
   async initMultipart(@Param("pid") pid: string, @Body(new ZodBodyPipe(GalleryInit)) dto: GalleryInitDto) {
     const ext = MIME_TO_KIND[dto.mime];
     const rest = `gallery/${randomUUID()}/original.${ext}`;
@@ -74,6 +81,7 @@ export class GalleryController {
   /** §Multipart: complete with ETags from each part upload. */
   @Post("gallery/:gid/complete-multipart")
   @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload", 120)
   @HttpCode(HttpStatus.OK)
   async completeMultipart(
     @Param("gid") gid: string,
@@ -89,6 +97,7 @@ export class GalleryController {
 
   @Post("gallery/:gid/complete")
   @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload", 120)
   @HttpCode(HttpStatus.OK) // action endpoint — the item already exists
   async complete(@Param("gid") gid: string): Promise<unknown> {
     const ctx = this.scope.requireCtx();
