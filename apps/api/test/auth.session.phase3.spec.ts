@@ -105,6 +105,12 @@ afterAll(async () => {
     if (app) await app.close();
   } finally {
     await db?.close();
+    // Suites share a worker process: never leave a tightened budget behind.
+    delete process.env.RATE_LIMIT_SYNC_PULL_MAX;
+    delete process.env.AUTH_IP_MAX;
+    delete process.env.AUTH_REFRESH_IP_MAX;
+    delete process.env.AUTH_LOGOUT_IP_MAX;
+    delete process.env.AUTH_PRINCIPAL_TTL_MS;
   }
 }, 30_000);
 
@@ -143,11 +149,12 @@ describe("atomic refresh rotation under concurrency (R4/H1)", () => {
 
     const rows = await migrateSql<{ total: string; replaced: string; live: string }>(
       migrateUrl(),
-      `SELECT count(*)::text AS total,
-              count(replaced_by)::text AS replaced,
-              count(*) FILTER (WHERE revoked_at IS NULL)::text AS live
-         FROM refresh_tokens
-        WHERE user_id = (SELECT id FROM users WHERE lower(email) = lower($1))`,
+      `SELECT
+         (SELECT count(*)::text FROM refresh_tokens rt WHERE rt.user_id = u.id) AS total,
+         (SELECT count(rt.replaced_by)::text FROM refresh_tokens rt WHERE rt.user_id = u.id) AS replaced,
+         (SELECT count(*)::text FROM refresh_tokens rt WHERE rt.user_id = u.id AND rt.revoked_at IS NULL) AS live
+       FROM users u
+      WHERE lower(u.email) = lower($1)`,
       [OWNER],
     );
     expect(rows[0]).toMatchObject({ total: "4", replaced: "3", live: "1" });
@@ -243,8 +250,7 @@ describe("per-clinic rate budget on expensive endpoints (L4)", () => {
       statuses.push(res.status);
     }
     expect(statuses[0]).toBe(200);
-    const limited = statuses.filter((s) => s === 429);
-    expect(limited.length).toBeGreaterThan(0);
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThan(0);
 
     // Same clinic, different user, same bucket — the budget is tenant-scoped.
     const colleagueToken = await accessToken(SECOND_USER);
