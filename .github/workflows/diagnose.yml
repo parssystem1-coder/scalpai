@@ -1,0 +1,81 @@
+# TEMPORARY (phase 4 review aid): one job per root gate so a red pipeline
+# points at the exact gate. Deleted before merge.
+name: diagnose
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  d-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npm run lint
+
+  d-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npm run typecheck
+
+  d-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build
+
+  d-ops-spec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npm exec -- vitest run tools/ops/deployment.phase4.spec.ts
+
+  d-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npm run conformance
+      - run: npm run graph -- --check
+
+  d-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: prod.yml renders with a full secret set
+        working-directory: ops
+        run: |
+          cat > ci.env <<'ENV'
+          SCALPAI_DOMAIN=clinic.example.com
+          ACME_EMAIL=admin@example.com
+          POSTGRES_USER=scalpai_owner
+          POSTGRES_PASSWORD=ci_dev_only_owner_pwd
+          POSTGRES_DB=scalpai
+          APP_ROLE_PASSWORD=ci_dev_only_app_pwd
+          MINIO_ROOT_USER=scalpai_admin
+          MINIO_ROOT_PASSWORD=ci_dev_only_minio_pwd
+          S3_BUCKET=scalpai-media
+          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
+          BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase
+          ENV
+          docker compose -f prod.yml --env-file ci.env config
