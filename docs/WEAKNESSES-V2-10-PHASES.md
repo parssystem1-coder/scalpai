@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۴ پیاده‌سازی شد (branch feat/phase4-selfhosted-deploy). یک توپولوژی رسمی استقرار، سرویس مهاجرت مستقل، حذف secretهای پیش‌فرض، TLS واقعی و بیلد/بوت اثبات‌شده در CI.**
+> وضعیت: **فاز ۵ پیاده‌سازی شد (branch feat/phase5-cicd-gatekeeping). هر گیت شواهد ثبت‌شده دارد، job `gate` هیچ PASS بدون لاگ را نمی‌پذیرد، coverage به API و مسیرهای بحرانی وب رسید، e2e دوباره گیت شد و ایمیج‌ها اسکن می‌شوند.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -108,18 +108,18 @@
 
 **هدف خروج:** هیچ گیت سبزی ادعای چیزی را نکند که اجرا نشده است.
 
-- [ ] **H14/R7** typecheck و build همه apps/packages اجرا شود؛ اسم jobها با کار واقعی منطبق شود.
-- [ ] **H14** coverage برای API و مسیرهای مهم web اضافه شود؛ ۷۰٪ پکیج‌ها به‌تنهایی کافی نیست.
-- [ ] **H15** Playwright با npm و URL/port واقعی اجرا شود؛ `main.ts` پورت را از `process.env.PORT` بخواند.
-- [ ] **H15** تست‌ها با `/login` و `data-testid` پایدار اصلاح شوند؛ smoke/offline/analysis/upload/perf واقعاً run شوند.
-- [ ] **H15** حداقل e2e smoke در CI و تست کامل nightly اجرا شود؛ حذف e2e از gate باید موقت و صریح باشد.
-- [ ] **H16** `npm ci` بدون fallback و lockfile review اجباری شود.
-- [ ] **H14** `npm audit --audit-level=high`، CodeQL، Dependabot و secret scanning به CI اضافه شوند.
-- [ ] **M17** Docker build و image scan در CI اجرا شود.
-- [ ] **L1/W23** گیت‌ها self-certified نباشند؛ هر PASS باید log دستورهای conformance, test, build, e2e را داشته باشد.
-- [ ] **M14** ruleهای جدید اضافه شوند: package بدون call-site، `SAMPLE_/MOCK_/Mocked` در production، و pnpm در repo npm.
-- [ ] **M15** bundle budget از manifest واقعی Vite و graph importهای static محاسبه شود.
-- [ ] CI concurrency cancellation و artifact retention برای trace/coverage/log اضافه شود.
+- [x] **H14/R7** typecheck و build همه apps/packages اجرا شود؛ اسم jobها با کار واقعی منطبق شود. (بسته شده در branch feat/phase5-cicd-gatekeeping، jobهای `lockfile`/`verify`/`security`/`e2e-smoke`/`deployment`/`gate` به‌نام کاری که واقعاً می‌کنند؛ `typecheck`/`build` ریشه با `turbo run` روی همه workspaceها — ADR-0037)
+- [x] **H14** coverage برای API و مسیرهای مهم web اضافه شود؛ ۷۰٪ پکیج‌ها به‌تنهایی کافی نیست. (بسته شده در branch feat/phase5-cicd-gatekeeping، `apps/api/src/**` و مسیرهای `api|context|offline` وب در include؛ threshold مستقل برای هر ناحیه به‌عنوان ratchet، گزارش json-summary/lcov و آپلود coverage در CI)
+- [x] **H15** Playwright با npm و URL/port واقعی اجرا شود؛ `main.ts` پورت را از `process.env.PORT` بخواند. (بسته شده در branch feat/phase5-cicd-gatekeeping، همه دستورهای playwright.config.ts روی npm/turbo، پورت‌ها از `API_PORT`/`WEB_PORT` و `main.ts` روی `env.PORT` گوش می‌دهد)
+- [x] **H15** تست‌ها با `/login` و `data-testid` پایدار اصلاح شوند؛ smoke/offline/analysis/upload/perf واقعاً run شوند. (بسته شده در branch feat/phase5-cicd-gatekeeping، helper مشترک `e2e/helpers/session.ts` با `/login` و testidهای پایدار در LoginPage/PatientsPage؛ هر پنج spec تگ‌دار است و تست رگرسیون فهرست تگ‌ها را قفل می‌کند تا هیچ suite بی‌صدا از اجرا نیفتد)
+- [x] **H15** حداقل e2e smoke در CI و تست کامل nightly اجرا شود؛ حذف e2e از gate باید موقت و صریح باشد. (بسته شده در branch feat/phase5-cicd-gatekeeping، job `e2e-smoke` روی هر PR در برابر استک واقعی API+web و `nightly.yml` با cron برای کل suite بدون grep)
+- [x] **H16** `npm ci` بدون fallback و lockfile review اجباری شود. (بسته شده در branch feat/phase5-cicd-gatekeeping، `npm ci` در همه jobها و گیت مستقل `tools/ci/lockfile-review.sh`: lockfile بیگانه، فرمت قدیمی، تغییر package.json بدون lock و registry غیر npmjs رد می‌شود)
+- [x] **H14** `npm audit --audit-level=high`، CodeQL، Dependabot و secret scanning به CI اضافه شوند. (بسته شده در branch feat/phase5-cicd-gatekeeping، job `security` با `audit:ci` و `tools/secret-scan.ts` روی همه فایل‌های tracked، `codeql.yml` با یک شرط صریح و `.github/dependabot.yml` برای npm/github-actions/docker)
+- [x] **M17** Docker build و image scan در CI اجرا شود. (بسته شده در branch feat/phase5-cicd-gatekeeping، گیت‌های `docker-build` و `image-scan`؛ `tools/ci/image-scan.sh` همان ایمیجی را که compose ساخته با `images -q` پیدا می‌کند و روی یافته‌های CRITICAL قابل رفع fail می‌شود)
+- [x] **L1/W23** گیت‌ها self-certified نباشند؛ هر PASS باید log دستورهای conformance, test, build, e2e را داشته باشد. (بسته شده در branch feat/phase5-cicd-gatekeeping، `tools/ci/run-gate.sh` فرمان، خروجی کامل و exit code را در `ci-evidence/<gate>.log` ثبت می‌کند و job `gate` با `tools/ci/gate-report.ts` همان لاگ‌ها را بازخوانی می‌کند؛ لاگ نبود = قرمز، و اجرای مجدد قرمز بر لاگ سبز قبلی غالب است — ADR-0037)
+- [x] **M14** ruleهای جدید اضافه شوند: package بدون call-site، `SAMPLE_/MOCK_/Mocked` در production، و pnpm در repo npm. (بسته شده در branch feat/phase5-cicd-gatekeeping، قواعد `package-call-site`, `production-mocks` و `package-manager` در `tools/conformance/rules/v2.ts` با self-test؛ بدهی شناخته‌شده به‌جای خاموش‌کردن rule در `exceptions.json` با ارجاع ADR ثبت شد)
+- [x] **M15** bundle budget از manifest واقعی Vite و graph importهای static محاسبه شود. (بسته شده در branch feat/phase5-cicd-gatekeeping، `manifest: true` در vite.config و پیمایش گراف static در `tools/bundle-budget.ts`؛ `dynamicImports` کنار گذاشته می‌شود و نبود manifest گیت را قرمز می‌کند نه صفر بایت)
+- [x] CI concurrency cancellation و artifact retention برای trace/coverage/log اضافه شود. (بسته شده در branch feat/phase5-cicd-gatekeeping، `cancel-in-progress` در ci.yml و nightly.yml و `retention-days` صریح روی تک‌تک artifactها؛ تست رگرسیون تعداد upload و retention را برابر نگه می‌دارد)
 
 **شرط تکمیل فاز:** یک PR عمداً خراب باید هر گیت مربوط را قرمز کند و یک PR سالم همه گیت‌ها را سبز کند.
 
@@ -240,7 +240,7 @@
 - [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی (تکمیل — پیاده‌سازی کامل در PR #28 با شواهد تست و مایگریشن)
 - [x] فاز ۳: نشست، توکن و Auth transaction integrity (تکمیل — پیاده‌سازی کامل در PR #30 با مایگریشن 0011، رفرش اتمیک، ردیس و تست رگرسیون)
 - [x] فاز ۴: زیرساخت self-hosted و استقرار امن (تکمیل — ADR-0036، سرویس migrate یک‌باره، secretهای اجباری، TLS واقعی، pin ایمیج‌ها، تست رگرسیون tools/ops/deployment.phase4.spec.ts و job `deployment` در CI که ایمیج‌ها را build و استک را از DB خالی بوت می‌کند)
-- [ ] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی
+- [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی (تکمیل — ADR-0037، زنجیره شواهد `ci-evidence` و job `gate` که PASS بدون لاگ را رد می‌کند، coverage اپ‌ها علاوه بر پکیج‌ها، e2e smoke روی هر PR + nightly کامل، audit/CodeQL/Dependabot/secret-scan، image scan و تست رگرسیون tools/ci/pipeline.phase5.spec.ts)
 - [ ] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی
 - [ ] فاز ۷: sync چنددستگاهی و offline correctness
 - [ ] فاز ۸: مدیا، آپلود و سهمیه
