@@ -41,13 +41,13 @@
     "lint-staged": "^17.3.0",
     "tsx": "^4.23.12",
     "turbo": "^2.10.11",
-    "typescript": "~5.9.3",
+    "typescript": "~7.0.2",
     "typescript-eslint": "^8.68.0",
     "unplugin-swc": "^1.5.11",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "dependencies": {
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
