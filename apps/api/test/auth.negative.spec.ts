@@ -1,9 +1,14 @@
+import { vi } from "vitest";
+
+vi.hoisted(() => {
+  process.env.STORAGE_DRIVER = "mock";
+  process.env.AUTH_LOCK_MS = "200";
+  process.env.AUTH_LOCK_MAX_MS = "200";
+});
+
 import { loadEnv } from "@scalpai/db";
 
 loadEnv();
-process.env.AUTH_LOCK_MS = "200";
-process.env.AUTH_LOCK_MAX_MS = "200";
-process.env.STORAGE_DRIVER = "mock";
 
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
