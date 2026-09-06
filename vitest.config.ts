@@ -6,10 +6,13 @@ import { defineConfig } from "vitest/config";
 // src and a stale build can never mask fresh changes.
 const pkgSrc = (name: string) =>
   fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url));
+const pkgFile = (path: string) => fileURLToPath(new URL(`./packages/${path}`, import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: {
+      // The subpath alias MUST come first: alias matching is prefix-based.
+      "@scalpai/db/testing": pkgFile("db/src/testing.ts"),
       "@scalpai/db": pkgSrc("db"),
       "@scalpai/shared": pkgSrc("shared"),
     },
