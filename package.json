@@ -6,8 +6,9 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "npm run dev --workspace=@scalpai/app-web",
-    "build": "npm run build --workspace=@scalpai/app-web && rm -rf dist && cp -r apps/web/dist dist",
-    "typecheck": "npm run typecheck --workspace=@scalpai/app-web",
+    "build": "npm exec -- turbo run build",
+    "build:vercel": "npm exec -- turbo run build --filter=@scalpai/app-web... && rm -rf dist && cp -r apps/web/dist dist",
+    "typecheck": "npm exec -- turbo run typecheck",
     "lint": "eslint .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -16,7 +17,9 @@
     "plans:admin": "tsx packages/db/src/plans-admin.ts",
     "budget:bundle": "tsx tools/bundle-budget.ts",
     "conformance": "tsx tools/conformance/run.ts",
-    "graph": "tsx tools/graph/extract.ts"
+    "graph": "tsx tools/graph/extract.ts",
+    "ops:validate": "docker compose -f ops/prod.yml --env-file ops/prod.env config -q",
+    "ops:up": "docker compose -f ops/prod.yml --env-file ops/prod.env up -d --build --wait"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
@@ -26,7 +29,6 @@
     "@swc/core": "^1.16.1",
     "@testing-library/dom": "^10.4.1",
     "@types/node": "^26.3.0",
-    "@types/three": "^0.185.4",
     "eslint": "^10.9.1",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
@@ -39,6 +41,7 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@types/three": "^0.185.4",
     "@vitest/coverage-v8": "^4.1.11",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",

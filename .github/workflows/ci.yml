@@ -29,7 +29,8 @@ jobs:
           --health-retries 10
 
       redis:
-        image: redis:7-alpine
+        # Pinned to the same minor as ops/dev.yml and ops/prod.yml (M17).
+        image: redis:7.4-alpine
         ports:
           - 6379:6379
         options: >-
@@ -71,15 +72,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci --legacy-peer-deps
-          else
-            npm install --legacy-peer-deps
-          fi
+      # H16: the lockfile is the contract. No `npm install` fallback that would
+      # silently resolve fresh versions when the lockfile drifts.
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
 
-      - name: Type check
+      - name: Type check (every workspace, via turbo)
         run: npm run typecheck
 
       - name: Lint
@@ -94,7 +92,7 @@ jobs:
       - name: Unit + integration tests + coverage gate >=70% (RLS / cross-tenant on real PG)
         run: npm run test:coverage
 
-      - name: Build all workspaces
+      - name: Build all workspaces (turbo)
         run: npm run build
 
       - name: Bundle budget (web <300KB gzip)
@@ -105,3 +103,71 @@ jobs:
 
       - name: Project graph up to date (ADR-22)
         run: npm run graph -- --check
+
+  deployment:
+    # Phase 4 (C8/M17/R10): the self-hosted stack is proven, not asserted.
+    # Images must really build with `npm ci` + native modules, compose must
+    # refuse a missing secret, and migrate+api must come up on an empty volume.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a complete CI secret set
+        working-directory: ops
+        run: |
+          cat > ci.env <<'ENV'
+          SCALPAI_DOMAIN=clinic.example.com
+          ACME_EMAIL=admin@example.com
+          POSTGRES_USER=scalpai_owner
+          POSTGRES_PASSWORD=ci_dev_only_owner_pwd
+          POSTGRES_DB=scalpai
+          APP_ROLE_PASSWORD=ci_dev_only_app_pwd
+          MINIO_ROOT_USER=scalpai_admin
+          MINIO_ROOT_PASSWORD=ci_dev_only_minio_pwd
+          S3_BUCKET=scalpai-media
+          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
+          BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase
+          ENV
+
+      - name: prod.yml is valid with a full secret set
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env config -q
+
+      - name: prod.yml REFUSES a missing secret set (negative proof)
+        working-directory: ops
+        run: |
+          if docker compose -f prod.yml config -q 2>/dev/null; then
+            echo "::error::prod.yml accepted an empty secret set"; exit 1
+          fi
+          echo "compose correctly refused to render without secrets"
+
+      - name: dev.yml is valid
+        run: docker compose -f ops/dev.yml config -q
+
+      - name: Build api + web images (npm ci, native modules, turbo)
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env build api web
+
+      - name: Boot from an empty database (migration gate + healthy API)
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
+
+      - name: Migration ran exactly once, as the owner role
+        working-directory: ops
+        run: |
+          docker compose -f prod.yml --env-file ci.env logs migrate
+          docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="
+
+      - name: API answers through its own healthcheck path
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env exec -T api node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()).then(j=>{console.log(j);process.exit(j.ok?0:1)})"
+
+      - name: Diagnostics on failure
+        if: failure()
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env ps -a && docker compose -f prod.yml --env-file ci.env logs --tail 200
+
+      - name: Tear down
+        if: always()
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env down -v

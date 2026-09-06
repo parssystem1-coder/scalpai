@@ -20,6 +20,11 @@ RUN npm exec -- turbo run build --filter=@scalpai/app-api...
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# The one-shot migrate container runs `npm run db:migrate` as the unprivileged
+# `node` user: give npm a writable HOME/cache so it never needs root.
+ENV HOME=/home/node
+ENV npm_config_cache=/tmp/.npm
+ENV npm_config_update_notifier=false
 
 # Runtime libvips for sharp.
 RUN apk add --no-cache vips libc6-compat

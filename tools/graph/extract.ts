@@ -1,15 +1,15 @@
 /**
- * ScalpAI Project Graph extractor — phase 0 scaffold (ADR-22).
+ * ScalpAI Project Graph extractor - phase 0 scaffold (ADR-22).
  *
  * Mechanically parses the workspace and emits PROJECT_GRAPH.md +
  * tools/graph/project-graph.json. Everything is PARSED from source; never
- * hand-edit the outputs. Descriptive only ("what exists") — enforcement is
+ * hand-edit the outputs. Descriptive only ("what exists") - enforcement is
  * the conformance harness's job (ADR-21).
  *
- * Usage:
- *   pnpm graph                regenerate outputs
- *   pnpm graph -- --check     fail if committed outputs are stale
- *   pnpm graph -- --since HEAD~3   structural diff against an earlier commit
+ * Usage (npm is the only package manager, ADR-0036):
+ *   npm run graph                regenerate outputs
+ *   npm run graph -- --check     fail if committed outputs are stale
+ *   npm run graph -- --since HEAD~3   structural diff against an earlier commit
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
@@ -101,7 +101,7 @@ function render(g: Graph): string {
   const lines: string[] = [
     "# Project Graph",
     "",
-    `**Generated** by \`pnpm graph\` from commit \`${g.generatedFrom.commit}\`${g.generatedFrom.dirty ? " (working tree dirty)" : ""}. **Do not hand-edit** — every row is parsed from source.`,
+    `**Generated** by \`npm run graph\` from commit \`${g.generatedFrom.commit}\`${g.generatedFrom.dirty ? " (working tree dirty)" : ""}. **Do not hand-edit** - every row is parsed from source.`,
     "",
     "Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).",
     "",
@@ -141,7 +141,7 @@ function checkStale(current: Graph): boolean {
     }
   }
   if (expectedJson !== actualJson) {
-    console.error(`${JSON_REL} is stale. Run \`pnpm graph\` and commit the result.`);
+    console.error(`${JSON_REL} is stale. Run \`npm run graph\` and commit the result.`);
     stale = true;
   }
   const expectedMd = normalize(render(current).split("\n").filter((l) => !l.startsWith("**Generated**")).join("\n"));
@@ -154,7 +154,7 @@ function checkStale(current: Graph): boolean {
       )
     : "";
   if (expectedMd !== actualMd) {
-    console.error("PROJECT_GRAPH.md is stale. Run `pnpm graph` and commit the result.");
+    console.error("PROJECT_GRAPH.md is stale. Run `npm run graph` and commit the result.");
     stale = true;
   }
   return stale;
@@ -165,7 +165,7 @@ function diffSince(ref: string, current: Graph): string {
   try {
     previous = JSON.parse(execFileSync("git", ["show", `${ref}:${JSON_REL}`], { cwd: ROOT }).toString()) as Graph;
   } catch {
-    return `No graph snapshot at ${ref}:${JSON_REL} — nothing to compare.\n`;
+    return `No graph snapshot at ${ref}:${JSON_REL} - nothing to compare.\n`;
   }
   const lines: string[] = [`Structural changes since ${ref}:`, ""];
   const names = (g: Graph) => g.modules.map((m) => m.name);
