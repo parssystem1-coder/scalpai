@@ -11,21 +11,27 @@ import type { FastifyInstance } from "fastify";
 import { AppModule } from "./app.module.js";
 import { resolveJwtConfig } from "./auth/jwt.config.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
+import { logEvent } from "./common/logging.js";
+import { assertPhiConfig } from "./common/phi.config.js";
 import { buildCorsOptions, resolveAllowedOrigins } from "./common/security.config.js";
 import { registerSecurityHeaders } from "./common/security-headers.js";
 import { assertSwaggerConfig, registerSwaggerGuard, setupSwagger, shouldExposeSwagger } from "./common/swagger.js";
 import { resolveStorageDriver } from "./media/storage.service.js";
 
 /**
- * Fail-closed boot: signing secret, CORS allowlist, storage driver and docs
- * exposure are all validated before a socket is opened. A missing or weak
- * value aborts startup instead of falling back to a permissive default.
+ * Fail-closed boot: signing secret, CORS allowlist, storage driver, docs
+ * exposure and (phase 6) PHI key material are all validated before a socket is
+ * opened. A missing or weak value aborts startup instead of falling back to a
+ * permissive default.
  */
 function assertBootConfig(): void {
   resolveJwtConfig();
   resolveAllowedOrigins();
   resolveStorageDriver();
   assertSwaggerConfig();
+  // C2/ADR-0038: in production a missing PHI key ring is a boot failure. There
+  // is no plaintext fallback for a clinical note.
+  assertPhiConfig();
 }
 
 /**
@@ -56,15 +62,18 @@ function installShutdownHandlers(app: NestFastifyApplication): void {
     process.on(signal, () => {
       if (closing) return;
       closing = true;
-      console.log(`${signal} received - draining connections`);
+      logEvent("info", { event: "process.draining", reason: signal });
       void app
         .close()
         .then(() => {
-          console.log("shutdown complete");
+          logEvent("info", { event: "process.shutdown_complete" });
           process.exit(0);
         })
         .catch((err: unknown) => {
-          console.error(`shutdown failed: ${err instanceof Error ? err.message : String(err)}`);
+          logEvent("error", {
+            event: "process.shutdown_failed",
+            message: err instanceof Error ? err.message : String(err),
+          });
           process.exit(1);
         });
     });
@@ -94,13 +103,13 @@ async function bootstrap(): Promise<void> {
   ];
   const staticRoot = candidateStaticRoots.find((dir) => existsSync(dir));
   if (staticRoot) {
-    console.log(`Serving static web assets from: ${staticRoot}`);
+    logEvent("info", { event: "web.static_root", path: staticRoot });
     await app.useStaticAssets({ root: staticRoot, prefix: "/", decorateReply: false });
   }
 
   const port = resolvePort();
   await app.listen(port, "0.0.0.0");
-  console.log(`ScalpAI API ready on :${port}`);
+  logEvent("info", { event: "api.ready", count: port });
 }
 
 void bootstrap();
