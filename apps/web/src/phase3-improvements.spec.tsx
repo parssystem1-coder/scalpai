@@ -12,30 +12,33 @@ vi.mock("./offline/SyncProvider.js", () => ({
     enqueue: vi.fn(),
     isFlushing: false,
     pendingCount: 2,
+    deadLetterCount: 0,
+    lastPullAt: null,
     flush: vi.fn(async () => 2),
+    syncNow: vi.fn(async () => undefined),
   }),
 }));
 
-vi.mock("./offline/db.js", () => ({
-  db: {
-    outbox: {
-      orderBy: () => ({
-        toArray: async () => [
-          {
-            id: "m-12345",
-            seq: 1,
-            entity: "patients",
-            op: "update",
-            schemaVersion: 1,
-            clientUpdatedAt: new Date().toISOString(),
-            baseVersion: "v1",
-            payload: JSON.stringify({ phone: "09121112233" }),
-            createdAt: Date.now(),
-          },
-        ],
-      }),
+// Phase 7: the offline database belongs to a (clinic, user) scope, so the UI asks
+// for the active one through listOutbox() instead of importing a singleton.
+vi.mock("./offline/sync.js", () => ({
+  listOutbox: async () => [
+    {
+      id: "m-12345678-90ab-cdef",
+      entity: "patients",
+      op: "update",
+      schemaVersion: 1,
+      clientUpdatedAt: new Date().toISOString(),
+      baseVersion: 1,
+      payload: JSON.stringify({ gender: "female" }),
+      createdAt: Date.now(),
+      attempts: 0,
+      nextAttemptAt: 0,
+      lastError: null,
+      clinicId: "clinic-a",
+      userId: "owner@clinic-a.test",
     },
-  },
+  ],
 }));
 
 afterEach(cleanup);
@@ -87,5 +90,6 @@ describe("Phase 3 Improvements Verification", () => {
     expect(screen.getByText(/آنلاین \(متصل به سرور\)/)).toBeDefined();
     expect(screen.getByText(/تاریخچه بازرسی و حل تعارض‌های همزمانی/)).toBeDefined();
     expect(screen.getByText("همگام‌سازی فوری")).toBeDefined();
+    expect(await screen.findByText(/ID: m-12345678-90ab/)).toBeDefined();
   });
 });

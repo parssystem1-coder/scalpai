@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { CURSOR_ZERO, makeMutation, type OutboxItem } from "@scalpai/sync-client";
 import { offlineDbName, sameScope, type OfflineScope } from "./db.js";
@@ -6,8 +7,12 @@ import { drainPull, toItem, toRecord, type CursorStore, type PullPage } from "./
 const scope: OfflineScope = { clinicId: "11111111-1111-4111-8111-111111111111", userId: "owner@clinic-a.test" };
 
 function item(payload: Record<string, unknown>, baseVersion: number | null = null): OutboxItem {
+  const envelope =
+    baseVersion === null
+      ? makeMutation("patients", "create", payload)
+      : makeMutation("patients", "update", payload, baseVersion);
   return {
-    envelope: makeMutation(baseVersion === null ? "patients" : "patients", baseVersion === null ? "create" : "update", payload, baseVersion),
+    envelope,
     attempts: 2,
     nextAttemptAt: 1_700_000_000_000,
     lastError: "network down",
@@ -27,9 +32,9 @@ function memoryCursors(initial = CURSOR_ZERO) {
 
 describe("offline scope (WEAKNESSES H8)", () => {
   it("gives every clinic and user its own database name", () => {
-    const other: OfflineScope = { ...scope, clinicId: "22222222-2222-4222-8222-222222222222" };
+    const otherClinic: OfflineScope = { ...scope, clinicId: "22222222-2222-4222-8222-222222222222" };
     const otherUser: OfflineScope = { ...scope, userId: "tricho@clinic-a.test" };
-    expect(offlineDbName(scope)).not.toBe(offlineDbName(other));
+    expect(offlineDbName(scope)).not.toBe(offlineDbName(otherClinic));
     expect(offlineDbName(scope)).not.toBe(offlineDbName(otherUser));
     expect(offlineDbName(scope)).toMatch(/^scalpai-offline-[a-zA-Z0-9_-]+-[a-zA-Z0-9_-]+$/);
   });
