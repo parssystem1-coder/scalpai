@@ -1,7 +1,18 @@
 import { sql } from "drizzle-orm";
-import { bigint, bigserial, boolean, date, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, customType, date, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /** Mirror of the hand-written SQL migrations (ADR-0002). */
+
+/**
+ * PostgreSQL `xid8` — the 64-bit transaction id behind the commit-safe sync
+ * cursor (phase 7 / H5). The driver returns it as digits, so it is carried as a
+ * string: a JS number cannot hold a 64-bit counter.
+ */
+const xid8 = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return "xid8";
+  },
+});
 
 export const clinics = pgTable("clinics", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -47,6 +58,10 @@ export const refreshTokens = pgTable("refresh_tokens", {
  * `notesEncrypted` is an AES-256-GCM envelope (`phi.v1.<kid>.…`) since phase 6 —
  * a CHECK constraint in 0012 refuses anything else, and `notesKeyId` records
  * which key wrapped it so rotation knows what to re-wrap (WEAKNESSES C2).
+ *
+ * Phase 7 (H6): `rowVersion` / `fieldVersions` are maintained by the
+ * `fn_bump_row_version` trigger and are the ONLY ordering input for sync
+ * conflict resolution. Never write them from application code.
  */
 export const patients = pgTable("patients", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -60,6 +75,8 @@ export const patients = pgTable("patients", {
   notesKeyId: text("notes_key_id"),
   notesUpdatedAt: timestamp("notes_updated_at", { withTimezone: true }),
   tags: text("tags").array().default([]),
+  rowVersion: integer("row_version").notNull().default(1),
+  fieldVersions: jsonb("field_versions").notNull().default({}),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -250,6 +267,13 @@ export const usageCounters = pgTable("usage_counters", {
  * Sync ledger. Phase 6 (H3): `payload` is the REDACTED delta — field names and
  * ciphertext only. A CHECK constraint in 0012 rejects readable PHI keys, so a
  * future code path cannot quietly start broadcasting notes again.
+ *
+ * Phase 7:
+ *  - H3: only APPLIED mutations are recorded, and the payload is the delta the
+ *    server actually wrote (a rejected push is not broadcast to peers).
+ *  - H4: idempotency is scoped to the clinic — `(clinic_id, client_mutation_id)`.
+ *  - H5: `commitXid` is the writing transaction id, which makes the pull cursor
+ *    commit-safe instead of trusting a pre-commit sequence.
  */
 export const mutations = pgTable("mutations", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -260,8 +284,9 @@ export const mutations = pgTable("mutations", {
   op: text("op").notNull(),
   payload: jsonb("payload").notNull(),
   serverSeq: bigserial("server_seq", { mode: "number" }).notNull(),
+  commitXid: xid8("commit_xid").notNull(),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [uniqueIndex("mutations_clinic_client_id_uq").on(t.clinicId, t.clientMutationId)]);
 
 export const treatmentPlans = pgTable("treatment_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -270,6 +295,8 @@ export const treatmentPlans = pgTable("treatment_plans", {
   items: jsonb("items").notNull().default([]),
   startDate: date("start_date"),
   reviewIntervals: jsonb("review_intervals"),
+  rowVersion: integer("row_version").notNull().default(1),
+  fieldVersions: jsonb("field_versions").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
