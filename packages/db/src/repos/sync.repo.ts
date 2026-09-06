@@ -45,8 +45,9 @@ class MutationRejected extends Error {
 }
 
 export class SyncCursorError extends Error {
-  constructor(cursor: string) {
-    super(`sync cursor '${cursor.slice(0, 40)}' is malformed`);
+  constructor(cursor: unknown) {
+    const raw = typeof cursor === "string" ? cursor : Array.isArray(cursor) ? String(cursor[0] ?? "") : String(cursor ?? "");
+    super(`sync cursor '${raw.slice(0, 40)}' is malformed`);
     this.name = "SyncCursorError";
   }
 }
@@ -459,6 +460,9 @@ export async function pullMutations(
   cursorValue: string,
   limit: number,
 ): Promise<SyncPullPage> {
+  // A non-string cursor is parameter tampering (array/object query params), not a
+  // decodable cursor: refuse it before it ever reaches decodeCursor.
+  if (typeof cursorValue !== "string") throw new SyncCursorError(cursorValue);
   const cursor = decodeCursor(cursorValue);
   if (!cursor) throw new SyncCursorError(cursorValue);
   const size = Math.min(Math.max(1, Math.trunc(limit) || 1), PULL_LIMIT_MAX);
