@@ -72,8 +72,8 @@ jobs:
         with:
           node-version: 22
 
-      # H16: the lockfile is the contract. No `npm install` fallback that would
-      # silently resolve fresh versions when the lockfile drifts.
+      # H16: the lockfile is the contract. No fallback that would silently
+      # resolve fresh versions when the lockfile drifts.
       - name: Install dependencies (npm ci, lockfile enforced)
         run: npm ci --legacy-peer-deps
 
@@ -106,27 +106,27 @@ jobs:
 
   deployment:
     # Phase 4 (C8/M17/R10): the self-hosted stack is proven, not asserted.
-    # Images must really build with `npm ci` + native modules, compose must
-    # refuse a missing secret, and migrate+api must come up on an empty volume.
+    # Images must really build, compose must refuse a missing secret, and
+    # migrate + api + web must come up on an empty volume.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Write a complete CI secret set
+      - name: Write a complete secret set
         working-directory: ops
         run: |
           cat > ci.env <<'ENV'
           SCALPAI_DOMAIN=clinic.example.com
           ACME_EMAIL=admin@example.com
           POSTGRES_USER=scalpai_owner
-          POSTGRES_PASSWORD=ci_dev_only_owner_pwd
+          POSTGRES_PASSWORD=ciOwnerPwd7Rq2XmT9
           POSTGRES_DB=scalpai
-          APP_ROLE_PASSWORD=ci_dev_only_app_pwd
+          APP_ROLE_PASSWORD=ciAppPwd4Kd8ZbV3Ns
           MINIO_ROOT_USER=scalpai_admin
-          MINIO_ROOT_PASSWORD=ci_dev_only_minio_pwd
+          MINIO_ROOT_PASSWORD=ciMinioPwd6Hf1QcY5
           S3_BUCKET=scalpai-media
-          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
-          BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase
+          JWT_SECRET=9f14c7a35b8e02d6417ac9b53e8f21d0c46b7a9e3512f8d0ab74c6e19d2537f8
+          BACKUP_ENCRYPTION_PASSPHRASE=ciBackupPass2Wm9Tz
           ENV
 
       - name: prod.yml is valid with a full secret set
@@ -144,7 +144,7 @@ jobs:
       - name: dev.yml is valid
         run: docker compose -f ops/dev.yml config -q
 
-      - name: Build api + web images (npm ci, native modules, turbo)
+      - name: Build api + web images (lockfile install, native modules, turbo)
         working-directory: ops
         run: docker compose -f prod.yml --env-file ci.env build api web
 
@@ -158,7 +158,7 @@ jobs:
           docker compose -f prod.yml --env-file ci.env logs migrate
           docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="
 
-      - name: API answers through its own healthcheck path
+      - name: API answers on its own health route
         working-directory: ops
         run: docker compose -f prod.yml --env-file ci.env exec -T api node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()).then(j=>{console.log(j);process.exit(j.ok?0:1)})"
 
