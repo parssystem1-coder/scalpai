@@ -47,6 +47,7 @@ export class DbService {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      await client.query("SET ROLE scalpai_app");
       await client.query("SELECT set_config('app.clinic_id', $1, true)", [clinicId]);
       if (userId) {
         await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
@@ -54,6 +55,7 @@ export class DbService {
       const d = drizzle(client, { schema });
       const tx = Object.assign(d, { client }) as Tx;
       const res = await fn(tx);
+      await client.query("RESET ROLE");
       await client.query("COMMIT");
       return res;
     } catch (err) {
