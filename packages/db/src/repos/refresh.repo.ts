@@ -6,13 +6,18 @@ import { sha256 } from "../tenant.js";
 const REFRESH_TTL_MS = 14 * 24 * 3600 * 1000;
 
 /**
- * Refresh-token store (WEAKNESSES C5/R5 — ADR-0029).
+ * Refresh-token store (WEAKNESSES C5/R5 — ADR-0029, R4 — ADR-0033).
  *
  * `refresh_tokens` sits behind FORCE RLS and the application role has NO direct
  * privilege on the table at all. Every access goes through SECURITY DEFINER
  * functions owned by the dedicated `scalpai_auth` role, so the pre-tenant auth
  * flow never needs a wide-open service role, and a tenant-scoped connection can
  * still only ever see its own clinic's rows (policy + explicit clinic_id).
+ *
+ * Phase 3: rotation is ONE call. `fn_refresh_rotate` locks the parent row,
+ * decides the outcome and writes the child + the replacement marker inside a
+ * single transaction — there is no window left where two concurrent refreshes
+ * can both win.
  */
 
 interface RawRefreshRow {
@@ -59,16 +64,20 @@ export async function findByHash(tx: Tx, presented: string): Promise<RefreshToke
   return row ? mapRow(row) : null;
 }
 
-export async function findLiveByHash(tx: Tx, presented: string): Promise<RefreshTokenRow | null> {
-  const row = await findByHash(tx, presented);
-  return row && row.revokedAt === null ? row : null;
-}
-
 export async function revokeFamily(tx: Tx, familyId: string): Promise<void> {
   await tx.execute(sql`SELECT fn_refresh_revoke_family(${familyId}::uuid)`);
 }
 
-/** Mint a brand-new family (login) or extend an existing one (rotation). */
+/** Logout: kill the whole family of the presented token in one round trip. */
+export async function revokeByToken(tx: Tx, presented: string): Promise<string | null> {
+  const res = await tx.execute(
+    sql`SELECT fn_refresh_revoke_by_token(${sha256(presented)}) AS family_id`,
+  );
+  const row = rowsOf<{ family_id: string | null }>(res)[0];
+  return row?.family_id ?? null;
+}
+
+/** Mint a brand-new family (login). */
 export async function issueRefresh(
   tx: Tx,
   p: { userId: string; clinicId: string; familyId?: string },
@@ -83,17 +92,68 @@ export async function issueRefresh(
   return { id, familyId, token };
 }
 
-/** Insert the rotated child token; returns its id (stored as replacedBy on the parent). */
-export async function insertChild(
-  tx: Tx,
-  p: { userId: string; clinicId: string; familyId: string },
-): Promise<{ childId: string; token: string }> {
-  const issued = await issueRefresh(tx, p);
-  return { childId: issued.id, token: issued.token };
+/** Every way a rotation attempt can end — decided by the database, not the API. */
+export type RotateOutcome =
+  | "rotated"
+  | "reused"
+  | "expired"
+  | "revoked_user"
+  | "clinic_mismatch"
+  | "unknown";
+
+export interface RotatedSession {
+  outcome: RotateOutcome;
+  familyId: string | null;
+  /** Only present for `rotated` — the freshly minted child token. */
+  refreshToken: string | null;
+  /** Server-side identity, always read from `users` (R5). */
+  user: { id: string; clinicId: string; role: string; email: string } | null;
 }
 
-export async function markReplaced(tx: Tx, parentId: string, childId: string): Promise<void> {
-  await tx.execute(sql`SELECT fn_refresh_mark_replaced(${parentId}::uuid, ${childId}::uuid)`);
+interface RawRotateRow {
+  outcome: string;
+  child_id: string | null;
+  subject_id: string | null;
+  subject_clinic_id: string | null;
+  subject_role: string | null;
+  subject_email: string | null;
+  token_family_id: string | null;
+}
+
+/**
+ * Atomic rotation (R4). The parent row is locked with `FOR UPDATE`, so the
+ * second of two concurrent refreshes re-reads the row only after the first has
+ * committed and therefore always lands on `reused` — which revokes the whole
+ * family in the same transaction.
+ */
+export async function rotateRefresh(tx: Tx, presented: string): Promise<RotatedSession> {
+  const childId = randomUUID();
+  const childToken = `${randomUUID()}.${randomUUID()}`;
+  const expiresAt = new Date(Date.now() + REFRESH_TTL_MS).toISOString();
+
+  const res = await tx.execute(
+    sql`SELECT outcome, child_id, subject_id, subject_clinic_id, subject_role, subject_email, token_family_id
+        FROM fn_refresh_rotate(${sha256(presented)}, ${childId}::uuid, ${sha256(childToken)}, ${expiresAt}::timestamptz)`,
+  );
+  const row = rowsOf<RawRotateRow>(res)[0];
+  if (!row) return { outcome: "unknown", familyId: null, refreshToken: null, user: null };
+
+  const outcome = row.outcome as RotateOutcome;
+  if (outcome !== "rotated" || !row.subject_id || !row.subject_clinic_id || !row.subject_role) {
+    return { outcome, familyId: row.token_family_id, refreshToken: null, user: null };
+  }
+
+  return {
+    outcome,
+    familyId: row.token_family_id,
+    refreshToken: childToken,
+    user: {
+      id: row.subject_id,
+      clinicId: row.subject_clinic_id,
+      role: row.subject_role,
+      email: row.subject_email ?? "",
+    },
+  };
 }
 
 export { REFRESH_TTL_MS };
