@@ -20,6 +20,7 @@ import { MockStorageController, registerMockStorageParsers } from "./media/mock-
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
 import { PlansController } from "./plans.controller.js";
 import { SyncController } from "./sync.controller.js";
+import { registerTenantContext } from "./tenancy/tenant-context.hook.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
 const jwt = resolveJwtConfig();
@@ -72,8 +73,11 @@ export class AppModule implements OnModuleInit {
   constructor(private adapterHost: HttpAdapterHost) {}
 
   onModuleInit(): void {
-    if (!mockStorage) return;
     const fastify = this.adapterHost.httpAdapter?.getInstance<FastifyInstance>();
-    if (fastify) registerMockStorageParsers(fastify);
+    if (!fastify) return;
+    // WEAKNESSES R3 — must be the first hook: everything downstream (guards,
+    // handlers, repos) resolves its tenant from this per-request store.
+    registerTenantContext(fastify);
+    if (mockStorage) registerMockStorageParsers(fastify);
   }
 }

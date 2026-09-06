@@ -23,6 +23,9 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
 /**
  * Patients + Sessions + Services (playbook 1.5). Every handler flows through
  * TenantScope.tx → RLS key set → scoped repos → audit row in the same tx.
+ *
+ * Phase 2: reads carry an explicit role gate (M14) and every repo call passes
+ * the clinic id explicitly instead of trusting the RLS key alone (M12).
  */
 @Controller()
 export class CoreController {
@@ -35,13 +38,15 @@ export class CoreController {
   }
 
   @Get("patients")
+  @Roles("owner", "trichologist", "receptionist")
   list(@Query(new ZodBodyPipe(PaginationQuery)) q: { q?: string; limit: number; offset: number }) {
-    return this.scope.tx((tx) => listPatients(tx, q));
+    return this.scope.tx((tx, ctx) => listPatients(tx, ctx.clinicId, q));
   }
 
   @Get("patients/:id")
+  @Roles("owner", "trichologist", "receptionist")
   async byId(@Param("id") id: string): Promise<unknown> {
-    const p = await this.scope.tx((tx) => getPatientById(tx, id));
+    const p = await this.scope.tx((tx, ctx) => getPatientById(tx, ctx.clinicId, id));
     if (!p) throw errors.notFound();
     return p;
   }
@@ -60,12 +65,14 @@ export class CoreController {
   }
 
   @Get("sessions")
+  @Roles("owner", "trichologist", "receptionist")
   listSessions(@Query(new ZodBodyPipe(PaginationQuery)) q: { limit: number; offset: number }) {
     return this.scope.tx((tx, ctx) => listSessions(tx, ctx.clinicId, q.limit, q.offset));
   }
 
   /** Booking lives behind the portal feature (§9.1 demo of feature gate). */
   @Post("sessions")
+  @Roles("owner", "trichologist", "receptionist")
   @RequireFeature("portal")
   @Quota("monthly_sessions")
   createSession(
@@ -83,11 +90,13 @@ export class CoreController {
   }
 
   @Get("services")
+  @Roles("owner", "trichologist", "receptionist")
   allServices() {
     return this.scope.tx(async (tx) => tx.select().from(services));
   }
 
   @Get("patients/:id/consents")
+  @Roles("owner", "trichologist", "receptionist")
   listConsents(@Param("id") patientId: string) {
     return this.scope.tx((tx, ctx) => listConsentsForPatient(tx, ctx.clinicId, patientId));
   }
@@ -127,6 +136,7 @@ export class CoreController {
 
   /** Feature-gate probe for integration tests (starter plan lacks ml_updates). */
   @Get("ml/status")
+  @Roles("owner", "trichologist", "receptionist")
   @RequireFeature("ml_updates")
   mlStatus() {
     return { mlUpdates: true };
