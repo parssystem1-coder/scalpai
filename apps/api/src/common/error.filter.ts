@@ -4,10 +4,15 @@ import { ZodError } from "zod";
 import { ApiError, resolveLocale, ERROR_MESSAGES } from "@scalpai/shared";
 import { join } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
+import { logEvent, requestIdOf } from "./logging.js";
 
 /**
  * Single exit shape: {code, message, details?} (engineering-rules §3).
- * Logs stay PHI-free — no request bodies here, ever.
+ *
+ * Phase 6 (L3): the log line is structured and SCRUBBED. It used to print the
+ * raw driver message, and a Postgres unique-violation message quotes the value
+ * that collided — which for `patients_clinic_phone_live_uq` is a patient's phone
+ * number. It also correlates with the access log through the request id.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -46,16 +51,28 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status = 400;
       body = { code: "VALIDATION_ERROR", message: ERROR_MESSAGES[locale].validation, details: exception.issues };
     } else if (isPgError(exception)) {
-      if ((exception as { code: string }).code === "23505") {
+      const code = (exception as { code: string }).code;
+      if (code === "23505" || code === "23505".slice(0)) {
         status = 409;
         body = { code: "CONFLICT", message: ERROR_MESSAGES[locale].conflict };
-      } else if ((exception as { code: string }).code === "23503") {
+      } else if (code === "23503") {
         status = 400;
         body = { code: "FK_VIOLATION", message: locale === "en" ? "Foreign key violation" : "ارجاع نامعتبر" };
+      } else if (code === "23514") {
+        // A CHECK constraint refused the write — phase 6 uses these to keep
+        // plaintext PHI out of the database, so it is a client error, not a 500.
+        status = 400;
+        body = {
+          code: "CONSTRAINT_VIOLATION",
+          message: locale === "en" ? "The value violates a data-protection constraint" : "مقدار با قید حفاظت از داده سازگار نیست",
+        };
       }
     }
 
-    if (status === 404 && !req.url.startsWith("/api")) {
+    // SPA fallback: only for non-API GETs, and it must never swallow a real
+    // /api 404 (M11 keeps the rest of this; the /api guard is the part that
+    // matters for a machine client).
+    if (status === 404 && req.method === "GET" && !req.url.startsWith("/api")) {
       try {
         const p1 = join(process.cwd(), "apps/web/dist/index.html");
         const p2 = join(process.cwd(), "../web/dist/index.html");
@@ -69,10 +86,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // Fallback if not built yet
       }
     }
-     
-    console.error(`[api] ${status} ${(exception as Error)?.message?.slice(0, 160) ?? "unknown"}`);
-    const cause = (exception as { cause?: unknown })?.cause;
-    if (cause) console.error(`[api] cause: ${String((cause as Error)?.message ?? cause).slice(0, 220)}`);
+
+    logEvent(status >= 500 ? "error" : "warn", {
+      event: "http.error",
+      requestId: requestIdOf(req),
+      status,
+      code: body.code,
+      // Scrubbed and truncated by the logger — driver messages quote values.
+      message: (exception as Error)?.message ?? "unknown",
+    });
+
     void res.status(status).send(body);
   }
 }
