@@ -7,7 +7,8 @@ import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DbService, migrate, resetAll, seed } from "@scalpai/db";
+import { DbService, migrate, seed } from "@scalpai/db";
+import { resetAll, seedMarkerClinicId } from "@scalpai/db/testing";
 import { AppModule } from "../src/app.module.js";
 
 /** Slice M5 — analyses persistence + expert review contract on real PG. */
@@ -81,9 +82,9 @@ describe("analyses (playbook 2.3)", () => {
     expect(got.body.type).toBe("heuristic");
 
     // audit chain still intact after these writes
-    const { verifyChain, seedMarkerClinicId } = await import("@scalpai/db");
+    const { verifyChain } = await import("@scalpai/db");
     const clinicId = await seedMarkerClinicId(process.env.MIGRATE_DATABASE_URL!);
-    expect(await db.withTenant(clinicId, null, (tx) => verifyChain(tx))).toBe(true);
+    expect(await db.withTenant(clinicId, null, (tx) => verifyChain(tx, clinicId))).toBe(true);
   });
 
   it("expert review stores Gold-label with reviewer identity", async () => {
