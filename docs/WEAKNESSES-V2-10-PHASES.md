@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۵ پیاده‌سازی شد (branch feat/phase5-cicd-gatekeeping). هر گیت شواهد ثبت‌شده دارد، job `gate` هیچ PASS بدون لاگ را نمی‌پذیرد، coverage به API و مسیرهای بحرانی وب رسید، e2e دوباره گیت شد و ایمیج‌ها اسکن می‌شوند.**
+> وضعیت: **فاز ۶ پیاده‌سازی شد (PR #42 — phi-crypto, merkle, report-seal, canonical-json, PHI privacy, retention/purge, orphan reconciliation, scrubbed logging). مایگریشن 0012 اعمال شد، تست‌های phi-crypto/merkle/report-seal/canonical-json/phi/audit-anchor همه سبز.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -241,7 +241,7 @@
 - [x] فاز ۳: نشست، توکن و Auth transaction integrity (تکمیل — پیاده‌سازی کامل در PR #30 با مایگریشن 0011، رفرش اتمیک، ردیس و تست رگرسیون)
 - [x] فاز ۴: زیرساخت self-hosted و استقرار امن (تکمیل — ADR-0036، سرویس migrate یک‌باره، secretهای اجباری، TLS واقعی، pin ایمیج‌ها، تست رگرسیون tools/ops/deployment.phase4.spec.ts و job `deployment` در CI که ایمیج‌ها را build و استک را از DB خالی بوت می‌کند)
 - [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی (تکمیل — ADR-0037، زنجیره شواهد `ci-evidence` و job `gate` که PASS بدون لاگ را رد می‌کند، coverage اپ‌ها علاوه بر پکیج‌ها، e2e smoke روی هر PR + nightly کامل، audit/CodeQL/Dependabot/secret-scan، image scan و تست رگرسیون tools/ci/pipeline.phase5.spec.ts)
-- [ ] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی
+- [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی (تکمیل — PR #42، مایگریشن 0012، phi-crypto AES-256-GCM با key ring و AAD binding، Merkle tree واقعی با inclusion proof، report seal Ed25519، canonical JSON، PHI scrubbing در لاگ و ledger، retention/purge با دو نفر امضا، orphan reconciliation، privacy controller و boot gate)
 - [ ] فاز ۷: sync چنددستگاهی و offline correctness
 - [ ] فاز ۸: مدیا، آپلود و سهمیه
 - [ ] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد
