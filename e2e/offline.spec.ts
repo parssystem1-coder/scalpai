@@ -1,41 +1,32 @@
 import { expect, test } from "@playwright/test";
+import { fillNewPatient, loginAndOpenPatients, uniquePhone } from "./helpers/session.js";
 
 /**
- * @offline & @license E2E tests:
- * Validates offline mutation enqueuing, Dexie IndexedDB persistence,
- * and automatic synchronization when re-establishing online connectivity.
+ * @offline - offline mutation enqueueing, Dexie persistence and automatic
+ * synchronization once connectivity returns.
  */
-test.describe("ScalpAI Phase 3 Offline & Sync Tests", () => {
+test.describe("offline queue and sync", () => {
   test("@offline queue patient creation offline and sync upon reconnect", async ({ page, context }) => {
-    await page.goto("/");
+    await loginAndOpenPatients(page);
 
-    // 1. Authenticate
-    await page.getByLabel("ایمیل").fill("owner@clinic-a.test");
-    await page.getByLabel("رمز عبور").fill("Dev12345!");
-    await page.getByRole("button", { name: "ورود" }).click();
-
-    await expect(page.getByRole("heading")).toContainText("بیماران");
-
-    // 2. Go Offline
+    // 1. go offline
     await context.setOffline(true);
+    await expect(page.getByTestId("offline-badge")).toBeVisible({ timeout: 15_000 });
 
-    const offlinePhone = `0935${String(Date.now()).slice(-7)}`;
-    await page.getByPlaceholder("نام", { exact: true }).fill("آفلاین");
-    await page.getByPlaceholder("نام خانوادگی").fill("تستی");
-    await page.getByPlaceholder("09xxxxxxxxx").fill(offlinePhone);
-    await page.getByRole("button", { name: "افزودن" }).click();
+    // 2. create a patient while offline - it must land in the outbox
+    const phone = await fillNewPatient(page, {
+      firstName: "آفلاین",
+      lastName: "تستی",
+      phone: uniquePhone("0935"),
+    });
+    await expect(page.getByText(phone)).toBeVisible({ timeout: 15_000 });
 
-    // 3. Confirm offline pending state is rendered locally
-    await expect(page.getByText(offlinePhone)).toBeVisible();
-
-    // 4. Restore Connection and verify automatic sync
+    // 3. restore connectivity and let the outbox flush
     await context.setOffline(false);
+    await page.waitForTimeout(2_000);
 
-    // Let the auto-sync flush the Outbox
-    await page.waitForTimeout(1500);
-
-    // Reload page to verify data was persisted to server and loaded from server query
+    // 4. a reload proves the row came back from the SERVER, not from local state
     await page.reload();
-    await expect(page.getByText(offlinePhone)).toBeVisible();
+    await expect(page.getByTestId("patients-table").getByText(phone)).toBeVisible({ timeout: 20_000 });
   });
 });
