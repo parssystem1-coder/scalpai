@@ -63,14 +63,30 @@ export const SessionCreate = z.object({
   startAt: z.string().datetime(),
 });
 
-/** §9.1 — plan = DB record; new plan ships with INSERT/upsert only, no deploy. */
+/**
+ * §9.1 — plan = DB record. Since phase 2 the catalog is platform data written
+ * only by the platform CLI/migration (WEAKNESSES C4, ADR-0031); this schema is
+ * the shared wire contract for that surface.
+ *
+ * Limits are metered against bigint counters, so every value must be a
+ * non-negative integer under a hard ceiling — no floats, no negatives, no
+ * overflow. Price is bounded by the numeric(12,0) column behind it.
+ */
+export const PLAN_LIMIT_MAX = 1_000_000_000;
+export const PLAN_PRICE_MAX = 999_999_999_999;
+
+export const PlanLimits = z.record(
+  z.string().min(1).max(60),
+  z.number().int("مقدار سقف باید عدد صحیح باشد").min(0).max(PLAN_LIMIT_MAX),
+);
+
 export const PlanUpsert = z.object({
   code: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/),
-  name: z.record(z.string().min(1), z.string().min(1)),
-  price: z.coerce.number().int().min(0),
+  name: z.record(z.string().min(1), z.string().min(1).max(120)),
+  price: z.coerce.number().int().min(0).max(PLAN_PRICE_MAX),
   interval: z.enum(["month", "year"]).default("month"),
-  features: z.array(z.string().min(1)).default([]),
-  limits: z.record(z.string(), z.number()).default({}),
+  features: z.array(z.string().min(1).max(60)).default([]),
+  limits: PlanLimits.default({}),
 });
 
 /** Gallery upload init (phase 2 media pipeline). 50MB hard cap per DoD. */
@@ -147,6 +163,7 @@ export type AuthSession = z.infer<typeof AuthSession>;
 export type PatientCreate = z.infer<typeof PatientCreate>;
 export type PatientCreateDto = PatientCreate;
 export type SessionCreate = z.infer<typeof SessionCreate>;
+export type PlanLimits = z.infer<typeof PlanLimits>;
 export type PlanUpsert = z.infer<typeof PlanUpsert>;
 export type PlanUpsertDto = PlanUpsert;
 export type GalleryInit = z.infer<typeof GalleryInit>;

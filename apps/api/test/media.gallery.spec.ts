@@ -8,7 +8,8 @@ import { Test } from "@nestjs/testing";
 import sharp from "sharp";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DbService, migrate, resetAll, seed } from "@scalpai/db";
+import { DbService, migrate, seed } from "@scalpai/db";
+import { resetAll } from "@scalpai/db/testing";
 import { AppModule } from "../src/app.module.js";
 
 /**

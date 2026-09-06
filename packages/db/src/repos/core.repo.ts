@@ -10,10 +10,10 @@ import type { Tx } from "../tenant.js";
  * Chain integrity: row_hash = sha256(prev_hash || canonical payload). The app
  * role has UPDATE/DELETE revoked on audit_log at the SQL level — history is immutable.
  *
- * Chain semantics (WEAKNESSES W21): the chain is PER-CLINIC by construction —
- * the prev-hash lookup runs inside the tenant tx, so a clinic only ever links
- * its own rows. `verifyChain` therefore verifies whatever rows are visible in
- * the caller's tenant context (run it inside db.withTenant(clinicId, ...)).
+ * Chain semantics (WEAKNESSES W21): the chain is PER-CLINIC by construction.
+ * Phase 2 (M12) makes that explicit instead of implicit: the prev-hash lookup
+ * and the verification pass both filter on clinic_id, so a missing RLS key can
+ * never silently link two clinics' rows together.
  */
 export async function appendAudit(
   tx: Tx,
@@ -34,6 +34,7 @@ export async function appendAudit(
   const prev = await tx
     .select({ rowHash: auditLog.rowHash })
     .from(auditLog)
+    .where(eq(auditLog.clinicId, entry.clinicId))
     .orderBy(desc(auditLog.id))
     .limit(1);
   const at = new Date();
@@ -62,9 +63,14 @@ export async function appendAudit(
   });
 }
 
-/** Verify the chain over all rows visible to the caller (per-clinic under RLS) in id order. */
-export async function verifyChain(tx: Tx): Promise<boolean> {
-  const rows = await tx.select().from(auditLog).orderBy(auditLog.id);
+/**
+ * Verify the chain in id order. Pass the clinic id to state the scope
+ * explicitly (M12); without it the caller's RLS context defines the rows.
+ */
+export async function verifyChain(tx: Tx, clinicId?: string): Promise<boolean> {
+  const rows = clinicId
+    ? await tx.select().from(auditLog).where(eq(auditLog.clinicId, clinicId)).orderBy(auditLog.id)
+    : await tx.select().from(auditLog).orderBy(auditLog.id);
   let prev: string | null = null;
   for (const r of rows) {
     const payload = JSON.stringify({
@@ -87,9 +93,11 @@ export async function verifyChain(tx: Tx): Promise<boolean> {
 
 export async function listPatients(
   tx: Tx,
+  clinicId: string,
   q: { search?: string; limit: number; offset: number },
 ) {
   const like = q.search ? `%${q.search}%` : null;
+  const scope = and(eq(patients.clinicId, clinicId), isNull(patients.deletedAt));
   return tx
     .select({
       id: patients.id,
@@ -101,26 +109,30 @@ export async function listPatients(
     .from(patients)
     .where(
       q.search && like
-        ? and(isNull(patients.deletedAt), sql`(${patients.firstName} ILIKE ${like} OR ${patients.lastName} ILIKE ${like} OR ${patients.phone} ILIKE ${like})`)
-        : isNull(patients.deletedAt),
+        ? and(scope, sql`(${patients.firstName} ILIKE ${like} OR ${patients.lastName} ILIKE ${like} OR ${patients.phone} ILIKE ${like})`)
+        : scope,
     )
     .orderBy(desc(patients.createdAt))
     .limit(q.limit)
     .offset(q.offset);
 }
 
-export async function getPatientById(tx: Tx, id: string) {
+export async function getPatientById(tx: Tx, clinicId: string, id: string) {
   const rows = await tx
     .select()
     .from(patients)
-    .where(and(eq(patients.id, id), isNull(patients.deletedAt)))
+    .where(and(eq(patients.clinicId, clinicId), eq(patients.id, id), isNull(patients.deletedAt)))
     .limit(1);
   return rows[0] ?? null;
 }
 
 /** Test/admin view incl. soft-deleted rows (updated_at trigger proof, W07). */
-export async function getPatientIncludingDeleted(tx: Tx, id: string) {
-  const rows = await tx.select().from(patients).where(eq(patients.id, id)).limit(1);
+export async function getPatientIncludingDeleted(tx: Tx, clinicId: string, id: string) {
+  const rows = await tx
+    .select()
+    .from(patients)
+    .where(and(eq(patients.clinicId, clinicId), eq(patients.id, id)))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -161,7 +173,7 @@ export async function softDeletePatient(tx: Tx, clinicId: string, userId: string
   const rows = await tx
     .update(patients)
     .set({ deletedAt: sql`now()` })
-    .where(and(eq(patients.id, id), isNull(patients.deletedAt)))
+    .where(and(eq(patients.clinicId, clinicId), eq(patients.id, id), isNull(patients.deletedAt)))
     .returning({ id: patients.id });
   if (!rows[0]) return false;
   await appendAudit(tx, {
@@ -259,4 +271,3 @@ export async function listConsentsForPatient(tx: Tx, clinicId: string, patientId
     .where(and(eq(consents.clinicId, clinicId), eq(consents.patientId, patientId)))
     .orderBy(desc(consents.signedAt));
 }
-

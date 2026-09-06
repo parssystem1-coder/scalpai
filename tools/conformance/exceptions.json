@@ -1,4 +1,40 @@
 {
   "comment": "ADR-21 conformance exceptions. Every entry MUST reference a registered ADR (ADR-\\d{3,4}) or the harness fails the build. rule/file optional; both act as matchers.",
-  "exceptions": []
+  "exceptions": [
+    {
+      "rule": "tenant-safety",
+      "file": "packages/db/sql/0001__init.sql:clinics",
+      "adr": "ADR-0028",
+      "reason": "clinics is the tenant root — isolation is by its own id, enforced by clinics_self_select/update policies",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "tenant-safety",
+      "file": "packages/db/sql/0001__init.sql:__migrations",
+      "adr": "ADR-0028",
+      "reason": "migration ledger is infrastructure, not tenant data; the app role has every write revoked",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "tenant-safety",
+      "file": "sql:__migrations",
+      "adr": "ADR-0028",
+      "reason": "migration ledger is owned by the migration role only — RLS would add nothing",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "tenant-safety",
+      "file": "packages/db/sql/0001__init.sql:plans",
+      "adr": "ADR-0031",
+      "reason": "platform catalog shared by all tenants: read-only policy for the app role, writes only via platform CLI/migration",
+      "since": "2026-09-06"
+    },
+    {
+      "rule": "tenant-safety",
+      "file": "packages/db/sql/0001__init.sql:plan_features",
+      "adr": "ADR-0031",
+      "reason": "platform catalog shared by all tenants: read-only policy for the app role, writes only via platform CLI/migration",
+      "since": "2026-09-06"
+    }
+  ]
 }

@@ -7,18 +7,16 @@ import {
   findByHash,
   findLiveByHash,
   insertChild,
+  issueRefresh,
   loginLookup,
   markReplaced,
-  refreshTokens,
   revokeFamily,
-  sha256,
   type DbService,
   type Tx,
 } from "@scalpai/db";
 import type { TokenPair } from "@scalpai/shared";
 import { resolveJwtConfig } from "./jwt.config.js";
 
-const REFRESH_TTL_MS = 14 * 24 * 3600 * 1000;
 const PRINCIPAL_CACHE_LIMIT = 5_000;
 
 export type Role = "owner" | "trichologist" | "receptionist";
@@ -86,23 +84,14 @@ export class AuthService {
     }
 
     const claims: AccessClaims = { sub: row.id, clinicId: row.clinic_id, role: row.role as Role };
-    const refreshToken = await this.issueRefresh(tx, claims.sub);
+    // Refresh tokens are written through the scalpai_auth definer surface — the
+    // app role has no privilege on refresh_tokens at all (ADR-0029).
+    const issued = await issueRefresh(tx, { userId: claims.sub, clinicId: claims.clinicId });
     return {
       accessToken: this.signAccess(claims),
-      refreshToken,
+      refreshToken: issued.token,
       user: { id: claims.sub, clinicId: claims.clinicId, role: claims.role, email },
     };
-  }
-
-  private async issueRefresh(tx: Tx, userId: string): Promise<string> {
-    const token = `${randomUUID()}.${randomUUID()}`;
-    await tx.insert(refreshTokens).values({
-      userId,
-      tokenHash: sha256(token),
-      familyId: randomUUID(),
-      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-    });
-    return token;
   }
 
   async revoke(db: DbService, presented: string): Promise<void> {
@@ -134,6 +123,9 @@ export class AuthService {
       // Claims always come from the database, never from the presented token.
       const u = await claimsById(tx, live.userId);
       if (!u || u.id !== live.userId) throw unauthorized("نشست باطل شده است");
+      // The clinic of the token row and the clinic of the user must agree; a
+      // mismatch means the row was tampered with or the user was moved.
+      if (live.clinicId !== u.clinic_id) throw unauthorized("نشست باطل شده است");
       return {
         reused: false,
         parent: { id: live.id, familyId: live.familyId, userId: live.userId },
@@ -155,6 +147,7 @@ export class AuthService {
     return db.withClient(async (tx) => {
       const { childId, token } = await insertChild(tx, {
         userId: parentData.userId,
+        clinicId: userData.clinicId,
         familyId: parentData.familyId,
       });
       await markReplaced(tx, parentData.id, childId);

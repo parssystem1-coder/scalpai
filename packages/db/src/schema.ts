@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, bigserial, boolean, date, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
-/** Mirror of sql/0001__init.sql — Drizzle query layer over the hand-written migration (ADR-0002). */
+/** Mirror of the hand-written SQL migrations (ADR-0002). */
 
 export const clinics = pgTable("clinics", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -24,16 +24,17 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   branchId: uuid("branch_id"),
-  role: text("role").notNull(), // owner | trichologist | receptionist
+  role: text("role").notNull(),
   email: text("email").notNull(),
   passwordHash: text("password_hash").notNull(),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
-}, (t) => [uniqueIndex("users_email_uq").on(t.email)]);
+});
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull(),
+  clinicId: uuid("clinic_id").notNull(),
   tokenHash: text("token_hash").notNull(),
   familyId: uuid("family_id").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -57,7 +58,6 @@ export const patients = pgTable("patients", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (t) => [
-  // Partial live-only uniqueness — engineering-rules §4
   uniqueIndex("patients_clinic_phone_live_uq").on(t.clinicId, t.phone).where(sql`deleted_at IS NULL`),
 ]);
 

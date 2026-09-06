@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "db:migrate": "tsx packages/db/src/migrate-cli.ts",
     "db:seed": "tsx packages/db/src/seed.ts",
+    "plans:admin": "tsx packages/db/src/plans-admin.ts",
     "budget:bundle": "tsx tools/bundle-budget.ts",
     "conformance": "tsx tools/conformance/run.ts",
     "graph": "tsx tools/graph/extract.ts"

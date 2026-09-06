@@ -7,7 +7,8 @@ import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DbService, getPatientIncludingDeleted, migrate, resetAll, seed, seedMarkerClinicId, verifyChain } from "@scalpai/db";
+import { DbService, getPatientIncludingDeleted, migrate, seed, verifyChain } from "@scalpai/db";
+import { resetAll, seedMarkerClinicId } from "@scalpai/db/testing";
 import { AppModule } from "../src/app.module.js";
 import { REFRESH_COOKIE } from "../src/auth/refresh-cookie.js";
 
@@ -130,7 +131,7 @@ describe("audit hash-chain", () => {
       .send({ firstName: "Sara2", lastName: "Karimi2", phone: "09122223344" });
 
     const clinicId = await clinicAId();
-    const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx));
+    const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx, clinicId));
     expect(ok).toBe(true);
   });
 
@@ -152,7 +153,7 @@ describe("audit hash-chain", () => {
     expect(settled.every((s) => s === 201 || s === 409)).toBe(true); // 409 only if phone collision
 
     const clinicId = await clinicAId();
-    const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx));
+    const ok = await db.withTenant(clinicId, null, (tx) => verifyChain(tx, clinicId));
     expect(ok).toBe(true);
   });
 });
@@ -172,7 +173,7 @@ describe("updated_at maintenance (W07 trigger)", () => {
     expect(del.status).toBe(200);
 
     const clinicId = await clinicAId();
-    const row = await db.withTenant(clinicId, null, (tx) => getPatientIncludingDeleted(tx, id));
+    const row = await db.withTenant(clinicId, null, (tx) => getPatientIncludingDeleted(tx, clinicId, id));
     expect(row).toBeTruthy();
     expect(row!.deletedAt).not.toBeNull();
     // timestamptz has µs precision — the trigger's now() must be strictly later
@@ -192,53 +193,31 @@ describe("feature gate (plans §9.1)", () => {
   });
 });
 
-describe("plans admin CRUD (playbook 1.4 / §9.1)", () => {
-  it("starter clinic without 'admin' feature gets FEATURE_DISABLED on write", async () => {
-    const b = await login(B);
-    const res = await http
-      .post("/api/v1/plans")
-      .set("Authorization", `Bearer ${b.accessToken}`)
-      .send({ code: "x_test", name: { fa: "ایکس", en: "X" }, price: 1000000 });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe("FEATURE_DISABLED");
-  });
-
-  it("growth owner manages plan lifecycle via API only (INSERT/upsert, no deploy)", async () => {
+describe("plans catalog is read-only for tenants (C4 — ADR-0031)", () => {
+  it("reads stay available to an authenticated role", async () => {
     const a = await login(A);
     const auth = { Authorization: `Bearer ${a.accessToken}` };
-    const code = `pro_${Date.now().toString().slice(-6)}`;
-
-    const created = await http
-      .post("/api/v1/plans")
-      .set(auth)
-      .send({ code, name: { fa: "حرفه‌ای", en: "Pro" }, price: 9900000, features: ["portal"], limits: { monthly_sessions: 10 } });
-    expect(created.status).toBe(201);
-    expect(created.body.code).toBe(code);
-    expect(created.body.features).toEqual(["portal"]);
-
     const list = await http.get("/api/v1/plans").set(auth);
     expect(list.status).toBe(200);
-    expect(list.body.map((p: { code: string }) => p.code)).toContain(code);
+    expect(list.body.map((p: { code: string }) => p.code)).toContain("growth");
 
-    const updated = await http
-      .put(`/api/v1/plans/${code}`)
-      .set(auth)
-      .send({ code, name: { fa: "حرفه‌ای", en: "Pro" }, price: 10900000, features: ["portal", "api"], limits: {} });
-    expect(updated.status).toBe(200);
-    expect([...updated.body.features].sort()).toEqual(["api", "portal"]);
+    const one = await http.get("/api/v1/plans/growth").set(auth);
+    expect(one.status).toBe(200);
+    expect(one.body.features).toContain("ml_updates");
+  });
 
-    const del = await http.delete(`/api/v1/plans/${code}`).set(auth);
-    expect(del.status).toBe(200);
-    const gone = await http.get(`/api/v1/plans/${code}`).set(auth);
-    expect(gone.status).toBe(404);
+  it("a clinic owner can no longer write the shared catalog", async () => {
+    const a = await login(A);
+    const auth = { Authorization: `Bearer ${a.accessToken}` };
+    const body = { code: "x_test", name: { fa: "ایکس", en: "X" }, price: 1_000_000 };
 
-    // a plan that clinics still sit on cannot be deleted
-    const used = await http.delete("/api/v1/plans/growth").set(auth);
-    expect(used.status).toBe(409);
+    expect((await http.post("/api/v1/plans").set(auth).send(body)).status).toBe(404);
+    expect((await http.put("/api/v1/plans/growth").set(auth).send(body)).status).toBe(404);
+    expect((await http.delete("/api/v1/plans/growth").set(auth)).status).toBe(404);
 
-    // every plan mutation landed in the audit chain
-    const clinicId = await clinicAId();
-    expect(await db.withTenant(clinicId, null, (tx) => verifyChain(tx))).toBe(true);
+    // and nothing changed in the catalog
+    const one = await http.get("/api/v1/plans/growth").set(auth);
+    expect(one.status).toBe(200);
   });
 });
 

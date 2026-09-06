@@ -39,8 +39,9 @@ export class JwtAccessGuard implements CanActivate {
       throw new UnauthorizedException({ code: "UNAUTHORIZED", message: "توکن نامعتبر یا منقضی" });
     }
 
-    // Store must be entered synchronously, before any await, so the handler
-    // continuation inherits it (see R3 in the phase-2 roadmap).
+    // The store itself was opened by the onRequest hook (als.run), so writing to
+    // it here is scoped to THIS request only — order of awaits no longer matters
+    // and nothing leaks into a sibling continuation (WEAKNESSES R3).
     TenantScope.enter({ clinicId: claims.clinicId, userId: claims.sub, role: claims.role });
     await this.auth.assertPrincipalActive(this.db, claims);
     return true;
