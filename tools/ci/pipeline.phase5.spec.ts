@@ -40,7 +40,8 @@ const viteConfig = read("apps/web/vite.config.ts");
 const apiMain = read("apps/api/src/main.ts");
 
 function jobs(workflow: string): string[] {
-  return [...workflow.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]!).sort();
+  const jobsSection = workflow.split(/^jobs:\s*$/m)[1] ?? workflow;
+  return [...jobsSection.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]!).sort();
 }
 
 function gatesOf(workflow: string): string[] {
