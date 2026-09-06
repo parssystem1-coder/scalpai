@@ -8,7 +8,7 @@ COPY . .
 RUN npm ci --legacy-peer-deps
 RUN npm exec -- turbo run build --filter=@scalpai/app-web...
 
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.31-alpine AS runner
 
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 COPY ops/nginx/web.conf /etc/nginx/conf.d/default.conf
