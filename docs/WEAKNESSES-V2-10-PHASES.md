@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۳ با موفقیت مرج شد (PR #30). یکپارچگی تراکنش‌های احراز هویت، چرخش اتمیک رفرش توکن، کش توزیع‌شده ردیس و لیمیت‌های کلینیک پیاده‌سازی شدند.**
+> وضعیت: **فاز ۴ پیاده‌سازی شد (branch feat/phase4-selfhosted-deploy). یک توپولوژی رسمی استقرار، سرویس مهاجرت مستقل، حذف secretهای پیش‌فرض، TLS واقعی و بیلد/بوت اثبات‌شده در CI.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -86,19 +86,19 @@
 
 **هدف خروج:** `ops/prod.yml` واقعاً بالا بیاید، migrate شود و TLS/secretهای امن داشته باشد.
 
-- [ ] **C8/R10** یک مدل استقرار رسمی انتخاب کن: پیشنهاد، web روی Vercel و API/worker روی Docker+Caddy؛ پروژه Vercel API ناسازگار حذف یا اصلاح شود.
-- [ ] **C8** `DATABASE_URL` در production با `scalpai_app` و secret صحیح تنظیم شود؛ role owner برای runtime ممنوع.
-- [ ] **C8** سرویس migration مستقل با اجرای یک‌باره و dependency صحیح اضافه شود؛ app قبل از migration بالا نیاید.
-- [ ] **C8** worker واقعی بساز یا worker service را حذف کن؛ `dist/worker.js` فعلی وجود ندارد.
-- [ ] **C8** Dockerfile از `npm run build --filter` استفاده نکند؛ build واقعی با `npm exec turbo run build --filter=...` یا script رسمی انجام شود.
-- [ ] **C8** `npm install --ignore-scripts` حذف/جایگزین شود؛ native moduleهای `sharp` و Argon2 باید واقعاً build/install شوند.
-- [ ] **C8/H16** lockfile در Docker و CI با `npm ci` اجباری شود؛ fallback به `npm install` حذف شود.
-- [ ] **C8** fallback passwordهای `scalpai_secure_pwd` و کلیدهای عمومی از compose حذف؛ نبود secret باید fail شود.
-- [ ] **C8/R10** Caddy با domain واقعی، ACME روشن و redirect HTTP به HTTPS اجرا شود؛ `auto_https off` و `:80` حذف شوند.
-- [ ] **M17** Postgres version بین CI و ops یکسان و imageهای MinIO/Redis/Caddy pin شوند.
-- [ ] **M17** `.dockerignore`، healthcheck API/web، resource limits و graceful shutdown اضافه شود.
-- [ ] **H15** تمام `pnpm`های Playwright، Husky، docs و graph با npm repository یکسان شوند.
-- [ ] **H14/R7/R9** root scripts واقعاً همه workspaceها را با Turbo build/typecheck کنند، نه فقط app-web.
+- [x] **C8/R10** یک مدل استقرار رسمی انتخاب کن: پیشنهاد، web روی Vercel و API/worker روی Docker+Caddy؛ پروژه Vercel API ناسازگار حذف یا اصلاح شود. (بسته شده در branch feat/phase4-selfhosted-deploy، ADR-0036: تنها توپولوژی رسمی = تک‌هاست Docker+Caddy؛ Vercel فقط بیلد استاتیک وب با `build:vercel` و `apps/api/vercel.json` حذف شد)
+- [x] **C8** `DATABASE_URL` در production با `scalpai_app` و secret صحیح تنظیم شود؛ role owner برای runtime ممنوع. (بسته شده در branch feat/phase4-selfhosted-deploy، runtime فقط `postgres://scalpai_app:${APP_ROLE_PASSWORD}` و اعتبار owner صرفاً در MIGRATE_DATABASE_URL؛ تست رگرسیون در tools/ops/deployment.phase4.spec.ts)
+- [x] **C8** سرویس migration مستقل با اجرای یک‌باره و dependency صحیح اضافه شود؛ app قبل از migration بالا نیاید. (بسته شده در branch feat/phase4-selfhosted-deploy، سرویس `migrate` با `restart: "no"` و `depends_on: migrate: service_completed_successfully` روی api؛ بوت واقعی از DB خالی در job `deployment` گیت CI)
+- [x] **C8** worker واقعی بساز یا worker service را حذف کن؛ `dist/worker.js` فعلی وجود ندارد. (بسته شده در branch feat/phase4-selfhosted-deploy، سرویس worker حذف شد و ادعای آن از ops/README پاک شد؛ کارهای پس‌زمینه با entrypoint واقعی در فازهای ۶ و ۹ برمی‌گردند — ADR-0036)
+- [x] **C8** Dockerfile از `npm run build --filter` استفاده نکند؛ build واقعی با `npm exec turbo run build --filter=...` یا script رسمی انجام شود. (بسته شده در branch feat/phase4-selfhosted-deploy، هر دو Dockerfile با `npm exec -- turbo run build --filter=...`؛ ایمیج‌ها در CI واقعاً build می‌شوند)
+- [x] **C8** `npm install --ignore-scripts` حذف/جایگزین شود؛ native moduleهای `sharp` و Argon2 باید واقعاً build/install شوند. (بسته شده در branch feat/phase4-selfhosted-deploy، `npm ci` بدون ignore-scripts + زنجیره ابزار vips-dev/python3/make/g++ و vips در مرحله runner)
+- [x] **C8/H16** lockfile در Docker و CI با `npm ci` اجباری شود؛ fallback به `npm install` حذف شود. (بسته شده در branch feat/phase4-selfhosted-deploy، حذف شرط `if [ -f package-lock.json ]` از CI و تست رگرسیون روی هر دو Dockerfile و ci.yml)
+- [x] **C8** fallback passwordهای `scalpai_secure_pwd` و کلیدهای عمومی از compose حذف؛ نبود secret باید fail شود. (بسته شده در branch feat/phase4-selfhosted-deploy، همه متغیرهای حساس `${VAR:?...}` شدند؛ اثبات منفی در CI: compose بدون env-file رد می‌شود)
+- [x] **C8/R10** Caddy با domain واقعی، ACME روشن و redirect HTTP به HTTPS اجرا شود؛ `auto_https off` و `:80` حذف شوند. (بسته شده در branch feat/phase4-selfhosted-deploy، سایت `{$SCALPAI_DOMAIN}` با ACME، ریدایرکت ۳۰۱ صریح، HSTS و حذف `strip_prefix /api` که مسیر `/api/v1` را می‌شکست)
+- [x] **M17** Postgres version بین CI و ops یکسان و imageهای MinIO/Redis/Caddy pin شوند. (بسته شده در branch feat/phase4-selfhosted-deploy، pg17 در CI/dev/prod و `postgres:17-alpine` برای pg_dump؛ caddy/redis/minio با تگ مشخص و ممنوعیت `:latest` در تست)
+- [x] **M17** `.dockerignore`، healthcheck API/web، resource limits و graceful shutdown اضافه شود. (بسته شده در branch feat/phase4-selfhosted-deploy، `.dockerignore` ریشه، HEALTHCHECK در هر دو ایمیج و healthcheck کامپوز، سقف CPU/RAM برای هر ۸ سرویس، drain با SIGTERM/SIGINT در main.ts + stop_grace_period)
+- [x] **H15** تمام `pnpm`های Playwright، Husky، docs و graph با npm repository یکسان شوند. (بسته شده در branch feat/phase4-selfhosted-deploy، playwright.config.ts، `.husky/*`، tools/graph و مرجع دستورها `docs/ops/DEPLOYMENT.md` روی npm؛ تست رگرسیون همه سطوح اجراشدنی را قفل می‌کند. اسنیپت‌های تاریخی در `docs/playbooks/*` و آرشیو `docs/tasks|gates` به آیتم drift اسناد در فاز ۱۰ سپرده شد — ADR-0036)
+- [x] **H14/R7/R9** root scripts واقعاً همه workspaceها را با Turbo build/typecheck کنند، نه فقط app-web. (بسته شده در branch feat/phase4-selfhosted-deploy، `build`/`typecheck` ریشه = `npm exec -- turbo run ...`؛ بیلد اپ API دیگر turbo را داخل turbo صدا نمی‌زند و فایل جعلی `dist/index.html` را نمی‌سازد؛ بیلد Vercel به `build:vercel` منتقل شد)
 
 **شرط تکمیل فاز:** اجرای clean از صفر با `docker compose`, migration، healthcheck، TLS و build بدون دست‌کاری دستی.
 
@@ -224,7 +224,7 @@
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
 - [ ] **L2** dashboard بزرگ به component/hookهای کوچک‌تر و یک سیستم style استاندارد شکسته شود.
-- [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند.
+- [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036)
 - [ ] **PR #21** به‌دلیل base قدیمی و diff آرایشی rebase/بسته شود؛ **PR #23** چون diff مؤثر ندارد بسته شود.
 - [ ] **M7/R13** Firebase/metadata و هر secret/scaffold غیرمصرفی بررسی، حذف یا rotate شود؛ secret scan باید json/yaml/ops/root را هم ببیند.
 - [ ] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند.
@@ -239,7 +239,7 @@
 - [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (تکمیل — بک‌اند PR #25 + کلاینت وب + تست‌های منفی + .env.example)
 - [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی (تکمیل — پیاده‌سازی کامل در PR #28 با شواهد تست و مایگریشن)
 - [x] فاز ۳: نشست، توکن و Auth transaction integrity (تکمیل — پیاده‌سازی کامل در PR #30 با مایگریشن 0011، رفرش اتمیک، ردیس و تست رگرسیون)
-- [ ] فاز ۴: زیرساخت self-hosted و استقرار امن
+- [x] فاز ۴: زیرساخت self-hosted و استقرار امن (تکمیل — ADR-0036، سرویس migrate یک‌باره، secretهای اجباری، TLS واقعی، pin ایمیج‌ها، تست رگرسیون tools/ops/deployment.phase4.spec.ts و job `deployment` در CI که ایمیج‌ها را build و استک را از DB خالی بوت می‌کند)
 - [ ] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی
 - [ ] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی
 - [ ] فاز ۷: sync چنددستگاهی و offline correctness

@@ -2,8 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 /**
  * Slice T3 - browser @smoke against REAL local stack:
- *   API  : node dist/main.js on :3001 (loadEnv reads .env -> native PG17, ADR-0024)
- *   Web  : vite dev on :5173 with VITE_API_URL pointed at the API
+ * API : node dist/main.js on :3001 (loadEnv reads .env -> native PG17, ADR-0024)
+ * Web : vite dev on :5173 with VITE_API_URL pointed at the API
+ *
+ * npm is the only package manager in this repo (ADR-0036): every command below
+ * goes through npm/turbo exclusively.
  */
 export default defineConfig({
   testDir: "e2e",
@@ -16,13 +19,16 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "pnpm --filter @scalpai/db build && pnpm --filter @scalpai/shared build && pnpm --filter @scalpai/analysis-core build && pnpm --filter @scalpai/app-api build && pnpm --filter @scalpai/app-api exec env PORT=3001 node dist/main.js",
+        "npm exec -- turbo run build --filter=@scalpai/app-api... && npm run start --workspace=@scalpai/app-api",
       url: "http://127.0.0.1:3001/api/v1/health",
       reuseExistingServer: !process.env.CI,
       timeout: 90_000,
+      env: {
+        PORT: "3001",
+      },
     },
     {
-      command: "pnpm --filter @scalpai/app-web exec vite --port 5173 --strictPort --host 127.0.0.1",
+      command: "npm exec --workspace=@scalpai/app-web -- vite --port 5173 --strictPort --host 127.0.0.1",
       url: "http://127.0.0.1:5173",
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

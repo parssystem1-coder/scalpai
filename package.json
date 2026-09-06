@@ -6,8 +6,9 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "npm run dev --workspace=@scalpai/app-web",
-    "build": "npm run build --workspace=@scalpai/app-web && rm -rf dist && cp -r apps/web/dist dist",
-    "typecheck": "npm run typecheck --workspace=@scalpai/app-web",
+    "build": "npm exec -- turbo run build",
+    "build:vercel": "npm exec -- turbo run build --filter=@scalpai/app-web... && rm -rf dist && cp -r apps/web/dist dist",
+    "typecheck": "npm exec -- turbo run typecheck",
     "lint": "eslint .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -16,7 +17,9 @@
     "plans:admin": "tsx packages/db/src/plans-admin.ts",
     "budget:bundle": "tsx tools/bundle-budget.ts",
     "conformance": "tsx tools/conformance/run.ts",
-    "graph": "tsx tools/graph/extract.ts"
+    "graph": "tsx tools/graph/extract.ts",
+    "ops:validate": "docker compose -f ops/prod.yml --env-file ops/prod.env config -q",
+    "ops:up": "docker compose -f ops/prod.yml --env-file ops/prod.env up -d --build --wait"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

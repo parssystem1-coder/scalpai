@@ -3,7 +3,9 @@ import swc from "unplugin-swc";
 import { defineConfig } from "vitest/config";
 
 // Tests execute package SOURCES (not their dist builds) so coverage maps to
-// src and a stale build can never mask fresh changes.
+// src and a stale build can never mask fresh changes. Every workspace package
+// whose package.json resolves to dist/ (production correctness) needs an alias
+// here, otherwise the suite would need a build first.
 const pkgSrc = (name: string) =>
   fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url));
 const pkgFile = (path: string) => fileURLToPath(new URL(`./packages/${path}`, import.meta.url));
@@ -15,6 +17,8 @@ export default defineConfig({
       "@scalpai/db/testing": pkgFile("db/src/testing.ts"),
       "@scalpai/db": pkgSrc("db"),
       "@scalpai/shared": pkgSrc("shared"),
+      "@scalpai/sync-client": pkgSrc("sync-client"),
+      "@scalpai/analysis-core": pkgSrc("analysis-core"),
     },
   },
   test: {

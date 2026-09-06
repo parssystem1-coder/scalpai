@@ -1,9 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "comment": "ADR-0036: Vercel builds the STATIC web app only. The API/worker never run here - they are Docker services behind Caddy (ops/prod.yml).",
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "npm ci --legacy-peer-deps",
   "rewrites": [
     {
       "source": "/(.*)",

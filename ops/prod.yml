@@ -1,18 +1,43 @@
-# ScalpAI v2 — Self-Hosted Production Stack (DESIGN-V2 §14 / Slice P6)
+# ScalpAI v2 - Self-Hosted Production Stack (DESIGN-V2 s14 / ADR-0036)
+#
+# This is the ONE supported production topology: a single host running
+# Caddy + web + api + postgres + minio + redis behind automatic TLS.
+# Vercel is only ever used for a STATIC preview build of the web app
+# (`npm run build:vercel`) - there is no Vercel deployment of the API.
+#
+# Run it:
+#   cp ops/prod.env.template ops/prod.env && $EDITOR ops/prod.env
+#   cd ops && docker compose -f prod.yml --env-file prod.env up -d --build
+#
+# Every secret below is REQUIRED: `${VAR:?...}` makes compose fail fast
+# instead of silently booting the stack with a shared default password.
+name: scalpai
+
 services:
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.8.4-alpine
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # A real, resolvable domain is mandatory: ACME cannot issue for :80.
+      SCALPAI_DOMAIN: ${SCALPAI_DOMAIN:?SCALPAI_DOMAIN is required (e.g. clinic.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required for automatic TLS}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
 
   web:
     build:
@@ -21,8 +46,43 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    stop_grace_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  # One-shot schema owner. Runs as the OWNER role, applies every migration and
+  # provisions the scalpai_app / scalpai_auth roles (ADR-0029), then exits.
+  # The API waits for a successful exit - it can never race the schema.
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    working_dir: /app
+    command: ["npm", "run", "db:migrate"]
+    restart: "no"
+    environment:
+      - NODE_ENV=production
+      - MIGRATE_DATABASE_URL=postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      # Password the migration assigns to the runtime role; must match the one
+      # the API connects with below.
+      - APP_ROLE_PASSWORD=${APP_ROLE_PASSWORD:?APP_ROLE_PASSWORD is required}
     depends_on:
-      - api
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
 
   api:
     build:
@@ -31,63 +91,75 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgres://${POSTGRES_USER:-scalpai}:${POSTGRES_PASSWORD:-scalpai_secure_pwd}@postgres:5432/${POSTGRES_DB:-scalpai}
-      # Shared auth/rate-limit state — mandatory in production (ADR-0034).
+      # Runtime connects as the least-privilege app role (NOSUPERUSER,
+      # NOBYPASSRLS). The owner role is NEVER used at runtime (C8/R5).
+      - DATABASE_URL=postgres://scalpai_app:${APP_ROLE_PASSWORD:?APP_ROLE_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      # Shared auth/rate-limit state - mandatory in production (ADR-0034).
       - REDIS_URL=redis://redis:6379
       - S3_ENDPOINT=http://minio:9000
-      - S3_BUCKET=${S3_BUCKET:-scalpai-media}
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-scalpai}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-scalpai_secure_pwd}
+      - S3_BUCKET=${S3_BUCKET:?S3_BUCKET is required}
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - S3_FORCE_PATH_STYLE=true
+      - STORAGE_DRIVER=s3
+      - CORS_ALLOWED_ORIGINS=https://${SCALPAI_DOMAIN:?SCALPAI_DOMAIN is required}
       # The API reads exactly these names (ADR-0035). The previous key only
       # verifies, and only until JWT_SECRET_PREVIOUS_UNTIL passes.
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required (32+ chars)}
       - JWT_SECRET_PREVIOUS=${JWT_SECRET_PREVIOUS:-}
       - JWT_SECRET_PREVIOUS_UNTIL=${JWT_SECRET_PREVIOUS_UNTIL:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    # SIGTERM drains in-flight requests (apps/api/src/main.ts).
+    stop_grace_period: 30s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
       redis:
         condition: service_healthy
-
-  worker:
-    build:
-      context: ..
-      dockerfile: apps/api/Dockerfile
-    command: ["node", "dist/worker.js"]
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://${POSTGRES_USER:-scalpai}:${POSTGRES_PASSWORD:-scalpai_secure_pwd}@postgres:5432/${POSTGRES_DB:-scalpai}
-      - REDIS_URL=redis://redis:6379
-      - S3_ENDPOINT=http://minio:9000
-    depends_on:
-      - postgres
-      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1536M
 
   postgres:
-    image: pgvector/pgvector:pg16
+    # Major version is pinned AND identical to CI (.github/workflows/ci.yml).
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-scalpai}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scalpai_secure_pwd}
-      POSTGRES_DB: ${POSTGRES_DB:-scalpai}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-scalpai} -d ${POSTGRES_DB:-scalpai}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2048M
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-scalpai}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-scalpai_secure_pwd}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     volumes:
       - miniodata:/data
     healthcheck:
@@ -95,9 +167,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     restart: unless-stopped
     volumes:
       - redisdata:/data
@@ -106,10 +183,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
 
-  # Automated periodic encrypted backups (Slice P6)
+  # Automated periodic encrypted backups. The passphrase is REQUIRED - a backup
+  # with a shared default passphrase is not a backup (C10 hardening: phase 9).
   backup-cron:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     command: >
       sh -c '
@@ -118,19 +201,25 @@ services:
         crond -f -l 2
       '
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-scalpai}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-scalpai_secure_pwd}
-      - POSTGRES_DB=${POSTGRES_DB:-scalpai}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB is required}
       - DB_HOST=postgres
       - DB_PORT=5432
-      - BACKUP_ENCRYPTION_PASSPHRASE=${BACKUP_ENCRYPTION_PASSPHRASE:-scalpai_secure_backup_key}
+      - BACKUP_ENCRYPTION_PASSPHRASE=${BACKUP_ENCRYPTION_PASSPHRASE:?BACKUP_ENCRYPTION_PASSPHRASE is required}
       - BACKUP_DIR=/backups
     volumes:
       - ./backup.sh:/scripts/backup.sh:ro
+      - ./restore.sh:/scripts/restore.sh:ro
       - backups_data:/backups
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
 
 volumes:
   pgdata:

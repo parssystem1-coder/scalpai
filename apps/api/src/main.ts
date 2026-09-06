@@ -28,6 +28,34 @@ function assertBootConfig(): void {
   assertSwaggerConfig();
 }
 
+/**
+ * Graceful shutdown (WEAKNESSES M17): the container orchestrator sends SIGTERM
+ * and waits `stop_grace_period`. Nest closes the HTTP server (draining
+ * in-flight requests) and runs every onModuleDestroy/beforeApplicationShutdown
+ * hook - pools and the Redis client included - before the process exits.
+ */
+function installShutdownHandlers(app: NestFastifyApplication): void {
+  let closing = false;
+  const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
+  for (const signal of signals) {
+    process.on(signal, () => {
+      if (closing) return;
+      closing = true;
+      console.log(`${signal} received - draining connections`);
+      void app
+        .close()
+        .then(() => {
+          console.log("shutdown complete");
+          process.exit(0);
+        })
+        .catch((err: unknown) => {
+          console.error(`shutdown failed: ${err instanceof Error ? err.message : String(err)}`);
+          process.exit(1);
+        });
+    });
+  }
+}
+
 async function bootstrap(): Promise<void> {
   assertBootConfig();
 
@@ -37,6 +65,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors(buildCorsOptions());
   await registerSecurityHeaders(app);
   app.enableShutdownHooks();
+  installShutdownHandlers(app);
 
   const fastify = app.getHttpAdapter().getInstance() as unknown as FastifyInstance;
   registerSwaggerGuard(fastify);
