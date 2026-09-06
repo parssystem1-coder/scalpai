@@ -33,7 +33,7 @@ export function assertResettableTarget(target: string): void {
   try {
     const url = new URL(target);
     host = url.hostname.toLowerCase();
-    database = decodeURIComponent(url.pathname.replace(/^\\//, "")).toLowerCase();
+    database = decodeURIComponent(url.pathname.replace(/^\//, "")).toLowerCase();
   } catch {
     throw new UnsafeDatabaseTargetError("target must be a parseable postgres connection URL");
   }
