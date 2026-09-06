@@ -44,5 +44,5 @@ test("@analysis upload, analyze under 3s, expert review", async ({ page }) => {
   // expert review - Gold-label capture (wait for autosave to land first)
   await expect(page.getByTestId("review-status")).toContainText("saved:", { timeout: 20_000 });
   await page.getByTestId("confirm").click();
-  await expect(page.getByTestId("saved")).toContainText("بازبینی ربت گردید");
+  await expect(page.getByTestId("saved")).toContainText("بازبینی ثبت گردید");
 });
