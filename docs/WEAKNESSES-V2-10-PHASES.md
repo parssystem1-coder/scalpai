@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۱ با موفقیت پیاده‌سازی و تکمیل شد. بک‌اند (PR #25) + کلاینت وب + تست‌های منفی + .env.example در branch feat/phase1-client-completion.**
+> وضعیت: **فاز ۲ با موفقیت مرج شد (PR #28). تمام گیت‌ها، RLS تنانسی و مرزهای دسترسی پیاده‌سازی شدند.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -48,18 +48,18 @@
 
 **هدف خروج:** هیچ tenant از tenant دیگر یا از platform catalog عبور نکند.
 
-- [ ] **C5** برای `clinics` و `refresh_tokens` تصمیم صریح بگیر: RLS/policy واقعی یا service role محدود و مستند با ADR؛ دسترسی کامل app role ممنوع.
-- [ ] **C5/M14** `EXEMPT_TABLES` هاردکد حذف شود؛ همه استثناها فقط از `exceptions.json` با ADR معتبر خوانده شوند.
-- [ ] **C5/M14** `RLS_TABLES` از SQL/migration استخراج شود؛ جدول جدید نباید با اضافه‌نشدن دستی از گیت جا بماند.
-- [ ] **C4** catalog پلن از tenant API خارج و به `platform_admin`/migration/CLI محدود شود؛ owner کلینیک نباید plan/features مشترک را تغییر دهد.
-- [ ] **C4** `limits` با schema عدد صحیح و `min(0)`، سقف منطقی و تست overflow اعتبارسنجی شود.
-- [ ] **R5** مسیرهای auth که خارج از tenant RLS هستند role و query محدود اختصاصی داشته باشند و در ADR ثبت شوند.
-- [ ] **R3** `AsyncLocalStorage.enterWith` با middleware/مرز درخواست مبتنی بر `als.run(ctx, next)` جایگزین شود؛ تست concurrent cross-tenant اضافه شود.
-- [ ] **M12** repoهایی که فقط به RLS تکیه دارند، predicate صریح `clinic_id` هم داشته باشند یا استثنای ADRدار داشته باشند.
-- [ ] **C5/M12** unique constraint ایمیل با مدل هویت تصمیم‌گیری شود؛ اگر ایمیل در هر کلینیک مستقل است، global uniqueness اصلاح و تست شود.
-- [ ] **C5** policyهای SELECT/INSERT/UPDATE/DELETE برای clinics, refresh_tokens, plans و plan_features با matrix نقش‌ها تست شوند.
-- [ ] **H18** `resetAll` از API عمومی خارج و به entrypoint testing منتقل شود؛ در production یا DB غیر test/dev باید fail کند.
-- [ ] **M14** ruleهای feature-gate برای GETهای PHI، controllerهای جدید، `.tsx`، `ops/` و فایل‌های JSON/YAML پوشش کامل داشته باشند.
+- [x] **C5** برای `clinics` و `refresh_tokens` تصمیم صریح بگیر: RLS/policy واقعی یا service role محدود و مستند با ADR؛ دسترسی کامل app role ممنوع. (بسته شده در PR #28، مایگریشن 0010 با تفکیک role، مقیدسازی RLS و SECURITY DEFINER)
+- [x] **C5/M14** `EXEMPT_TABLES` هاردکد حذف شود؛ همه استثناها فقط از `exceptions.json` با ADR معتبر خوانده شوند. (بسته شده در PR #28، موتور انطباق conformance با ADR 0029)
+- [x] **C5/M14** `RLS_TABLES` از SQL/migration استخراج شود؛ جدول جدید نباید با اضافه‌نشدن دستی از گیت جا بماند. (بسته شده در PR #28، استخراج مستقیم از اسکریپت‌های DDL و migration)
+- [x] **C4** catalog پلن از tenant API خارج و به `platform_admin`/migration/CLI محدود شود؛ owner کلینیک نباید plan/features مشترک را تغییر دهد. (بسته شده در PR #28، حذف دسترسی‌های نوشتن کنترلر و انتقال به plans:admin CLI)
+- [x] **C4** `limits` با schema عدد صحیح و `min(0)`، سقف منطقی و تست overflow اعتبارسنجی شود. (بسته شده در PR #28، اسکیمای مشترک با zod و تست سرریز)
+- [x] **R5** مسیرهای auth که خارج از tenant RLS هستند role و query محدود اختصاصی داشته باشند و در ADR ثبت شوند. (بسته شده در PR #28، نقش اختصاصی scalpai_auth و مستند ADR 0030)
+- [x] **R3** `AsyncLocalStorage.enterWith` با middleware/مرز درخواست مبتنی بر `als.run(ctx, next)` جایگزین شود؛ تست concurrent cross-tenant اضافه شود. (بسته شده در PR #28، ریفکتور مرز درخواست در auth guard/scope و تست‌های همروندی)
+- [x] **M12** repoهایی که فقط به RLS تکیه دارند، predicate صریح `clinic_id` هم داشته باشند یا استثنای ADRدار داشته باشند. (بسته شده در PR #28، افزودن قیدهای صریح در core.repo و audit)
+- [x] **C5/M12** unique constraint ایمیل با مدل هویت تصمیم‌گیری شود؛ اگر ایمیل در هر کلینیک مستقل است، global uniqueness اصلاح و تست شود. (بسته شده در PR #28، یکتایی سراسری ایمیل در سطح پلتفرم و ایندکس مربوطه)
+- [x] **C5** policyهای SELECT/INSERT/UPDATE/DELETE برای clinics, refresh_tokens, plans و plan_features با matrix نقش‌ها تست شوند. (بسته شده در PR #28، پوشش کامل در tenancy.phase2.spec.ts)
+- [x] **H18** `resetAll` از API عمومی خارج و به entrypoint testing منتقل شود؛ در production یا DB غیر test/dev باید fail کند. (بسته شده در PR #28، ماژول testing با گارد‌های سخت‌گیرانه محیطی)
+- [x] **M14** ruleهای feature-gate برای GETهای PHI، controllerهای جدید، `.tsx`، `ops/` و فایل‌های JSON/YAML پوشش کامل داشته باشند. (بسته شده در PR #28، اضافه شدن قوانین پلتفرم در conformance)
 
 **شرط تکمیل فاز:** تست cross-tenant برای هر جدول clinic-scoped + اجرای conformance بدون exemption پنهان.
 
@@ -237,7 +237,7 @@
 
 - [x] ممیزی و ادغام یافته‌ها انجام شد.
 - [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (تکمیل — بک‌اند PR #25 + کلاینت وب + تست‌های منفی + .env.example)
-- [ ] فاز ۲: قفل تنانسی، RLS و مرز دسترسی
+- [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی (تکمیل — پیاده‌سازی کامل در PR #28 با شواهد تست و مایگریشن)
 - [ ] فاز ۳: نشست، توکن و Auth transaction integrity
 - [ ] فاز ۴: زیرساخت self-hosted و استقرار امن
 - [ ] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی
