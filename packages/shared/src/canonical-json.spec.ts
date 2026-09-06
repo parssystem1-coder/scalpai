@@ -20,9 +20,8 @@ describe("canonical JSON (H17)", () => {
   });
 
   it("normalizes Unicode so the same visible text hashes the same", () => {
-    // U+0622 vs U+0627 U+0654 — identical on screen, different code points.
-    const composed = { note: "\u0622" };
-    const decomposed = { note: "\u0627\u0654" };
+    const composed = { note: "é" };
+    const decomposed = { note: "e\u0301" };
     expect(canonicalJson(composed)).toBe(canonicalJson(decomposed));
   });
 
