@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { LoginThrottleService } from "../src/auth/login-throttle.service.js";
 import { MemoryKvStore, RedisKvStore, type KvStore } from "../src/common/state/kv.store.js";
 import { RedisClient } from "../src/common/state/redis.client.js";
 import { StateStore } from "../src/common/state/state.store.js";
@@ -74,6 +75,55 @@ if (REDIS_URL) {
   });
 
   kvContract("redis", () => new RedisKvStore(new RedisClient({ url: REDIS_URL })));
+
+  describe("two replicas, one shared budget (R11)", () => {
+    const saved = {
+      url: process.env.REDIS_URL,
+      namespace: process.env.REDIS_NAMESPACE,
+      max: process.env.AUTH_IP_MAX,
+      window: process.env.AUTH_IP_WINDOW_MS,
+    };
+    let replicaA: StateStore;
+    let replicaB: StateStore;
+
+    beforeAll(() => {
+      process.env.REDIS_URL = REDIS_URL;
+      process.env.REDIS_NAMESPACE = `phase3-replicas-${randomUUID()}`;
+      process.env.AUTH_IP_MAX = "4";
+      process.env.AUTH_IP_WINDOW_MS = "5000";
+      // Two independent stores over one Redis == two API replicas.
+      replicaA = new StateStore();
+      replicaB = new StateStore();
+    });
+
+    afterAll(async () => {
+      await replicaA?.onModuleDestroy();
+      await replicaB?.onModuleDestroy();
+      restore("REDIS_URL", saved.url);
+      restore("REDIS_NAMESPACE", saved.namespace);
+      restore("AUTH_IP_MAX", saved.max);
+      restore("AUTH_IP_WINDOW_MS", saved.window);
+    });
+
+    it("refuses at the shared limit instead of once per process", async () => {
+      expect(replicaA.driver).toBe("redis");
+      expect(replicaB.driver).toBe("redis");
+
+      const throttleA = new LoginThrottleService(replicaA);
+      const throttleB = new LoginThrottleService(replicaB);
+      const ip = "203.0.113.7";
+
+      await throttleA.assertBucketAllowed("login", ip);
+      await throttleA.assertBucketAllowed("login", ip);
+      await throttleB.assertBucketAllowed("login", ip);
+      await throttleB.assertBucketAllowed("login", ip);
+
+      // Fifth attempt anywhere in the cluster is over the shared budget of 4 —
+      // with per-process Maps each replica would still have two attempts left.
+      await expect(throttleB.assertBucketAllowed("login", ip)).rejects.toMatchObject({ status: 429 });
+      await expect(throttleA.assertBucketAllowed("login", ip)).rejects.toMatchObject({ status: 429 });
+    });
+  });
 } else {
   describe.skip("kv contract — redis (REDIS_TEST_URL not set)", () => {
     it("skipped", () => {
@@ -86,8 +136,7 @@ describe("state namespacing (M6)", () => {
   const previousNamespace = process.env.REDIS_NAMESPACE;
 
   afterAll(() => {
-    if (previousNamespace === undefined) delete process.env.REDIS_NAMESPACE;
-    else process.env.REDIS_NAMESPACE = previousNamespace;
+    restore("REDIS_NAMESPACE", previousNamespace);
   });
 
   it("scopes tenant state per clinic and stores no raw identifier in a key", async () => {
@@ -106,3 +155,8 @@ describe("state namespacing (M6)", () => {
     }
   });
 });
+
+function restore(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

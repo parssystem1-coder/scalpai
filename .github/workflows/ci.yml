@@ -9,6 +9,8 @@ jobs:
   base:
     # Phase 1: real Postgres (docker service on runner), migrations from
     # empty DB, integration suite with FORCE RLS, guardrails (§14.2/14.3).
+    # Phase 3 adds a real Redis: the shared throttle/entitlement/rate-limit
+    # state and the hand-rolled RESP client are proven against a live server.
     runs-on: ubuntu-latest
 
     services:
@@ -26,11 +28,22 @@ jobs:
           --health-timeout 3s
           --health-retries 10
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     env:
       MIGRATE_DATABASE_URL: postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
       DATABASE_URL: postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
       APP_ROLE_PASSWORD: scalpai_dev_only
       JWT_SECRET: ci_dev_only_secret_0123456789abcdef
+      REDIS_TEST_URL: redis://127.0.0.1:6379
       S3_ENDPOINT: http://127.0.0.1:9000
       S3_REGION: us-east-1
       S3_BUCKET: scalpai-ci
