@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { AnalysisSubmit, ExpertReview, type AnalysisSubmitDto, type ExpertReviewDto, errors } from "@scalpai/shared";
 import { createAnalysis, getAnalysisById, listAnalysesByPatient, saveExpertReview } from "@scalpai/db";
+import { RateLimit } from "./common/rate-limit.guard.js";
 import { Roles } from "./common/roles.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
@@ -9,6 +10,10 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
  * Analyses (playbook 2.3): the CLIENT engine computes scores locally
  * (§3 golden rule — analysis never leaves the device); the server only
  * validates the contract and persists. expert_review is the Gold-label door.
+ *
+ * Submitting an analysis is metered by the plan quota AND rate-limited per
+ * clinic (WEAKNESSES L4) — quota answers "how many this month", the limit
+ * answers "how fast".
  */
 @Controller("analyses")
 export class AnalysesController {
@@ -16,6 +21,7 @@ export class AnalysesController {
 
   @Post()
   @Roles("owner", "trichologist")
+  @RateLimit("analysis", 120)
   async submit(@Body(new ZodBodyPipe(AnalysisSubmit)) dto: AnalysisSubmitDto) {
     const created = await this.scope.tx(async (tx, ctx) => {
       const row = await createAnalysis(tx, ctx.clinicId, {

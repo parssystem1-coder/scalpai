@@ -32,13 +32,17 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgres://${POSTGRES_USER:-scalpai}:${POSTGRES_PASSWORD:-scalpai_secure_pwd}@postgres:5432/${POSTGRES_DB:-scalpai}
+      # Shared auth/rate-limit state — mandatory in production (ADR-0034).
       - REDIS_URL=redis://redis:6379
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET=${S3_BUCKET:-scalpai-media}
       - S3_ACCESS_KEY=${MINIO_ROOT_USER:-scalpai}
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-scalpai_secure_pwd}
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      # The API reads exactly these names (ADR-0035). The previous key only
+      # verifies, and only until JWT_SECRET_PREVIOUS_UNTIL passes.
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET_PREVIOUS=${JWT_SECRET_PREVIOUS:-}
+      - JWT_SECRET_PREVIOUS_UNTIL=${JWT_SECRET_PREVIOUS_UNTIL:-}
     depends_on:
       postgres:
         condition: service_healthy
