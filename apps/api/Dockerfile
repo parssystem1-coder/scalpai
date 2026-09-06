@@ -4,7 +4,7 @@
 #  - `npm ci` against the committed lockfile, never `npm install`
 #  - NO --ignore-scripts: sharp and @node-rs/argon2 are native and must build
 #  - build through turbo (`npm exec -- turbo run build`), never `npm run build --filter`
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 
 # Toolchain for the native modules (sharp -> libvips, argon2 -> cc).
@@ -17,7 +17,7 @@ COPY . .
 RUN npm ci --legacy-peer-deps
 RUN npm exec -- turbo run build --filter=@scalpai/app-api...
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # The one-shot migrate container runs `npm run db:migrate` as the unprivileged
