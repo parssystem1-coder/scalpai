@@ -148,8 +148,8 @@ describe("sync push (§8)", () => {
   });
 });
 
-describe("sync pull (§8)", () => {
-  it("returns applied mutations since a given seq", async () => {
+describe("sync pull (§8) — commit-safe cursor", () => {
+  it("returns applied mutations after a cursor and terminates", async () => {
     const token = await login(A);
     const auth = { Authorization: `Bearer ${token}` };
 
@@ -170,16 +170,18 @@ describe("sync pull (§8)", () => {
         ],
       });
 
-    // pull from seq 0 — should include everything
-    const pull0 = await http.get("/api/v1/sync/pull?sinceSeq=0").set(auth);
-    expect(pull0.status).toBe(200);
-    expect(pull0.body.items.length).toBeGreaterThan(0);
+    // from the zero cursor — everything the clinic has
+    const first = await http.get("/api/v1/sync/pull?cursor=0:0").set(auth);
+    expect(first.status).toBe(200);
+    expect(first.body.items.length).toBeGreaterThan(0);
+    expect(first.body.cursor).toMatch(/^\d+:\d+$/);
 
-    // pull from the last returned seq — should be empty
-    const lastSeq = pull0.body.nextSeq;
-    const pullEmpty = await http.get(`/api/v1/sync/pull?sinceSeq=${lastSeq}`).set(auth);
-    expect(pullEmpty.status).toBe(200);
-    expect(pullEmpty.body.items).toHaveLength(0);
-    expect(pullEmpty.body.nextSeq).toBe(lastSeq);
+    // resuming from the returned cursor — nothing new, cursor unchanged
+    const cursor = String(first.body.cursor);
+    const empty = await http.get(`/api/v1/sync/pull?cursor=${encodeURIComponent(cursor)}`).set(auth);
+    expect(empty.status).toBe(200);
+    expect(empty.body.items).toHaveLength(0);
+    expect(empty.body.cursor).toBe(cursor);
+    expect(empty.body.hasMore).toBe(false);
   });
 });
