@@ -129,17 +129,17 @@
 
 **هدف خروج:** PHI در rest، transit، log، ledger و storage مسیر کنترل‌شده داشته باشد.
 
-- [ ] **C2** `notes_encrypted` واقعاً با AES-256-GCM/pgcrypto رمز شود؛ key از secret manager بیاید و rotation policy داشته باشد.
-- [ ] **C2/H3** یادداشت خام از mutation ledger و Dexie خارج شود؛ فقط ciphertext یا field names/delta مجاز ذخیره شود.
-- [ ] **H17** canonical JSON برای audit meta تعریف شود؛ ترتیب کلیدها و دقت timestamp باید deterministic باشد.
-- [ ] **H17** `verifyAuditChainIntegrity` واقعاً row hash را recompute کند؛ ادعای Merkle فقط با tree و inclusion proof مجاز باشد.
-- [ ] **H17** anchor در جدول و مقصد بیرونی WORM/فایل امضاشده ذخیره و verify شود.
-- [ ] **M8** signature payload محدودیت حجم، MIME و schema داشته باشد؛ IP و user-agent ثبت شوند.
-- [ ] **M8** امضا در MinIO با hash نگه‌داری شود، نه data URL حجیم در DB؛ template نسخه‌دار و revoke flow اضافه شود.
-- [ ] **M9** گزارش/PDF فقط وقتی «اصالت» بنویسد که hash، امضای Ed25519 و QR verify داشته باشد؛ وگرنه label حذف شود.
-- [ ] **M21** retention و purge بیمار برای DB، تصاویر، analysis و ledger با audit و approval طراحی شود.
-- [ ] **M22** orphan object queue و reconciliation بین DB و bucket اضافه شود؛ شکست delete نباید silent باشد.
-- [ ] لاگ‌ها requestId و metadata محدود داشته باشند؛ PHI/password/token هرگز log نشود.
+- [x] **C2** `notes_encrypted` واقعاً با AES-256-GCM/pgcrypto رمز شود؛ key از secret manager بیاید و rotation policy داشته باشد.
+- [x] **C2/H3** یادداشت خام از mutation ledger و Dexie خارج شود؛ فقط ciphertext یا field names/delta مجاز ذخیره شود.
+- [x] **H17** canonical JSON برای audit meta تعریف شود؛ ترتیب کلیدها و دقت timestamp باید deterministic باشد.
+- [x] **H17** `verifyAuditChainIntegrity` واقعاً row hash را recompute کند؛ ادعای Merkle فقط با tree و inclusion proof مجاز باشد.
+- [x] **H17** anchor در جدول و مقصد بیرونی WORM/فایل امضاشده ذخیره و verify شود.
+- [x] **M8** signature payload محدودیت حجم، MIME و schema داشته باشد؛ IP و user-agent ثبت شوند.
+- [x] **M8** امضا در MinIO با hash نگه‌داری شود، نه data URL حجیم در DB؛ template نسخه‌دار و revoke flow اضافه شود.
+- [x] **M9** گزارش/PDF فقط وقتی «اصالت» بنویسد که hash، امضای Ed25519 و QR verify داشته باشد؛ وگرنه label حذف شود.
+- [x] **M21** retention و purge بیمار برای DB، تصاویر، analysis و ledger با audit و approval طراحی شود.
+- [x] **M22** orphan object queue و reconciliation بین DB و bucket اضافه شود؛ شکست delete نباید silent باشد.
+- [x] لاگ‌ها requestId و metadata محدود داشته باشند؛ PHI/password/token هرگز log نشود.
 
 **شرط تکمیل فاز:** threat model PHI، تست رمزگشایی/rotation، تست tamper audit و گزارش retention.
 
