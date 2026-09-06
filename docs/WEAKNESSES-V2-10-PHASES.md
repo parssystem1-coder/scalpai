@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۱ بخش سرور، احراز هویت واقعی، کوکی‌های HttpOnly، جداسازی Mock Storage و CI سبز با موفقیت پیاده‌سازی و مستند شد.**
+> وضعیت: **فاز ۱ با موفقیت پیاده‌سازی و تکمیل شد. بک‌اند (PR #25) + کلاینت وب + تست‌های منفی + .env.example در branch feat/phase1-client-completion.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -28,9 +28,9 @@
 - [x] **C1/R1** mock-s3 را از مسیر production حذف یا فقط پشت `STORAGE_DRIVER=mock` در dev/test فعال کن؛ GET/PUT خام باید auth، allowlist، سقف حجم و audit داشته باشند. (بسته شده در PR #25، کنترلر MockStorageController با گیت محیطی و امضای HMAC)
 - [x] **C1** مسیر فایل را با `path.resolve` و بررسی containment نسبت به `localStorageDir` ببند؛ blacklist `replace(/\.\./g, "")` کافی نیست. (بسته شده در PR #25، StorageService)
 - [x] **C1/R1** parser عمومی `*`، `inMemoryMap` بدون سقف و fallback محلی را محدود کن؛ برای body size، تعداد درخواست و حافظه سقف بگذار. (بسته شده در PR #25، حذف parser باز Fastify و محدودسازی با سقف حجم)
-- [ ] **C3** fallback کاربر demo در `AuthContext` و `useAuth` حذف شود؛ `isAuthenticated` فقط از session/token معتبر بیاید.
-- [ ] **C3** LoginPage نباید identity سرور را دور بریزد؛ role/clinic/user فقط از پاسخ API بیاید، نه `activeRole`, `clinic-a` یا مقدار `tricho`.
-- [ ] **C3** credentialهای پیش‌فرض `owner@clinic-a.test` و `Dev12345!` فقط در dev/test و با guard build قابل استفاده باشند.
+- [x] **C3** fallback کاربر demo در `AuthContext` و `useAuth` حذف شود؛ `isAuthenticated` فقط از session/token معتبر بیاید. (بسته شده در branch feat/phase1-client-completion، حذف demo user fallback و setDemoUser، `isAuthenticated: !!user && !!token`)
+- [x] **C3** LoginPage نباید identity سرور را دور بریزد؛ role/clinic/user فقط از پاسخ API بیاید، نه `activeRole`, `clinic-a` یا مقدار `tricho`. (بسته شده در branch feat/phase1-client-completion، `pair.user` از API response خوانده می‌شود)
+- [x] **C3** credentialهای پیش‌فرض `owner@clinic-a.test` و `Dev12345!` فقط در dev/test و با guard build قابل استفاده باشند. (بسته شده در branch feat/phase1-client-completion، `import.meta.env.DEV` guard روی quick role switcher و default values)
 - [x] **C6/R2** fallback `JWT_SECRET` حذف شود؛ نبود secret یا secret ضعیف باید در boot fail کند. نام env در کد و `ops/prod.yml` یکسان شود. (بسته شده در PR #25، `jwt.config.ts`)
 - [x] **R12** JWT با `iss`, `aud`, `kid`/rotation policy و validation صریح verify شود؛ revoke شدن کاربر/تغییر رمز در اعتبارسنجی لحاظ شود. (بسته شده در PR #25، `auth.service.ts` و `jwt-access.guard.ts`)
 - [x] **R12** login با verify ساختگی برای کاربر ناشناخته، normalize ایمیل و تست timing برابر سخت شود. (بسته شده در PR #25، `AuthService.login` با decoy argon2)
@@ -38,7 +38,7 @@
 - [x] **H1** refresh token از localStorage خارج و به HttpOnly/Secure/SameSite cookie منتقل شود؛ logout باید خانواده توکن را در سرور revoke کند. (بسته شده در PR #25، `refresh-cookie.ts` و `auth.controller.ts`)
 - [x] **C7/R2** CORS در production فقط allowlist صریح env باشد؛ wildcardهای `*.vercel.app`/`*.run.app` و شرط `NODE_ENV !== production` حذف شوند. (بسته شده در PR #25، `security.config.ts` و `main.ts`)
 - [x] **R12** Swagger در production auth یا allowlist داشته باشد. (بسته شده در PR #25، گیت توکن SWAGGER_TOKEN روی مستندات)
-- [ ] **C1,C3,C6,C7,H1,R12** تست منفی end-to-end برای جعل JWT، origin غیرمجاز، mock-s3، refresh reuse و logout اضافه شود.
+- [x] **C1,C3,C6,C7,H1,R12** تست منفی end-to-end برای جعل JWT، origin غیرمجاز، mock-s3، refresh reuse و logout اضافه شود. (بسته شده در branch feat/phase1-client-completion، `auth.negative.spec.ts` و `mock-storage.spec.ts`)
 
 **شرط تکمیل فاز:** تست امنیتی سبز + secret scan سبز + بررسی دستی endpointهای public.
 
@@ -236,7 +236,7 @@
 ## وضعیت فازها
 
 - [x] ممیزی و ادغام یافته‌ها انجام شد.
-- [~] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (بخش بک‌اند و زیرساخت تکمیل و مرج شد؛ کلاینت وب و تست‌های منفی در ادامه)
+- [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (تکمیل — بک‌اند PR #25 + کلاینت وب + تست‌های منفی + .env.example)
 - [ ] فاز ۲: قفل تنانسی، RLS و مرز دسترسی
 - [ ] فاز ۳: نشست، توکن و Auth transaction integrity
 - [ ] فاز ۴: زیرساخت self-hosted و استقرار امن
