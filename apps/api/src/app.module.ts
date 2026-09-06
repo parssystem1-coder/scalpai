@@ -14,6 +14,7 @@ import { QuotaGuard } from "./common/quota.guard.js";
 import { RateLimitGuard } from "./common/rate-limit.guard.js";
 import { RolesGuard } from "./common/roles.guard.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
+import { registerRequestLogging } from "./common/logging.js";
 import { StateStore } from "./common/state/state.store.js";
 import { CoreController } from "./core.controller.js";
 import { EntitlementService } from "./entitlements/entitlement.service.js";
@@ -21,6 +22,7 @@ import { GalleryController } from "./media/gallery.controller.js";
 import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
 import { PlansController } from "./plans.controller.js";
+import { PrivacyController } from "./privacy/privacy.controller.js";
 import { SyncController } from "./sync.controller.js";
 import { registerTenantContext } from "./tenancy/tenant-context.hook.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
@@ -52,6 +54,7 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     GalleryController,
     AnalysesController,
     SyncController,
+    PrivacyController,
     ...(mockStorage ? [MockStorageController] : []),
   ],
   providers: [
@@ -82,8 +85,11 @@ export class AppModule implements OnModuleInit {
   onModuleInit(): void {
     const fastify = this.adapterHost.httpAdapter?.getInstance<FastifyInstance>();
     if (!fastify) return;
-    // WEAKNESSES R3 — must be the first hook: everything downstream (guards,
-    // handlers, repos) resolves its tenant from this per-request store.
+    // Phase 6 (L3): the request id is minted before anything else so every log
+    // line of this request — access log, error filter, audit warnings — shares it.
+    registerRequestLogging(fastify);
+    // WEAKNESSES R3 — must be the first hook that touches tenancy: everything
+    // downstream (guards, handlers, repos) resolves its tenant from this store.
     registerTenantContext(fastify);
     if (mockStorage) registerMockStorageParsers(fastify);
   }

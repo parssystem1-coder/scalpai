@@ -1,16 +1,29 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
-import { PaginationQuery, PatientCreate, SessionCreate, ConsentCreate } from "@scalpai/shared";
-import type { PatientCreateDto, ConsentCreateDto } from "@scalpai/shared";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query, Req } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
+import {
+  PaginationQuery,
+  PatientCreate,
+  PatientNotesUpdate,
+  SessionCreate,
+  ConsentCreate,
+  ConsentRevoke,
+  parseSignatureDataUrl,
+} from "@scalpai/shared";
+import type { PatientCreateDto, ConsentCreateDto, PatientNotesUpdateDto, ConsentRevokeDto } from "@scalpai/shared";
 import { errors } from "@scalpai/shared";
 import {
   createPatient,
   createSession,
   createConsent,
+  getConsentSignatureRef,
   listConsentsForPatient,
   getPatientById,
   listPatients,
   listSessions,
+  readPatientNotes,
+  revokeConsent,
   services,
+  setPatientNotes,
   softDeletePatient,
 } from "@scalpai/db";
 import { Roles } from "./common/roles.guard.js";
@@ -19,6 +32,7 @@ import { RequireFeature } from "./common/feature.guard.js";
 import { Quota } from "./common/quota.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
+import { StorageService } from "./media/storage.service.js";
 
 /**
  * Patients + Sessions + Services (playbook 1.5). Every handler flows through
@@ -26,10 +40,15 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
  *
  * Phase 2: reads carry an explicit role gate (M14) and every repo call passes
  * the clinic id explicitly instead of trusting the RLS key alone (M12).
+ *
+ * Phase 6 (C2/M8): the clinical note has its own endpoint pair — encrypted on
+ * write, decrypted on read, audited both ways, and never part of a patient list.
+ * A consent signature is uploaded to object storage and only ever handed back as
+ * a short-lived presigned URL.
  */
 @Controller()
 export class CoreController {
-  constructor(private scope: TenantScope) {}
+  constructor(private scope: TenantScope, private storage: StorageService) {}
 
   @Public()
   @Get("health")
@@ -55,6 +74,30 @@ export class CoreController {
   @Roles("owner", "trichologist", "receptionist")
   create(@Body(new ZodBodyPipe(PatientCreate)) dto: PatientCreateDto) {
     return this.scope.tx((tx, ctx) => createPatient(tx, ctx.clinicId, ctx.userId, dto));
+  }
+
+  /**
+   * Reading a clinical note is a clinical act, not a list field: it needs a
+   * clinical role and it writes its own audit row (فاز ۶ / C2).
+   */
+  @Get("patients/:id/notes")
+  @Roles("owner", "trichologist")
+  async notes(@Param("id") id: string): Promise<{ notes: string | null }> {
+    const found = await this.scope.tx((tx, ctx) => getPatientById(tx, ctx.clinicId, id));
+    if (!found) throw errors.notFound();
+    const notes = await this.scope.tx((tx, ctx) => readPatientNotes(tx, ctx.clinicId, ctx.userId, id));
+    return { notes };
+  }
+
+  @Put("patients/:id/notes")
+  @Roles("owner", "trichologist")
+  async setNotes(
+    @Param("id") id: string,
+    @Body(new ZodBodyPipe(PatientNotesUpdate)) dto: PatientNotesUpdateDto,
+  ): Promise<{ saved: true }> {
+    const ok = await this.scope.tx((tx, ctx) => setPatientNotes(tx, ctx.clinicId, ctx.userId, id, dto.notes));
+    if (!ok) throw errors.notFound();
+    return { saved: true };
   }
 
   @Delete("patients/:id")
@@ -103,17 +146,8 @@ export class CoreController {
 
   @Post("consents")
   @Roles("owner", "trichologist", "receptionist")
-  createConsent(@Body(new ZodBodyPipe(ConsentCreate)) dto: ConsentCreateDto) {
-    return this.scope.tx((tx, ctx) =>
-      createConsent(tx, {
-        clinicId: ctx.clinicId,
-        userId: ctx.userId,
-        patientId: dto.patientId,
-        serviceId: dto.serviceId,
-        templateVersion: dto.templateVersion,
-        signaturePayload: dto.signaturePayload,
-      }),
-    );
+  createConsent(@Body(new ZodBodyPipe(ConsentCreate)) dto: ConsentCreateDto, @Req() req: FastifyRequest) {
+    return this.persistConsent(dto.patientId, dto, req);
   }
 
   @Post("patients/:id/consents")
@@ -121,7 +155,22 @@ export class CoreController {
   createPatientConsent(
     @Param("id") patientId: string,
     @Body(new ZodBodyPipe(ConsentCreate.omit({ patientId: true }))) dto: Omit<ConsentCreateDto, "patientId">,
+    @Req() req: FastifyRequest,
   ) {
+    return this.persistConsent(patientId, dto, req);
+  }
+
+  /**
+   * One consent write path. The signature bytes go to MinIO under the consent's
+   * own key; the row keeps the digest, the size, the MIME type and the request
+   * context that produced it (M8).
+   */
+  private persistConsent(
+    patientId: string,
+    dto: Omit<ConsentCreateDto, "patientId">,
+    req: FastifyRequest,
+  ): Promise<unknown> {
+    const signature = parseSignatureDataUrl(dto.signaturePayload);
     return this.scope.tx((tx, ctx) =>
       createConsent(tx, {
         clinicId: ctx.clinicId,
@@ -129,9 +178,39 @@ export class CoreController {
         patientId,
         serviceId: dto.serviceId,
         templateVersion: dto.templateVersion,
-        signaturePayload: dto.signaturePayload,
+        signature,
+        signedFromIp: req.ip ?? null,
+        userAgent: (req.headers["user-agent"] as string | undefined) ?? null,
+        storeSignature: (key, body, mime) => this.storage.putBuffer(ctx.clinicId, key, body, mime),
       }),
     );
+  }
+
+  /** The trace itself is never inlined in a response — only a short-lived URL. */
+  @Get("consents/:cid/signature")
+  @Roles("owner", "trichologist")
+  async consentSignature(@Param("cid") cid: string): Promise<unknown> {
+    const ctx = this.scope.requireCtx();
+    const ref = await this.scope.tx((tx) => getConsentSignatureRef(tx, ctx.clinicId, cid));
+    if (!ref?.signatureKey) throw errors.notFound();
+    return {
+      url: await this.storage.presignGet(ctx.clinicId, ref.signatureKey),
+      sha256: ref.signatureSha256,
+      mime: ref.signatureMime,
+      revokedAt: ref.revokedAt,
+    };
+  }
+
+  @Post("consents/:cid/revoke")
+  @Roles("owner", "trichologist")
+  @HttpCode(HttpStatus.OK)
+  async revoke(
+    @Param("cid") cid: string,
+    @Body(new ZodBodyPipe(ConsentRevoke)) dto: ConsentRevokeDto,
+  ): Promise<{ revoked: true }> {
+    const ok = await this.scope.tx((tx, ctx) => revokeConsent(tx, ctx.clinicId, ctx.userId, cid, dto.reason));
+    if (!ok) throw errors.notFound();
+    return { revoked: true };
   }
 
   /** Feature-gate probe for integration tests (starter plan lacks ml_updates). */

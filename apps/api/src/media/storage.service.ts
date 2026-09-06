@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
-import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
+import { readFile, readdir, writeFile, unlink, mkdir } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { Injectable, type OnModuleInit } from "@nestjs/common";
 import {
@@ -11,6 +11,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -229,6 +230,66 @@ export class StorageService implements OnModuleInit {
       return;
     }
     await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  /* ---------------- maintenance surface (WEAKNESSES M22) ---------------- */
+
+  /**
+   * Every object under one clinic's prefix. Reconciliation compares this against
+   * the live rows, so it must be the FULL listing — pagination included.
+   */
+  async listClinicObjects(clinicId: string): Promise<string[]> {
+    const prefix = `clinic-${clinicId}/`;
+
+    if (!this.s3) {
+      const root = resolve(this.localRoot, prefix);
+      const out: string[] = [];
+      const walk = async (dir: string): Promise<void> => {
+        let entries: Awaited<ReturnType<typeof readdir>>;
+        try {
+          entries = await readdir(dir, { withFileTypes: true });
+        } catch {
+          return; // clinic has no objects yet
+        }
+        for (const entry of entries) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) await walk(full);
+          else out.push(`${prefix}${full.slice(root.length + 1).split(sep).join("/")}`);
+        }
+      };
+      await walk(root);
+      return out.filter(isAllowedStorageKey).sort();
+    }
+
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.s3.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token, MaxKeys: 1000 }),
+      );
+      for (const obj of page.Contents ?? []) {
+        if (obj.Key && isAllowedStorageKey(obj.Key)) keys.push(obj.Key);
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return keys.sort();
+  }
+
+  /**
+   * Delete by FULL key (the shape the orphan queue stores). The clinic id is
+   * passed separately and must match the key's own prefix — a queue row can never
+   * be used to reach into another tenant's prefix.
+   */
+  async removeObjectByKey(clinicId: string, fullKey: string): Promise<void> {
+    if (!isAllowedStorageKey(fullKey)) throw new Error("storage key is not an allowed tenant key");
+    if (clinicIdFromKey(fullKey) !== clinicId) {
+      throw new Error("storage key belongs to another clinic");
+    }
+    if (!this.s3) {
+      await unlink(this.localPath(fullKey));
+      return;
+    }
+    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: fullKey }));
   }
 
   async initiateMultipartUpload(

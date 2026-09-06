@@ -1,4 +1,5 @@
 import { Outbox, type MutationEnvelope } from "@scalpai/sync-client";
+import { redactPhiPayload } from "@scalpai/shared";
 import { db, type OutboxRecord } from "./db.js";
 
 /** Wire sync-client's Outbox to Dexie persistence (ADR-0027). */
@@ -12,11 +13,15 @@ export function createDexieAdapter() {
       schemaVersion: m.schemaVersion,
       clientUpdatedAt: m.clientUpdatedAt,
       baseVersion: m.baseVersion ?? null,
-      payload: JSON.stringify(m.payload),
+      // IndexedDB is not a secret store: keep the same redacted delta that the
+      // server ledger will receive. Ciphertext survives; readable notes do not.
+      payload: JSON.stringify(redactPhiPayload(m.payload)),
       createdAt: Date.now() + i,
     }));
-    await db.outbox.clear();
-    await db.outbox.bulkAdd(records);
+    await db.transaction("rw", db.outbox, async () => {
+      await db.outbox.clear();
+      await db.outbox.bulkAdd(records);
+    });
   };
 }
 
@@ -48,7 +53,6 @@ export async function flushOutbox(
     const acked = results.filter((r) => r.status === "applied" || r.status === "duplicate").map((r) => r.clientMutationId);
     outbox.ack(acked);
     flushed += acked.length;
-    // clean dexie after ack
     await db.outbox.bulkDelete(acked).catch(() => {});
   }
   return flushed;
