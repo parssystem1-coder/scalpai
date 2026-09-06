@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -281,6 +281,55 @@ describe("H15 - the browser suite runs against a real, addressable stack", () =>
     for (const id of ["patients-title", "patient-form", "patient-first-name", "patient-phone", "patient-add", "patient-row"]) {
       expect(patients).toContain(`data-testid="${id}"`);
     }
+  });
+});
+
+/**
+ * H15 - "smoke/offline/analysis/upload/perf really run". The helper assertions
+ * above only reach the four specs that log in, so perf.gallery.spec.ts (and any
+ * spec added later) could quietly lose its tag and stop being executed by any
+ * workflow while every gate stayed green. A tag is the only thing that makes a
+ * spec reachable through --grep, so the tag inventory is a gate of its own.
+ */
+describe("H15 - every e2e spec is tagged, and something really runs it", () => {
+  const specs = readdirSync(join(ROOT, "e2e"))
+    .filter((f) => f.endsWith(".spec.ts"))
+    .sort();
+
+  function tagsOf(rel: string): string[] {
+    return [...new Set([...read(rel).matchAll(/\btest\(\s*"(@[a-z0-9-]+)/g)].map((m) => m[1]!))].sort();
+  }
+
+  it("ships the five suites phase 5 promised", () => {
+    expect(specs).toEqual([
+      "analysis.spec.ts",
+      "offline.spec.ts",
+      "perf.gallery.spec.ts",
+      "smoke.spec.ts",
+      "upload-big.spec.ts",
+    ]);
+  });
+
+  it("tags every spec, so none is unreachable by --grep", () => {
+    const all = new Set<string>();
+    for (const spec of specs) {
+      const tags = tagsOf(`e2e/${spec}`);
+      expect(tags, `e2e/${spec} carries no @tag on any test title`).not.toHaveLength(0);
+      for (const tag of tags) all.add(tag);
+    }
+    expect([...all].sort()).toEqual(["@analysis", "@offline", "@perf", "@smoke", "@upload-big"]);
+  });
+
+  it("keeps @smoke as the only PR tag and leaves the rest to the untagged nightly run", () => {
+    expect(ci).toContain("npm run e2e:smoke");
+    expect(ci).not.toContain("e2e-full");
+    expect(nightly).toContain("run-gate.sh e2e-full npm run e2e");
+  });
+
+  it("hides no suite from the runner", () => {
+    expect(playwright).toContain('testDir: "e2e"');
+    expect(playwright).not.toContain("testIgnore");
+    expect(playwright).not.toContain("grepInvert");
   });
 });
 
