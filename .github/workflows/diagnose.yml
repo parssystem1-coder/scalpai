@@ -1,5 +1,6 @@
-# TEMPORARY (phase 4 review aid): one job per root gate so a red pipeline
-# points at the exact gate. Deleted before merge.
+# TEMPORARY (phase 4 review aid). Runs the two failing gates, captures their
+# output and posts it back as a PR comment so the failure is visible without
+# downloading artifacts. Deleted before merge.
 name: diagnose
 
 on:
@@ -7,62 +8,70 @@ on:
     branches: [main]
 
 jobs:
-  d-ops-spec:
+  d-report:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci --legacy-peer-deps
-      - run: npm exec -- vitest run tools/ops/deployment.phase4.spec.ts
 
-  d-image-api:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -f apps/api/Dockerfile -t scalpai-api:ci .
-
-  d-image-web:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -f apps/web/Dockerfile -t scalpai-web:ci .
-
-  d-boot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Secret set
-        working-directory: ops
+      - name: Collect gate output
         run: |
-          cat > ci.env <<'ENV'
-          SCALPAI_DOMAIN=clinic.example.com
-          ACME_EMAIL=admin@example.com
-          POSTGRES_USER=scalpai_owner
-          POSTGRES_PASSWORD=ci_dev_only_owner_pwd
-          POSTGRES_DB=scalpai
-          APP_ROLE_PASSWORD=ci_dev_only_app_pwd
-          MINIO_ROOT_USER=scalpai_admin
-          MINIO_ROOT_PASSWORD=ci_dev_only_minio_pwd
-          S3_BUCKET=scalpai-media
-          JWT_SECRET=ci_dev_only_secret_0123456789abcdef
-          BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase
-          ENV
-      - name: Build images
-        working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env build api web
-      - name: Boot migrate + api + web from an empty volume
-        working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
-      - name: Migration log
-        working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env logs migrate
-      - name: Diagnostics
-        if: failure()
-        working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env ps -a && docker compose -f prod.yml --env-file ci.env logs --tail 300
-      - name: Tear down
-        if: always()
-        working-directory: ops
-        run: docker compose -f prod.yml --env-file ci.env down -v
+          set +e
+          exec > /tmp/report.txt 2>&1
+          echo "===== vitest: tools/ops/deployment.phase4.spec.ts ====="
+          npm exec -- vitest run tools/ops/deployment.phase4.spec.ts
+          echo "vitest exit=$?"
+          cd ops
+          printf '%s\n' \
+            'SCALPAI_DOMAIN=clinic.example.com' \
+            'ACME_EMAIL=admin@example.com' \
+            'POSTGRES_USER=scalpai_owner' \
+            'POSTGRES_PASSWORD=ci_dev_only_owner_pwd' \
+            'POSTGRES_DB=scalpai' \
+            'APP_ROLE_PASSWORD=ci_dev_only_app_pwd' \
+            'MINIO_ROOT_USER=scalpai_admin' \
+            'MINIO_ROOT_PASSWORD=ci_dev_only_minio_pwd' \
+            'S3_BUCKET=scalpai-media' \
+            'JWT_SECRET=ci_dev_only_secret_0123456789abcdef' \
+            'BACKUP_ENCRYPTION_PASSPHRASE=ci_dev_only_backup_passphrase' > ci.env
+          echo "===== docker compose build api web ====="
+          docker compose -f prod.yml --env-file ci.env build api web
+          echo "compose build exit=$?"
+          echo "===== docker compose up --wait api web ====="
+          docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 200 api web
+          echo "compose up exit=$?"
+          docker compose -f prod.yml --env-file ci.env ps -a
+          docker compose -f prod.yml --env-file ci.env logs --tail 80 migrate api web
+          docker compose -f prod.yml --env-file ci.env down -v
+          exit 0
+
+      - name: Post report as a PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          raw = open("/tmp/report.txt", "r", errors="replace").read()
+          body = "### diagnose report\n\n```\n" + raw[-40000:] + "\n```"
+          url = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/issues/{os.environ['PR_NUMBER']}/comments"
+          req = urllib.request.Request(
+              url,
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req) as resp:
+              print(resp.status)
+          PY
