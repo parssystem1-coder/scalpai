@@ -130,12 +130,14 @@ describe("clinic timezone rendering (M13)", () => {
     expect(formatDate(instant, { locale: "en", format: "short", timeZone: "Pacific/Kiritimati" })).toBe("2026-09-05");
   });
 
-  it("handles midnight without emitting hour 24", () => {
+  it("handles the midnight rollover without emitting hour 24", () => {
+    // 20:30Z + 03:30 = exactly 00:00 on the next Tehran day.
     const midnightTehran = new Date("2026-09-04T20:30:00Z");
     const wall = wallClockIn(midnightTehran, "Asia/Tehran");
     expect(wall.hour).toBe(0);
-    expect(formatDate(midnightTehran, { locale: "en", format: "short", includeTime: true, timeZone: "Asia/Tehran" })).toBe(
-      "2026-09-05 at 00:30",
-    );
+    expect(wall.day).toBe(5);
+    expect(
+      formatDate(midnightTehran, { locale: "en", format: "short", includeTime: true, timeZone: "Asia/Tehran" }),
+    ).toBe("2026-09-05 at 00:00");
   });
 });
