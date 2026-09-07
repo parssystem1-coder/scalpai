@@ -6,6 +6,7 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "strict": true,
+    "types": ["node"],
     "skipLibCheck": true,
     "declaration": true,
     "sourceMap": true,

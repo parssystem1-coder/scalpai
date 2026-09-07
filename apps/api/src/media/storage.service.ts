@@ -245,14 +245,14 @@ export class StorageService implements OnModuleInit {
       const root = resolve(this.localRoot, prefix);
       const out: string[] = [];
       const walk = async (dir: string): Promise<void> => {
-        let entries: Awaited<ReturnType<typeof readdir>>;
+        let entries: any[];
         try {
-          entries = await readdir(dir, { withFileTypes: true });
+          entries = await readdir(dir, { withFileTypes: true }) as any[];
         } catch {
           return; // clinic has no objects yet
         }
         for (const entry of entries) {
-          const full = join(dir, entry.name);
+          const full = join(dir, (entry as unknown as { name: string }).name);
           if (entry.isDirectory()) await walk(full);
           else out.push(`${prefix}${full.slice(root.length + 1).split(sep).join("/")}`);
         }
