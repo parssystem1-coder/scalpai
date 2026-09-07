@@ -47,15 +47,43 @@ export class MutationContractError extends Error {
   }
 }
 
-/** A 4xx the server will refuse forever — retrying identical bytes cannot help. */
+/**
+ * A 4xx the server will refuse forever — retrying identical bytes cannot help.
+ *
+ * Phase 7.1 (ADR-0040): a refusal now says WHO it is about. `itemIds` carries the
+ * mutations the server actually named; an empty list means the server blamed the
+ * REQUEST, which is not evidence against any single queued item. The old class
+ * could not express that difference, so `flushOutbox` assumed the worst and
+ * dead-lettered the entire batch on every 400.
+ */
 export class PermanentPushError extends Error {
+  /** Mutations the server named. Empty = the request as a whole was refused. */
+  readonly itemIds: string[];
+  /** The API error code, when the transport could read one (`VALIDATION_ERROR`…). */
+  readonly code: string | null;
+
   constructor(
     message: string,
     public status = 400,
+    options: { itemIds?: readonly string[]; code?: string | null } = {},
   ) {
     super(message);
     this.name = "PermanentPushError";
+    this.itemIds = [...(options.itemIds ?? [])];
+    this.code = options.code ?? null;
   }
+
+  /** True when no single mutation can be blamed for this refusal. */
+  get isBatchScoped(): boolean {
+    return this.itemIds.length === 0;
+  }
+}
+
+/** RFC-4122 shape — the idempotency key the server can answer per item with. */
+const MUTATION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isMutationId(value: unknown): value is string {
+  return typeof value === "string" && MUTATION_ID_RE.test(value);
 }
 
 export function newMutationId(): string {
@@ -98,8 +126,16 @@ export function makeMutation(
  * The same validation the server runs, exposed so a bad envelope is refused at
  * ENQUEUE time. Historically a forged entity (`"consents" as "patients"`) was
  * only caught by the API, which 400s the whole batch and wedged the outbox.
+ *
+ * Phase 7.1: `flushOutbox` runs this again on the way OUT, because a queue can
+ * gain a bad record without ever passing through `enqueue` — a hand-restored
+ * backup, a downgraded build, a schema window that moved under a device that was
+ * offline for a week.
  */
 export function assertEnvelope(envelope: MutationEnvelope): void {
+  if (!isMutationId(envelope.clientMutationId)) {
+    throw new MutationContractError("clientMutationId must be a uuid — the server cannot answer per item without it");
+  }
   if (!isEntityName(envelope.entity)) throw new MutationContractError(`unknown entity '${String(envelope.entity)}'`);
   if (!isOp(envelope.op)) throw new MutationContractError(`unknown op '${String(envelope.op)}'`);
   if (!isSchemaVersionSupported(envelope.schemaVersion)) {

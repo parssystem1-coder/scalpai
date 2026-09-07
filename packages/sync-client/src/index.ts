@@ -32,6 +32,7 @@ export {
   PermanentPushError,
   assertEnvelope,
   isBaseVersion,
+  isMutationId,
   isSchemaVersionSupported,
   makeMutation,
   newMutationId,
@@ -50,6 +51,7 @@ export {
 export {
   Outbox,
   flushOutbox,
+  type FlushOptions,
   type FlushReport,
   type FlushStop,
   type OutboxItem,

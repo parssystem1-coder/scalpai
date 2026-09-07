@@ -45,6 +45,12 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
+    /**
+     * The `details` half of the canonical error body (engineering-rules §3). The
+     * sync client needs it: a 400 that names the offending mutations must not be
+     * treated as a verdict on the whole batch (ADR-0040).
+     */
+    public details?: unknown,
   ) {
     super(message);
   }
@@ -62,8 +68,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const err = body as { code?: string; message?: string } | null;
-    throw new ApiError(res.status, err?.code ?? "ERROR", err?.message ?? "خطای نامشخص");
+    const err = body as { code?: string; message?: string; details?: unknown } | null;
+    throw new ApiError(res.status, err?.code ?? "ERROR", err?.message ?? "خطای نامشخص", err?.details);
   }
   return body as T;
 }
