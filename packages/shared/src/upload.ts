@@ -110,9 +110,19 @@ export const UploadPartUrlsRequest = z.object({
 });
 export type UploadPartUrlsRequestDto = z.infer<typeof UploadPartUrlsRequest>;
 
+/**
+ * One uploaded part.
+ *
+ * `etag` is OPTIONAL on purpose. A browser can only read the `ETag` response
+ * header of a cross-origin PUT when the bucket exposes it, so demanding one made
+ * completion fail for a reason no client could fix. The server takes the ETag it
+ * sends to `CompleteMultipartUpload` from the BUCKET; when the client does supply
+ * one it is compared, which turns it into an integrity check instead of a
+ * requirement.
+ */
 export const UploadedPart = z.object({
   partNumber: z.coerce.number().int().min(1).max(UPLOAD_MAX_PARTS),
-  etag: z.string().regex(ETAG_PATTERN, "etag معتبر نیست"),
+  etag: z.string().regex(ETAG_PATTERN, "etag معتبر نیست").optional(),
   sizeBytes: z.coerce.number().int().min(0).max(UPLOAD_MAX_BYTES).optional(),
 });
 export type UploadedPartDto = z.infer<typeof UploadedPart>;
@@ -145,6 +155,7 @@ export const UploadComplete = z
   });
 export type UploadCompleteDto = z.infer<typeof UploadComplete>;
 
+/** What `GET /gallery/uploads/:id` answers — the resume contract. */
 export interface UploadSessionView {
   sessionId: string;
   galleryItemId: string;

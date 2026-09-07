@@ -232,9 +232,10 @@ export class UploadService {
 
   /**
    * Finish a multipart upload. Every declared part is verified against the
-   * BUCKET first — presence and byte size — because `CompleteMultipartUpload`
-   * will happily assemble a truncated object out of whatever parts exist, and the
-   * corruption then shows up later, inside a clinical image.
+   * BUCKET first — presence, byte size and (when the client could read it) the
+   * ETag — because `CompleteMultipartUpload` will happily assemble a truncated
+   * object out of whatever parts exist, and the corruption then shows up later,
+   * inside a clinical image.
    */
   async completeMultipart(sessionId: string, dto: UploadCompleteDto): Promise<CompleteResult> {
     const ctx = this.scope.requireCtx();
@@ -247,6 +248,7 @@ export class UploadService {
     const inBucket = new Map(
       (await this.storage.listParts(ctx.clinicId, session.storageKey, session.uploadId)).map((p) => [p.partNumber, p]),
     );
+    const verified: Array<{ partNumber: number; etag: string }> = [];
     for (const part of dto.parts) {
       const actual = inBucket.get(part.partNumber);
       if (!actual) throw errors.validation({ parts: `part ${part.partNumber} is not in the bucket` });
@@ -254,14 +256,14 @@ export class UploadService {
       if (actual.bytes !== expected) {
         throw errors.validation({ parts: `part ${part.partNumber} is ${actual.bytes} bytes, expected ${expected}` });
       }
+      const claimed = part.etag?.replace(/"/g, "");
+      if (claimed && claimed !== actual.etag) {
+        throw errors.validation({ parts: `part ${part.partNumber} does not match the stored object` });
+      }
+      verified.push({ partNumber: part.partNumber, etag: actual.etag });
     }
 
-    await this.storage.completeMultipartUpload(
-      ctx.clinicId,
-      session.storageKey,
-      session.uploadId,
-      dto.parts.map((p) => ({ partNumber: p.partNumber, etag: p.etag })),
-    );
+    await this.storage.completeMultipartUpload(ctx.clinicId, session.storageKey, session.uploadId, verified);
     return this.runPipeline(session.galleryItemId, session);
   }
 
