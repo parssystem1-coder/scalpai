@@ -9,17 +9,55 @@
     <meta property="og:description" content="پلتفرم جامع تریکولوژی، آنالیز پوست و مو، مدیریت پرونده بیماران و ثبت داده‌های کلینیکی" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#C9906A" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
+      /*
+        WEAKNESSES M18 - fonts are SELF-HOSTED.
+
+        This head used to open with preconnects to fonts.googleapis.com and
+        fonts.gstatic.com and pull FIVE families. For a self-hosted clinical
+        product that is three separate problems: a third-party request on the
+        first paint of a page that renders PHI, an install that breaks on an
+        air-gapped network, and ~400KB of display faces nobody asked for.
+
+        Two families remain: Vazirmatn (the UI face, Persian + Latin) and
+        Playfair Display (marketing headlines only). Both resolve, in order, to a
+        font already installed on the machine, then to the vendored file under
+        /fonts, then to the platform stack - so a fresh clone with an empty
+        /fonts directory still renders correctly, just without the brand face.
+        See apps/web/public/fonts/README.md for the vendoring step.
+      */
+      @font-face {
+        font-family: 'Vazirmatn';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src:
+          local('Vazirmatn'),
+          url('/fonts/Vazirmatn-Variable.woff2') format('woff2-variations');
+      }
+
+      @font-face {
+        font-family: 'Playfair Display';
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src:
+          local('Playfair Display'),
+          url('/fonts/PlayfairDisplay-Variable.woff2') format('woff2-variations');
+      }
+
+      :root {
+        --font-ui: 'Vazirmatn', 'Segoe UI', system-ui, -apple-system, 'Noto Sans Arabic', sans-serif;
+        --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      }
+
       * {
         box-sizing: border-box;
       }
       body {
         margin: 0;
         padding: 0;
-        font-family: 'Vazirmatn', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        font-family: var(--font-ui);
         background-color: #FAF6F0;
         color: #1A1614;
         -webkit-font-smoothing: antialiased;
