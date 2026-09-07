@@ -12,6 +12,7 @@ import { AppModule } from "./app.module.js";
 import { resolveJwtConfig } from "./auth/jwt.config.js";
 import { AllExceptionsFilter } from "./common/error.filter.js";
 import { logEvent } from "./common/logging.js";
+import { assertObservabilityConfig } from "./common/observability.config.js";
 import { assertPhiConfig } from "./common/phi.config.js";
 import { buildCorsOptions, resolveAllowedOrigins } from "./common/security.config.js";
 import { registerSecurityHeaders } from "./common/security-headers.js";
@@ -20,9 +21,9 @@ import { resolveStorageDriver } from "./media/storage.service.js";
 
 /**
  * Fail-closed boot: signing secret, CORS allowlist, storage driver, docs
- * exposure and (phase 6) PHI key material are all validated before a socket is
- * opened. A missing or weak value aborts startup instead of falling back to a
- * permissive default.
+ * exposure, (phase 6) PHI key material and (phase 9) the alert sink are all
+ * validated before a socket is opened. A missing or weak value aborts startup
+ * instead of falling back to a permissive default.
  */
 function assertBootConfig(): void {
   resolveJwtConfig();
@@ -32,6 +33,9 @@ function assertBootConfig(): void {
   // C2/ADR-0038: in production a missing PHI key ring is a boot failure. There
   // is no plaintext fallback for a clinical note.
   assertPhiConfig();
+  // L3/ADR-0042: in production an install that can page nobody about a failed
+  // backup or a 5xx burst is not operable.
+  assertObservabilityConfig();
 }
 
 /**

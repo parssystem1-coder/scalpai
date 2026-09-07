@@ -21,6 +21,8 @@ import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
 import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
+import { OpsController } from "./ops/ops.controller.js";
+import { installObservability } from "./ops/observability.js";
 import { UploadService } from "./media/upload.service.js";
 import { PlansController } from "./plans.controller.js";
 import { PrivacyController } from "./privacy/privacy.controller.js";
@@ -56,6 +58,8 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     AnalysesController,
     SyncController,
     PrivacyController,
+    // Phase 9 (L3/ADR-0042): readiness, liveness and the metrics scrape.
+    OpsController,
     ...(mockStorage ? [MockStorageController] : []),
   ],
   providers: [
@@ -87,6 +91,8 @@ export class AppModule implements OnModuleInit {
   constructor(private adapterHost: HttpAdapterHost) {}
 
   onModuleInit(): void {
+    // Phase 9 (L3): metrics + alerting subscribe to the access log exactly once.
+    installObservability();
     const fastify = this.adapterHost.httpAdapter?.getInstance<FastifyInstance>();
     if (!fastify) return;
     // Phase 6 (L3): the request id is minted before anything else so every log

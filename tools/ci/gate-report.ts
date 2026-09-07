@@ -40,7 +40,25 @@ export const REQUIRED_GATES = [
   "stack-boot",
   "migrate-once",
   "api-health",
+  // Phase 9 (C10/ADR-0042): the backup pipeline is proven by running it and
+  // restoring from it, not by reading a cron log.
+  "backup-image",
+  "backup-run",
+  "backup-offsite",
+  "restore-drill",
 ] as const;
+
+/**
+ * The subset a scheduled restore drill has to produce (nightly + the monthly
+ * staging run). It deliberately omits the image build: a drill proves recovery,
+ * not packaging.
+ */
+export const DRILL_GATES = ["backup-run", "backup-offsite", "restore-drill"] as const;
+
+export const GATE_SETS: Record<string, readonly string[]> = {
+  ci: REQUIRED_GATES,
+  drill: DRILL_GATES,
+};
 
 export type GateStatus = "pass" | "fail" | "missing";
 
@@ -140,11 +158,23 @@ export function renderTable(rows: GateRow[]): string {
   return lines.join("\n");
 }
 
+/** `gate-report.ts [dir] [--set=ci|drill]` */
+export function parseArgs(argv: readonly string[]): { dir: string; set: string } {
+  const set = argv.find((a) => a.startsWith("--set="))?.slice("--set=".length) ?? "ci";
+  const dir = argv.find((a) => !a.startsWith("--")) ?? process.env.CI_EVIDENCE_DIR ?? "ci-evidence";
+  return { dir, set };
+}
+
 function main(): void {
-  const dir = process.argv[2] ?? process.env.CI_EVIDENCE_DIR ?? "ci-evidence";
-  const result = auditGates(dir);
+  const { dir, set } = parseArgs(process.argv.slice(2));
+  const required = GATE_SETS[set];
+  if (!required) {
+    console.error(`unknown gate set '${set}' (known: ${Object.keys(GATE_SETS).join(", ")})`);
+    process.exit(2);
+  }
+  const result = auditGates(dir, required);
   const table = renderTable(result.rows);
-  console.log(`Gate report from ${dir}\n`);
+  console.log(`Gate report (${set}) from ${dir}\n`);
   console.log(table);
   if (result.extra.length > 0) console.log(`\nextra evidence (not required): ${result.extra.join(", ")}`);
 
@@ -152,7 +182,7 @@ function main(): void {
   if (summary) {
     appendFileSync(
       summary,
-      `## Gate report\n\n${table}\n\n${result.ok ? "All required gates ran and passed." : "Missing or failed gates - see above."}\n`,
+      `## Gate report (${set})\n\n${table}\n\n${result.ok ? "All required gates ran and passed." : "Missing or failed gates - see above."}\n`,
       "utf8",
     );
   }

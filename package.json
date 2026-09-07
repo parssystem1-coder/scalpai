@@ -23,8 +23,12 @@
     "audit:ci": "npm audit --audit-level=high --omit=dev",
     "scan:secrets": "tsx tools/secret-scan.ts",
     "ci:gate": "tsx tools/ci/gate-report.ts ci-evidence",
+    "ci:gate:drill": "tsx tools/ci/gate-report.ts ci-evidence --set=drill",
     "ops:validate": "docker compose -f ops/prod.yml --env-file ops/prod.env config -q",
-    "ops:up": "docker compose -f ops/prod.yml --env-file ops/prod.env up -d --build --wait"
+    "ops:up": "docker compose -f ops/prod.yml --env-file ops/prod.env up -d --build --wait",
+    "ops:backup": "bash ops/backup.sh",
+    "ops:restore": "bash ops/restore.sh",
+    "ops:restore-drill": "bash ops/restore-drill.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
