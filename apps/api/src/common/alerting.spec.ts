@@ -34,13 +34,17 @@ describe("L3 - an alert never carries patient data", () => {
   });
 
   it("ignores anything not on the allowlist", () => {
-    const payload = buildAlertPayload({
+    const smuggled = {
       event: "x",
       severity: "info",
-      // @ts-expect-error - deliberately passing a key the contract forbids
       notes: "patient has a scalp condition",
-    });
-    expect(JSON.stringify(payload)).not.toContain("scalp condition");
+      email: "owner@clinic-a.test",
+    } as unknown as Parameters<typeof buildAlertPayload>[0];
+    const payload = buildAlertPayload(smuggled, { NODE_ENV: "test" });
+    expect(Object.keys(payload).sort()).toEqual(["at", "environment", "event", "severity", "source"]);
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain("scalp condition");
+    expect(serialized).not.toContain("owner@clinic-a.test");
   });
 });
 
@@ -60,10 +64,9 @@ describe("L3 - delivery is filtered, deduped and never fatal", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", fetchMock);
     const sink = new AlertSink(() => config());
-    const event = { event: "http.server_error", severity: "critical", path: "/api/v1/sync/push" } as const;
-    await sink.notify({ ...event });
-    await sink.notify({ ...event });
-    await sink.notify({ ...event });
+    for (let i = 0; i < 3; i++) {
+      await sink.notify({ event: "http.server_error", severity: "critical", path: "/api/v1/sync/push" });
+    }
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -84,10 +87,13 @@ describe("L3 - delivery is filtered, deduped and never fatal", () => {
   });
 
   it("swallows a dead webhook instead of failing the request", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
+    const sink = new AlertSink(() => config());
+    await expect(sink.notify({ event: "backup.failed", severity: "critical" })).resolves.toBe(false);
+  });
+
+  it("reports a rejected delivery without throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503 }));
     const sink = new AlertSink(() => config());
     await expect(sink.notify({ event: "backup.failed", severity: "critical" })).resolves.toBe(false);
   });
