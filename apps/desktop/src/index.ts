@@ -1,6 +1,18 @@
 /**
- * ScalpAI Desktop Shell (Phase 4.5)
- * Electron / Native wrapper supporting UVC trichoscopy hardware and local SQLite caching.
+ * ScalpAI desktop shell — CONTRACT ONLY.
+ *
+ * WEAKNESSES M3. This module used to export a `UvcDeviceManager` that returned a
+ * hard-coded list of two trichoscopes (a Dino-Lite MEDL4HM and a Firefly DE330T),
+ * set `uvcDeviceSupported: true`, and logged "Initialized with 2 detected UVC
+ * trichoscopy drivers" at import time. None of that was real: there is no
+ * Electron main process in this repository, no IPC bridge, no UVC enumeration and
+ * no local SQLite cache. The claim was reachable from docs and from the product
+ * copy, which is exactly the kind of unprovable statement phase 10 removes.
+ *
+ * The honest version keeps the CONTRACT — the channel names and payload shapes a
+ * real shell would have to implement — and reports capability as false. Anything
+ * that asks "can this installation talk to a trichoscope?" now gets `false` until
+ * a shell exists to answer otherwise.
  */
 
 export interface DesktopAppConfig {
@@ -8,10 +20,13 @@ export interface DesktopAppConfig {
   appVersion: string;
   apiBaseUrl: string;
   isOfflineMode: boolean;
-  uvcDeviceSupported: boolean;
-  hardwareAcceleration: boolean;
 }
 
+/**
+ * The shape a real shell would return from `ENUMERATE_UVC_DEVICES`. It exists so
+ * the web app can be written against a stable type, not so anything can pretend
+ * to have found one.
+ */
 export interface UvcTrichoscopeDevice {
   deviceId: string;
   label: string;
@@ -21,6 +36,7 @@ export interface UvcTrichoscopeDevice {
   supportsOpticalMagnification: boolean;
 }
 
+/** IPC channel names a desktop shell would have to implement. */
 export const TRICHOSCOPY_IPC_CHANNELS = {
   ENUMERATE_UVC_DEVICES: "trichoscopy:enumerate-devices",
   SELECT_UVC_DEVICE: "trichoscopy:select-device",
@@ -29,45 +45,54 @@ export const TRICHOSCOPY_IPC_CHANNELS = {
   CHECK_LICENSE_STATUS: "license:check-status",
 } as const;
 
-export class UvcDeviceManager {
-  private connectedDevices: UvcTrichoscopeDevice[] = [
-    {
-      deviceId: "uvc-dermo-01",
-      label: "Dino-Lite TrichoScope Polarized (MEDL4HM)",
-      manufacturer: "AnMo Electronics",
-      maxResolution: { width: 2592, height: 1944 }, // 5MP Trichoscopy
-      supportsCrossPolarization: true,
-      supportsOpticalMagnification: true,
-    },
-    {
-      deviceId: "uvc-dermo-02",
-      label: "Firefly DE330T Wireless Trichoscope",
-      manufacturer: "Firefly Global",
-      maxResolution: { width: 1920, height: 1080 },
-      supportsCrossPolarization: true,
-      supportsOpticalMagnification: true,
-    },
-  ];
+/**
+ * What a desktop shell would have to inject on `globalThis` for any of the above
+ * to be callable. Nothing in this repository provides it.
+ */
+export interface DesktopBridge {
+  invoke(channel: string, payload?: unknown): Promise<unknown>;
+}
 
-  public listDevices(): UvcTrichoscopeDevice[] {
-    return this.connectedDevices;
+function resolveBridge(): DesktopBridge | null {
+  const candidate = (globalThis as { scalpaiDesktop?: unknown }).scalpaiDesktop;
+  if (candidate && typeof (candidate as DesktopBridge).invoke === "function") {
+    return candidate as DesktopBridge;
   }
+  return null;
+}
 
-  public getDeviceById(deviceId: string): UvcTrichoscopeDevice | undefined {
-    return this.connectedDevices.find((d) => d.deviceId === deviceId);
-  }
+/**
+ * Capability report. `available` is the ONLY honest answer about hardware: it is
+ * true when, and only when, a shell has injected a bridge to ask.
+ */
+export interface TrichoscopyCapability {
+  available: boolean;
+  reason: string;
+}
+
+export function trichoscopyCapability(): TrichoscopyCapability {
+  return resolveBridge()
+    ? { available: true, reason: "desktop bridge present" }
+    : {
+        available: false,
+        reason: "no desktop shell: UVC trichoscopy capture is not implemented in this build",
+      };
+}
+
+/**
+ * Enumerate devices THROUGH the bridge. With no bridge the answer is an empty
+ * list — never a fabricated one.
+ */
+export async function listTrichoscopes(): Promise<UvcTrichoscopeDevice[]> {
+  const bridge = resolveBridge();
+  if (!bridge) return [];
+  const devices = await bridge.invoke(TRICHOSCOPY_IPC_CHANNELS.ENUMERATE_UVC_DEVICES);
+  return Array.isArray(devices) ? (devices as UvcTrichoscopeDevice[]) : [];
 }
 
 export const DEFAULT_DESKTOP_CONFIG: DesktopAppConfig = {
-  appName: "ScalpAI Clinical Studio Desktop",
-  appVersion: "2.0.0-phase4",
-  apiBaseUrl: process.env.SCALPAI_API_URL || "http://localhost:3001/api",
+  appName: "ScalpAI Clinical Studio",
+  appVersion: "0.0.0",
+  apiBaseUrl: process.env.SCALPAI_API_URL ?? "http://localhost:3001/api",
   isOfflineMode: false,
-  uvcDeviceSupported: true,
-  hardwareAcceleration: true,
 };
-
-export const uvcManager = new UvcDeviceManager();
-console.log(`[ScalpAI Desktop Shell] Initialized with ${uvcManager.listDevices().length} detected UVC trichoscopy drivers.`);
-
-

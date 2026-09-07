@@ -9,6 +9,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DbService, migrate, seed } from "@scalpai/db";
 import { resetAll, seedMarkerClinicId } from "@scalpai/db/testing";
+import { ANALYSIS_MODEL_REGISTRY, modelRefOf, sha256HexOfText } from "@scalpai/shared";
 import { AppModule } from "../src/app.module.js";
 
 /** Slice M5 — analyses persistence + expert review contract on real PG. */
@@ -19,6 +20,24 @@ let db: DbService;
 
 const A = { email: "owner@clinic-a.test", password: "Dev12345!" };
 const B = { email: "owner@clinic-b.test", password: "Dev12345!" };
+
+const MODEL = ANALYSIS_MODEL_REGISTRY[0]!;
+
+/**
+ * Phase 10 (H13): a submission has to say WHICH pixels and WHICH model produced
+ * it. `label` only varies the digest so two tests never look like the same image.
+ */
+function provenance(label: string, overrides: Record<string, unknown> = {}) {
+  return {
+    imageSha256: sha256HexOfText(`pixels:${label}`),
+    pixelWidth: 1024,
+    pixelHeight: 768,
+    model: modelRefOf(MODEL),
+    computedAt: new Date().toISOString(),
+    diagnostic: false,
+    ...overrides,
+  };
+}
 
 async function login(creds: { email: string; password: string }): Promise<string> {
   const res = await http.post("/api/v1/auth/login").send(creds);
@@ -71,7 +90,12 @@ describe("analyses (playbook 2.3)", () => {
       .send({
         patientId: pid,
         galleryItemId: init.body.id,
-        result: { scores: { redness: 42, flakeTexture: 17, densityProxy: 88 }, severity: 47, modelVersion: "heuristic-v0" },
+        result: {
+          scores: { redness: 42, flakeTexture: 17, densityProxy: 88 },
+          severity: 47,
+          modelVersion: MODEL.version,
+          provenance: provenance("persist"),
+        },
       });
     expect(submit.status).toBe(201);
     expect(String(submit.body.id)).toBeTruthy();
@@ -103,7 +127,12 @@ describe("analyses (playbook 2.3)", () => {
       .send({
         patientId: pid,
         galleryItemId: init.body.id,
-        result: { scores: { redness: 10, flakeTexture: 20, densityProxy: 30 }, severity: 19, modelVersion: "heuristic-v0" },
+        result: {
+          scores: { redness: 10, flakeTexture: 20, densityProxy: 30 },
+          severity: 19,
+          modelVersion: MODEL.version,
+          provenance: provenance("gold-label"),
+        },
       });
     const id = String(submit.body.id);
 
@@ -143,12 +172,115 @@ describe("analyses (playbook 2.3)", () => {
       .send({
         patientId: pid,
         galleryItemId: init.body.id,
-        result: { scores: { redness: 1, flakeTexture: 2, densityProxy: 3 }, severity: 2, modelVersion: "heuristic-v0" },
+        result: {
+          scores: { redness: 1, flakeTexture: 2, densityProxy: 3 },
+          severity: 2,
+          modelVersion: MODEL.version,
+          provenance: provenance("tenant-isolation"),
+        },
       });
 
     const leak = await http
       .get(`/api/v1/analyses/${submit.body.id}`)
       .set("Authorization", `Bearer ${b}`);
     expect(leak.status).toBe(404);
+  });
+});
+
+/**
+ * Phase 10 (H13). The server cannot recompute a client-side analysis, so the one
+ * thing it CAN do is refuse a result that does not say what produced it. These
+ * are the refusals that turn "the client claims heuristic-v0" into something
+ * checkable.
+ */
+describe("analysis provenance is enforced server-side (H13)", () => {
+  async function setup(): Promise<{ auth: { Authorization: string }; pid: string; gid: string }> {
+    const token = await login(A);
+    const auth = { Authorization: `Bearer ${token}` };
+    const patient = await http
+      .post("/api/v1/patients")
+      .set(auth)
+      .send({ firstName: "پرووننس", lastName: "تست", phone: `0919${Date.now()}`.slice(0, 11) });
+    const pid = String(patient.body.id);
+    const init = await http
+      .post(`/api/v1/patients/${pid}/gallery/init`)
+      .set(auth)
+      .send({ mime: "image/jpeg", sizeBytes: 200_000 });
+    return { auth, pid, gid: String(init.body.id) };
+  }
+
+  it("refuses a submission with no provenance at all", async () => {
+    const { auth, pid, gid } = await setup();
+    const res = await http
+      .post("/api/v1/analyses")
+      .set(auth)
+      .send({
+        patientId: pid,
+        galleryItemId: gid,
+        result: { scores: { redness: 5, flakeTexture: 5, densityProxy: 5 }, severity: 5, modelVersion: MODEL.version },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("refuses a model version that is not in the platform registry", async () => {
+    const { auth, pid, gid } = await setup();
+    const res = await http
+      .post("/api/v1/analyses")
+      .set(auth)
+      .send({
+        patientId: pid,
+        galleryItemId: gid,
+        result: {
+          scores: { redness: 5, flakeTexture: 5, densityProxy: 5 },
+          severity: 5,
+          modelVersion: "scalp-gpt-v7",
+          provenance: provenance("unknown-model", {
+            model: { ...modelRefOf(MODEL), version: "scalp-gpt-v7" },
+          }),
+        },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("refuses a modelVersion that disagrees with the manifest it shipped", async () => {
+    const { auth, pid, gid } = await setup();
+    const res = await http
+      .post("/api/v1/analyses")
+      .set(auth)
+      .send({
+        patientId: pid,
+        galleryItemId: gid,
+        result: {
+          scores: { redness: 5, flakeTexture: 5, densityProxy: 5 },
+          severity: 5,
+          modelVersion: "heuristic-v9",
+          provenance: provenance("mismatch"),
+        },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("refuses a digest that is not a sha256, and a client claiming diagnostic scope", async () => {
+    const { auth, pid, gid } = await setup();
+    const base = {
+      patientId: pid,
+      galleryItemId: gid,
+      result: { scores: { redness: 5, flakeTexture: 5, densityProxy: 5 }, severity: 5, modelVersion: MODEL.version },
+    };
+
+    const badDigest = await http
+      .post("/api/v1/analyses")
+      .set(auth)
+      .send({ ...base, result: { ...base.result, provenance: provenance("x", { imageSha256: "not-a-digest" }) } });
+    expect(badDigest.status).toBe(400);
+
+    const claimsDiagnostic = await http
+      .post("/api/v1/analyses")
+      .set(auth)
+      .send({ ...base, result: { ...base.result, provenance: provenance("y", { diagnostic: true }) } });
+    expect(claimsDiagnostic.status).toBe(400);
   });
 });

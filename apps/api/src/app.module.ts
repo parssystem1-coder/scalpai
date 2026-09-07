@@ -18,6 +18,8 @@ import { registerRequestLogging } from "./common/logging.js";
 import { StateStore } from "./common/state/state.store.js";
 import { CoreController } from "./core.controller.js";
 import { EntitlementService } from "./entitlements/entitlement.service.js";
+import { LicenseController } from "./licensing/license.controller.js";
+import { LicenseService } from "./licensing/license.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
 import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
@@ -58,6 +60,9 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     AnalysesController,
     SyncController,
     PrivacyController,
+    // Phase 10 (M2/ADR-0043): the licence verdict comes from a real Ed25519
+    // verification here, not from a literal in the browser.
+    LicenseController,
     // Phase 9 (L3/ADR-0042): readiness, liveness and the metrics scrape.
     OpsController,
     ...(mockStorage ? [MockStorageController] : []),
@@ -70,6 +75,7 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     EntitlementService,
     LoginThrottleService,
     StorageService,
+    LicenseService,
     // Phase 8 (ADR-0041): quota, object store and the upload session row have to
     // move together, so exactly one service owns that ordering.
     UploadService,

@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import { ApiError, resolveLocale, ERROR_MESSAGES } from "@scalpai/shared";
 import { join } from "node:path";
-import { readFileSync, existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { logEvent, requestIdOf } from "./logging.js";
 
 /**
@@ -13,7 +13,84 @@ import { logEvent, requestIdOf } from "./logging.js";
  * raw driver message, and a Postgres unique-violation message quotes the value
  * that collided — which for `patients_clinic_phone_live_uq` is a patient's phone
  * number. It also correlates with the access log through the request id.
+ *
+ * Phase 10 (M11): the SPA fallback was doing TWO `existsSync` calls plus a
+ * synchronous `readFileSync` of index.html on every single 404 — on the event
+ * loop, per request, forever. It is now read once, cached (including the
+ * "there is no build here" answer), and primed off the request path at module
+ * load. It also stopped swallowing real 404s: /api answers with the canonical
+ * error body, and so does anything that looks like a missing ASSET, because
+ * returning HTML with status 200 for a missing .js chunk is how a broken deploy
+ * turns into a silent white screen.
  */
+
+/** Where a built web bundle can legitimately sit relative to the API's cwd. */
+const SHELL_CANDIDATES = ["apps/web/dist/index.html", "../web/dist/index.html"] as const;
+
+/** Requests that must NEVER receive the HTML shell. */
+const API_PREFIXES = ["/api", "/health", "/ready", "/metrics", "/docs"] as const;
+
+/** A path whose last segment carries an extension is an asset, not a route. */
+const ASSET_LIKE = /\/[^/]+\.[a-zA-Z0-9]{1,8}$/;
+
+type ShellCache = { loaded: true; html: string | null } | { loaded: false };
+
+let shellCache: ShellCache = { loaded: false };
+let shellLoading: Promise<void> | null = null;
+
+async function loadShell(): Promise<void> {
+  for (const candidate of SHELL_CANDIDATES) {
+    try {
+      const html = await readFile(join(process.cwd(), candidate), "utf-8");
+      shellCache = { loaded: true, html };
+      return;
+    } catch {
+      // try the next candidate
+    }
+  }
+  // Cache the negative answer too: an API-only deployment must not retry the
+  // filesystem on every 404 for the rest of its life.
+  shellCache = { loaded: true, html: null };
+}
+
+/**
+ * Kick the read off the request path. Exported so a test can await it instead of
+ * racing it.
+ */
+export function primeSpaShell(): Promise<void> {
+  shellLoading ??= loadShell();
+  return shellLoading;
+}
+
+/** Test seam: forget everything the process learned about the bundle. */
+export function resetSpaShellCache(): void {
+  shellCache = { loaded: false };
+  shellLoading = null;
+}
+
+/** The cached shell, or null when there is no build (or it is not read yet). */
+export function cachedSpaShell(): string | null {
+  if (!shellCache.loaded) {
+    void primeSpaShell();
+    return null;
+  }
+  return shellCache.html;
+}
+
+/**
+ * M11 — a 404 may only be answered with the SPA shell when it is plausibly a
+ * client-side ROUTE. Machine clients and missing assets get the real 404.
+ */
+export function isSpaShellCandidate(method: string, url: string): boolean {
+  if (method !== "GET") return false;
+  const path = url.split("?")[0] ?? url;
+  if (API_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return false;
+  if (ASSET_LIKE.test(path)) return false;
+  return true;
+}
+
+void primeSpaShell();
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -69,24 +146,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
-    // SPA fallback: only for non-API GETs, and it must never swallow a real
-    // /api 404 (M11 keeps the rest of this; the /api guard is the part that
-    // matters for a machine client).
-    if (status === 404 && req.method === "GET" && !req.url.startsWith("/api")) {
-      try {
-        const p1 = join(process.cwd(), "apps/web/dist/index.html");
-        const p2 = join(process.cwd(), "../web/dist/index.html");
-        const filePath = existsSync(p1) ? p1 : existsSync(p2) ? p2 : null;
-        if (filePath) {
-          const indexHtml = readFileSync(filePath, "utf-8");
-          void res.type("text/html").send(indexHtml);
-          return;
-        }
-      } catch {
-        // Fallback if not built yet
-      }
-    }
-
+    // The log line is written for EVERY refusal, including the ones answered with
+    // the shell — a swallowed 404 that leaves no trace is how M11 stayed open.
     logEvent(status >= 500 ? "error" : "warn", {
       event: "http.error",
       requestId: requestIdOf(req),
@@ -95,6 +156,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // Scrubbed and truncated by the logger — driver messages quote values.
       message: (exception as Error)?.message ?? "unknown",
     });
+
+    if (status === 404 && isSpaShellCandidate(req.method, req.url)) {
+      const html = cachedSpaShell();
+      if (html !== null) {
+        void res.status(200).type("text/html").send(html);
+        return;
+      }
+    }
 
     void res.status(status).send(body);
   }
