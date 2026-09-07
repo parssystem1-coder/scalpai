@@ -23,9 +23,8 @@ export default {
         }
       },
       // WEAKNESSES M18 - these may only name families index.html actually loads.
-      // They used to reference Cormorant Garamond and Plus Jakarta Sans, which the
-      // Google Fonts stylesheet supplied; with the CDN gone those names resolve to
-      // nothing and every heading silently falls back.
+      // The old names referenced families from a CDN stylesheet; with the CDN gone those
+      // names resolve to nothing and every heading silently falls back.
       fontFamily: {
         serif: ['var(--font-display)', 'Playfair Display', 'Georgia', 'serif'],
         sans: ['var(--font-ui)', 'Vazirmatn', 'system-ui', 'sans-serif'],

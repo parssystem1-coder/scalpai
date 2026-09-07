@@ -1,9 +1,9 @@
 /**
  * ScalpAI desktop shell — CONTRACT ONLY.
  *
- * WEAKNESSES M3. This module used to export a `UvcDeviceManager` that returned a
- * hard-coded list of two trichoscopes (a Dino-Lite MEDL4HM and a Firefly DE330T),
- * set `uvcDeviceSupported: true`, and logged "Initialized with 2 detected UVC
+ * WEAKNESSES M3. This module used to export a manager that returned a
+ * hard-coded list of two trichoscopes (brand A model X and brand B model Y),
+ * set a flag to true, and logged "Initialized with 2 detected UVC
  * trichoscopy drivers" at import time. None of that was real: there is no
  * Electron main process in this repository, no IPC bridge, no UVC enumeration and
  * no local SQLite cache. The claim was reachable from docs and from the product

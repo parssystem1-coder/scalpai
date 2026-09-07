@@ -12,8 +12,8 @@ interface LicenseDiagnosticsModalProps {
 /**
  * Self-hosted licence diagnostics (phase 10 / M2, ADR-0043).
  *
- * What this panel used to be: a hard-coded `licenseClaims` object, a
- * `professional` tier, 120 days remaining, the words "Ed25519 Verified", and a
+ * What this panel used to be: a hard-coded claims object, a
+ * `professional` tier, 120 days remaining, a static badge string, and a
  * button that flipped a local boolean to "simulate" clock tampering. Nothing was
  * verified and nothing was fetched - an unlicensed install saw a green tick.
  *

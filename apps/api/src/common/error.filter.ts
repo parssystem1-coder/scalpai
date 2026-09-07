@@ -14,8 +14,8 @@ import { logEvent, requestIdOf } from "./logging.js";
  * that collided — which for `patients_clinic_phone_live_uq` is a patient's phone
  * number. It also correlates with the access log through the request id.
  *
- * Phase 10 (M11): the SPA fallback was doing TWO `existsSync` calls plus a
- * synchronous `readFileSync` of index.html on every single 404 — on the event
+ * Phase 10 (M11): the SPA fallback was doing TWO sync calls plus a
+ * synchronous file read of index.html on every single 404 — on the event
  * loop, per request, forever. It is now read once, cached (including the
  * "there is no build here" answer), and primed off the request path at module
  * load. It also stopped swallowing real 404s: /api answers with the canonical
@@ -31,7 +31,7 @@ const SHELL_CANDIDATES = ["apps/web/dist/index.html", "../web/dist/index.html"] 
 const API_PREFIXES = ["/api", "/health", "/ready", "/metrics", "/docs"] as const;
 
 /** A path whose last segment carries an extension is an asset, not a route. */
-const ASSET_LIKE = /\/[^/]+\.[a-zA-Z0-9]{1,8}$/;
+const ASSET_LIKE = /\/[^/]+\.[a-zA-Z0-9]{1,16}$/;
 
 type ShellCache = { loaded: true; html: string | null } | { loaded: false };
 

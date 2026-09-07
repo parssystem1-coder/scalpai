@@ -13,9 +13,8 @@
       /*
         WEAKNESSES M18 - fonts are SELF-HOSTED.
 
-        This head used to open with preconnects to fonts.googleapis.com and
-        fonts.gstatic.com and pull FIVE families. For a self-hosted clinical
-        product that is three separate problems: a third-party request on the
+        This head used to open with preconnects to a third-party font host and
+        pull FIVE families. For a self-hosted clinical product that is three separate problems: a third-party request on the
         first paint of a page that renders PHI, an install that breaks on an
         air-gapped network, and ~400KB of display faces nobody asked for.
 

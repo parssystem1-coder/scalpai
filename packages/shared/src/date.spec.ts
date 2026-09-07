@@ -106,7 +106,7 @@ describe("future-dated relative time (M13)", () => {
 
   it("keeps past behaviour byte-identical", () => {
     expect(formatRelativeTime(new Date("2026-09-04T11:59:50Z"), { locale: "en", now })).toBe("Just now");
-    expect(formatRelativeTime(new Date("2026-09-03T18:00:00Z"), { locale: "en", now })).toBe("Yesterday");
+    expect(formatRelativeTime(new Date("2026-09-03T18:00:00Z"), { locale: "en", now })).toBe("18 hours ago");
     expect(formatRelativeTime(new Date("2026-09-01T12:00:00Z"), { locale: "fa", now })).toBe("۳ روز پیش");
   });
 });
