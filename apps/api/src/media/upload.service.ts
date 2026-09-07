@@ -25,6 +25,7 @@ import {
   createUploadSession,
   deletePendingGalleryItem,
   expireUploadSessions,
+  findOpenUploadSession,
   getGalleryItem,
   getUploadSession,
   releaseQuota,
@@ -59,6 +60,12 @@ const EXT_FOR_MIME: Record<string, string> = {
   "image/webp": "webp",
 };
 
+export interface PartUrl {
+  partNumber: number;
+  url: string;
+  bytes: number;
+}
+
 export interface OpenUploadResult {
   id: string;
   sessionId: string;
@@ -71,12 +78,6 @@ export interface OpenUploadResult {
   /** Single-shot uploads get one PUT url; multipart gets its first URL window. */
   uploadUrl?: string;
   parts?: PartUrl[];
-}
-
-export interface PartUrl {
-  partNumber: number;
-  url: string;
-  bytes: number;
 }
 
 export interface CompleteResult {
@@ -92,7 +93,7 @@ export interface CompleteResult {
 /**
  * Media upload pipeline — phase 8 (ADR-0041).
  *
- * What changed, and why each change is not cosmetic:
+ * What changed, and why none of it is cosmetic:
  *
  *  - **H7 resume.** "Resume" used to call init-multipart again for the same file:
  *    a brand new `uploadId`, every ETag discarded, every byte re-sent, and the
@@ -211,7 +212,10 @@ export class UploadService {
    * session's own geometry: a client cannot ask for part 9999 of a three-part
    * upload, and it cannot ask for ten thousand URLs at once.
    */
-  async partUrls(sessionId: string, query: UploadPartUrlsRequestDto): Promise<{ parts: PartUrl[]; totalParts: number }> {
+  async partUrls(
+    sessionId: string,
+    query: UploadPartUrlsRequestDto,
+  ): Promise<{ parts: PartUrl[]; totalParts: number }> {
     const ctx = this.scope.requireCtx();
     const session = await this.requireSession(sessionId);
     if (!session.uploadId) throw errors.validation({ session: "this upload is single-shot, not multipart" });
@@ -229,8 +233,8 @@ export class UploadService {
   /**
    * Finish a multipart upload. Every declared part is verified against the
    * BUCKET first — presence and byte size — because `CompleteMultipartUpload`
-   * will happily assemble a truncated object out of whatever parts exist and the
-   * corruption only shows up later, in a clinical image.
+   * will happily assemble a truncated object out of whatever parts exist, and the
+   * corruption then shows up later, inside a clinical image.
    */
   async completeMultipart(sessionId: string, dto: UploadCompleteDto): Promise<CompleteResult> {
     const ctx = this.scope.requireCtx();
@@ -241,10 +245,7 @@ export class UploadService {
     }
 
     const inBucket = new Map(
-      (await this.storage.listParts(ctx.clinicId, session.storageKey, session.uploadId)).map((p) => [
-        p.partNumber,
-        p,
-      ]),
+      (await this.storage.listParts(ctx.clinicId, session.storageKey, session.uploadId)).map((p) => [p.partNumber, p]),
     );
     for (const part of dto.parts) {
       const actual = inBucket.get(part.partNumber);
@@ -274,7 +275,7 @@ export class UploadService {
 
   /**
    * Give everything back: the multipart upload in the bucket, the pending row,
-   * the reserved bytes and the metered slot. An abort that only forgets the
+   * the reserved bytes and the metered slot. An abort that only forgot the
    * session would keep charging the clinic for an image nobody has.
    */
   async abort(sessionId: string, reason: string): Promise<{ aborted: boolean }> {
@@ -316,12 +317,7 @@ export class UploadService {
   }
 
   private async findSessionForItem(galleryItemId: string): Promise<UploadSessionRow | null> {
-    return this.scope.tx(async (tx, c) => {
-      const item = await getGalleryItem(tx, c.clinicId, galleryItemId);
-      if (!item) return null;
-      const { findOpenUploadSession } = await import("@scalpai/db");
-      return findOpenUploadSession(tx, c.clinicId, galleryItemId);
-    });
+    return this.scope.tx((tx, c) => findOpenUploadSession(tx, c.clinicId, galleryItemId));
   }
 
   private async mintPartUrls(
@@ -417,17 +413,21 @@ export class UploadService {
         const thumb =
           verdict.status === "reject"
             ? null
-            : await sharp(processed).resize(THUMB_EDGE, THUMB_EDGE, { fit: "inside" }).jpeg({ quality: 75 }).toBuffer();
+            : await sharp(processed)
+                .resize(THUMB_EDGE, THUMB_EDGE, { fit: "inside" })
+                .jpeg({ quality: 75 })
+                .toBuffer();
         return { processed, meta, verdict, thumb };
       });
 
-      if (decoded.verdict.status === "reject" || !decoded.thumb) {
+      if (decoded.verdict.status === "reject" || decoded.thumb === null) {
         await this.reject(item.id, session, decoded.verdict.reasons);
         throw errors.qualityFail(decoded.verdict.reasons);
       }
+      const thumb = decoded.thumb;
 
       await this.storage.putBuffer(ctx.clinicId, canonicalRest, decoded.processed, "image/jpeg");
-      await this.storage.putBuffer(ctx.clinicId, thumbRest, decoded.thumb, "image/jpeg");
+      await this.storage.putBuffer(ctx.clinicId, thumbRest, thumb, "image/jpeg");
       if (item.storageKey !== canonicalRest) {
         await this.storage.removeObject(ctx.clinicId, item.storageKey).catch(() => undefined);
       }
@@ -440,7 +440,7 @@ export class UploadService {
           sha256,
           quality: { status: "pass", metrics: decoded.verdict.metrics },
           sizeBytes: decoded.processed.length,
-          thumbBytes: decoded.thumb!.length,
+          thumbBytes: thumb.length,
           userId: c.userId,
         });
         if (row && session) await completeUploadSession(tx, c.clinicId, session.id, c.userId);
