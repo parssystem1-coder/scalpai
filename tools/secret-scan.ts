@@ -37,9 +37,33 @@ export const STRICT_PATTERNS: { rule: string; re: RegExp }[] = [
   { rule: "github-token", re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b/ },
   { rule: "slack-token", re: /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/ },
   { rule: "google-api-key", re: /\bAIza[0-9A-Za-z_-]{35}\b/ },
-  { rule: "google-oauth-client-id", re: /\b[0-9]{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com\b/ },
   { rule: "stripe-live-key", re: /\bsk_live_[0-9A-Za-z]{16,}\b/ },
   { rule: "npm-token", re: /\bnpm_[A-Za-z0-9]{36}\b/ },
+];
+
+/**
+ * A credential shape whose tail is a HOSTNAME cannot be expressed as a substring
+ * regex. An unanchored host pattern also matches
+ * `...apps.googleusercontent.com.attacker.example`, which is precisely what
+ * CodeQL's `js/regex/missing-regexp-anchor` refuses - and it is right to. So the
+ * line is tokenised first and each token is matched WHOLE, with `^` and `$`.
+ */
+export interface StrictMatcher {
+  rule: string;
+  test: (line: string) => boolean;
+}
+
+/** Everything that cannot be part of a credential token. */
+const TOKEN_SEPARATORS = /[^A-Za-z0-9._-]+/;
+
+/** Fully anchored: a token either IS a Google OAuth client id, or it is not. */
+const GOOGLE_OAUTH_CLIENT_ID = /^[0-9]{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com$/;
+
+export const STRICT_MATCHERS: StrictMatcher[] = [
+  {
+    rule: "google-oauth-client-id",
+    test: (line) => line.split(TOKEN_SEPARATORS).some((token) => GOOGLE_OAUTH_CLIENT_ID.test(token)),
+  },
 ];
 
 /** A literal value assigned to an obviously secret-bearing name. */
@@ -100,6 +124,9 @@ export function scanText(rel: string, text: string): SecretFinding[] {
     for (const { rule, re } of STRICT_PATTERNS) {
       if (re.test(line)) out.push({ file: rel, line: index + 1, rule, excerpt: line.trim().slice(0, 120) });
     }
+    for (const { rule, test } of STRICT_MATCHERS) {
+      if (test(line)) out.push({ file: rel, line: index + 1, rule, excerpt: line.trim().slice(0, 120) });
+    }
     if (!configTier || placeholderFile) return;
     if (PLACEHOLDER_MARKERS.some((re) => re.test(line))) return;
     if (CONFIG_SECRET.test(line)) {
@@ -137,7 +164,7 @@ function main(): void {
   const root = process.argv[2] ?? process.cwd();
   const files = trackedFiles(root);
   const findings = scanRepo(root, files);
-  console.log(`secret scan: ${files.length} tracked files, ${STRICT_PATTERNS.length + 1} patterns`);
+  console.log(`secret scan: ${files.length} tracked files, ${STRICT_PATTERNS.length + STRICT_MATCHERS.length + 1} patterns`);
   if (findings.length === 0) {
     console.log("secret scan: OK (no credential-shaped literal found)");
     return;
