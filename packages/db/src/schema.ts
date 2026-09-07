@@ -14,11 +14,18 @@ const xid8 = customType<{ data: string; driverData: string }>({
   },
 });
 
+/**
+ * `timezone` is the clinic's IANA zone (phase 8 / H11). Quota periods are
+ * computed from it in `fn_clinic_period_start`, because a fixed-UTC month opens
+ * and closes a clinic budget on the wrong day. A guard trigger refuses a zone
+ * PostgreSQL itself does not recognise.
+ */
 export const clinics = pgTable("clinics", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   plan: text("plan").notNull().default("starter"),
   status: text("status").notNull().default("active"),
+  timezone: text("timezone").notNull().default("Asia/Tehran"),
   settings: jsonb("settings").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -111,6 +118,11 @@ export const sessions = pgTable("sessions", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
+/**
+ * Phase 8 (H12/M22): `sizeBytes` is the size of the object the pipeline actually
+ * kept. The wire contract always carried a size, but nothing stored it, so no
+ * honest storage total could be computed from the rows.
+ */
 export const galleryItems = pgTable("gallery_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
@@ -125,8 +137,43 @@ export const galleryItems = pgTable("gallery_items", {
   uploadState: text("upload_state").notNull().default("pending"),
   quality: jsonb("quality"),
   sha256: text("sha256"),
+  sizeBytes: bigint("size_bytes", { mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * Phase 8 (H7): the SERVER side of a resumable multipart upload. The browser
+ * keeps a pointer to `id`; `uploadId`, `partSizeBytes` and `totalParts` live
+ * here, which is what makes a resume continue the same S3 upload instead of
+ * restarting it from part 1.
+ */
+export const uploadSessions = pgTable("upload_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  galleryItemId: uuid("gallery_item_id").notNull(),
+  patientId: uuid("patient_id").notNull(),
+  storageKey: text("storage_key").notNull(),
+  mime: text("mime").notNull(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  partSizeBytes: integer("part_size_bytes").notNull(),
+  totalParts: integer("total_parts").notNull(),
+  uploadId: text("upload_id"),
+  state: text("state").notNull().default("open"),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+/** Measured bucket occupancy per clinic (phase 8 / M22). */
+export const storageUsage = pgTable("storage_usage", {
+  clinicId: uuid("clinic_id").primaryKey(),
+  objectCount: bigint("object_count", { mode: "number" }).notNull().default(0),
+  bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+  source: text("source").notNull().default("delta"),
+  measuredAt: timestamp("measured_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const analyses = pgTable("analyses", {
