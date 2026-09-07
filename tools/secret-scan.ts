@@ -16,6 +16,12 @@ import { join } from "node:path";
  *            committed passwords actually hide. Documented placeholder files are
  *            skipped, and any line marked dev_only / example / ${VAR} / $(cmd)
  *            is skipped because it is by definition not a real credential.
+ *
+ * Phase 10 (M7/R13): CONFIG surfaces now include .mjs/.cjs (this repo's tooling
+ * configs are ESM), .html and .webmanifest, and STRICT learned the Google OAuth
+ * client-id shape. The file that motivated this - a root scaffold config carrying
+ * a live web API key and an OAuth client id - was deleted in the same change, but
+ * the point of a scan is that the NEXT one is caught by machine, not by review.
  */
 
 export interface SecretFinding {
@@ -31,6 +37,7 @@ export const STRICT_PATTERNS: { rule: string; re: RegExp }[] = [
   { rule: "github-token", re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b|\bgithub_pat_[A-Za-z0-9_]{22,}\b/ },
   { rule: "slack-token", re: /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/ },
   { rule: "google-api-key", re: /\bAIza[0-9A-Za-z_-]{35}\b/ },
+  { rule: "google-oauth-client-id", re: /\b[0-9]{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com\b/ },
   { rule: "stripe-live-key", re: /\bsk_live_[0-9A-Za-z]{16,}\b/ },
   { rule: "npm-token", re: /\bnpm_[A-Za-z0-9]{36}\b/ },
 ];
@@ -57,7 +64,20 @@ export const PLACEHOLDER_MARKERS: RegExp[] = [
 const PLACEHOLDER_FILES = [/(^|\/)\.env\.example$/, /\.template$/, /(^|\/)\.env\.sample$/];
 
 /** Surfaces where the CONFIG tier applies. Prose and tests are STRICT-only. */
-const CONFIG_SURFACES = [/\.ya?ml$/, /\.json$/, /\.sh$/, /(^|\/)Dockerfile$/, /(^|\/)Caddyfile$/, /\.env[^/]*$/, /\.ts$/, /\.tsx$/];
+const CONFIG_SURFACES = [
+  /\.ya?ml$/,
+  /\.json$/,
+  /\.webmanifest$/,
+  /\.sh$/,
+  /(^|\/)Dockerfile$/,
+  /(^|\/)Caddyfile$/,
+  /\.env[^/]*$/,
+  /\.ts$/,
+  /\.tsx$/,
+  /\.mjs$/,
+  /\.cjs$/,
+  /\.html$/,
+];
 
 const SKIP_CONFIG_TIER = [/(^|\/)docs\//, /\.spec\.tsx?$/, /(^|\/)e2e\//, /package-lock\.json$/, /(^|\/)tools\/secret-scan\.ts$/];
 
