@@ -15,18 +15,22 @@ import {
   countOpenOrphans,
   executePurge,
   generateClinicAuditAnchor,
+  getStorageUsage,
   listPurgeRequests,
   markStorageOrphanDeleted,
   markStorageOrphanFailed,
   reconcileStorage,
   rejectPurge,
   requestPurge,
+  resolveQuotaLimit,
+  setStorageUsage,
   upsertRetentionPolicy,
   verifyChain,
 } from "@scalpai/db";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
 import { logEvent } from "../common/logging.js";
+import { EntitlementService } from "../entitlements/entitlement.service.js";
 import { TenantScope } from "../tenancy/tenant.scope.js";
 import { StorageService } from "../media/storage.service.js";
 
@@ -40,12 +44,20 @@ const ORPHAN_BATCH = 50;
  * verify the chain, publish a signed Merkle anchor, prove one row's inclusion,
  * request/approve/execute a patient purge, and reconcile the bucket against the
  * database.
+ *
+ * Phase 8 (M22): the same scan now MEASURES the bucket and re-bases
+ * `storage_usage`, because a plan's `storage_mb` was previously compared against
+ * nothing at all.
  */
 @Controller("privacy")
 export class PrivacyController {
-  constructor(private scope: TenantScope, private storage: StorageService) {}
+  constructor(
+    private scope: TenantScope,
+    private storage: StorageService,
+    private entitlements: EntitlementService,
+  ) {}
 
-  /* ── audit evidence (H17) ─────────────────────────────────────────── */
+  /* ── audit evidence (H17) ──────────────────────────────────────── */
 
   @Get("audit/verify")
   @Roles("owner")
@@ -92,7 +104,7 @@ export class PrivacyController {
     return result;
   }
 
-  /* ── retention + purge (M21) ──────────────────────────────────────── */
+  /* ── retention + purge (M21) ───────────────────────────────────── */
 
   @Put("retention")
   @Roles("owner")
@@ -158,22 +170,42 @@ export class PrivacyController {
       entityId: id,
       count: evidence.objectsQueued,
     });
+    // The purge deleted objects, so the measured total is stale until it is
+    // re-based from the bucket.
+    await this.measureStorage();
     return { ...evidence, objectsDeleted: drained.deleted, objectsFailed: drained.failed };
   }
 
-  /* ── storage reconciliation (M22) ─────────────────────────────────── */
+  /* ── storage reconciliation + measurement (M22) ──────────────────── */
 
   @Post("storage/reconcile")
   @Roles("owner")
   @HttpCode(HttpStatus.OK)
   async reconcile(): Promise<unknown> {
     const ctx = this.scope.requireCtx();
-    const listed = await this.storage.listClinicObjects(ctx.clinicId);
-    const report = await this.scope.tx((tx, c) => reconcileStorage(tx, c.clinicId, c.userId, listed));
+    const measured = await this.storage.listClinicObjectSizes(ctx.clinicId);
+    const report = await this.scope.tx((tx, c) =>
+      reconcileStorage(
+        tx,
+        c.clinicId,
+        c.userId,
+        measured.map((o) => o.key),
+      ),
+    );
     const drained = await this.drainOrphans();
     const open = await this.scope.tx((tx, c) => countOpenOrphans(tx, c.clinicId));
+
+    // Bytes that are actually referenced by a live row: the orphans are on their
+    // way out, so counting them would inflate the clinic's usage.
+    const orphans = new Set(report.orphanKeys);
+    const kept = measured.filter((o) => !orphans.has(o.key));
+    const bytes = kept.reduce((sum, o) => sum + o.bytes, 0);
+    await this.scope.tx((tx, c) =>
+      setStorageUsage(tx, c.clinicId, { bytes, objectCount: kept.length, source: "bucket-scan" }),
+    );
+
     return {
-      listed: listed.length,
+      listed: measured.length,
       orphans: report.orphanKeys.length,
       // A referenced object missing from the bucket is data loss, not garbage:
       // it is reported, never "cleaned up".
@@ -181,7 +213,35 @@ export class PrivacyController {
       deleted: drained.deleted,
       failed: drained.failed,
       stillOpen: open,
+      bytes,
+      objects: kept.length,
     };
+  }
+
+  /** What the clinic occupies, and what its plan allows (M22/H11). */
+  @Get("storage/usage")
+  @Roles("owner")
+  async storageUsage(): Promise<unknown> {
+    const ctx = this.scope.requireCtx();
+    const ent = await this.entitlements.resolve(ctx.clinicId);
+    const usage = await this.scope.tx((tx, c) => getStorageUsage(tx, c.clinicId));
+    return {
+      bytes: usage?.bytes ?? 0,
+      objects: usage?.objectCount ?? 0,
+      source: usage?.source ?? "none",
+      measuredAt: usage?.measuredAt ?? null,
+      limitBytes: resolveQuotaLimit(ent?.limits, "storage"),
+    };
+  }
+
+  /** Re-base the measured total from the bucket itself. */
+  private async measureStorage(): Promise<void> {
+    const ctx = this.scope.requireCtx();
+    const measured = await this.storage.listClinicObjectSizes(ctx.clinicId);
+    const bytes = measured.reduce((sum, o) => sum + o.bytes, 0);
+    await this.scope.tx((tx, c) =>
+      setStorageUsage(tx, c.clinicId, { bytes, objectCount: measured.length, source: "bucket-scan" }),
+    );
   }
 
   /**

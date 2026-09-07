@@ -12,6 +12,7 @@ import {
 import type { PatientCreateDto, ConsentCreateDto, PatientNotesUpdateDto, ConsentRevokeDto } from "@scalpai/shared";
 import { errors } from "@scalpai/shared";
 import {
+  consumeQuota,
   createPatient,
   createSession,
   createConsent,
@@ -21,6 +22,7 @@ import {
   listPatients,
   listSessions,
   readPatientNotes,
+  resolveQuotaLimit,
   revokeConsent,
   services,
   setPatientNotes,
@@ -31,6 +33,7 @@ import { Public } from "./auth/jwt-access.guard.js";
 import { RequireFeature } from "./common/feature.guard.js";
 import { Quota } from "./common/quota.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
+import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 import { StorageService } from "./media/storage.service.js";
 
@@ -45,10 +48,18 @@ import { StorageService } from "./media/storage.service.js";
  * write, decrypted on read, audited both ways, and never part of a patient list.
  * A consent signature is uploaded to object storage and only ever handed back as
  * a short-lived presigned URL.
+ *
+ * Phase 8 (H11): booking CONSUMES its monthly quota inside the writing
+ * transaction. The `@Quota` guard in front of it is a cheap pre-check now, not
+ * the enforcement.
  */
 @Controller()
 export class CoreController {
-  constructor(private scope: TenantScope, private storage: StorageService) {}
+  constructor(
+    private scope: TenantScope,
+    private storage: StorageService,
+    private entitlements: EntitlementService,
+  ) {}
 
   @Public()
   @Get("health")
@@ -117,19 +128,24 @@ export class CoreController {
   @Post("sessions")
   @Roles("owner", "trichologist", "receptionist")
   @RequireFeature("portal")
-  @Quota("monthly_sessions")
-  createSession(
+  @Quota("sessions")
+  async createSession(
     @Body(new ZodBodyPipe(SessionCreate)) dto: { patientId: string; serviceId: string; startAt: string },
-  ) {
-    return this.scope.tx((tx, ctx) =>
-      createSession(tx, {
-        clinicId: ctx.clinicId,
-        userId: ctx.userId,
+  ): Promise<unknown> {
+    const ctx = this.scope.requireCtx();
+    const ent = await this.entitlements.resolve(ctx.clinicId);
+    const limit = resolveQuotaLimit(ent?.limits, "sessions");
+    return this.scope.tx(async (tx, c) => {
+      const slot = await consumeQuota(tx, c.clinicId, "sessions", 1, limit);
+      if (!slot.allowed) throw errors.quotaExceeded();
+      return createSession(tx, {
+        clinicId: c.clinicId,
+        userId: c.userId,
         patientId: dto.patientId,
         serviceId: dto.serviceId,
         startAt: new Date(dto.startAt),
-      }),
-    );
+      });
+    });
   }
 
   @Get("services")
