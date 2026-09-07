@@ -3,7 +3,7 @@ import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Phase 10 regression gate (ADR-0043).
+ * Phase 10 regression gate (ADR-0043, ADR-0044).
  *
  * Every assertion here corresponds to a claim that was once in the docs with
  * nothing behind it. A reviewer forgets; this file does not. It is deliberately
@@ -32,6 +32,12 @@ function walk(relDir: string, exts: string[]): string[] {
   visit(base);
   return out;
 }
+
+interface Manifest {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+const manifest = (rel: string): Manifest => JSON.parse(read(rel)) as Manifest;
 
 describe("H10 - patient search is wired and indexed", () => {
   const migration = "packages/db/sql/0015__phase10_search_trigram.sql";
@@ -284,6 +290,129 @@ describe("M20 - the repository can be picked up by a stranger", () => {
   });
 });
 
+/**
+ * M4/M16 (ADR-0044). Phase 5 built the package-call-site rule and then
+ * registered the two packages it caught in exceptions.json, because deleting
+ * them touches package.json and the lockfile gate refuses a hand edit. An
+ * exception with an ADR is honest bookkeeping, not a fix. These assertions make
+ * the deletion the permanent state.
+ */
+describe("M4/M16 - dead weight is deleted, not registered", () => {
+  it("has no scaffold package left", () => {
+    for (const rel of ["packages/ui", "packages/notify"]) {
+      expect(has(rel), `${rel} must be deleted, not exempted`).toBe(false);
+    }
+  });
+
+  it("keeps exactly one audit anchor implementation", () => {
+    // The ops/ copy hashed concatenated row hashes and called it a Merkle root,
+    // and its chain verifier never recomputed a row hash - the two claims H17
+    // was raised against. Keeping a weaker copy of a security primitive next to
+    // the real one is an invitation to import the wrong one.
+    expect(has("ops/audit-anchor.ts"), "the pre-phase-6 duplicate must stay deleted").toBe(false);
+    expect(has("packages/db/src/audit-anchor.ts")).toBe(true);
+    const real = read("packages/db/src/audit-anchor.ts");
+    expect(real).toContain("AuditAnchorError");
+  });
+
+  it("has no root src/ tree outside the workspace layout", () => {
+    // Workspaces are apps/*, packages/*, tools/*. The old root src/assets/images
+    // held 6.0MB of JPEGs nothing referenced.
+    expect(has("src"), "the repository root has no src/").toBe(false);
+  });
+
+  it("stopped exempting the packages it just deleted", () => {
+    const parsed = JSON.parse(read("tools/conformance/exceptions.json")) as {
+      exceptions: { rule?: string; file?: string }[];
+    };
+    expect(
+      parsed.exceptions.some((e) => e.rule === "package-call-site"),
+      "package-call-site must pass on merit, with no registered exception",
+    ).toBe(false);
+    for (const gone of ["packages/ui", "packages/notify"]) {
+      expect(parsed.exceptions.some((e) => (e.file ?? "").startsWith(gone))).toBe(false);
+    }
+  });
+
+  it("keeps the generated graph consistent with the tree", () => {
+    const graph = JSON.parse(read("tools/graph/project-graph.json")) as {
+      modules: { name: string; dir: string }[];
+      counts: { packages: number };
+    };
+    for (const mod of graph.modules) {
+      expect(has(mod.dir), `${mod.name} is in the graph but ${mod.dir} does not exist`).toBe(true);
+    }
+    const packages = graph.modules.filter((m) => m.dir.startsWith("packages/"));
+    expect(graph.counts.packages).toBe(packages.length);
+  });
+});
+
+/**
+ * R14 (ADR-0044). A workspace root has no runtime. These assert the RULE rather
+ * than the current snapshot: npm hoisting will happily resolve an undeclared
+ * import, which is exactly why three/lucide-react survived in the root manifest
+ * unnoticed while apps/web built against versions it never declared.
+ */
+describe("R14 - dependencies live in the workspace that uses them", () => {
+  const ROOT_MANIFEST = "package.json";
+  const WEB_MANIFEST = "apps/web/package.json";
+
+  it("declares no runtime dependency at the workspace root", () => {
+    const deps = manifest(ROOT_MANIFEST).dependencies ?? {};
+    expect(Object.keys(deps), "a workspace container has no runtime").toEqual([]);
+  });
+
+  it("moved every former root runtime package to apps/web", () => {
+    const deps = manifest(WEB_MANIFEST).dependencies ?? {};
+    for (const name of ["three", "lucide-react", "react", "react-dom"]) {
+      expect(deps[name], `apps/web must declare ${name} itself`).toBeTruthy();
+    }
+  });
+
+  it("keeps @types/three beside its subject", () => {
+    expect(manifest(WEB_MANIFEST).devDependencies?.["@types/three"]).toBeTruthy();
+    expect(manifest(ROOT_MANIFEST).devDependencies?.["@types/three"]).toBeUndefined();
+  });
+
+  it("keeps the coverage provider a dev dependency", () => {
+    // It was in "dependencies": a production shipping decision nobody made.
+    expect(manifest(ROOT_MANIFEST).devDependencies?.["@vitest/coverage-v8"]).toBeTruthy();
+  });
+
+  it("has one jsdom, owned by the root test runner", () => {
+    expect(manifest(ROOT_MANIFEST).devDependencies?.jsdom).toBeTruthy();
+    expect(
+      manifest(WEB_MANIFEST).devDependencies?.jsdom,
+      "vitest runs from the root; a second major of jsdom in the app is drift",
+    ).toBeUndefined();
+  });
+
+  it("proves no workspace other than apps/web imports what only apps/web declares", () => {
+    const WEB_ONLY = /from\s+["'](?:three|lucide-react)(?:\/[^"']*)?["']|import\(\s*["'](?:three|lucide-react)/;
+    for (const scope of ["apps/api", "apps/admin", "apps/portal", "apps/desktop", "packages"]) {
+      for (const rel of walk(scope, [".ts", ".tsx"])) {
+        expect(
+          WEB_ONLY.test(read(rel)),
+          `${rel} imports a package only apps/web declares - declare it in that workspace instead of relying on hoisting`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("declares a workspace dependency for every internal import in apps/web", () => {
+    const deps = manifest(WEB_MANIFEST).dependencies ?? {};
+    const internal = new Set<string>();
+    for (const rel of walk("apps/web/src", [".ts", ".tsx"])) {
+      for (const m of read(rel).matchAll(/from\s+["'](@scalpai\/[a-z-]+)(?:\/[^"']*)?["']/g)) {
+        internal.add(m[1]!);
+      }
+    }
+    for (const name of internal) {
+      expect(deps[name], `apps/web imports ${name} without declaring it`).toBeTruthy();
+    }
+  });
+});
+
 describe("phase 10 bookkeeping is honest", () => {
   it("drops the exceptions this phase actually resolved", () => {
     const raw = read("tools/conformance/exceptions.json");
@@ -309,5 +438,30 @@ describe("phase 10 bookkeeping is honest", () => {
     for (const open of ["M1", "M5", "L2", "R14", "M19"]) {
       expect(adr).toContain(open);
     }
+  });
+
+  it("records batch 2 in its own ADR rather than editing history", () => {
+    expect(has("docs/adr/ADR-0044-phase10-debt-removal.md")).toBe(true);
+    const adr = read("docs/adr/ADR-0044-phase10-debt-removal.md");
+    expect(adr).toContain("Weaknesses addressed:");
+    // It must name what it did NOT close, same rule as ADR-0043.
+    for (const open of ["M1", "M5", "M14", "M15", "M19", "L1", "L2"]) {
+      expect(adr, `ADR-0044 must still name ${open} as open`).toContain(open);
+    }
+    // The lockfile gate is the reason this batch exists - it must say so.
+    expect(adr).toContain("package-lock.json");
+  });
+
+  it("ticks a phase-10 box only when this file has an assertion behind it", () => {
+    const phase = read("docs/WEAKNESSES-V2-10-PHASES.md");
+    const section = phase.slice(phase.indexOf("# \u0641\u0627\u0632 \u06f1\u06f0"));
+    const openCount = (section.match(/^- \[ \] /gm) ?? []).length;
+    // M1, M5, M14, M15, M19, L1/W01/W22/W23, L2 - seven, and the phase box.
+    expect(openCount, "an item was ticked or added without updating this gate").toBe(7);
+  });
+
+  it("keeps the phase-level box open while any item is open", () => {
+    const phase = read("docs/WEAKNESSES-V2-10-PHASES.md");
+    expect(phase).toMatch(/- \[ \] \u0641\u0627\u0632 \u06f1\u06f0:/);
   });
 });
