@@ -227,16 +227,15 @@ export const SyncPushResultItem = z.object({
 });
 
 /**
- * §8 — GET /sync/pull. The cursor is OPAQUE by contract: it encodes the writing
- * transaction id and the server sequence, which is what makes it commit-safe
- * (H5). A client must send back exactly what it received.
+ * §8 — GET /sync/pull response item. The cursor is OPAQUE by contract: it
+ * encodes the writing transaction id and the server sequence, which is what
+ * makes it commit-safe (H5). A client must send back exactly what it received.
+ *
+ * NOTE: SyncPullQuery and SyncPullPage zod schemas were removed here because
+ * the sync controller validates query params manually (parseInt + clamp) and
+ * the db repo defines its own SyncPullPage interface. These schemas were dead
+ * code — never imported anywhere.
  */
-export const SyncPullQuery = z.object({
-  cursor: z.string().max(64).optional(),
-  limit: z.coerce.number().int().min(1).max(500).default(100),
-});
-export type SyncPullQueryDto = z.infer<typeof SyncPullQuery>;
-
 export const SyncPullItem = z.object({
   entity: z.string(),
   op: z.string(),
@@ -245,13 +244,6 @@ export const SyncPullItem = z.object({
   at: z.string(),
   cursor: z.string(),
 });
-
-export const SyncPullPage = z.object({
-  items: z.array(SyncPullItem),
-  cursor: z.string(),
-  hasMore: z.boolean(),
-});
-export type SyncPullPageDto = z.infer<typeof SyncPullPage>;
 
 /**
  * Retention & purge (phase 6 / M21). `scope` is explicit on purpose: "delete the
