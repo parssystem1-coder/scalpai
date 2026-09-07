@@ -3,6 +3,13 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import { createEngine } from "@scalpai/analysis-engine";
+import {
+  ANALYSIS_MODEL_REGISTRY,
+  ANALYSIS_NON_DIAGNOSTIC_LABEL,
+  modelRefOf,
+  sha256Hex,
+  type AnalysisProvenanceDto,
+} from "@scalpai/shared";
 import { useTranslation } from "react-i18next";
 import { faNum, toggleLang } from "../i18n.js";
 import AutoLock from "../components/AutoLock.js";
@@ -23,6 +30,28 @@ const SCORE_LABELS: Array<{ key: keyof Scores }> = [
   { key: "densityProxy" },
 ];
 
+/**
+ * Phase 10 (H13). Analysis runs on the device (§3), so the server can never
+ * recompute the numbers it is asked to store. The client therefore has to say
+ * WHAT it analysed and WITH WHAT: the sha256 of the exact RGBA buffer handed to
+ * the engine, the buffer's geometry, and a reference to a registered model
+ * manifest. The API verifies that reference against the platform registry.
+ *
+ * The non-diagnostic label is rendered as part of the RESULT, not as small print
+ * elsewhere on the page, so a score can never appear without its scope.
+ */
+function buildProvenance(imageData: ImageData): AnalysisProvenanceDto {
+  const model = ANALYSIS_MODEL_REGISTRY[0]!;
+  return {
+    imageSha256: sha256Hex(imageData.data),
+    pixelWidth: imageData.width,
+    pixelHeight: imageData.height,
+    model: modelRefOf(model),
+    computedAt: new Date().toISOString(),
+    diagnostic: false,
+  };
+}
+
 export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { pid = "", gid = "" } = useParams();
   const { t, i18n } = useTranslation();
@@ -32,6 +61,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [scores, setScores] = useState<Scores | null>(null);
   const [adjusted, setAdjusted] = useState<Scores | null>(null);
+  const [provenance, setProvenance] = useState<AnalysisProvenanceDto | null>(null);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState<Saved | null>(null);
   const [reviewDone, setReviewDone] = useState(false);
@@ -39,7 +69,12 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
   const startedRef = useRef(false);
 
   const save = useMutation({
-    mutationFn: (result: { scores: Scores; severity: number; modelVersion: string }) =>
+    mutationFn: (result: {
+      scores: Scores;
+      severity: number;
+      modelVersion: string;
+      provenance: AnalysisProvenanceDto;
+    }) =>
       apiFetch<Saved>("/analyses", {
         method: "POST",
         body: JSON.stringify({ patientId: pid, galleryItemId: gid, result }),
@@ -79,12 +114,23 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
         if (!ctx) throw new Error("canvas unavailable");
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Hash the SAME buffer the engine is about to read, before anything can
+        // touch it — a digest of a different buffer proves nothing.
+        const prov = buildProvenance(imageData);
         const engine = createEngine();
-        const out = await engine.analyze({ image: { data: imageData.data, width: imageData.width, height: imageData.height } });
+        const out = await engine.analyze({
+          image: { data: imageData.data, width: imageData.width, height: imageData.height },
+        });
         setElapsedMs(Math.round(performance.now() - t0));
         setScores(out.scores);
         setAdjusted(out.scores);
-        save.mutate({ scores: out.scores, severity: out.severity, modelVersion: out.modelVersion });
+        setProvenance(prov);
+        save.mutate({
+          scores: out.scores,
+          severity: out.severity,
+          modelVersion: out.modelVersion,
+          provenance: prov,
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -93,6 +139,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
   const severity =
     adjusted ? Math.round(adjusted.redness * 0.4 + adjusted.flakeTexture * 0.35 + adjusted.densityProxy * 0.25) : null;
+  const nonDiagnostic = i18n.language === "fa" ? ANALYSIS_NON_DIAGNOSTIC_LABEL.fa : ANALYSIS_NON_DIAGNOSTIC_LABEL.en;
 
   return (
     <main style={{ maxWidth: 720, margin: "4vh auto" }}>
@@ -110,6 +157,11 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
       {scores && (
         <>
+          {/* H13: the scope of the result travels WITH the result. */}
+          <p data-testid="non-diagnostic-label" style={{ background: "#FFF7E6", border: "1px solid #E6C067", padding: "8px 12px", borderRadius: 8 }}>
+            {nonDiagnostic}
+          </p>
+
           <p>
             {t("analysis.elapsed")} <strong data-testid="elapsed">{faNum(elapsedMs)}</strong> {t("analysis.msUnit")}
           </p>
@@ -124,6 +176,14 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
           <p>
             {t("analysis.severity")} <strong>{faNum(severity)}</strong> / {faNum(100)}
           </p>
+
+          {provenance && (
+            <p style={{ fontSize: 12, color: "#6b6560", wordBreak: "break-all" }}>
+              <span data-testid="provenance-model">{provenance.model.id}@{provenance.model.version}</span>{" "}
+              · {provenance.pixelWidth}×{provenance.pixelHeight} ·{" "}
+              <code data-testid="provenance-digest">sha256:{provenance.imageSha256}</code>
+            </p>
+          )}
 
           {!reviewDone ? (
             <section>
