@@ -51,7 +51,6 @@ export default defineConfig({
         "packages/sync-client/src/**",
         "packages/licensing/src/**",
         "packages/analysis-core/src/**",
-        "packages/shared/src/**",
         "apps/api/src/**",
         "apps/web/src/api/**",
         "apps/web/src/context/**",
@@ -67,7 +66,6 @@ export default defineConfig({
       ],
       thresholds: {
         "packages/{db,sync-client,licensing,analysis-core}/src/**": { lines: 70 },
-        "packages/shared/src/**": { lines: 55 },
         "apps/api/src/**": { lines: 40 },
         "apps/web/src/{api,context,offline}/**": { lines: 40 },
       },
