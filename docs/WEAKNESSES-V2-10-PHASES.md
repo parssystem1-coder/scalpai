@@ -1,8 +1,8 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فاز ۷ پیاده‌سازی شد (PR #43 — sync contract، مایگریشن 0013، cursor پایدار commit-safe، ledger فقط applied، ایزولاسیون SAVEPOINT، dedupe کلینیک‌محور، LWW سروری، Dexie اتمیک، dead-letter و پاک‌سازی logout). فاز ۶ پیش‌تر در PR #42 بسته شد.**
+> وضعیت: **فاز ۱۰ در حال اجرا است — ۱۳ از ۱۹ مورد تکمیل شد (ADR-0043 و ADR-0044). ۷ مورد باقی‌مانده (M1، M5، M14، M15، M19، L1/W01/W22/W23، L2) برای نشست بعدی تعیین‌شدند.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
-> تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
+> تاریخ آخرین بروزرسانی: 2026-09-08 · مخزن: `parssystem1-coder/scalpai`
 
 ## حکم ممیزی
 
@@ -208,26 +208,33 @@
 
 **هدف خروج:** ادعاهای محصول، معماری و UX با واقعیت کد یکی باشند.
 
+**وضعیت:** ۱۳ از ۱۹ مورد تکمیل شد؛ ۷ باقی‌مانده برای نشست بعدی.
+
+### تکمیل‌شده (۱۳ مورد):
+
 - [x] **H10** پارامتر `q/search` یکسان و تست regression برای search واقعی اضافه شود؛ trigram index واقعاً استفاده شود.
 - [x] **H13** تحلیل client را با image hash، model manifest/version، signature یا server verification قابل اثبات کن؛ label «کمکی و غیرتشخیصی» اجباری.
-- [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
 - [x] **M2** licensing واقعاً به endpoint و verify Ed25519 وصل شود؛ متن «Verified» از mock نیاید.
 - [x] **M3** desktop یا Electron واقعی شود یا ادعای سخت‌افزار از scope و docs حذف شود.
-- [ ] **M4/M16** packageهای scaffold/BOM، کدهای unused، duplicate audit-anchor و assetهای بدون reference حذف یا ثبت شوند.
-- [ ] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند.
+- [x] **M4/M16** packageهای scaffold/BOM، کدهای unused، duplicate audit-anchor و assetهای بدون reference حذف یا ثبت شوند. (تکمیل شده در PR #54، مایگریشن شامل حذف packages/ui، packages/notify، ops/audit-anchor.ts و orphan images)
 - [x] **M10** signature canvas هنگام resize snapshot/restore داشته باشد.
 - [x] **M11** error filter SPA fallback را non-blocking/cached کند، 404 واقعی را نبلعد و log را scrub کند.
 - [x] **M13** timezone کلینیک در DB/settings استاندارد شود؛ تاریخ آینده در relative time درست نمایش داده شود.
 - [x] **M18** فونت‌ها self-host و تعدادشان کم شود؛ third-party CDN برای self-hosted حذف شود.
-- [ ] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند.
 - [x] **M20** README، LICENSE، SECURITY.md، `.env.example`، CODEOWNERS، PR template و Dependabot اضافه شوند.
+- [x] **M7/R13** Firebase/metadata و هر secret/scaffold غیرمصرفی بررسی، حذف یا rotate شود؛ secret scan باید json/yaml/ops/root را هم ببیند.
+- [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
+- [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
+
+### باقی‌مانده (۷ مورد) برای نشست بعدی:
+
+- [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
+- [ ] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند.
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
+- [ ] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند.
+- [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036)
 - [ ] **L2** dashboard بزرگ به component/hookهای کوچک‌تر و یک سیستم style استاندارد شکسته شود.
-- [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036)
-- [ ] **PR #21** به‌دلیل base قدیمی و diff آرایشی rebase/بسته شود؛ **PR #23** چون diff مؤثر ندارد بسته شود.
-- [x] **M7/R13** Firebase/metadata و هر secret/scaffold غیرمصرفی بررسی، حذف یا rotate شود؛ secret scan باید json/yaml/ops/root را هم ببیند.
-- [ ] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند.
 
 **شرط تکمیل فاز:** README از صفر اجرا شود، docs با کد تطبیق داشته باشد، dead-code scan سبز و هیچ claim بدون evidence باقی نماند.
 
@@ -236,16 +243,16 @@
 ## وضعیت فازها
 
 - [x] ممیزی و ادغام یافته‌ها انجام شد.
-- [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی (تکمیل — بک‌اند PR #25 + کلاینت وب + تست‌های منفی + .env.example)
-- [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی (تکمیل — پیاده‌سازی کامل در PR #28 با شواهد تست و مایگریشن)
-- [x] فاز ۳: نشست، توکن و Auth transaction integrity (تکمیل — پیاده‌سازی کامل در PR #30 با مایگریشن 0011، رفرش اتمیک، ردیس و تست رگرسیون)
-- [x] فاز ۴: زیرساخت self-hosted و استقرار امن (تکمیل — ADR-0036، سرویس migrate یک‌باره، secretهای اجباری، TLS واقعی، pin ایمیج‌ها، تست رگرسیون tools/ops/deployment.phase4.spec.ts و job `deployment` در CI که ایمیج‌ها را build و استک را از DB خالی بوت می‌کند)
-- [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی (تکمیل — ADR-0037، زنجیره شواهد `ci-evidence` و job `gate` که PASS بدون لاگ را رد می‌کند، coverage اپ‌ها علاوه بر پکیج‌ها، e2e smoke روی هر PR + nightly کامل، audit/CodeQL/Dependabot/secret-scan، image scan و تست رگرسیون tools/ci/pipeline.phase5.spec.ts)
-- [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی (تکمیل — PR #42، مایگریشن 0012، phi-crypto AES-256-GCM با key ring و AAD binding، Merkle tree واقعی با inclusion proof، report seal Ed25519، canonical JSON، PHI scrubbing در لاگ و ledger، retention/purge با دو نفر امضا، orphan reconciliation، privacy controller و boot gate)
-- [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
-- [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
-- [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
-- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی
+- [x] فاز ۱: قطع نشت امنیتی و احراز هویت واقعی
+- [x] فاز ۲: قفل تنانسی، RLS و مرز دسترسی
+- [x] فاز ۳: نشست، توکن و Auth transaction integrity
+- [x] فاز ۴: زیرساخت self-hosted و استقرار امن
+- [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی
+- [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی
+- [x] فاز ۷: sync چنددستگاهی و offline correctness
+- [x] فاز ۸: مدیا، آپلود و سهمیه
+- [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد
+- [~] **فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی** (۱۳ از ۱۹ تکمیل، ۷ باقی‌مانده در نشست بعدی)
 
 ## روش بستن هر فاز
 
