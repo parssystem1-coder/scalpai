@@ -9,10 +9,21 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DbService, migrate, seed } from "@scalpai/db";
 import { resetAll } from "@scalpai/db/testing";
+import {
+  Outbox,
+  PermanentPushError,
+  RETRY_MAX_DELAY_MS,
+  flushOutbox,
+  type MutationEnvelope,
+  type OutboxItem,
+  type OutboxStore,
+  type PushItemResult,
+} from "@scalpai/sync-client";
 import { AppModule } from "../src/app.module.js";
 
 /**
- * Phase 7 (ADR-0039) — offline correctness against a REAL PostgreSQL.
+ * Phase 7 (ADR-0039) + phase 7.1 (ADR-0040) — offline correctness against a REAL
+ * PostgreSQL.
  *
  * Every test here maps to a WEAKNESSES item that used to be claimed but never
  * proven: per-item isolation (H4), an honest ledger (H3), tenant-scoped dedupe
@@ -89,6 +100,13 @@ async function lastPulled(token: string): Promise<PullItem> {
   return items[items.length - 1]!;
 }
 
+/** How many rows the clinic ledger holds right now — H3 evidence, not a guess. */
+async function ledgerSize(token: string): Promise<number> {
+  const res = await pull(token);
+  expect(res.status).toBe(200);
+  return (res.body.items as PullItem[]).length;
+}
+
 /** Create a patient THROUGH sync and learn its id + version from the ledger. */
 async function createPatient(token: string, n: number, over: Record<string, unknown> = {}) {
   const res = await push(token, [createEnvelope(n, over)]);
@@ -96,6 +114,66 @@ async function createPatient(token: string, n: number, over: Record<string, unkn
   expect(res.body.results[0].status).toBe("applied");
   const item = await lastPulled(token);
   return { id: String(item.payload._id), version: Number(item.payload._version) };
+}
+
+/**
+ * A REAL device: its own durable store, its own clock, and a queue that can be
+ * rebooted from what survived on disk. Two of these is what "two devices" has to
+ * mean — the previous test logged in once and fired three sequential requests
+ * from a single session, which proves nothing about two offline peers.
+ */
+function newDevice(startAt = 1_800_000_000_000) {
+  let clock = startAt;
+  const records = new Map<string, OutboxItem>();
+  const dead: Array<{ id: string; reason: string }> = [];
+  const store: OutboxStore = {
+    async put(item) {
+      records.set(item.envelope.clientMutationId, { ...item });
+    },
+    async remove(ids) {
+      for (const id of ids) records.delete(id);
+    },
+    async deadLetter(item, reason) {
+      records.delete(item.envelope.clientMutationId);
+      dead.push({ id: item.envelope.clientMutationId, reason });
+    },
+  };
+  return {
+    records,
+    dead,
+    now: () => clock,
+    advance(ms: number) {
+      clock += ms;
+    },
+    /** Boot the queue from the durable records — a process restart. */
+    open(): Outbox {
+      const outbox = new Outbox(store, () => clock);
+      outbox.restore([...records.values()].map((item) => ({ ...item })));
+      return outbox;
+    },
+  };
+}
+
+/** The real HTTP transport for one device, with the client's 400 semantics. */
+function transport(token: string) {
+  const results: PushItemResult[] = [];
+  const calls: string[][] = [];
+  return {
+    results,
+    calls,
+    push: async (batch: MutationEnvelope[]): Promise<PushItemResult[]> => {
+      calls.push(batch.map((m) => m.clientMutationId));
+      const res = await push(token, batch);
+      if (res.status === 400) {
+        const code = String(res.body?.code ?? "VALIDATION_ERROR");
+        throw new PermanentPushError(code, 400, { code });
+      }
+      if (res.status !== 201) throw new Error(`push failed with status ${res.status}`);
+      const page = (res.body.results ?? []) as PushItemResult[];
+      results.push(...page);
+      return page;
+    },
+  };
 }
 
 beforeAll(async () => {
@@ -188,35 +266,36 @@ describe("push isolation and an honest ledger (H3/H4)", () => {
   });
 });
 
-describe("conflict resolution on server versions (H6)", () => {
-  it("two devices on the same base each keep their own field", async () => {
+describe("per-item validation of a push batch (ADR-0040)", () => {
+  it("refuses only the malformed items and applies their healthy siblings", async () => {
     const token = await login(A);
-    const patient = await createPatient(token, 40, { gender: "male" });
-    expect(patient.version).toBe(1);
+    const badTimestamp = { ...createEnvelope(81), clientUpdatedAt: "دیروز" };
+    const res = await push(token, [
+      createEnvelope(80),
+      badTimestamp,
+      { ...createEnvelope(82), entity: "consents" },
+      createEnvelope(83),
+    ]);
 
-    // device A renames, based on version 1
-    const deviceA = await push(token, [updateEnvelope(41, patient.id, { lastName: "الف" }, 1)]);
-    expect(deviceA.body.results[0].status).toBe("applied");
-    expect(deviceA.body.results[0].rowVersion).toBe(2);
+    // one broken envelope no longer answers for the batch around it
+    expect(res.status).toBe(201);
+    expect(res.body.results).toHaveLength(4);
+    expect(res.body.results[0].status).toBe("applied");
+    expect(res.body.results[1].status).toBe("rejected");
+    expect(res.body.results[1].clientMutationId).toBe(mid(81));
+    expect(res.body.results[1].reason).toContain("clientUpdatedAt");
+    expect(res.body.results[2].status).toBe("rejected");
+    expect(res.body.results[2].reason).toContain("entity");
+    expect(res.body.results[3].status).toBe("applied");
 
-    // device B is still on version 1 and touches a DIFFERENT field — no conflict
-    const deviceB = await push(token, [updateEnvelope(42, patient.id, { gender: "female" }, 1)]);
-    expect(deviceB.body.results[0].status).toBe("applied");
-    expect(deviceB.body.results[0].conflicts).toBeUndefined();
-
-    // device C is on version 1 and touches the field A already changed — server wins
-    const deviceC = await push(token, [updateEnvelope(43, patient.id, { lastName: "جیم" }, 1)]);
-    expect(deviceC.body.results[0].status).toBe("applied");
-    expect(deviceC.body.results[0].conflicts).toEqual(["lastName"]);
-
-    const readBack = await http.get(`/api/v1/patients/${patient.id}`).set({ Authorization: `Bearer ${token}` });
-    expect(readBack.status).toBe(200);
-    expect(readBack.body.lastName).toBe("الف"); // A survived C
-    expect(readBack.body.gender).toBe("female"); // B survived too
-    expect(readBack.body.rowVersion).toBeGreaterThanOrEqual(3);
+    // a refused item left NO trace: pushing it again is a fresh refusal, not a
+    // duplicate, so the ledger never learned about it
+    const retry = await push(token, [badTimestamp]);
+    expect(retry.status).toBe(201);
+    expect(retry.body.results[0].status).toBe("rejected");
   });
 
-  it("refuses an update without a baseVersion at the contract boundary", async () => {
+  it("refuses an update without a baseVersion per item, not per batch (H6)", async () => {
     const token = await login(A);
     const res = await push(token, [
       {
@@ -228,8 +307,97 @@ describe("conflict resolution on server versions (H6)", () => {
         payload: { id: "11111111-1111-4111-8111-111111111111", gender: "male" },
       },
     ]);
+    expect(res.status).toBe(201);
+    expect(res.body.results[0].status).toBe("rejected");
+    expect(res.body.results[0].reason).toContain("baseVersion");
+  });
+
+  it("400s the batch only when an item cannot be answered per item", async () => {
+    const token = await login(A);
+    const res = await push(token, [createEnvelope(84), { ...createEnvelope(85), clientMutationId: "not-a-uuid" }]);
     expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain("baseVersion");
+    const body = JSON.stringify(res.body);
+    expect(body).toContain("SYNC_MUTATION_UNADDRESSABLE");
+    // the offending indexes are named, so the client dead-letters exactly those
+    expect(body).toContain("indexes");
+
+    // and nothing in a 400 request was applied
+    const applied = await push(token, [createEnvelope(84)]);
+    expect(applied.status).toBe(201);
+    expect(applied.body.results[0].status).toBe("applied");
+  });
+
+  it("refuses an empty batch", async () => {
+    const token = await login(A);
+    const res = await push(token, []);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("conflict resolution on server versions (H6)", () => {
+  it("two devices, two tokens, two offline outboxes — each keeps its own field", async () => {
+    const tokenA = await login(A);
+    const tokenB = await login(A); // a second sign-in = a second device/session
+    const patient = await createPatient(tokenA, 40, { gender: "male" });
+    expect(patient.version).toBe(1);
+
+    const deviceA = newDevice();
+    const deviceB = newDevice();
+    const outboxA = deviceA.open();
+    const outboxB = deviceB.open();
+
+    // Both devices are OFFLINE, both edit the SAME base version, different fields.
+    await outboxA.enqueue("patients", "update", { id: patient.id, lastName: "الف" }, patient.version);
+    await outboxB.enqueue("patients", "update", { id: patient.id, gender: "female" }, patient.version);
+
+    const offline = async (): Promise<PushItemResult[]> => {
+      throw new Error("network unreachable");
+    };
+    for (const [device, outbox] of [
+      [deviceA, outboxA],
+      [deviceB, outboxB],
+    ] as const) {
+      const report = await flushOutbox(outbox, offline, { now: device.now });
+      expect(report.stopped).toBe("transport");
+      expect(report.retried).toBe(1);
+      expect(report.dead).toBe(0);
+      expect(outbox.size).toBe(1); // still queued
+      expect(device.records.size).toBe(1); // and it survived on disk
+    }
+
+    // Back online — each device flushes with ITS OWN token.
+    deviceA.advance(RETRY_MAX_DELAY_MS + 1);
+    deviceB.advance(RETRY_MAX_DELAY_MS + 1);
+    const wireA = transport(tokenA);
+    const wireB = transport(tokenB);
+    const flushA = await flushOutbox(outboxA, wireA.push, { now: deviceA.now });
+    const flushB = await flushOutbox(outboxB, wireB.push, { now: deviceB.now });
+
+    expect(flushA.applied).toBe(1);
+    expect(flushB.applied).toBe(1);
+    expect(outboxA.size).toBe(0);
+    expect(outboxB.size).toBe(0);
+    expect(deviceA.records.size).toBe(0);
+    expect(deviceB.records.size).toBe(0);
+    expect(deviceA.dead).toHaveLength(0);
+    expect(deviceB.dead).toHaveLength(0);
+    expect(wireA.results[0]!.rowVersion).toBe(2);
+    expect(wireB.results[0]!.conflicts).toBeUndefined(); // a different field: no conflict
+
+    // A third device is still on version 1 and touches the field A changed.
+    const deviceC = newDevice();
+    const outboxC = deviceC.open();
+    await outboxC.enqueue("patients", "update", { id: patient.id, lastName: "جیم" }, 1);
+    const wireC = transport(tokenA);
+    const flushC = await flushOutbox(outboxC, wireC.push, { now: deviceC.now });
+    expect(flushC.applied).toBe(1);
+    expect(wireC.results[0]!.conflicts).toEqual(["lastName"]);
+
+    const readBack = await http.get(`/api/v1/patients/${patient.id}`).set({ Authorization: `Bearer ${tokenA}` });
+    expect(readBack.status).toBe(200);
+    expect(readBack.body.lastName).toBe("الف"); // device A survived device C
+    expect(readBack.body.gender).toBe("female"); // device B survived too
+    expect(readBack.body.rowVersion).toBeGreaterThanOrEqual(3);
   });
 
   it("refuses a baseVersion the server never issued", async () => {
@@ -239,6 +407,104 @@ describe("conflict resolution on server versions (H6)", () => {
     expect(res.status).toBe(201);
     expect(res.body.results[0].status).toBe("rejected");
     expect(res.body.results[0].reason).toContain("baseVersion");
+  });
+});
+
+describe("crash mid-push and outbox state after a restart (C9)", () => {
+  it("keeps a committed push after a crash and never applies it twice", async () => {
+    const token = await login(A);
+    const device = newDevice();
+    const outbox = device.open();
+    const envelope = await outbox.enqueue("patients", "create", {
+      firstName: "برق",
+      lastName: "رفت",
+      phone: "09127000070",
+    });
+    const before = await ledgerSize(token);
+
+    // The server COMMITS, then the device dies before it can record the ack.
+    const crashed = await flushOutbox(
+      outbox,
+      async (batch) => {
+        await push(token, batch);
+        throw new Error("power lost before the ack");
+      },
+      { now: device.now },
+    );
+    expect(crashed.stopped).toBe("transport");
+    expect(crashed.applied).toBe(0);
+    expect(crashed.dead).toBe(0);
+
+    // the write IS on the server ...
+    expect(await ledgerSize(token)).toBe(before + 1);
+    // ... and the mutation is still queued, with its retry state persisted
+    expect(outbox.size).toBe(1);
+    const stored = device.records.get(envelope.clientMutationId);
+    expect(stored?.attempts).toBe(1);
+    expect(stored?.lastError).toContain("power lost");
+
+    // RESTART: a fresh queue rehydrated from disk — same id, same retry state.
+    device.advance(RETRY_MAX_DELAY_MS + 1);
+    const rebooted = device.open();
+    expect(rebooted.size).toBe(1);
+    expect(rebooted.snapshot()[0]!.attempts).toBe(1);
+    expect(rebooted.snapshot()[0]!.envelope.clientMutationId).toBe(envelope.clientMutationId);
+
+    const wire = transport(token);
+    const retry = await flushOutbox(rebooted, wire.push, { now: device.now });
+    expect(retry.duplicate).toBe(1); // the server remembers the id
+    expect(retry.applied).toBe(0);
+    expect(retry.stopped).toBe("drained");
+    expect(rebooted.size).toBe(0);
+    expect(device.records.size).toBe(0);
+    expect(device.dead).toHaveLength(0);
+    expect(await ledgerSize(token)).toBe(before + 1); // no second ledger row
+  });
+
+  it("keeps the items of an earlier successful push when a later one crashes", async () => {
+    const token = await login(A);
+    const device = newDevice();
+    const outbox = device.open();
+    const first = await outbox.enqueue("patients", "create", {
+      firstName: "نیمه",
+      lastName: "کاره",
+      phone: "09127000071",
+    });
+    const second = await outbox.enqueue("patients", "create", {
+      firstName: "نیمه",
+      lastName: "دوم",
+      phone: "09127000072",
+    });
+    const before = await ledgerSize(token);
+
+    let call = 0;
+    const report = await flushOutbox(
+      outbox,
+      async (batch) => {
+        call += 1;
+        const res = await push(token, batch);
+        // the second batch commits on the server, then the process dies
+        if (call === 2) throw new Error("crashed after the second batch committed");
+        return (res.body.results ?? []) as PushItemResult[];
+      },
+      { now: device.now, batchSize: 1 },
+    );
+
+    expect(report.applied).toBe(1); // batch 1 acked
+    expect(report.retried).toBe(1); // batch 2 committed but unacked
+    expect(outbox.size).toBe(1);
+    expect(device.records.has(first.clientMutationId)).toBe(false); // settled, gone
+    expect([...device.records.keys()]).toEqual([second.clientMutationId]);
+    expect(await ledgerSize(token)).toBe(before + 2); // BOTH writes are on the server
+
+    // the survivor is retried and answered as a duplicate — never applied twice
+    device.advance(RETRY_MAX_DELAY_MS + 1);
+    const wire = transport(token);
+    const drain = await flushOutbox(device.open(), wire.push, { now: device.now });
+    expect(drain.duplicate).toBe(1);
+    expect(drain.applied).toBe(0);
+    expect(device.records.size).toBe(0);
+    expect(await ledgerSize(token)).toBe(before + 2);
   });
 });
 

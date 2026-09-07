@@ -8,6 +8,7 @@ import {
 } from "./contract.js";
 import {
   PermanentPushError,
+  assertEnvelope,
   makeMutation,
   newMutationId,
   type MutationEnvelope,
@@ -46,13 +47,39 @@ export interface FlushReport {
   rejected: number;
   retried: number;
   dead: number;
+  /** Items the LOCAL contract check refused before anything left the device. */
+  screened: number;
+  /** Times an unattributed refusal forced the batch to be split (ADR-0040). */
+  isolated: number;
   rounds: number;
   stopped: FlushStop;
+}
+
+export interface FlushOptions {
+  maxRounds?: number;
+  batchSize?: number;
+  now?: () => number;
+  /**
+   * Local contract check: return a reason to refuse the envelope, or `null` when
+   * it is safe to send. Defaults to the §8 envelope assertion, so a record that
+   * drifted out of contract is dead-lettered ALONE instead of taking the batch it
+   * happens to share down with it.
+   */
+  screen?: (envelope: MutationEnvelope) => string | null;
 }
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message.slice(0, 300);
   return String(error).slice(0, 300);
+}
+
+function screenEnvelope(envelope: MutationEnvelope): string | null {
+  try {
+    assertEnvelope(envelope);
+    return null;
+  } catch (error) {
+    return errorMessage(error);
+  }
 }
 
 export class Outbox {
@@ -161,46 +188,95 @@ export class Outbox {
  * Push the queue in BOUNDED rounds (C9). Every exit is named in the report, so
  * "nothing synced" is never a mystery: drained, waiting on backoff, out of
  * rounds, or the transport is down.
+ *
+ * Phase 7.1 (ADR-0040) changes how a permanent (4xx) refusal is attributed:
+ *
+ *  1. every envelope is screened against the local §8 contract first, so a record
+ *     that drifted is dead-lettered alone rather than 400ing its batch;
+ *  2. a refusal that NAMES mutations only kills those;
+ *  3. a refusal that names nobody is not evidence against 20 healthy items — the
+ *     batch is halved and retried until the culprit is alone and answers for
+ *     itself.
+ *
+ * The old code did the opposite: one 400 harvested every id in the batch into the
+ * dead-letter queue, so a single drifted envelope could destroy 19 real edits.
  */
 export async function flushOutbox(
   outbox: Outbox,
   push: (mutations: MutationEnvelope[]) => Promise<PushItemResult[]>,
-  opts: { maxRounds?: number; batchSize?: number; now?: () => number } = {},
+  opts: FlushOptions = {},
 ): Promise<FlushReport> {
   const maxRounds = opts.maxRounds ?? FLUSH_MAX_ROUNDS;
   const batchSize = opts.batchSize ?? FLUSH_BATCH_SIZE;
   const clock = opts.now ?? (() => Date.now());
+  const screen = opts.screen ?? screenEnvelope;
   const report: FlushReport = {
     applied: 0,
     duplicate: 0,
     rejected: 0,
     retried: 0,
     dead: 0,
+    screened: 0,
+    isolated: 0,
     rounds: 0,
     stopped: "drained",
   };
 
+  // > 0 while we are bisecting a batch the server refused without naming an item.
+  let isolateSize = 0;
+
   for (let round = 0; round < maxRounds; round++) {
-    const batch = outbox.takeBatch(batchSize, clock());
+    const take = isolateSize > 0 ? Math.min(isolateSize, batchSize) : batchSize;
+    const batch = outbox.takeBatch(take, clock());
     if (batch.length === 0) {
       report.stopped = outbox.size > 0 ? "backoff" : "drained";
       return report;
     }
     report.rounds += 1;
-    const ids = batch.map((m) => m.clientMutationId);
+
+    // Refuse locally what the server is going to refuse anyway — one item at a
+    // time, so the rest of the batch never pays for it.
+    const sendable: MutationEnvelope[] = [];
+    for (const envelope of batch) {
+      const problem = screen(envelope);
+      if (problem === null) {
+        sendable.push(envelope);
+        continue;
+      }
+      report.screened += 1;
+      report.rejected += 1;
+      if (await outbox.reject(envelope.clientMutationId, `local contract check: ${problem}`)) report.dead += 1;
+    }
+    if (sendable.length === 0) continue;
+
+    const ids = sendable.map((m) => m.clientMutationId);
 
     let results: PushItemResult[];
     try {
-      results = await push(batch);
+      results = await push(sendable);
     } catch (error) {
       if (error instanceof PermanentPushError) {
-        // The request itself is invalid: retrying it 5 times only delays the truth.
-        for (const id of ids) {
-          report.rejected += 1;
-          if (await outbox.reject(id, errorMessage(error))) report.dead += 1;
+        const named = error.itemIds.filter((id) => ids.includes(id));
+        if (named.length > 0) {
+          // The server pointed at specific mutations: only those are hopeless.
+          for (const id of named) {
+            report.rejected += 1;
+            if (await outbox.reject(id, errorMessage(error))) report.dead += 1;
+          }
+          isolateSize = 0;
+          continue;
         }
-        report.stopped = "transport";
-        return report;
+        if (sendable.length === 1) {
+          // Nothing else was in the request, so the refusal IS about this item.
+          report.rejected += 1;
+          if (await outbox.reject(ids[0]!, errorMessage(error))) report.dead += 1;
+          isolateSize = 0;
+          continue;
+        }
+        // Unattributed: split instead of condemning the whole batch.
+        report.isolated += 1;
+        isolateSize = Math.max(1, Math.floor(sendable.length / 2));
+        continue;
       }
       const outcome = await outbox.fail(ids, errorMessage(error));
       report.retried += outcome.retried.length;
@@ -211,7 +287,7 @@ export async function flushOutbox(
 
     const byId = new Map(results.map((r) => [r.clientMutationId, r]));
     const settled: string[] = [];
-    for (const envelope of batch) {
+    for (const envelope of sendable) {
       const id = envelope.clientMutationId;
       const result = byId.get(id);
       if (!result) {

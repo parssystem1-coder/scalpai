@@ -211,9 +211,53 @@ export const SyncMutation = z
     }
   });
 
-export const SyncPush = z.object({
-  mutations: z.array(SyncMutation).min(1).max(100),
+/** Hard ceiling on one push batch — the client batches 20, this is headroom. */
+export const SYNC_PUSH_MAX_MUTATIONS = 100;
+
+/**
+ * §8 push — the OUTER envelope ONLY (phase 7.1 / ADR-0040).
+ *
+ * The route used to validate the whole body against an array of `SyncMutation`.
+ * One malformed item therefore 400'd the entire request: `processPushBatch` never
+ * ran, the 19 healthy mutations around it were never applied, and the client
+ * dead-lettered every id in the batch. Per-item validation lives in the API
+ * (`splitSyncBatch`) and answers per item instead, so the only thing that can
+ * still fail as a batch is the envelope itself.
+ */
+export const SyncPushEnvelope = z.object({
+  mutations: z.array(z.unknown()).min(1).max(SYNC_PUSH_MAX_MUTATIONS),
 });
+
+/**
+ * The minimum an item must carry to be ANSWERABLE: without a usable idempotency
+ * key there is no way to tell the client which mutation was refused, and a
+ * batch-level 400 is the only honest answer left.
+ */
+export const SyncMutationRef = z.object({
+  clientMutationId: z.string().uuid(),
+});
+
+/** Shape of a validator issue this module can describe (zod-compatible). */
+export interface ValidationIssueLike {
+  readonly path?: readonly PropertyKey[];
+  readonly message: string;
+}
+
+/**
+ * A refusal reason built from field PATHS and validator messages only — never
+ * from the offending VALUE, because a sync payload can carry PHI (§13). Bounded,
+ * deduplicated and safe to persist in a dead-letter row.
+ */
+export function describeSyncIssues(issues: readonly ValidationIssueLike[]): string {
+  const seen = new Set<string>();
+  for (const issue of issues) {
+    const path = issue.path && issue.path.length > 0 ? issue.path.map((part) => String(part)).join(".") : "(envelope)";
+    seen.add(`${path}: ${issue.message}`);
+    if (seen.size >= 5) break;
+  }
+  const reason = [...seen].join("; ");
+  return reason.length > 0 ? reason.slice(0, 300) : "invalid mutation envelope";
+}
 
 /** §8 — per-mutation result returned by POST /sync/push. */
 export const SyncPushResultItem = z.object({
@@ -290,5 +334,6 @@ export type AnalysisSubmitDto = AnalysisSubmit;
 export type ExpertReview = z.infer<typeof ExpertReview>;
 export type ExpertReviewDto = ExpertReview;
 export type SyncMutationDto = z.infer<typeof SyncMutation>;
-export type SyncPush = z.infer<typeof SyncPush>;
-export type SyncPushDto = SyncPush;
+export type SyncMutationRefDto = z.infer<typeof SyncMutationRef>;
+export type SyncPushEnvelope = z.infer<typeof SyncPushEnvelope>;
+export type SyncPushEnvelopeDto = SyncPushEnvelope;
