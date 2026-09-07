@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { scrubForLog, scrubText } from "@scalpai/shared";
 
 /**
- * Structured, PHI-free logging (WEAKNESSES L3, ADR-0038).
+ * Structured, PHI-free logging (WEAKNESSES L3, ADR-0038 / ADR-0042).
  *
  * What was wrong: `console.error("[api] …")` with a raw error message. Postgres
  * unique-violation messages quote the conflicting VALUE, so a duplicate-phone
@@ -18,6 +18,10 @@ import { scrubForLog, scrubText } from "@scalpai/shared";
  *  - every value goes through the shared scrubber (tokens, emails, phones,
  *    data URLs, PHI field names);
  *  - the request id comes from the caller only if it looks like an id.
+ *
+ * Phase 9 adds one thing: the access log is also the single place where a
+ * finished request is announced, so metrics and alerting subscribe here instead
+ * of being sprinkled through handlers.
  */
 
 export const REQUEST_ID_HEADER = "x-request-id";
@@ -95,6 +99,44 @@ export function requestIdOf(req: FastifyRequest): string {
 }
 
 /**
+ * Phase 9 (L3): one fan-out point for "a request finished". Metrics and alerting
+ * register here (see ops/observability.ts) so neither of them has to wrap the
+ * Fastify lifecycle again, and an observer that throws can never fail a request.
+ */
+export interface FinishedRequest {
+  requestId: string;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}
+
+export type RequestObserver = (finished: FinishedRequest) => void;
+
+const observers = new Set<RequestObserver>();
+
+export function onRequestFinished(observer: RequestObserver): void {
+  observers.add(observer);
+}
+
+export function clearRequestObservers(): void {
+  observers.clear();
+}
+
+export function emitRequestFinished(finished: FinishedRequest): void {
+  for (const observer of observers) {
+    try {
+      observer(finished);
+    } catch (err) {
+      logEvent("warn", {
+        event: "observer.failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+/**
  * Correlation + access log. Registered next to the tenant-context hook so every
  * downstream line can quote the same id, and echoed back so a client can hand it
  * to support without anyone pasting PHI into a ticket.
@@ -109,15 +151,23 @@ export function registerRequestLogging(fastify: FastifyInstance): void {
 
   fastify.addHook("onResponse", (req: FastifyRequest, reply: FastifyReply, done: () => void) => {
     const startedAt = (req as unknown as { scalpaiStartedAt?: number }).scalpaiStartedAt ?? Date.now();
-    logEvent(reply.statusCode >= 500 ? "error" : "info", {
-      event: "http.request",
+    const finished: FinishedRequest = {
       requestId: requestIdOf(req),
       method: req.method,
       // The PATH only — a query string can carry a search term, i.e. a name.
       path: scrubText(req.url.split("?")[0] ?? req.url),
       status: reply.statusCode,
       durationMs: Date.now() - startedAt,
+    };
+    logEvent(finished.status >= 500 ? "error" : "info", {
+      event: "http.request",
+      requestId: finished.requestId,
+      method: finished.method,
+      path: finished.path,
+      status: finished.status,
+      durationMs: finished.durationMs,
     });
+    emitRequestFinished(finished);
     done();
   });
 }
