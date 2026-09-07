@@ -52,6 +52,19 @@ safe without anything mechanically making it so.
    uploads.
 7. **Expensive work is admitted, not queued forever.** A process-wide semaphore
    fronts every decode; past its queue the answer is 429.
+8. **An override replaces the ceiling it addresses.** A metric may be written with
+   more than one plan key (`storage_bytes` or `storage_mb`, `uploads_per_month` or
+   `uploads`) and the resolver takes the first usable key in priority order, so a
+   plain `{ ...plan, ...overrides }` merge let a clinic override lose to the plan's
+   sibling key while looking applied. `mergePlanLimits` retires every sibling key
+   of a metric the override touches, and it is the only place the two are combined.
+9. **A metered endpoint validates before it meters.** Nest runs guards before
+   pipes, so `@Quota` cannot see a parsed body: on `POST
+   patients/:pid/gallery/uploads` it answered 403 QUOTA_EXCEEDED to a `sizeBytes`
+   over the 50MB contract, telling the client to buy a bigger plan for a file no
+   plan accepts. The slot and the bytes are taken atomically inside the handler's
+   transaction anyway (decision 5/6), so the decorator came off that route rather
+   than the contract moving into a guard that runs too early to be right.
 
 ## Consequences
 
@@ -66,3 +79,11 @@ safe without anything mechanically making it so.
   over its (previously unmeasured) ceiling will start being refused. That is the
   intended behaviour, and `GET /privacy/storage/usage` exists so it can be seen
   before it bites.
+- The resolved entitlement is cached per clinic with a TTL (ADR-0034), so a plan
+  or override written **outside** `EntitlementService` — a migration-role UPDATE, a
+  test fixture, a support script — is invisible until the TTL expires. Such a
+  write must call `invalidate(clinicId)`, otherwise an enforced ceiling and a
+  stale one are indistinguishable from the outside.
+- Quota is per clinic and cumulative, which makes an integration suite that shares
+  one clinic order-dependent unless it clears `usage_counters`, `upload_sessions`
+  and `storage_usage` between cases. `media.phase8.spec.ts` does that per test.

@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { entitlements, planFeatures, plans, users } from "../schema.js";
+import { mergePlanLimits } from "./quota.repo.js";
 import type { Tx } from "../tenant.js";
 
 export async function findUserByEmail(tx: Tx, email: string) {
@@ -37,7 +38,13 @@ export async function resolveEntitlement(tx: Tx, clinicId: string): Promise<Reso
   return {
     plan: ent.planCode,
     features: feats.map((f) => f.feature),
-    limits: { ...(plan.limits as object), ...((ent.overrides as object) ?? {}) },
+    // NOT a spread: a metric can be written with more than one key, so an
+    // override must retire the plan's sibling key instead of sitting next to it
+    // (see mergePlanLimits — WEAKNESSES H11).
+    limits: mergePlanLimits(
+      plan.limits as Record<string, unknown> | null,
+      ent.overrides as Record<string, unknown> | null,
+    ),
   };
 }
 

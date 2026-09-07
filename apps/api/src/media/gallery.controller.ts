@@ -10,7 +10,6 @@ import {
   type UploadPartUrlsRequestDto,
 } from "@scalpai/shared";
 import { listGalleryByPatient, softDeleteGalleryItem } from "@scalpai/db";
-import { Quota } from "../common/quota.guard.js";
 import { RateLimit } from "../common/rate-limit.guard.js";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
@@ -45,11 +44,19 @@ export class GalleryController {
   /**
    * Open an upload. Small files get a single presigned PUT; anything over the
    * multipart threshold gets a session plus its FIRST window of part URLs.
+   *
+   * No `@Quota("uploads")` here, on purpose. Nest runs guards BEFORE pipes, so the
+   * decorator refused a request the body schema had not even looked at yet: a
+   * `sizeBytes` over the 50MB contract came back as 403 QUOTA_EXCEEDED instead of
+   * 400 VALIDATION_ERROR, which tells the client to buy a bigger plan for a file
+   * no plan will ever accept. The upload slot AND the storage bytes are taken
+   * atomically inside the handler's own transaction under a row lock
+   * (`consumeQuota` / `reserveStorageBytes`, ADR-0041 §5) — that is the binding
+   * check, and the guard was only ever an optimisation in front of it.
    */
   @Post("patients/:pid/gallery/uploads")
   @Roles("owner", "trichologist", "receptionist")
   @RateLimit("upload", 120)
-  @Quota("uploads")
   @HttpCode(HttpStatus.CREATED)
   open(@Param("pid") pid: string, @Body(new ZodBodyPipe(UploadInit)) dto: UploadInitDto) {
     return this.uploads.open(pid, dto);

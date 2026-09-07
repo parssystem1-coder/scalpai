@@ -7,7 +7,7 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DbService, migrate, seed } from "@scalpai/db";
 import { migrateSql, resetAll, seedMarkerClinicId } from "@scalpai/db/testing";
 import {
@@ -18,6 +18,7 @@ import {
   partRange,
 } from "@scalpai/shared";
 import { AppModule } from "../src/app.module.js";
+import { EntitlementService } from "../src/entitlements/entitlement.service.js";
 
 /**
  * Phase 8 (ADR-0041) — media, upload and quota against a REAL PostgreSQL.
@@ -31,6 +32,7 @@ import { AppModule } from "../src/app.module.js";
 let app: NestFastifyApplication;
 let http: ReturnType<typeof request>;
 let db: DbService;
+let entitlements: EntitlementService;
 let clinicA: string;
 
 const A = { email: "owner@clinic-a.test", password: "Dev12345!" };
@@ -67,6 +69,24 @@ async function setLimits(limits: Record<string, number>): Promise<void> {
     clinicA,
     JSON.stringify(limits),
   ]);
+  // The resolved entitlement is cached per clinic with a TTL (ADR-0034 / M6) and
+  // only the service that writes a plan drops that cache. A raw SQL write walks
+  // past it, so without this the API keeps answering from the PREVIOUS ceiling
+  // for the whole TTL — which looks exactly like a ceiling that is not enforced.
+  await entitlements.invalidate(clinicA);
+}
+
+/**
+ * Quota is per clinic and cumulative, and every block below signs in as the SAME
+ * seeded clinic. Left alone, a block inherits the counters, the open sessions and
+ * the storage reservations of the block before it: it stops proving its own
+ * behaviour and starts reporting its neighbour's leftovers (an exhausted monthly
+ * slot turns every "expect 201" into a 403, and every session id into undefined).
+ */
+async function resetUsage(): Promise<void> {
+  await migrateSql(MIGRATE(), "DELETE FROM upload_sessions WHERE clinic_id = $1", [clinicA]);
+  await migrateSql(MIGRATE(), "DELETE FROM usage_counters WHERE clinic_id = $1", [clinicA]);
+  await migrateSql(MIGRATE(), "DELETE FROM storage_usage WHERE clinic_id = $1", [clinicA]);
 }
 
 beforeAll(async () => {
@@ -82,6 +102,12 @@ beforeAll(async () => {
   await app.listen(0, "127.0.0.1");
   http = request(await app.getUrl());
   db = app.get(DbService);
+  entitlements = app.get(EntitlementService);
+  // Under STORAGE_DRIVER=mock the presigned URLs are signed against
+  // MOCK_S3_PUBLIC_URL, and this suite listens on an ephemeral port: without this
+  // a part PUT would travel to whatever happens to own the default port. The S3
+  // driver ignores it.
+  process.env.MOCK_S3_PUBLIC_URL = await app.getUrl();
 }, 60_000);
 
 afterAll(async () => {
@@ -93,10 +119,10 @@ afterAll(async () => {
 }, 30_000);
 
 describe("quota is atomic, not read-then-write (H11)", () => {
+  beforeEach(resetUsage);
+
   it("lets exactly `limit` of N parallel uploads through", async () => {
     await setLimits({ uploads_per_month: 3 });
-    await migrateSql(MIGRATE(), "DELETE FROM usage_counters WHERE clinic_id = $1", [clinicA]);
-    await migrateSql(MIGRATE(), "DELETE FROM upload_sessions WHERE clinic_id = $1", [clinicA]);
 
     const token = await login(A);
     const pid = await firstPatientId(token);
@@ -123,7 +149,6 @@ describe("quota is atomic, not read-then-write (H11)", () => {
 
   it("refunds the slot when the upload is abandoned", async () => {
     await setLimits({ uploads_per_month: 2 });
-    await migrateSql(MIGRATE(), "DELETE FROM usage_counters WHERE clinic_id = $1", [clinicA]);
     const token = await login(A);
     const pid = await firstPatientId(token);
 
@@ -177,11 +202,12 @@ describe("quota is atomic, not read-then-write (H11)", () => {
 });
 
 describe("storage is reserved against measured bytes (H11/M22)", () => {
+  beforeEach(resetUsage);
+
   it("refuses an upload that would not fit the plan ceiling", async () => {
+    // `storage_bytes` must retire the plan's own `storage_mb`, or the ceiling
+    // under test is still the 50GB one the growth plan ships with.
     await setLimits({ uploads_per_month: 100, storage_bytes: 300_000 });
-    await migrateSql(MIGRATE(), "DELETE FROM usage_counters WHERE clinic_id = $1", [clinicA]);
-    await migrateSql(MIGRATE(), "DELETE FROM upload_sessions WHERE clinic_id = $1", [clinicA]);
-    await migrateSql(MIGRATE(), "DELETE FROM storage_usage WHERE clinic_id = $1", [clinicA]);
 
     const token = await login(A);
     const pid = await firstPatientId(token);
@@ -204,6 +230,8 @@ describe("storage is reserved against measured bytes (H11/M22)", () => {
 });
 
 describe("part geometry is the server's, not the client's (H12)", () => {
+  beforeEach(resetUsage);
+
   it("derives totalParts from size and part size", async () => {
     await setLimits({ uploads_per_month: 100 });
     const token = await login(A);
@@ -221,6 +249,9 @@ describe("part geometry is the server's, not the client's (H12)", () => {
   }, 20_000);
 
   it("refuses a size over the contract ceiling", async () => {
+    // 400, not 403: a size no plan will ever accept is a malformed request, so
+    // the body schema has to answer before anything meters the clinic.
+    await setLimits({ uploads_per_month: 100 });
     const token = await login(A);
     const pid = await firstPatientId(token);
     const res = await open(token, pid, { mime: "image/jpeg", sizeBytes: UPLOAD_MAX_BYTES + 1 });
@@ -246,6 +277,7 @@ describe("part geometry is the server's, not the client's (H12)", () => {
     const token = await login(A);
     const pid = await firstPatientId(token);
     const opened = await open(token, pid, { mime: "image/jpeg", sizeBytes: 20 * 1024 * 1024 });
+    expect(opened.status).toBe(201);
 
     const tooFar = await http
       .post(`/api/v1/gallery/uploads/${opened.body.sessionId}/parts`)
@@ -262,6 +294,8 @@ describe("part geometry is the server's, not the client's (H12)", () => {
 });
 
 describe("resume continues the SAME upload (H7)", () => {
+  beforeEach(resetUsage);
+
   it("keeps the uploadId and reports the parts the bucket already holds", async () => {
     await setLimits({ uploads_per_month: 100 });
     const token = await login(A);
@@ -321,6 +355,7 @@ describe("resume continues the SAME upload (H7)", () => {
     const pid = await firstPatientId(token);
     const size = 20 * 1024 * 1024;
     const opened = await open(token, pid, { mime: "image/jpeg", sizeBytes: size });
+    expect(opened.status).toBe(201);
     const total = partCountFor(size, UPLOAD_PART_SIZE_BYTES);
 
     const res = await http
@@ -332,6 +367,8 @@ describe("resume continues the SAME upload (H7)", () => {
 });
 
 describe("tenant isolation and key shape (C1)", () => {
+  beforeEach(resetUsage);
+
   it("hides another clinic's upload session", async () => {
     await setLimits({ uploads_per_month: 100 });
     const tokenA = await login(A);
