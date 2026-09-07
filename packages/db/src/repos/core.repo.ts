@@ -8,7 +8,7 @@ import {
   type ParsedSignature,
 } from "@scalpai/shared";
 import { auditLog, consents, patients, sessions } from "../schema.js";
-import { incrementUsage } from "./users.repo.js";
+
 import { computeAuditRowHash } from "../audit-hash.js";
 import {
   decryptPhi,
@@ -377,8 +377,6 @@ export async function createSession(
     entity: "session",
     entityId: created.id,
   });
-  // §9.1 metering: inline in the same tx until BullMQ workers take over.
-  await incrementUsage(tx, input.clinicId, "monthly_sessions");
   return created;
 }
 

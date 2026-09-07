@@ -211,9 +211,9 @@ BEGIN
   -- ON CONFLICT DO NOTHING منتظر تراکنش رقیب نمی‌ماند و ردیف نامرئی می‌مانَد.
   LOOP
     v_round := v_round + 1;
-    SELECT value INTO v_used
-      FROM usage_counters
-     WHERE clinic_id = p_clinic AND metric = p_metric AND period_start = v_period
+    SELECT uc.value INTO v_used
+      FROM usage_counters uc
+     WHERE uc.clinic_id = p_clinic AND uc.metric = p_metric AND uc.period_start = v_period
        FOR UPDATE;
     IF FOUND THEN
       EXIT;
@@ -236,9 +236,9 @@ BEGIN
     RETURN;
   END IF;
 
-  UPDATE usage_counters
-     SET value = value + p_amount
-   WHERE clinic_id = p_clinic AND metric = p_metric AND period_start = v_period;
+  UPDATE usage_counters uc
+     SET value = uc.value + p_amount
+   WHERE uc.clinic_id = p_clinic AND uc.metric = p_metric AND uc.period_start = v_period;
 
   RETURN QUERY SELECT true, v_used + p_amount, v_period;
 END;
