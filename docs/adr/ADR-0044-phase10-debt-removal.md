@@ -1,8 +1,8 @@
-# ADR-0044 - Phase 10 (batch 1): delete the debt instead of registering it
+# ADR-0044 - Phase 10 (batch 2): delete the debt instead of registering it
 
 - **Status:** accepted
 - **Date:** 2026-09-08
-- **Relates to:** ADR-0043 (phase 10 part 1), ADR-0036 (npm is the only package
+- **Relates to:** ADR-0043 (phase 10 batch 1), ADR-0036 (npm is the only package
   manager), ADR-0037 (evidence-carrying gates)
 - **Weaknesses addressed:** M4/M16, R14, PR #21/#23
 - **Weaknesses still NOT addressed:** M1, M5, M14, M15, M19, L1, L2
@@ -64,12 +64,12 @@ to import the wrong one.
 
 ### 3. The repository root has no `src/`
 
-The workspace layout is `apps/*`, `packages/*`, `tools/*`. A root `src/assets/images`
-held eight generator-named JPEGs (6.0MB) with zero references anywhere in the
-tree: no component, stylesheet, manifest, doc or test. Deleted. If a real
-sample fixture is wanted for **M1**, it belongs under `apps/web/public` or a
-test fixture directory and gets recovered from history deliberately, not
-inherited by accident.
+The workspace layout is `apps/*`, `packages/*`, `tools/*`. A root
+`src/assets/images` held eight generator-named JPEGs (6.0MB) with zero
+references anywhere in the tree: no component, stylesheet, manifest, doc or
+test. Deleted. If a real sample fixture is wanted for **M1**, it belongs under
+`apps/web/public` or a test fixture directory and gets recovered from history
+deliberately, not inherited by accident.
 
 ### 4. A workspace root has no runtime
 
@@ -96,7 +96,8 @@ tree. This is what Dependabot #48 has been arguing with.
 The regression test asserts the direction of the rule, not just the current
 state: if any workspace other than `apps/web` starts importing `three` or
 `lucide-react`, the gate fails rather than letting hoisting resolve it
-silently.
+silently. A companion assertion requires every `@scalpai/*` import in
+`apps/web/src` to be declared by that workspace, for the same reason.
 
 ### 5. PR #21 and #23 were verified, not assumed
 
@@ -113,8 +114,8 @@ self-certified gate that ADR-0037 exists to prevent.
 
 ### 6. Two pieces of drift fixed in passing
 
-Neither closes **L1**; both were found while doing the above and left uncorrected
-would contradict this ADR:
+Neither closes **L1**; both were found while doing the above and left
+uncorrected would contradict this ADR:
 
 - The phase file's header announced phase 7 as the frontier while phases 8 and 9
   were ticked in the same document.
@@ -133,9 +134,16 @@ archive still carry pnpm snippets and PASS marks with no evidence log.
   working, not a problem to route around.
 - `packages/ui`, `packages/notify` and `ops/audit-anchor.ts` are gone from `HEAD`
   and recoverable from history. The 6.0MB of images are gone from `HEAD` but
-  remain in history; this is not a size reduction of the clone.
+  remain in history; this is not a size reduction of an existing clone.
 - Two `package-call-site` exceptions are removed. Any future scaffold fails
   conformance immediately.
-- Phase 10 remains OPEN. Six items are still `[ ]`: M1, M5, M14, M15, M19, L1, L2.
+- Phase 10 remains OPEN. Seven items are still `[ ]`: M1, M5, M14, M15, M19,
+  L1/W01/W22/W23 and L2. `product.phase10.spec.ts` asserts that count, so
+  ticking a box without adding evidence turns the suite red.
+- **M19 is now unblocked** by the same lockfile regeneration, but it is not done
+  here: turning on type-aware ESLint, `react-hooks`, `jsx-a11y`,
+  `no-floating-promises` and the strict TypeScript flags surfaces existing
+  violations across the whole tree. That needs its own branch where the errors
+  are read and fixed, not a config landed blind.
 - Regenerating the graph (`npm run graph`) should now be a no-op against the
   hand-corrected files; if it is not, the generator is the source of truth.
