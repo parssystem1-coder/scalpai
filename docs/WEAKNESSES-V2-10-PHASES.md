@@ -169,16 +169,16 @@
 
 **هدف خروج:** upload امن، قابل ادامه، bounded و tenant-scoped باشد.
 
-- [ ] **H7** resume واقعاً S3 multipart upload قبلی را ادامه دهد؛ `uploadId` حفظ و `ListParts` استفاده شود.
-- [ ] **H7** state به جدول Dexie `pendingUploads` منتقل شود؛ localStorage مرجع اصلی نباشد.
-- [ ] **H7/H12** presigned URLها lazy/part-based صادر شوند؛ URLهای منقضی‌شده و totalParts غیرمعتبر مدیریت شوند.
-- [ ] **H12** bodyهای multipart با Zod، حداقل/حداکثر part، size و تعداد parts اعتبارسنجی شوند.
-- [ ] **H12** قبل از `getObject` با `HeadObject` اندازه واقعی check شود؛ sharp با stream و concurrency محدود اجرا شود.
-- [ ] **H11** quotaهای analyses، storage bytes و uploads اضافه و check+increment در یک transaction قفل‌شده انجام شود.
-- [ ] **H11** period quota با timezone کلینیک محاسبه شود، نه UTC ثابت.
-- [ ] **C1/M22** storage key فقط clinic-scoped و allowlist‌شده باشد؛ direct media proxy بدون auth/tenancy ممنوع.
-- [ ] **M22** usage واقعی bucket اندازه‌گیری و object lifecycle/retention تنظیم شود.
-- [ ] rate limit و concurrency limit برای upload/thumbnail/analysis اضافه شود تا OOM ممکن نباشد.
+- [x] **H7** resume واقعاً S3 multipart upload قبلی را ادامه دهد؛ `uploadId` حفظ و `ListParts` استفاده شود.
+- [x] **H7** state به جدول Dexie `pendingUploads` منتقل شود؛ localStorage مرجع اصلی نباشد.
+- [x] **H7/H12** presigned URLها lazy/part-based صادر شوند؛ URLهای منقضی‌شده و totalParts غیرمعتبر مدیریت شوند.
+- [x] **H12** bodyهای multipart با Zod، حداقل/حداکثر part، size و تعداد parts اعتبارسنجی شوند.
+- [x] **H12** قبل از `getObject` با `HeadObject` اندازه واقعی check شود؛ sharp با stream و concurrency محدود اجرا شود.
+- [x] **H11** quotaهای analyses، storage bytes و uploads اضافه و check+increment در یک transaction قفل‌شده انجام شود.
+- [x] **H11** period quota با timezone کلینیک محاسبه شود، نه UTC ثابت.
+- [x] **C1/M22** storage key فقط clinic-scoped و allowlist‌شده باشد؛ direct media proxy بدون auth/tenancy ممنوع.
+- [x] **M22** usage واقعی bucket اندازه‌گیری و object lifecycle/retention تنظیم شود.
+- [x] rate limit و concurrency limit برای upload/thumbnail/analysis اضافه شود تا OOM ممکن نباشد.
 
 **شرط تکمیل فاز:** تست فایل بزرگ، upload قطع‌شده، resume واقعی، فایل خراب، oversize، quota race و object isolation.
 
@@ -243,7 +243,7 @@
 - [x] فاز ۵: CI/CD، تست و گیت‌کیپینگ واقعی (تکمیل — ADR-0037، زنجیره شواهد `ci-evidence` و job `gate` که PASS بدون لاگ را رد می‌کند، coverage اپ‌ها علاوه بر پکیج‌ها، e2e smoke روی هر PR + nightly کامل، audit/CodeQL/Dependabot/secret-scan، image scan و تست رگرسیون tools/ci/pipeline.phase5.spec.ts)
 - [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی (تکمیل — PR #42، مایگریشن 0012، phi-crypto AES-256-GCM با key ring و AAD binding، Merkle tree واقعی با inclusion proof، report seal Ed25519، canonical JSON، PHI scrubbing در لاگ و ledger، retention/purge با دو نفر امضا، orphan reconciliation، privacy controller و boot gate)
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
-- [ ] فاز ۸: مدیا، آپلود و سهمیه
+- [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
 - [ ] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد
 - [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی
 
