@@ -20,7 +20,7 @@ import type { Tx } from "../tenant.js";
  * Storage is deliberately NOT a monthly counter: bytes are a stock, not a flow.
  * It is reserved against measured bucket usage plus the reservations of open
  * upload sessions (M22), so a plan ceiling means the same thing at the start and
- * the end of a month.
+ * at the end of a month.
  */
 
 export class QuotaError extends Error {
@@ -66,6 +66,11 @@ export const QUOTA_SPECS = {
       { key: "uploads_per_month", scale: 1 },
       { key: "uploads", scale: 1 },
     ],
+  },
+  sessions: {
+    metric: "monthly_sessions",
+    kind: "flow",
+    limits: [{ key: "monthly_sessions", scale: 1 }],
   },
   storage: {
     metric: "storage_bytes",

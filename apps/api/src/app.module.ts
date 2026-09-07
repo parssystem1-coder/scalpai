@@ -21,6 +21,7 @@ import { EntitlementService } from "./entitlements/entitlement.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
 import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
+import { UploadService } from "./media/upload.service.js";
 import { PlansController } from "./plans.controller.js";
 import { PrivacyController } from "./privacy/privacy.controller.js";
 import { SyncController } from "./sync.controller.js";
@@ -65,6 +66,9 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     EntitlementService,
     LoginThrottleService,
     StorageService,
+    // Phase 8 (ADR-0041): quota, object store and the upload session row have to
+    // move together, so exactly one service owns that ordering.
+    UploadService,
     RolesGuard,
     FeatureGuard,
     QuotaGuard,
