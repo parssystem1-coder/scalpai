@@ -115,7 +115,7 @@ sha256_of() {
 # 1. Preconditions - tools and secrets, before a single byte is written.
 # ---------------------------------------------------------------------------
 require_tool pg_dump "postgresql-client"
-require_tool age "authenticated encryption, replaces openssl enc -aes-256-cbc"
+require_tool age "authenticated encryption (age-x25519), not legacy openssl"
 require_tool mc "MinIO client - the object store is part of the clinical record"
 require_tool sha256sum "checksum manifest"
 

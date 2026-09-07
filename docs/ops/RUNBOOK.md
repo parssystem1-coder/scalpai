@@ -124,7 +124,18 @@ and request ID, not a patient. Close an incident only when:
 - readiness is `ready`, not merely liveness;
 - the root cause and next prevention are captured without PHI.
 
-## 9. Monthly restore checklist
+## 9. Backup environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BACKUP_RETENTION_DAYS` | `14` | Days to keep local snapshots |
+| `BACKUP_OFFSITE_RETENTION_DAYS` | `90` | Days to keep off-site WORM copies |
+| `BACKUP_OFFSITE_LOCK_MODE` | `COMPLIANCE` | Object-lock mode (`COMPLIANCE` or `GOVERNANCE`) |
+| `BACKUP_AGE_RECIPIENTS_FILE` | *(required)* | Path to mounted age recipients file |
+| `BACKUP_OFFSITE_ENDPOINT` | *(required)* | Off-site S3-compatible endpoint |
+| `BACKUP_SNAPSHOT_ID` | *(auto)* | Override snapshot timestamp |
+
+## 10. Monthly restore checklist
 
 The staging workflow is enabled only when `ENABLE_STAGING_RESTORE_DRILL=true`.
 Store these GitHub Environment secrets in `staging`: `BACKUP_AGE_IDENTITY`,
