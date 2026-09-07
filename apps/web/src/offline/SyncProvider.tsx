@@ -242,11 +242,31 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * A 4xx the server will never accept is permanent — the batch is dead-lettered
- * instead of retried five times. 401/403/408/429 are NOT permanent: those are a
- * token refresh or a rate budget, and the mutation is still perfectly valid.
+ * A 4xx the server will never accept is permanent — there is no point retrying it
+ * five times. 401/403/408/429 are NOT permanent: those are a token refresh or a
+ * rate budget, and the mutation is still perfectly valid.
  */
 const PERMANENT_STATUSES = new Set([400, 404, 413, 422]);
+
+/**
+ * Which mutations the server actually blamed (ADR-0040). Since push validates per
+ * item, a 400 means the REQUEST was unanswerable — and the API says which indexes
+ * caused it. Anything we cannot map stays unattributed on purpose: the outbox then
+ * splits the batch instead of dead-lettering healthy edits.
+ */
+function blamedItemIds(mutations: MutationEnvelope[], details: unknown): string[] {
+  if (!details || typeof details !== "object") return [];
+  const indexes = (details as { indexes?: unknown }).indexes;
+  if (!Array.isArray(indexes)) return [];
+  const ids: string[] = [];
+  for (const raw of indexes) {
+    const index = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isInteger(index)) continue;
+    const envelope = mutations[index];
+    if (envelope) ids.push(envelope.clientMutationId);
+  }
+  return ids;
+}
 
 async function pushToServer(mutations: MutationEnvelope[]): Promise<PushItemResult[]> {
   try {
@@ -257,7 +277,10 @@ async function pushToServer(mutations: MutationEnvelope[]): Promise<PushItemResu
     return res.results ?? [];
   } catch (err) {
     if (err instanceof ApiError && PERMANENT_STATUSES.has(err.status)) {
-      throw new PermanentPushError(`${err.code}: ${err.message}`, err.status);
+      throw new PermanentPushError(`${err.code}: ${err.message}`, err.status, {
+        code: err.code,
+        itemIds: blamedItemIds(mutations, err.details),
+      });
     }
     throw err;
   }
