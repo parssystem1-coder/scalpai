@@ -77,9 +77,12 @@ describe("analyses (playbook 2.3)", () => {
       .send({ firstName: "تحلیل", lastName: "تست", phone: `0912${Date.now()}`.slice(0, 11) });
     const pid = String(patient.body.id);
 
-    // minimal done gallery item row via init only (complete not required for FK)
+    // Phase 8 (ADR-0041) replaced `gallery/init` with the upload-session endpoint.
+    // Opening the upload is all the analyses FK needs: the gallery item row exists
+    // as `pending` from here on, and completion would need real bytes in the
+    // bucket.
     const init = await http
-      .post(`/api/v1/patients/${pid}/gallery/init`)
+      .post(`/api/v1/patients/${pid}/gallery/uploads`)
       .set(auth)
       .send({ mime: "image/jpeg", sizeBytes: 200_000 });
     expect(init.status).toBe(201);
@@ -120,7 +123,10 @@ describe("analyses (playbook 2.3)", () => {
       .set(auth)
       .send({ firstName: "گلد", lastName: "لیبل", phone: `0935${Date.now()}`.slice(0, 11) });
     const pid = String(patient.body.id);
-    const init = await http.post(`/api/v1/patients/${pid}/gallery/init`).set(auth).send({ mime: "image/jpeg", sizeBytes: 200_000 });
+    const init = await http
+      .post(`/api/v1/patients/${pid}/gallery/uploads`)
+      .set(auth)
+      .send({ mime: "image/jpeg", sizeBytes: 200_000 });
     const submit = await http
       .post("/api/v1/analyses")
       .set(auth)
@@ -163,7 +169,7 @@ describe("analyses (playbook 2.3)", () => {
       .send({ firstName: "X", lastName: "Y", phone: `0912${String(Date.now()).slice(-6)}9` });
     const pid = String(patient.body.id);
     const init = await http
-      .post(`/api/v1/patients/${pid}/gallery/init`)
+      .post(`/api/v1/patients/${pid}/gallery/uploads`)
       .set("Authorization", `Bearer ${a}`)
       .send({ mime: "image/jpeg", sizeBytes: 200_000 });
     const submit = await http
@@ -203,7 +209,7 @@ describe("analysis provenance is enforced server-side (H13)", () => {
       .send({ firstName: "پرووننس", lastName: "تست", phone: `0919${Date.now()}`.slice(0, 11) });
     const pid = String(patient.body.id);
     const init = await http
-      .post(`/api/v1/patients/${pid}/gallery/init`)
+      .post(`/api/v1/patients/${pid}/gallery/uploads`)
       .set(auth)
       .send({ mime: "image/jpeg", sizeBytes: 200_000 });
     return { auth, pid, gid: String(init.body.id) };
