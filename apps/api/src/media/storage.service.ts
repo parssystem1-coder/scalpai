@@ -43,9 +43,11 @@ const SNIFF_BYTES = 32;
 const KEY_PATTERN = /^clinic-[0-9a-fA-F-]{36}\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/;
 
 /**
- * Phase 8 (C1): the SHAPE of a media key, not just its prefix. The same pattern
- * is a CHECK constraint on `upload_sessions.storage_key` and `gallery_items`, so
- * a key the API would refuse cannot be smuggled in through a repository either.
+ * Phase 8 (C1): the SHAPE of a media key, not merely its tenant prefix. The same
+ * pattern is a CHECK constraint on `upload_sessions.storage_key` and on
+ * `gallery_items`, so a key the API would refuse cannot be smuggled in through a
+ * repository either. Non-media objects (consent signatures) have their own key
+ * space and are validated by the tenant-key allowlist alone.
  */
 const MEDIA_REST_PATTERN = /^gallery\/[0-9a-fA-F-]{36}\/(original|thumb)\.(jpg|jpeg|png|webp)$/;
 
@@ -108,7 +110,10 @@ export interface ObjectSize {
 }
 
 export class ObjectTooLargeError extends Error {
-  constructor(readonly bytes: number, readonly maxBytes: number) {
+  constructor(
+    readonly bytes: number,
+    readonly maxBytes: number,
+  ) {
     super(`object is ${bytes} bytes, over the ${maxBytes} byte ceiling`);
     this.name = "ObjectTooLargeError";
   }
@@ -137,7 +142,7 @@ export class StorageService implements OnModuleInit {
   private bucket: string;
   private localRoot = "";
   readonly driver: StorageDriver;
-  /** Observable for the ops test: did the lifecycle policy actually apply? */
+  /** Observable for the ops regression test: did the lifecycle policy apply? */
   lifecycleApplied = false;
 
   constructor() {
@@ -180,6 +185,23 @@ export class StorageService implements OnModuleInit {
     return `${key}.part-${String(partNumber).padStart(5, "0")}`;
   }
 
+  /**
+   * The single place a clinic-relative path becomes a bucket key. Every surface
+   * goes through it, so "is this key allowed" is asked exactly once per call and
+   * cannot be forgotten by a new method.
+   */
+  private fullKey(clinicId: string, rest: string): string {
+    const key = StorageService.clinicKey(clinicId, rest);
+    if (!isAllowedStorageKey(key)) {
+      throw new Error("storage key is not an allowed tenant key");
+    }
+    return key;
+  }
+
+  private mediaKey(clinicId: string, rest: string): string {
+    return this.fullKey(clinicId, assertAllowedMediaRest(rest));
+  }
+
   async onModuleInit(): Promise<void> {
     await this.ensureBucket();
     await this.ensureLifecycle();
@@ -202,8 +224,8 @@ export class StorageService implements OnModuleInit {
    * Object lifecycle (WEAKNESSES M22). An interrupted multipart upload keeps its
    * parts in the bucket forever unless the BUCKET is told to abort them: no
    * application code ever runs for a client that simply never came back. The
-   * clinical objects themselves are never expired here — retention is a clinical
-   * decision and it runs through the purge flow (M21).
+   * clinical objects themselves are never expired here — how long a scalp image
+   * is kept is a clinical decision and it runs through the purge flow (M21).
    */
   async ensureLifecycle(): Promise<void> {
     if (!this.s3) return;
@@ -288,10 +310,12 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Store one part of a mock multipart upload. Phase 8 replaced the previous
-   * `appendMockObject`: appending made part order and retries meaningless, so the
-   * dev/test driver could never exercise a real resume. Each part is now its own
-   * object with its own ETag, exactly like S3.
+   * Store ONE part of a mock multipart upload and return its ETag.
+   *
+   * Phase 8 replaced `appendMockObject`: appending made part order and retries
+   * meaningless, so the dev/test driver could never exercise a real resume — the
+   * very behaviour H7 is about. Each part is now its own object with its own
+   * ETag, exactly like S3.
    */
   async writeMockPart(key: string, partNumber: number, body: Buffer): Promise<string> {
     await this.writeMockObject(StorageService.mockPartKey(key, partNumber), body);
@@ -301,17 +325,26 @@ export class StorageService implements OnModuleInit {
   // ---------------- driver-agnostic object API ----------------
 
   async presignPut(clinicId: string, rest: string, contentType: string): Promise<string> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) return this.mockUrl(key);
     const cmd = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
     return getSignedUrl(this.s3, cmd, { expiresIn: PRESIGN_TTL_SECONDS });
   }
 
   async presignGet(clinicId: string, rest: string): Promise<string> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) return this.mockUrl(key);
     const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key });
     return getSignedUrl(this.s3, cmd, { expiresIn: PRESIGN_TTL_SECONDS });
+  }
+
+  /** Media variants also assert the media key SHAPE (C1). */
+  async presignMediaPut(clinicId: string, rest: string, contentType: string): Promise<string> {
+    return this.presignPut(clinicId, assertAllowedMediaRest(rest), contentType);
+  }
+
+  async presignMediaGet(clinicId: string, rest: string): Promise<string> {
+    return this.presignGet(clinicId, assertAllowedMediaRest(rest));
   }
 
   /**
@@ -320,7 +353,7 @@ export class StorageService implements OnModuleInit {
    * filled in, while the server happily buffered whatever the bucket held.
    */
   async headObject(clinicId: string, rest: string): Promise<ObjectHead | null> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) {
       try {
         const info = await stat(this.localPath(key));
@@ -339,16 +372,16 @@ export class StorageService implements OnModuleInit {
 
   /** First bytes only — enough to sniff magic bytes without a full download. */
   async getObjectRange(clinicId: string, rest: string, length = SNIFF_BYTES): Promise<Buffer> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) {
       const data = await this.readMockObject(key);
-      if (!data) throw new Error(`Object not found: ${key}`);
+      if (!data) throw new Error("object not found");
       return data.subarray(0, length);
     }
     const res = await this.s3.send(
       new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=0-${Math.max(0, length - 1)}` }),
     );
-    if (!res.Body) throw new Error(`Empty body for object: ${key}`);
+    if (!res.Body) throw new Error("object has an empty body");
     const bytes = await res.Body.transformToByteArray();
     return Buffer.from(bytes);
   }
@@ -358,47 +391,51 @@ export class StorageService implements OnModuleInit {
    * result AND enforced on the stream itself, because a bucket is not a trusted
    * narrator of its own object sizes.
    */
-  async getObjectStream(clinicId: string, rest: string, maxBytes: number): Promise<{ stream: Readable; bytes: number }> {
+  async getObjectStream(
+    clinicId: string,
+    rest: string,
+    maxBytes: number,
+  ): Promise<{ stream: Readable; bytes: number }> {
     const head = await this.headObject(clinicId, rest);
-    if (!head) throw new Error(`Object not found: ${rest}`);
+    if (!head) throw new Error("object not found");
     if (head.bytes > maxBytes) throw new ObjectTooLargeError(head.bytes, maxBytes);
 
-    const key = StorageService.clinicKey(clinicId, rest);
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) {
       const data = await this.readMockObject(key);
-      if (!data) throw new Error(`Object not found: ${key}`);
+      if (!data) throw new Error("object not found");
       if (data.length > maxBytes) throw new ObjectTooLargeError(data.length, maxBytes);
       return { stream: Readable.from(data), bytes: data.length };
     }
     const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
-    if (!res.Body) throw new Error(`Empty body for object: ${key}`);
+    if (!res.Body) throw new Error("object has an empty body");
     const source = res.Body as unknown as Readable;
     return { stream: boundedStream(source, maxBytes), bytes: head.bytes };
   }
 
   /**
-   * Buffered read, still bounded. Kept for the small objects (consent
-   * signatures); the image pipeline uses `getObjectStream`.
+   * Buffered read, still bounded. Kept for small objects; the image pipeline uses
+   * `getObjectStream` so a 50MB upload never sits in the heap twice.
    */
   async getObject(clinicId: string, rest: string, maxBytes: number = UPLOAD_MAX_BYTES): Promise<Buffer> {
-    const key = StorageService.clinicKey(clinicId, rest);
+    const key = this.fullKey(clinicId, rest);
     const head = await this.headObject(clinicId, rest).catch(() => null);
     if (head && head.bytes > maxBytes) throw new ObjectTooLargeError(head.bytes, maxBytes);
     if (!this.s3) {
       const data = await this.readMockObject(key);
-      if (!data) throw new Error(`Object not found: ${key}`);
+      if (!data) throw new Error("object not found");
       if (data.length > maxBytes) throw new ObjectTooLargeError(data.length, maxBytes);
       return data;
     }
     const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
-    if (!res.Body) throw new Error(`Empty body for object: ${key}`);
+    if (!res.Body) throw new Error("object has an empty body");
     const bytes = await res.Body.transformToByteArray();
     if (bytes.length > maxBytes) throw new ObjectTooLargeError(bytes.length, maxBytes);
     return Buffer.from(bytes);
   }
 
   async putBuffer(clinicId: string, rest: string, body: Buffer, contentType: string): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, rest);
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) {
       await this.writeMockObject(key, body);
       return;
@@ -409,7 +446,7 @@ export class StorageService implements OnModuleInit {
   }
 
   async removeObject(clinicId: string, rest: string): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, rest);
+    const key = this.fullKey(clinicId, rest);
     if (!this.s3) {
       try {
         await unlink(this.localPath(key));
@@ -510,7 +547,7 @@ export class StorageService implements OnModuleInit {
    * that is precisely why "resume" used to restart from part 1.
    */
   async createMultipartUpload(clinicId: string, rest: string, contentType: string): Promise<string> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.mediaKey(clinicId, rest);
     if (!this.s3) return `mock-${randomUUID()}`;
     const create = await this.s3.send(
       new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }),
@@ -520,7 +557,7 @@ export class StorageService implements OnModuleInit {
   }
 
   async presignUploadPart(clinicId: string, rest: string, uploadId: string, partNumber: number): Promise<string> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.mediaKey(clinicId, rest);
     if (!this.s3) return this.mockUrl(key, `&part=${partNumber}`);
     return getSignedUrl(
       this.s3,
@@ -531,11 +568,11 @@ export class StorageService implements OnModuleInit {
 
   /**
    * What the bucket already holds. This is the answer a resume is built on — the
-   * client's own list of "completed parts" is a hint at best and a lie after a
-   * crash.
+   * client's own list of "completed parts" is a hint at best, and a lie after a
+   * crash between the PUT and the write to local state.
    */
   async listParts(clinicId: string, rest: string, uploadId: string): Promise<UploadedPartInfo[]> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.mediaKey(clinicId, rest);
     if (!this.s3) {
       const dir = dirname(this.localPath(key));
       const base = `${key.split("/").pop()!}.part-`;
@@ -587,18 +624,19 @@ export class StorageService implements OnModuleInit {
     uploadId: string,
     parts: ReadonlyArray<{ partNumber: number; etag: string }>,
   ): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.mediaKey(clinicId, rest);
+    const ordered = [...parts].sort((a, b) => a.partNumber - b.partNumber);
     if (!this.s3) {
       // Assemble the mock object from its parts, in order, then drop the parts.
       const chunks: Buffer[] = [];
-      for (const part of [...parts].sort((a, b) => a.partNumber - b.partNumber)) {
+      for (const part of ordered) {
         const partKey = StorageService.mockPartKey(key, part.partNumber);
         const data = await this.readMockObject(partKey);
         if (!data) throw new Error(`mock part ${part.partNumber} is missing`);
         chunks.push(data);
       }
       await this.writeMockObject(key, Buffer.concat(chunks));
-      for (const part of parts) {
+      for (const part of ordered) {
         await unlink(this.localPath(StorageService.mockPartKey(key, part.partNumber))).catch(() => undefined);
       }
       return;
@@ -608,17 +646,13 @@ export class StorageService implements OnModuleInit {
         Bucket: this.bucket,
         Key: key,
         UploadId: uploadId,
-        MultipartUpload: {
-          Parts: [...parts]
-            .sort((a, b) => a.partNumber - b.partNumber)
-            .map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })),
-        },
+        MultipartUpload: { Parts: ordered.map((p) => ({ PartNumber: p.partNumber, ETag: p.etag })) },
       }),
     );
   }
 
   async abortMultipartUpload(clinicId: string, rest: string, uploadId: string): Promise<void> {
-    const key = StorageService.clinicKey(clinicId, assertAllowedMediaRest(rest));
+    const key = this.mediaKey(clinicId, rest);
     if (!this.s3) {
       const existing = await this.listParts(clinicId, rest, uploadId);
       for (const part of existing) {

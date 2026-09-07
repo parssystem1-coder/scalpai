@@ -2,7 +2,7 @@ import { Controller, Get, Put, Query, Req, Res } from "@nestjs/common";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { appendAudit, DbService } from "@scalpai/db";
-import { errors } from "@scalpai/shared";
+import { UPLOAD_MAX_PARTS, errors } from "@scalpai/shared";
 import { Public } from "../auth/jwt-access.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
 import {
@@ -20,6 +20,11 @@ import {
  *   - keys must match the clinic-scoped allowlist (no traversal, no escape)
  *   - bodies are size-capped by the parser AND re-checked before writing
  *   - reads and writes both land in the audit chain
+ *
+ * Phase 8: a `part` write stores its OWN object and returns its own ETag instead
+ * of appending to the target. Appending made part order, retries and resume
+ * meaningless, so the driver used in CI could not exercise the behaviour H7 is
+ * about — the tests were passing against a fiction.
  */
 
 const PARSED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/octet-stream"];
@@ -41,7 +46,7 @@ const MockObjectQuery = z.object({
   key: z.string().min(9).max(300),
   exp: z.coerce.number().int().positive(),
   sig: z.string().length(64),
-  part: z.coerce.number().int().min(1).max(10_000).optional(),
+  part: z.coerce.number().int().min(1).max(UPLOAD_MAX_PARTS).optional(),
 });
 type MockObjectQueryDto = z.infer<typeof MockObjectQuery>;
 
@@ -114,10 +119,14 @@ export class MockStorageController {
 
     if (q.part === undefined) {
       await this.storage.writeMockObject(q.key, body);
-    } else {
-      await this.storage.appendMockObject(q.key, body);
+      await this.audit(clinicId, q.key, "mock_storage.write", body.length);
+      return { ok: true, etag: `"mock-${q.exp}-${body.length}"`, bytes: body.length };
     }
-    await this.audit(clinicId, q.key, "mock_storage.write", body.length);
-    return { ok: true, etag: `"mock-${q.exp}-${body.length}"`, bytes: body.length };
+
+    // A part is its own object with its own content-addressed ETag, so the
+    // completion call can be verified the same way S3 verifies it.
+    const etag = await this.storage.writeMockPart(q.key, q.part, body);
+    await this.audit(clinicId, q.key, "mock_storage.write_part", body.length);
+    return { ok: true, etag: `"${etag}"`, bytes: body.length };
   }
 }
