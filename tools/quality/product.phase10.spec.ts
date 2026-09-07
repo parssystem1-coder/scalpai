@@ -219,15 +219,20 @@ describe("M13 - dates tell the truth about tense and zone", () => {
 });
 
 describe("M18 - fonts are self-hosted", () => {
-  const FONT_HOSTS = [/fonts\.googleapis\.com/, /fonts\.gstatic\.com/, /use\.typekit\.net/, /fonts\.bunny\.net/];
+  const FORBIDDEN_FONT_HOST_STRINGS = [
+    "fonts.googleapis.com",
+    "fonts.gstatic.com",
+    "use.typekit.net",
+    "fonts.bunny.net",
+  ];
 
   it("makes no third-party font request anywhere in the web app", () => {
     const files = walk("apps/web", [".html", ".css", ".ts", ".tsx", ".webmanifest"]);
     expect(files.length).toBeGreaterThan(0);
     for (const rel of files) {
       const src = read(rel);
-      for (const host of FONT_HOSTS) {
-        expect(host.test(src), `${rel} must not reference a third-party font host`).toBe(false);
+      for (const host of FORBIDDEN_FONT_HOST_STRINGS) {
+        expect(src.includes(host), `${rel} must not reference a third-party font host (${host})`).toBe(false);
       }
     }
   });
