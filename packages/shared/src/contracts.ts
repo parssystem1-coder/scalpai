@@ -6,6 +6,7 @@ import {
   isActiveConsentTemplate,
   parseSignatureDataUrl,
 } from "./phi.js";
+import { AnalysisProvenance } from "./analysis-provenance.js";
 
 /** Canonical API error shape (engineering-rules §3) — nothing else may leave the API. */
 export const ErrorBody = z.object({
@@ -70,11 +71,35 @@ export const PatientNotesUpdate = z.object({
 export type PatientNotesUpdate = z.infer<typeof PatientNotesUpdate>;
 export type PatientNotesUpdateDto = PatientNotesUpdate;
 
-export const PaginationQuery = z.object({
-  q: z.string().max(120).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
-});
+/** Upper bound on a search term — a search box is not a query language. */
+export const SEARCH_TERM_MAX = 120;
+
+/**
+ * Pagination + free-text search (phase 10 / H10).
+ *
+ * The bug this schema now makes impossible: the controller passed the parsed
+ * query straight to `listPatients`, which reads `q.search` — but the schema only
+ * produced `q.q`. The ILIKE branch was therefore never taken and patient search
+ * silently returned the unfiltered first page for every clinic.
+ *
+ * The contract owns the name now. Either spelling is accepted on the wire, the
+ * term is trimmed once, an empty term becomes `undefined` (so a blank box can
+ * never turn into `ILIKE '%%'`), and the SAME value is published under BOTH keys
+ * so no call site can read the wrong one.
+ */
+export const PaginationQuery = z
+  .object({
+    q: z.string().max(SEARCH_TERM_MAX).optional(),
+    search: z.string().max(SEARCH_TERM_MAX).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .transform(({ q, search, limit, offset }) => {
+    const raw = (q ?? search ?? "").trim();
+    const term = raw.length > 0 ? raw : undefined;
+    return { q: term, search: term, limit, offset };
+  });
+export type PaginationQueryDto = z.infer<typeof PaginationQuery>;
 
 export const SessionCreate = z.object({
   patientId: z.string().uuid(),
@@ -126,14 +151,32 @@ export const AnalysisScores = z.object({
   densityProxy: z.number().min(0).max(100),
 });
 
+/**
+ * Phase 10 (H13): a submitted result must be PROVABLE, so `provenance` is
+ * mandatory and `modelVersion` may not disagree with the manifest reference
+ * inside it. `AnalysisProvenance` itself verifies the model against the
+ * platform registry, so an unregistered or edited manifest is a 400 rather than
+ * a row the product later presents as clinical context.
+ */
 export const AnalysisSubmit = z.object({
   patientId: z.string().uuid(),
   galleryItemId: z.string().uuid(),
-  result: z.object({
-    scores: AnalysisScores,
-    severity: z.number().min(0).max(100),
-    modelVersion: z.string().min(3).max(60),
-  }),
+  result: z
+    .object({
+      scores: AnalysisScores,
+      severity: z.number().min(0).max(100),
+      modelVersion: z.string().min(3).max(60),
+      provenance: AnalysisProvenance,
+    })
+    .superRefine((result, ctx) => {
+      if (result.modelVersion !== result.provenance.model.version) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["modelVersion"],
+          message: "modelVersion باید با provenance.model.version یکسان باشد",
+        });
+      }
+    }),
 });
 
 /** Gold-label capture (§10.2) — the expert is the source of truth. */
@@ -142,6 +185,53 @@ export const ExpertReview = z.object({
   adjustedScores: AnalysisScores.optional(),
   note: z.string().max(500).optional(),
 });
+
+/**
+ * Self-hosted licence status (phase 10 / M2, ADR-0043).
+ *
+ * The diagnostics panel used to derive "Ed25519 Verified" from a hard-coded
+ * object in the browser: a clinic with no licence at all saw a green tick. The
+ * verdict now comes from the server, which verifies a real EdDSA token against a
+ * configured public key, and "unlicensed" is a first-class state instead of an
+ * impossible one.
+ */
+export const LICENSE_STATE_VALUES = [
+  "active",
+  "grace_period",
+  "expired",
+  "tampered",
+  "invalid_signature",
+  "unlicensed",
+] as const;
+
+export const LicenseClaimsPublic = z.object({
+  sub: z.string(),
+  name: z.string(),
+  tier: z.enum(["standard", "professional", "enterprise"]),
+  features: z.array(z.string()),
+  maxSeats: z.number().int().min(0),
+  maxPatients: z.number().int().min(0),
+  issuedAt: z.number().int(),
+  expiresAt: z.number().int(),
+  graceDays: z.number().int().min(0).optional(),
+});
+export type LicenseClaimsPublicDto = z.infer<typeof LicenseClaimsPublic>;
+
+export const LicenseStatus = z.object({
+  /** True only for `active` and `grace_period`. */
+  valid: z.boolean(),
+  state: z.enum(LICENSE_STATE_VALUES),
+  /** Present only when a signature actually verified. */
+  claims: LicenseClaimsPublic.optional(),
+  daysRemaining: z.number().int().optional(),
+  /** Whether a signature was cryptographically checked at all. */
+  verified: z.boolean(),
+  /** Key id / fingerprint of the public key used, for audit. */
+  keyFingerprint: z.string().optional(),
+  checkedAt: z.string().datetime(),
+  reason: z.string().optional(),
+});
+export type LicenseStatusDto = z.infer<typeof LicenseStatus>;
 
 /**
  * Consent (phase 6 / M8). Three things changed:
