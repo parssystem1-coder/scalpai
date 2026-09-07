@@ -110,6 +110,36 @@ export function resolveQuotaLimit(
   return null;
 }
 
+/**
+ * Plan limits with the clinic's overrides applied — the ONLY way the two are
+ * combined (WEAKNESSES H11).
+ *
+ * A plain `{ ...plan, ...overrides }` is not enough, and the difference is a real
+ * unenforced ceiling rather than a style point. One metric may be written with
+ * more than one key (`storage_bytes` OR `storage_mb`, `uploads_per_month` OR
+ * `uploads`) and `resolveQuotaLimit` takes the FIRST usable key in priority
+ * order. So an override that names the other key of the same pair used to lose to
+ * the plan's key: the clinic looked capped at 300KB while the base 50GB ceiling
+ * was still the one being enforced. An override now retires every sibling key of
+ * the metric it addresses — overriding a ceiling means replacing it, not racing
+ * it.
+ */
+export function mergePlanLimits(
+  planLimits: Record<string, unknown> | null | undefined,
+  overrides: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...(planLimits ?? {}) };
+  if (!overrides) return merged;
+  for (const spec of Object.values(QUOTA_SPECS) as ReadonlyArray<QuotaSpec>) {
+    const touched = spec.limits.some((candidate) =>
+      Object.prototype.hasOwnProperty.call(overrides, candidate.key),
+    );
+    if (!touched) continue;
+    for (const candidate of spec.limits) delete merged[candidate.key];
+  }
+  return { ...merged, ...overrides };
+}
+
 function rowsOf<T>(result: unknown): T[] {
   return ((result as { rows?: T[] }).rows ?? []) as T[];
 }
