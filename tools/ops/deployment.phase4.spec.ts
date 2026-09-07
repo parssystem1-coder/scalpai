@@ -13,6 +13,11 @@ import { describe, expect, it } from "vitest";
  *
  * Negative assertions run against the file with comment lines removed: a
  * comment that documents a banned pattern is not the banned pattern.
+ *
+ * Phase 9 note: the backup contract changed on purpose (ADR-0042). The old
+ * `BACKUP_ENCRYPTION_PASSPHRASE` is gone - encryption is now age with a mounted
+ * recipients file - so the "every secret is mandatory" check tracks the new
+ * variables. The rule it enforces is unchanged: no shared default, ever.
  */
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -71,15 +76,25 @@ describe("C8 - production secrets have no fallbacks", () => {
       "MINIO_ROOT_PASSWORD",
       "S3_BUCKET",
       "JWT_SECRET",
-      "BACKUP_ENCRYPTION_PASSPHRASE",
       "SCALPAI_DOMAIN",
       "ACME_EMAIL",
+      // Phase 9 (ADR-0042): the backup pipeline's own mandatory inputs.
+      "BACKUP_AGE_RECIPIENTS_FILE",
+      "BACKUP_OFFSITE_ENDPOINT",
+      "BACKUP_OFFSITE_BUCKET",
+      "BACKUP_OFFSITE_ACCESS_KEY",
+      "BACKUP_OFFSITE_SECRET_KEY",
+      "ALERT_WEBHOOK_URL",
     ]);
     for (const { name, raw } of composeVars(prod)) {
       if (!mustBeRequired.has(name)) continue;
       expect(raw.startsWith(":?"), `${name} must be declared as \${${name}:?...}`).toBe(true);
     }
     for (const name of mustBeRequired) expect(prod).toContain(`\${${name}:?`);
+  });
+
+  it("has no passphrase variable left to fall back to", () => {
+    expect(prod).not.toContain("BACKUP_ENCRYPTION_PASSPHRASE");
   });
 });
 
@@ -92,7 +107,7 @@ describe("C8 - runtime never uses the database owner role", () => {
     for (const url of runtime) expect(url).toContain("postgres://scalpai_app:");
   });
 
-  it("reserves the owner credentials for the migration and the server itself", () => {
+  it("reserves the owner credentials for the migration, the server and the backup", () => {
     for (const line of code(prod).split("\n")) {
       if (!line.includes("${POSTGRES_USER:?")) continue;
       const ownerUsage = /MIGRATE_DATABASE_URL|POSTGRES_USER: |POSTGRES_USER=/.test(line);
@@ -192,6 +207,7 @@ describe("M17 - runtime healthchecks, limits and pinned images", () => {
       }),
     );
     expect([...majors]).toHaveLength(1);
+    // The backup runner is built FROM postgres:<major>-alpine (ADR-0042).
     const backupMajor = /postgres:(\d+)-alpine/.exec(prod)?.[1];
     expect(backupMajor).toBe([...majors][0]);
   });
@@ -270,6 +286,10 @@ describe("H15 - npm is the only package manager on executable surfaces", () => {
     "ops/prod.yml",
     "ops/dev.yml",
     "ops/README.md",
+    "ops/backup.sh",
+    "ops/restore.sh",
+    "ops/restore-drill.sh",
+    "ops/backup.Dockerfile",
     "apps/api/Dockerfile",
     "apps/web/Dockerfile",
     "vercel.json",
