@@ -188,17 +188,17 @@
 
 **هدف خروج:** از دست‌رفتن DB یا تصاویر به از دست‌رفتن پرونده تبدیل نشود.
 
-- [ ] **C10** backup شامل PostgreSQL و MinIO باشد؛ `pg_dump` به‌تنهایی کافی نیست.
-- [ ] **C10** CBC به ابزار authenticated encryption مثل age یا GPG/AES-GCM منتقل شود؛ اگر CBC موقتاً ماند، HMAC مستقل اضافه شود.
-- [ ] **C10** passphrase از `pass:` و env عمومی خارج و از mounted secret/file descriptor خوانده شود.
-- [ ] **C10** fallback passphrase حذف و backup بدون secret fail شود.
-- [ ] **C10** backup off-site، immutable/WORM و با retention مستند نگه‌داری شود.
-- [ ] **C10** restore خودکار ماهانه در staging با checksum و smoke query اجرا شود.
-- [ ] **L3** requestId، structured logs، metrics، health/readiness و alerting اضافه شود؛ PHI scrub اجباری باشد.
-- [ ] **L4** rate limit سراسری و per-clinic برای endpointهای پرهزینه operationalize شود.
-- [ ] pool DB دارای `statement_timeout`, `idle_in_transaction_session_timeout` و limit مناسب باشد.
-- [ ] runbook برای incident، key rotation، restore، tenant isolation و data deletion نوشته شود.
-- [ ] صحت backup و restore به CI/nightly gate متصل شود، نه فقط به cron log.
+- [x] **C10** backup شامل PostgreSQL و MinIO باشد؛ `pg_dump` به‌تنهایی کافی نیست.
+- [x] **C10** CBC به ابزار authenticated encryption مثل age یا GPG/AES-GCM منتقل شود؛ اگر CBC موقتاً ماند، HMAC مستقل اضافه شود.
+- [x] **C10** passphrase از `pass:` و env عمومی خارج و از mounted secret/file descriptor خوانده شود.
+- [x] **C10** fallback passphrase حذف و backup بدون secret fail شود.
+- [x] **C10** backup off-site، immutable/WORM و با retention مستند نگه‌داری شود.
+- [x] **C10** restore خودکار ماهانه در staging با checksum و smoke query اجرا شود.
+- [x] **L3** requestId، structured logs، metrics، health/readiness و alerting اضافه شود؛ PHI scrub اجباری باشد.
+- [x] **L4** rate limit سراسری و per-clinic برای endpointهای پرهزینه operationalize شود.
+- [x] pool DB دارای `statement_timeout`, `idle_in_transaction_session_timeout` و limit مناسب باشد.
+- [x] runbook برای incident، key rotation، restore، tenant isolation و data deletion نوشته شود.
+- [x] صحت backup و restore به CI/nightly gate متصل شود، نه فقط به cron log.
 
 **شرط تکمیل فاز:** restore موفق از backup واقعی شامل عکس، با زمان بازیابی اندازه‌گیری‌شده و گزارش امضاشده.
 
@@ -244,7 +244,7 @@
 - [x] فاز ۶: داده بالینی، رمزنگاری و حریم خصوصی (تکمیل — PR #42، مایگریشن 0012، phi-crypto AES-256-GCM با key ring و AAD binding، Merkle tree واقعی با inclusion proof، report seal Ed25519، canonical JSON، PHI scrubbing در لاگ و ledger، retention/purge با دو نفر امضا، orphan reconciliation، privacy controller و boot gate)
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
-- [ ] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد
+- [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
 - [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی
 
 ## روش بستن هر فاز
