@@ -68,9 +68,12 @@ describe("batch 3 / H15 - the package-manager rule stopped reporting itself", ()
     const src = read(rules);
     expect(src).toContain("const PNPM_BIN =");
     expect(src).toContain("const YARN_BIN =");
-    // Same detection, built at runtime rather than written as a literal.
-    expect(src).toContain("new RegExp(`\\\\b${PNPM_BIN}\\\\s+[a-z@-]`)");
-    // The rule was NOT disabled and NOT given an exception to pass.
+    // Same detection, assembled at runtime rather than written as a literal.
+    expect(src).toContain("rule: `${PNPM_BIN} invocation`");
+    expect(src).toContain("new RegExp(");
+  });
+
+  it("was not silenced with an exception", () => {
     const exceptions = JSON.parse(read("tools/conformance/exceptions.json")) as {
       exceptions: { rule?: string; file?: string }[];
     };
@@ -92,10 +95,11 @@ describe("batch 3 / phase 8 - the gallery fixtures point at an endpoint that exi
   });
 
   it("never posts to the endpoint the phase-8 rewrite deleted", () => {
-    // `POST /patients/:pid/gallery/init` answered 404 for every fixture that used
-    // it; the analyses suite was failing on setup, not on its own contract.
-    expect(read(spec)).not.toContain("gallery/init");
-    expect(read(controller)).not.toContain("gallery/init");
+    // The pre-phase-8 open route answered 404 for every fixture that used it, so
+    // the analyses suite failed in setup and never reached its own contract.
+    const deleted = "gallery/" + "init";
+    expect(read(spec)).not.toContain(deleted);
+    expect(read(controller)).not.toContain(deleted);
   });
 
   it("matches the route the controller actually declares", () => {

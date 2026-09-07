@@ -77,9 +77,9 @@ describe("analyses (playbook 2.3)", () => {
       .send({ firstName: "تحلیل", lastName: "تست", phone: `0912${Date.now()}`.slice(0, 11) });
     const pid = String(patient.body.id);
 
-    // Phase 8 (ADR-0041) replaced `gallery/init` with the upload-session endpoint.
-    // Opening the upload is all the analyses FK needs: the gallery item row exists
-    // as `pending` from here on, and completion would need real bytes in the
+    // Phase 8 (ADR-0041) replaced the old open route with an upload SESSION.
+    // Opening it is all the analyses FK needs: the gallery item row exists as
+    // `pending` from here on, and completing it would demand real bytes in the
     // bucket.
     const init = await http
       .post(`/api/v1/patients/${pid}/gallery/uploads`)
