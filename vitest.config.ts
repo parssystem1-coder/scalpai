@@ -19,6 +19,10 @@ export default defineConfig({
       "@scalpai/shared": pkgSrc("shared"),
       "@scalpai/sync-client": pkgSrc("sync-client"),
       "@scalpai/analysis-core": pkgSrc("analysis-core"),
+      // Phase 10 (M2): the licence suite signs a real token with the licensing
+      // package and verifies it through the API service, so it needs the same
+      // source-not-dist treatment as every other workspace package.
+      "@scalpai/licensing": pkgSrc("licensing"),
     },
   },
   test: {
@@ -47,6 +51,7 @@ export default defineConfig({
         "packages/sync-client/src/**",
         "packages/licensing/src/**",
         "packages/analysis-core/src/**",
+        "packages/shared/src/**",
         "apps/api/src/**",
         "apps/web/src/api/**",
         "apps/web/src/context/**",
@@ -62,6 +67,7 @@ export default defineConfig({
       ],
       thresholds: {
         "packages/{db,sync-client,licensing,analysis-core}/src/**": { lines: 70 },
+        "packages/shared/src/**": { lines: 55 },
         "apps/api/src/**": { lines: 40 },
         "apps/web/src/{api,context,offline}/**": { lines: 40 },
       },

@@ -24,6 +24,13 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
  * the row. `@Quota` still fronts the handler, but it is only a cheap pre-check —
  * two submissions arriving together used to both read `used = limit - 1` and both
  * be accepted, and nothing downstream noticed.
+ *
+ * Phase 10 (H13): because the computation happens off-server, the SUBMISSION has
+ * to carry its own provenance — the digest of the pixels that produced it and a
+ * reference to a registered model manifest. `AnalysisSubmit` verifies that
+ * reference against the platform registry, so an unknown model or a mismatched
+ * `modelVersion` is refused here instead of becoming a stored clinical claim.
+ * The provenance is persisted with the result so a row stays re-checkable.
  */
 @Controller("analyses")
 export class AnalysesController {
@@ -41,13 +48,20 @@ export class AnalysesController {
     const ent = await this.entitlements.resolve(ctx.clinicId);
     const limit = resolveQuotaLimit(ent?.limits, "analyses");
 
+    // Named so the provenance rides along with the scores it belongs to.
+    const result = {
+      scores: dto.result.scores,
+      severity: dto.result.severity,
+      provenance: dto.result.provenance,
+    };
+
     const created = await this.scope.tx(async (tx, c) => {
       const slot = await consumeQuota(tx, c.clinicId, "analyses", 1, limit);
       if (!slot.allowed) throw errors.quotaExceeded();
       const row = await createAnalysis(tx, c.clinicId, {
         patientId: dto.patientId,
         galleryItemId: dto.galleryItemId,
-        result: { scores: dto.result.scores, severity: dto.result.severity },
+        result,
         modelVersion: dto.result.modelVersion,
         userId: c.userId,
       });
