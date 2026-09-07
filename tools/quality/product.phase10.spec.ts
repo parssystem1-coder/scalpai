@@ -39,6 +39,10 @@ interface Manifest {
 }
 const manifest = (rel: string): Manifest => JSON.parse(read(rel)) as Manifest;
 
+const PHASE_FILE = "docs/WEAKNESSES-V2-10-PHASES.md";
+const PHASE_10_HEADING = "# \u0641\u0627\u0632 \u06f1\u06f0:";
+const PHASE_SUMMARY_HEADING = "## \u0648\u0636\u0639\u06cc\u062a \u0641\u0627\u0632\u0647\u0627";
+
 describe("H10 - patient search is wired and indexed", () => {
   const migration = "packages/db/sql/0015__phase10_search_trigram.sql";
 
@@ -311,8 +315,7 @@ describe("M4/M16 - dead weight is deleted, not registered", () => {
     // the real one is an invitation to import the wrong one.
     expect(has("ops/audit-anchor.ts"), "the pre-phase-6 duplicate must stay deleted").toBe(false);
     expect(has("packages/db/src/audit-anchor.ts")).toBe(true);
-    const real = read("packages/db/src/audit-anchor.ts");
-    expect(real).toContain("AuditAnchorError");
+    expect(read("packages/db/src/audit-anchor.ts")).toContain("AuditAnchorError");
   });
 
   it("has no root src/ tree outside the workspace layout", () => {
@@ -453,15 +456,19 @@ describe("phase 10 bookkeeping is honest", () => {
   });
 
   it("ticks a phase-10 box only when this file has an assertion behind it", () => {
-    const phase = read("docs/WEAKNESSES-V2-10-PHASES.md");
-    const section = phase.slice(phase.indexOf("# \u0641\u0627\u0632 \u06f1\u06f0"));
-    const openCount = (section.match(/^- \[ \] /gm) ?? []).length;
-    // M1, M5, M14, M15, M19, L1/W01/W22/W23, L2 - seven, and the phase box.
+    const phase = read(PHASE_FILE);
+    const start = phase.indexOf(PHASE_10_HEADING);
+    const end = phase.indexOf(PHASE_SUMMARY_HEADING);
+    expect(start, "phase 10 heading not found").toBeGreaterThan(-1);
+    expect(end, "phase summary must follow the phase 10 section").toBeGreaterThan(start);
+    const openCount = (phase.slice(start, end).match(/^- \[ \] /gm) ?? []).length;
+    // M1, M5, M19, M14, M15, L2, L1/W01/W22/W23.
     expect(openCount, "an item was ticked or added without updating this gate").toBe(7);
   });
 
   it("keeps the phase-level box open while any item is open", () => {
-    const phase = read("docs/WEAKNESSES-V2-10-PHASES.md");
-    expect(phase).toMatch(/- \[ \] \u0641\u0627\u0632 \u06f1\u06f0:/);
+    const phase = read(PHASE_FILE);
+    const summary = phase.slice(phase.indexOf(PHASE_SUMMARY_HEADING));
+    expect(summary).toContain(`- [ ] \u0641\u0627\u0632 \u06f1\u06f0:`);
   });
 });
