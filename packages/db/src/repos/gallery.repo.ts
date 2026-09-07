@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { galleryItems } from "../schema.js";
 import { appendAudit } from "./core.repo.js";
+import { addStorageBytes } from "./quota.repo.js";
 import { enqueueStorageOrphans } from "./storage-orphans.repo.js";
 import type { Tx } from "../tenant.js";
 
@@ -50,10 +51,19 @@ export interface GalleryCompleteUpdate {
   thumbKey: string;
   sha256: string;
   quality: unknown;
+  /** Bytes of the canonical object the pipeline kept. */
   sizeBytes: number;
+  /** Bytes of the thumbnail — counted too, it is a real object in the bucket. */
+  thumbBytes: number;
   userId: string;
 }
 
+/**
+ * Phase 8 (M22): the kept size lands on the row AND on the clinic storage total
+ * in the same transaction. Before this, `sizeBytes` was accepted by the caller
+ * and silently dropped, so nothing in the database could answer how much space a
+ * clinic actually used.
+ */
 export async function completeGalleryItem(tx: Tx, clinicId: string, id: string, update: GalleryCompleteUpdate) {
   const rows = await tx
     .update(galleryItems)
@@ -62,17 +72,21 @@ export async function completeGalleryItem(tx: Tx, clinicId: string, id: string, 
       thumbKey: update.thumbKey,
       sha256: update.sha256,
       quality: update.quality as object,
+      sizeBytes: update.sizeBytes,
+      exifStripped: true,
       uploadState: "done",
     })
     .where(and(eq(galleryItems.clinicId, clinicId), eq(galleryItems.id, id), eq(galleryItems.uploadState, "pending")))
     .returning();
   if (!rows[0]) return null;
+  await addStorageBytes(tx, clinicId, update.sizeBytes + update.thumbBytes, 2);
   await appendAudit(tx, {
     clinicId,
     userId: update.userId,
     action: "gallery.complete",
     entity: "gallery_item",
     entityId: id,
+    meta: { bytes: update.sizeBytes, thumbBytes: update.thumbBytes },
   });
   return rows[0];
 }
