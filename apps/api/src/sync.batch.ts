@@ -52,5 +52,9 @@ export function splitSyncBatch(raw: readonly unknown[]): SyncBatchSplit {
 
 /** The mutations that are safe to hand to `processPushBatch`, in request order. */
 export function acceptedMutations(split: SyncBatchSplit): SyncMutationDto[] {
-  return split.entries.filter((entry) => entry.kind === "accepted").map((entry) => entry.mutation);
+  const out: SyncMutationDto[] = [];
+  for (const entry of split.entries) {
+    if (entry.kind === "accepted") out.push(entry.mutation);
+  }
+  return out;
 }
