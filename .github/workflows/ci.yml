@@ -1,6 +1,8 @@
 name: CI
 
 # Phase 5 - CI/CD, tests and real gatekeeping (WEAKNESSES H14/H15/H16/M14/M15/M17/L1).
+# Phase 9 adds the backup/restore gate (C10): the recovery path is executed, not
+# described.
 #
 # Two rules govern this file:
 #
@@ -290,6 +292,163 @@ jobs:
           path: ci-evidence
           retention-days: 14
 
+  backup-restore:
+    name: encrypted backup of both stores + verified restore drill (C10)
+    # Phase 9 (ADR-0042). The previous pipeline was never executed by anything:
+    # `pg_dump` alone, CBC without integrity, no off-site copy and no restore.
+    # This job runs the real scripts against a real Postgres and a real MinIO
+    # with object locking, then restores into a scratch database and asserts the
+    # data is there. It also proves the off-site copy CANNOT be deleted.
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: scalpai
+          POSTGRES_PASSWORD: scalpai_dev_only
+          POSTGRES_DB: scalpai
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U scalpai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      MIGRATE_DATABASE_URL: postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
+      DATABASE_URL: postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
+      APP_ROLE_PASSWORD: scalpai_dev_only
+      JWT_SECRET: ci_dev_only_secret_0123456789abcdef
+      POSTGRES_USER: scalpai
+      POSTGRES_PASSWORD: scalpai_dev_only
+      POSTGRES_DB: scalpai
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5433"
+      BACKUP_DIR: /tmp/scalpai-backups
+      BACKUP_RETENTION_DAYS: "2"
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_BUCKET: scalpai-ci
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin-dev-only
+      BACKUP_OFFSITE_ENDPOINT: http://127.0.0.1:9000
+      BACKUP_OFFSITE_BUCKET: scalpai-ci-offsite
+      BACKUP_OFFSITE_ACCESS_KEY: minioadmin
+      BACKUP_OFFSITE_SECRET_KEY: minioadmin-dev-only
+      BACKUP_OFFSITE_RETENTION_DAYS: "1"
+      BACKUP_OFFSITE_LOCK_MODE: COMPLIANCE
+      BACKUP_AGE_RECIPIENTS_FILE: /tmp/scalpai-secrets/recipients.txt
+      BACKUP_AGE_IDENTITY_FILE: /tmp/scalpai-secrets/identity.txt
+      DRILL_REPORT_HMAC_KEY_FILE: /tmp/scalpai-secrets/drill.key
+      DRILL_REPORT_DIR: /tmp/scalpai-drills
+      DRILL_ENVIRONMENT: ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age, jq, mc and postgresql-client 17
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age jq postgresql-client-17
+          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x /usr/local/bin/mc
+          age --version && pg_dump --version && mc --version
+
+      # The recipients file is PUBLIC, the identity is generated here and never
+      # leaves the runner - exactly the split ops/prod.env.template describes.
+      - name: Generate the age keypair and the drill signing key
+        run: |
+          umask 077
+          mkdir -p /tmp/scalpai-secrets
+          age-keygen -o /tmp/scalpai-secrets/identity.txt 2> /tmp/scalpai-secrets/keygen.out
+          grep -o 'age1[0-9a-z]*' /tmp/scalpai-secrets/keygen.out | head -n 1 > /tmp/scalpai-secrets/recipients.txt
+          openssl rand -hex 32 > /tmp/scalpai-secrets/drill.key
+          test -s /tmp/scalpai-secrets/recipients.txt
+
+      - name: Start MinIO with a media bucket and an OBJECT-LOCKED off-site bucket
+        run: |
+          curl -fsSL -o /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
+          chmod +x /usr/local/bin/minio
+          MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin-dev-only \
+            nohup /usr/local/bin/minio server /tmp/minio-data --address 127.0.0.1:9000 > /tmp/minio.log 2>&1 &
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != "1" ]; then echo "::error::MinIO failed to start"; cat /tmp/minio.log; exit 1; fi
+          export MC_HOST_local="http://minioadmin:minioadmin-dev-only@127.0.0.1:9000"
+          mc mb --ignore-existing local/scalpai-ci
+          mc mb --with-lock --ignore-existing local/scalpai-ci-offsite
+          printf 'consent-signature-bytes' > /tmp/object.bin
+          mc cp --quiet /tmp/object.bin local/scalpai-ci/clinic-a/consents/signature.bin
+          mc cp --quiet /tmp/object.bin local/scalpai-ci/clinic-a/gallery/photo.bin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      - name: Migrate and seed, so the drill has real rows to find
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Encrypted backup of Postgres AND MinIO, pushed off-site
+        run: bash tools/ci/run-gate.sh backup-run bash ops/backup.sh
+
+      - name: The off-site copy exists and is immutable (negative proof)
+        run: bash tools/ci/run-gate.sh backup-offsite bash tools/ci/offsite-check.sh
+
+      - name: Restore into a scratch database, verify checksums and smoke-query it
+        run: bash tools/ci/run-gate.sh restore-drill bash ops/restore-drill.sh --use-latest
+
+      - name: The backup image really builds (age, mc, jq baked in)
+        working-directory: ops
+        run: |
+          umask 077
+          cat > ci.env <<ENV
+          SCALPAI_DOMAIN=clinic.example.com
+          ACME_EMAIL=admin@example.com
+          POSTGRES_USER=scalpai_owner
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          POSTGRES_DB=scalpai
+          APP_ROLE_PASSWORD=$(openssl rand -hex 16)
+          MINIO_ROOT_USER=scalpai_admin
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+          S3_BUCKET=scalpai-media
+          JWT_SECRET=$(openssl rand -hex 32)
+          ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
+          BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-secrets/recipients.txt
+          BACKUP_OFFSITE_ENDPOINT=http://127.0.0.1:9000
+          BACKUP_OFFSITE_BUCKET=scalpai-ci-offsite
+          BACKUP_OFFSITE_ACCESS_KEY=minioadmin
+          BACKUP_OFFSITE_SECRET_KEY=minioadmin-dev-only
+          ENV
+          bash ../tools/ci/run-gate.sh backup-image docker compose -f prod.yml --env-file ci.env build backup-cron
+
+      - name: Upload the signed drill report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-report
+          path: /tmp/scalpai-drills
+          retention-days: 90
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-backup-restore
+          path: ci-evidence
+          retention-days: 14
+
   deployment:
     name: build images, scan them, boot the self-hosted stack
     # Phase 4 (C8/M17/R10) proof, extended with the phase 5 image scan: images
@@ -316,8 +475,14 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
-          BACKUP_ENCRYPTION_PASSPHRASE=$(openssl rand -hex 16)
+          ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
+          BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-recipients.txt
+          BACKUP_OFFSITE_ENDPOINT=https://s3.provider.example
+          BACKUP_OFFSITE_BUCKET=scalpai-offsite
+          BACKUP_OFFSITE_ACCESS_KEY=$(openssl rand -hex 12)
+          BACKUP_OFFSITE_SECRET_KEY=$(openssl rand -hex 16)
           ENV
+          printf 'age1ci0000000000000000000000000000000000000000000000000000000\n' > /tmp/scalpai-recipients.txt
 
       - name: prod.yml and dev.yml render with a full secret set
         working-directory: ops
@@ -343,9 +508,9 @@ jobs:
         working-directory: ops
         run: bash ../tools/ci/run-gate.sh migrate-once bash -c 'docker compose -f prod.yml --env-file ci.env logs migrate && docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="'
 
-      - name: API answers on its own health route
+      - name: API answers on its own health and readiness routes
         working-directory: ops
-        run: bash ../tools/ci/run-gate.sh api-health docker compose -f prod.yml --env-file ci.env exec -T api node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()).then(j=>{console.log(j);process.exit(j.ok?0:1)})"
+        run: bash ../tools/ci/run-gate.sh api-health docker compose -f prod.yml --env-file ci.env exec -T api node -e "Promise.all([fetch('http://127.0.0.1:3000/api/v1/health').then(r=>r.json()),fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>r.json())]).then(([h,r])=>{console.log(JSON.stringify({h,r}));process.exit(h.ok&&r.ok?0:1)}).catch(e=>{console.error(e);process.exit(1)})"
 
       - name: Diagnostics on failure
         if: failure()
@@ -372,7 +537,7 @@ jobs:
     # checkmark. It runs even when an upstream job failed, so the summary always
     # names what was missing or red.
     if: always()
-    needs: [lockfile, verify, security, e2e-smoke, deployment]
+    needs: [lockfile, verify, security, e2e-smoke, backup-restore, deployment]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,125 @@
+name: Monthly staging restore drill
+
+# WEAKNESSES C10: "restore خودکار ماهانه در staging با checksum و smoke query".
+#
+# The nightly drill proves the SCRIPTS work against a throwaway stack. This one
+# proves the real thing: it pulls the actual off-site snapshot of the staging
+# environment, restores it into a scratch database and smoke-queries it, then
+# publishes the signed report.
+#
+# It is opt-in through a single visible condition (same pattern as codeql.yml):
+# an environment without off-site credentials cannot drill, and a workflow that
+# fails every month for a missing secret trains people to ignore red builds.
+# Set the repository variable ENABLE_STAGING_RESTORE_DRILL to 'true' and provide
+# the secrets listed in docs/ops/RUNBOOK.md.
+
+on:
+  schedule:
+    # 03:00 UTC on the first of every month.
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  staging-drill:
+    name: restore the real off-site snapshot into staging scratch
+    if: vars.ENABLE_STAGING_RESTORE_DRILL == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: staging
+
+    env:
+      DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+      DB_PORT: ${{ secrets.STAGING_DB_PORT }}
+      POSTGRES_USER: ${{ secrets.STAGING_POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.STAGING_POSTGRES_DB }}
+      S3_ENDPOINT: ${{ secrets.STAGING_S3_ENDPOINT }}
+      S3_ACCESS_KEY: ${{ secrets.STAGING_S3_ACCESS_KEY }}
+      S3_SECRET_KEY: ${{ secrets.STAGING_S3_SECRET_KEY }}
+      S3_BUCKET: ${{ secrets.STAGING_S3_BUCKET }}
+      BACKUP_DIR: /tmp/scalpai-backups
+      BACKUP_OFFSITE_ENDPOINT: ${{ secrets.BACKUP_OFFSITE_ENDPOINT }}
+      BACKUP_OFFSITE_BUCKET: ${{ secrets.BACKUP_OFFSITE_BUCKET }}
+      BACKUP_OFFSITE_ACCESS_KEY: ${{ secrets.BACKUP_OFFSITE_ACCESS_KEY }}
+      BACKUP_OFFSITE_SECRET_KEY: ${{ secrets.BACKUP_OFFSITE_SECRET_KEY }}
+      BACKUP_AGE_IDENTITY_FILE: /tmp/scalpai-secrets/identity.txt
+      DRILL_REPORT_HMAC_KEY_FILE: /tmp/scalpai-secrets/drill.key
+      DRILL_REPORT_DIR: /tmp/scalpai-drills
+      DRILL_ENVIRONMENT: staging
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age, jq, mc and postgresql-client 17
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age jq postgresql-client-17
+          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x /usr/local/bin/mc
+
+      # The restore identity is the ONLY place it is ever used: nothing on the
+      # clinic host can decrypt a snapshot.
+      - name: Materialise the restore identity and the report signing key
+        run: |
+          umask 077
+          mkdir -p /tmp/scalpai-secrets
+          printf '%s\n' "${{ secrets.BACKUP_AGE_IDENTITY }}" > /tmp/scalpai-secrets/identity.txt
+          printf '%s\n' "${{ secrets.DRILL_REPORT_HMAC_KEY }}" > /tmp/scalpai-secrets/drill.key
+          test -s /tmp/scalpai-secrets/identity.txt
+          test -s /tmp/scalpai-secrets/drill.key
+
+      - name: Pull the newest off-site snapshot
+        run: |
+          mkdir -p "$BACKUP_DIR"
+          export MC_HOST_offsite="https://${BACKUP_OFFSITE_ACCESS_KEY}:${BACKUP_OFFSITE_SECRET_KEY}@${BACKUP_OFFSITE_ENDPOINT#*://}"
+          SNAPSHOT="$(mc ls "offsite/${BACKUP_OFFSITE_BUCKET}/" | awk '{print $NF}' | tr -d '/' | sort | tail -n 1)"
+          test -n "$SNAPSHOT"
+          echo "SNAPSHOT=$SNAPSHOT" >> "$GITHUB_ENV"
+          mc cp --quiet --recursive "offsite/${BACKUP_OFFSITE_BUCKET}/${SNAPSHOT}/" "${BACKUP_DIR}/${SNAPSHOT}/"
+
+      - name: Verify the snapshot checksums before touching anything
+        run: bash tools/ci/run-gate.sh backup-run bash ops/restore.sh "$SNAPSHOT" --verify-only
+
+      - name: The off-site copy is still immutable
+        run: bash tools/ci/run-gate.sh backup-offsite bash tools/ci/offsite-check.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (npm ci, lockfile enforced)
+        run: npm ci --legacy-peer-deps
+
+      - name: Restore into a scratch database and smoke-query it
+        run: bash tools/ci/run-gate.sh restore-drill bash ops/restore-drill.sh --snapshot "$SNAPSHOT"
+
+      - name: No PASS without the drill evidence
+        if: always()
+        run: npm run ci:gate:drill
+
+      - name: Publish the signed drill report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-restore-drill-report
+          path: /tmp/scalpai-drills
+          retention-days: 365
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-drill-evidence
+          path: ci-evidence
+          retention-days: 90
