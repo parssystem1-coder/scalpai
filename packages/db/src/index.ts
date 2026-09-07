@@ -150,6 +150,49 @@ export {
   type PurgeEvidence,
   type PurgeScope,
 } from "./repos/retention.repo.js";
+/**
+ * Phase 8 (ADR-0041) — metering. This is the ONLY door to usage counters and
+ * storage totals: the previous `getUsage`/`incrementUsage` pair computed its
+ * period in UTC and left check and increment as two racing statements (H11).
+ */
+export {
+  QUOTA_SPECS,
+  QuotaError,
+  addStorageBytes,
+  clinicPeriodStart,
+  consumeQuota,
+  getStorageUsage,
+  isQuotaName,
+  peekQuota,
+  quotaMetric,
+  releaseQuota,
+  reserveStorageBytes,
+  resolveQuotaLimit,
+  setStorageUsage,
+  type QuotaName,
+  type QuotaSpec,
+  type QuotaVerdict,
+  type StorageReservation,
+  type StorageUsageRow,
+} from "./repos/quota.repo.js";
+/**
+ * Phase 8 (ADR-0041) — resumable uploads. The session row is the server-side
+ * truth for `uploadId`/part geometry, so a resume continues the SAME multipart
+ * upload instead of restarting it from part 1 (H7).
+ */
+export {
+  UPLOAD_SESSION_TTL_MS,
+  abortUploadSession,
+  attachUploadId,
+  completeUploadSession,
+  createUploadSession,
+  expireUploadSessions,
+  findOpenUploadSession,
+  getUploadSession,
+  type CreateUploadSessionInput,
+  type UploadSessionRow,
+  type UploadSessionState,
+} from "./repos/upload-sessions.repo.js";
 export {
   findUserByEmail,
   touchLogin,
@@ -162,8 +205,6 @@ export {
   upsertPlan,
   deletePlan,
   countEntitlementsByPlan,
-  getUsage,
-  incrementUsage,
   type ResolvedEntitlement,
   type PlanUpsertInput,
 } from "./repos/users.repo.js";

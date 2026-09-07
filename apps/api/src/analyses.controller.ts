@@ -1,6 +1,15 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { AnalysisSubmit, ExpertReview, type AnalysisSubmitDto, type ExpertReviewDto, errors } from "@scalpai/shared";
-import { createAnalysis, getAnalysisById, listAnalysesByPatient, saveExpertReview } from "@scalpai/db";
+import {
+  consumeQuota,
+  createAnalysis,
+  getAnalysisById,
+  listAnalysesByPatient,
+  resolveQuotaLimit,
+  saveExpertReview,
+} from "@scalpai/db";
+import { EntitlementService } from "./entitlements/entitlement.service.js";
+import { Quota } from "./common/quota.guard.js";
 import { RateLimit } from "./common/rate-limit.guard.js";
 import { Roles } from "./common/roles.guard.js";
 import { ZodBodyPipe } from "./common/zod.pipe.js";
@@ -11,25 +20,36 @@ import { TenantScope } from "./tenancy/tenant.scope.js";
  * (§3 golden rule — analysis never leaves the device); the server only
  * validates the contract and persists. expert_review is the Gold-label door.
  *
- * Submitting an analysis is metered by the plan quota AND rate-limited per
- * clinic (WEAKNESSES L4) — quota answers "how many this month", the limit
- * answers "how fast".
+ * Phase 8 (H11): the plan quota is CONSUMED in the same transaction that writes
+ * the row. `@Quota` still fronts the handler, but it is only a cheap pre-check —
+ * two submissions arriving together used to both read `used = limit - 1` and both
+ * be accepted, and nothing downstream noticed.
  */
 @Controller("analyses")
 export class AnalysesController {
-  constructor(private scope: TenantScope) {}
+  constructor(
+    private scope: TenantScope,
+    private entitlements: EntitlementService,
+  ) {}
 
   @Post()
   @Roles("owner", "trichologist")
   @RateLimit("analysis", 120)
+  @Quota("analyses")
   async submit(@Body(new ZodBodyPipe(AnalysisSubmit)) dto: AnalysisSubmitDto) {
-    const created = await this.scope.tx(async (tx, ctx) => {
-      const row = await createAnalysis(tx, ctx.clinicId, {
+    const ctx = this.scope.requireCtx();
+    const ent = await this.entitlements.resolve(ctx.clinicId);
+    const limit = resolveQuotaLimit(ent?.limits, "analyses");
+
+    const created = await this.scope.tx(async (tx, c) => {
+      const slot = await consumeQuota(tx, c.clinicId, "analyses", 1, limit);
+      if (!slot.allowed) throw errors.quotaExceeded();
+      const row = await createAnalysis(tx, c.clinicId, {
         patientId: dto.patientId,
         galleryItemId: dto.galleryItemId,
         result: { scores: dto.result.scores, severity: dto.result.severity },
         modelVersion: dto.result.modelVersion,
-        userId: ctx.userId,
+        userId: c.userId,
       });
       if (!row) throw errors.notFound();
       return row;

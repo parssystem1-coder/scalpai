@@ -60,12 +60,18 @@ async function withPool<T>(url: string, fn: (pool: Pool) => Promise<T>): Promise
   }
 }
 
-/** Dev/CI helper: wipe all business data for a deterministic re-seed. */
+/**
+ * Dev/CI helper: wipe all business data for a deterministic re-seed.
+ *
+ * Phase 8 adds `upload_sessions` and `storage_usage`: a leftover open session
+ * would keep holding a storage reservation across suites and make quota tests
+ * order-dependent.
+ */
 export async function resetAll(migrateUrl: string): Promise<void> {
   assertResettableTarget(migrateUrl);
   await withPool(migrateUrl, (pool) =>
-    pool.query(`TRUNCATE audit_log, consents, analyses, gallery_items, sessions,
-      patients, services, usage_counters, entitlements, plan_features, plans,
+    pool.query(`TRUNCATE audit_log, consents, analyses, upload_sessions, gallery_items, sessions,
+      patients, services, storage_usage, usage_counters, entitlements, plan_features, plans,
       refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`),
   );
 }

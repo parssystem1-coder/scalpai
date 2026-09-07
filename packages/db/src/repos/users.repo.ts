@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { entitlements, planFeatures, plans, usageCounters, users } from "../schema.js";
+import { entitlements, planFeatures, plans, users } from "../schema.js";
 import type { Tx } from "../tenant.js";
 
 export async function findUserByEmail(tx: Tx, email: string) {
@@ -119,28 +119,12 @@ export async function countEntitlementsByPlan(tx: Tx, code: string): Promise<num
   return rows.length;
 }
 
-// ---------------- Usage counters (§9.1 metering — monthly period) ----------------
-
-function currentPeriod(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
-}
-
-export async function getUsage(tx: Tx, clinicId: string, metric: string): Promise<number> {
-  const rows = await tx
-    .select({ value: usageCounters.value })
-    .from(usageCounters)
-    .where(and(eq(usageCounters.clinicId, clinicId), eq(usageCounters.metric, metric), eq(usageCounters.periodStart, currentPeriod())))
-    .limit(1);
-  return rows[0]?.value ?? 0;
-}
-
-export async function incrementUsage(tx: Tx, clinicId: string, metric: string, by = 1): Promise<void> {
-  await tx
-    .insert(usageCounters)
-    .values({ clinicId, metric, periodStart: currentPeriod(), value: by })
-    .onConflictDoUpdate({
-      target: [usageCounters.clinicId, usageCounters.metric, usageCounters.periodStart],
-      set: { value: sql`${usageCounters.value} + ${by}` },
-    });
-}
+/**
+ * Metering does NOT live here any more (phase 8 / WEAKNESSES H11).
+ *
+ * `getUsage()` + `incrementUsage()` used to sit in this file. They computed the
+ * period in fixed UTC and left check and increment as two statements, which is
+ * exactly the race that let a clinic pass its own plan ceiling. They are gone —
+ * not deprecated — so nothing can quietly keep using them. The single metering
+ * surface is `repos/quota.repo.ts` (ADR-0041).
+ */

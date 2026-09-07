@@ -7,7 +7,7 @@ import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
 import DigitalConsentModal from "../components/DigitalConsentModal.js";
 import { faNum, toggleLang } from "../i18n.js";
-import { uploadChunked, getPendingUploads, type ChunkedUploadState } from "../offline/chunked-upload.js";
+import { uploadChunked, getPendingUploads, type PendingUploadState } from "../offline/chunked-upload.js";
 import { formatDate } from "@scalpai/shared";
 
 interface GalleryItem {
@@ -53,7 +53,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [pct, setPct] = useState<number | null>(null);
-  const [pendingUploads, setPendingUploads] = useState<ChunkedUploadState[]>([]);
+  const [pendingUploads, setPendingUploads] = useState<PendingUploadState[]>([]);
   const [isConsentOpen, setIsConsentOpen] = useState(false);
   const mockItems = useMockItems();
 
@@ -63,10 +63,19 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
     queryFn: () => apiFetch<{ id: string; firstName: string; lastName: string; phone: string }>(`/patients/${pid}`),
   });
 
-  // refresh pending uploads on mount and after uploads
-  useEffect(() => {
-    setPendingUploads(getPendingUploads());
+  /**
+   * Phase 8 (H7): upload state lives in the scoped offline database, not in
+   * localStorage, so reading it is async and it disappears with the rest of the
+   * clinical data on logout.
+   */
+  const refreshPending = useCallback(async () => {
+    const rows = await getPendingUploads().catch(() => []);
+    setPendingUploads(rows);
   }, []);
+
+  useEffect(() => {
+    void refreshPending();
+  }, [refreshPending]);
 
   const galleryQuery = useInfiniteQuery({
     queryKey: ["gallery", pid],
@@ -84,15 +93,16 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   const upload = useMutation({
     mutationFn: async (file: File) => {
       await uploadChunked(file, pid, setPct);
-      setPendingUploads(getPendingUploads());
+      await refreshPending();
     },
     onSuccess: () => {
       setPct(null);
       setError(null);
-      setPendingUploads(getPendingUploads());
+      void refreshPending();
       void qc.invalidateQueries({ queryKey: ["gallery", pid] });
     },
     onError: (e) => {
+      void refreshPending();
       if (e instanceof ApiError && e.status === 401) {
         clearAccessToken();
         onLoggedOut();
@@ -130,7 +140,8 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
   });
 
   const renderCell = (it: GalleryItem) => {
-    const pending = pendingUploads.find((p) => p.galleryItemId === it.id);
+    const pending = pendingUploads.find((p) => p.key === it.id);
+    const acked = pending ? Object.keys(pending.partEtags).length : 0;
     return (
       <figure key={it.id} style={{ margin: 0, position: "relative" }}>
         {it.thumbUrl ? (
@@ -155,7 +166,7 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
               borderRadius: 8,
             }}
           >
-            {pending.completedParts.length}/{pending.totalParts}
+            {acked}/{pending.totalParts}
           </span>
         )}
         {!mockItems && (

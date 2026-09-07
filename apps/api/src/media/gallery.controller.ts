@@ -1,197 +1,106 @@
-import { createHash } from "node:crypto";
-import { randomUUID } from "node:crypto";
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from "@nestjs/common";
-import sharp from "sharp";
-import { computeQuality, rgbaToGray } from "@scalpai/analysis-core";
-import { GalleryInit, GalleryPageQuery, type GalleryInitDto, errors } from "@scalpai/shared";
 import {
-  appendAudit,
-  completeGalleryItem,
-  createPendingGalleryItem,
-  deletePendingGalleryItem,
-  getGalleryItem,
-  listGalleryByPatient,
-  softDeleteGalleryItem,
-} from "@scalpai/db";
+  GalleryPageQuery,
+  UploadComplete,
+  UploadInit,
+  UploadPartUrlsRequest,
+  errors,
+  type UploadCompleteDto,
+  type UploadInitDto,
+  type UploadPartUrlsRequestDto,
+} from "@scalpai/shared";
+import { listGalleryByPatient, softDeleteGalleryItem } from "@scalpai/db";
+import { Quota } from "../common/quota.guard.js";
 import { RateLimit } from "../common/rate-limit.guard.js";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
 import { TenantScope } from "../tenancy/tenant.scope.js";
 import { StorageService } from "./storage.service.js";
-import { MIME_TO_KIND, sniffImageMime } from "./magic.js";
-
-const MAX_EDGE = 2048;
-const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks for multipart upload
+import { UploadService } from "./upload.service.js";
 
 /**
- * Media pipeline (playbook 2.1): init issues a tenant-prefixed presigned PUT,
- * the client uploads directly to MinIO, and `complete` runs the server-side
- * gauntlet — magic bytes, EXIF-strip/auto-orient, resolution cap, thumbnail,
- * quality gate — before the item ever becomes `done`.
+ * Media pipeline (playbook 2.1) — phase 8 shape (ADR-0041).
  *
- * Every upload entry point carries a per-clinic rate budget (WEAKNESSES L4):
- * `complete` runs sharp on a full-size image, so an unbounded burst is an OOM,
- * not just a slow response.
+ * The controller is deliberately thin now: opening, resuming, completing and
+ * aborting an upload all live in `UploadService`, because each of them has to
+ * touch quota, the object store and the session row together and getting that
+ * ordering wrong is what H7/H11 were.
+ *
+ * The old `init-multipart` / `complete-multipart` pair is GONE rather than kept
+ * as a compatibility shim: it minted every presigned URL up front and accepted an
+ * unvalidated `{ uploadId, parts }` body, so leaving it in place would have left a
+ * second, unbounded way in.
+ *
+ * Every entry point carries a per-clinic rate budget (L4) on top of the plan
+ * quota, and the decode itself runs behind the process-wide image semaphore.
  */
 @Controller()
 export class GalleryController {
-  constructor(private scope: TenantScope, private storage: StorageService) {}
+  constructor(
+    private scope: TenantScope,
+    private storage: StorageService,
+    private uploads: UploadService,
+  ) {}
 
-  @Post("patients/:pid/gallery/init")
+  /**
+   * Open an upload. Small files get a single presigned PUT; anything over the
+   * multipart threshold gets a session plus its FIRST window of part URLs.
+   */
+  @Post("patients/:pid/gallery/uploads")
   @Roles("owner", "trichologist", "receptionist")
   @RateLimit("upload", 120)
-  async init(@Param("pid") pid: string, @Body(new ZodBodyPipe(GalleryInit)) dto: GalleryInitDto) {
-    const ext = MIME_TO_KIND[dto.mime];
-    const rest = `gallery/${randomUUID()}/original.${ext}`;
-    const created = await this.scope.tx(async (tx, ctx) =>
-      createPendingGalleryItem(tx, ctx.clinicId, {
-        patientId: pid,
-        storageKey: rest,
-        mime: dto.mime,
-        sizeBytes: dto.sizeBytes,
-        userId: ctx.userId,
-      }),
-    );
-    const uploadUrl = await this.storage.presignPut(this.scope.requireCtx().clinicId, rest, dto.mime);
-    return { id: created.id, uploadUrl, key: rest };
+  @Quota("uploads")
+  @HttpCode(HttpStatus.CREATED)
+  open(@Param("pid") pid: string, @Body(new ZodBodyPipe(UploadInit)) dto: UploadInitDto) {
+    return this.uploads.open(pid, dto);
   }
 
-  /** §Multipart: init for large files (>8MB). Returns presigned URLs for each chunk. */
-  @Post("patients/:pid/gallery/init-multipart")
+  /**
+   * Resume: what does the BUCKET already have? The client sends only the parts
+   * missing from this answer, which is the whole point of H7.
+   */
+  @Get("gallery/uploads/:sid")
   @Roles("owner", "trichologist", "receptionist")
-  @RateLimit("upload", 120)
-  async initMultipart(@Param("pid") pid: string, @Body(new ZodBodyPipe(GalleryInit)) dto: GalleryInitDto) {
-    const ext = MIME_TO_KIND[dto.mime];
-    const rest = `gallery/${randomUUID()}/original.${ext}`;
-    const created = await this.scope.tx(async (tx, ctx) =>
-      createPendingGalleryItem(tx, ctx.clinicId, {
-        patientId: pid,
-        storageKey: rest,
-        mime: dto.mime,
-        sizeBytes: dto.sizeBytes,
-        userId: ctx.userId,
-      }),
-    );
-    const totalParts = Math.ceil(dto.sizeBytes / CHUNK_SIZE);
-    const ctx = this.scope.requireCtx();
-    const { uploadId, partUrls } = await this.storage.initiateMultipartUpload(ctx.clinicId, rest, dto.mime, totalParts);
-    return { id: created.id, uploadId, partUrls, totalParts, key: rest };
+  @RateLimit("upload-status", 600)
+  status(@Param("sid") sid: string) {
+    return this.uploads.status(sid);
   }
 
-  /** §Multipart: complete with ETags from each part upload. */
-  @Post("gallery/:gid/complete-multipart")
+  /** A bounded window of fresh presigned part URLs (expired ones are re-asked). */
+  @Post("gallery/uploads/:sid/parts")
+  @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload-parts", 600)
+  @HttpCode(HttpStatus.OK)
+  parts(
+    @Param("sid") sid: string,
+    @Body(new ZodBodyPipe(UploadPartUrlsRequest)) dto: UploadPartUrlsRequestDto,
+  ) {
+    return this.uploads.partUrls(sid, dto);
+  }
+
+  @Post("gallery/uploads/:sid/complete")
   @Roles("owner", "trichologist", "receptionist")
   @RateLimit("upload", 120)
   @HttpCode(HttpStatus.OK)
-  async completeMultipart(
-    @Param("gid") gid: string,
-    @Body() body: { uploadId: string; parts: { partNumber: number; etag: string }[] },
-  ): Promise<unknown> {
-    const ctx = this.scope.requireCtx();
-    const item = await this.scope.tx((tx) => getGalleryItem(tx, ctx.clinicId, gid));
-    if (!item || item.uploadState !== "pending") throw errors.notFound();
-    await this.storage.completeMultipartUpload(ctx.clinicId, item.storageKey, body.uploadId, body.parts);
-    // delegate to the existing complete pipeline (quality gate, thumbnail, etc.)
-    return this.complete(gid);
+  complete(@Param("sid") sid: string, @Body(new ZodBodyPipe(UploadComplete)) dto: UploadCompleteDto) {
+    return this.uploads.completeMultipart(sid, dto);
   }
 
+  /** Abandon an upload: bucket parts, pending row, reserved bytes and slot back. */
+  @Delete("gallery/uploads/:sid")
+  @Roles("owner", "trichologist", "receptionist")
+  @RateLimit("upload", 120)
+  abort(@Param("sid") sid: string) {
+    return this.uploads.abort(sid, "client aborted");
+  }
+
+  /** Single-shot completion for the presigned-PUT path. */
   @Post("gallery/:gid/complete")
   @Roles("owner", "trichologist", "receptionist")
   @RateLimit("upload", 120)
-  @HttpCode(HttpStatus.OK) // action endpoint — the item already exists
-  async complete(@Param("gid") gid: string): Promise<unknown> {
-    const ctx = this.scope.requireCtx();
-    const item = await this.scope.tx((tx) => getGalleryItem(tx, ctx.clinicId, gid));
-    if (!item || item.uploadState !== "pending") throw errors.notFound();
-
-    let raw: Buffer;
-    try {
-      raw = await this.storage.getObject(ctx.clinicId, item.storageKey);
-    } catch {
-      await this.rejectPending(ctx.clinicId, gid, item.storageKey, null);
-      throw errors.invalidImage();
-    }
-
-    // 1) magic bytes — declared mime must match actual content (rules §2)
-    const sniffed = sniffImageMime(raw);
-    if (!sniffed || sniffed !== MIME_TO_KIND[item.mime]) {
-      await this.rejectPending(ctx.clinicId, gid, item.storageKey, null);
-      throw errors.invalidImage();
-    }
-
-    // base dir of this item inside the clinic prefix: gallery/{uuid}
-    const baseDir = item.storageKey.split("/").slice(0, -1).join("/");
-    const canonicalRest = `${baseDir}/original.jpg`;
-    const thumbRest = `${baseDir}/thumb.jpg`;
-
-    try {
-      // 2) auto-orient by EXIF, strip metadata on re-encode, cap resolution
-      const processed = await sharp(raw)
-        .rotate()
-        .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      const meta = await sharp(processed).metadata();
-
-      // 3) quality gate BEFORE anything is kept (§10.1 / rules §2)
-      const grayRaw = await sharp(processed).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-      const gray = rgbaToGray(grayRaw.data, grayRaw.info.width, grayRaw.info.height);
-      const verdict = computeQuality(gray);
-      if (verdict.status === "reject") {
-        await this.rejectPending(ctx.clinicId, gid, item.storageKey, verdict.reasons);
-        throw errors.qualityFail(verdict.reasons);
-      }
-
-      // 4) thumbnail + canonical store (normalized to jpeg)
-      const thumb = await sharp(processed).resize(512, 512, { fit: "inside" }).jpeg({ quality: 75 }).toBuffer();
-      await this.storage.putBuffer(ctx.clinicId, canonicalRest, processed, "image/jpeg");
-      await this.storage.putBuffer(ctx.clinicId, thumbRest, thumb, "image/jpeg");
-      if (item.storageKey !== canonicalRest) {
-        await this.storage.removeObject(ctx.clinicId, item.storageKey).catch(() => undefined);
-      }
-
-      const sha256 = createHash("sha256").update(processed).digest("hex");
-      const done = await this.scope.tx((tx) =>
-        completeGalleryItem(tx, ctx.clinicId, gid, {
-          storageKey: canonicalRest,
-          thumbKey: thumbRest,
-          sha256,
-          quality: { status: "pass", metrics: verdict.metrics },
-          sizeBytes: processed.length,
-          userId: ctx.userId,
-        }),
-      );
-      if (!done) throw errors.notFound();
-      return {
-        id: done.id,
-        state: done.uploadState,
-        width: meta.width ?? null,
-        height: meta.height ?? null,
-        quality: verdict.metrics,
-        sha256,
-      };
-    } catch (err) {
-      if ((err as { status?: number }).status === 400) throw err; // handled failures keep their contract
-      await this.rejectPending(ctx.clinicId, gid, item.storageKey, null);
-      throw errors.invalidImage();
-    }
-  }
-
-  /** Remove the raw object + pending row + audit the rejection. */
-  private async rejectPending(clinicId: string, gid: string, rest: string, reasons: string[] | null): Promise<void> {
-    await this.storage.removeObject(clinicId, rest).catch(() => undefined);
-    await this.scope.tx(async (tx, ctx) => {
-      if (await deletePendingGalleryItem(tx, clinicId, gid)) {
-        await appendAudit(tx, {
-          clinicId,
-          userId: ctx.userId,
-          action: reasons ? "gallery.reject_quality" : "gallery.reject_invalid",
-          entity: "gallery_item",
-          entityId: gid,
-          meta: reasons ? { reasons } : null,
-        });
-      }
-    });
+  @HttpCode(HttpStatus.OK)
+  completeSingle(@Param("gid") gid: string) {
+    return this.uploads.completeSingle(gid);
   }
 
   @Get("patients/:pid/gallery")
@@ -201,16 +110,19 @@ export class GalleryController {
     @Query(new ZodBodyPipe(GalleryPageQuery)) q: { limit: number; cursor?: string },
   ): Promise<unknown> {
     const ctx = this.scope.requireCtx();
-    const page = await this.scope.tx((tx) => listGalleryByPatient(tx, ctx.clinicId, pid, { limit: q.limit, cursor: q.cursor }));
-    // Presigned view URLs are minted per-request and expire in minutes —
-    // images are never proxied through the API nor embedded as base64.
+    const page = await this.scope.tx((tx) =>
+      listGalleryByPatient(tx, ctx.clinicId, pid, { limit: q.limit, cursor: q.cursor }),
+    );
+    // Presigned view URLs are minted per-request and expire in minutes — images
+    // are never proxied through the API nor embedded as base64, and the key shape
+    // is asserted again on the way out (C1).
     const items = await Promise.all(
       page.items.map(async (it) => ({
         id: it.id,
         createdAt: it.createdAt,
         quality: it.quality,
-        viewUrl: it.storageKey ? await this.storage.presignGet(ctx.clinicId, it.storageKey) : null,
-        thumbUrl: it.thumbKey ? await this.storage.presignGet(ctx.clinicId, it.thumbKey) : null,
+        viewUrl: it.storageKey ? await this.storage.presignMediaGet(ctx.clinicId, it.storageKey) : null,
+        thumbUrl: it.thumbKey ? await this.storage.presignMediaGet(ctx.clinicId, it.thumbKey) : null,
       })),
     );
     return { items, nextCursor: page.nextCursor };

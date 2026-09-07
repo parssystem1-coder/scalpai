@@ -1,7 +1,8 @@
 import Dexie, { type EntityTable } from "dexie";
 
 /**
- * Local-first store (ADR-0027) — phase 7 rework (ADR-0039).
+ * Local-first store (ADR-0027) — phase 7 rework (ADR-0039), phase 8 uploads
+ * (ADR-0041).
  *
  * WEAKNESSES H8: there used to be ONE database called `scalpai-offline`. On a
  * shared clinic workstation that meant clinic A's queued mutations were still
@@ -45,12 +46,31 @@ export interface SyncStateRecord {
   updatedAt: number;
 }
 
+/**
+ * An upload in flight (phase 8 / H7).
+ *
+ * This used to live in `localStorage` under one shared key: it survived a logout,
+ * it was readable by the next person at the terminal, and it was the ONLY record
+ * of a multipart upload — so clearing site data silently orphaned parts in the
+ * bucket. It is now a row in the scoped offline database, and it is a POINTER:
+ * the authoritative part geometry belongs to the server's `upload_sessions` row,
+ * and which parts exist is answered by the bucket.
+ */
 export interface PendingUpload {
-  key: string; // gallery item id or storage key
-  totalParts: number;
-  completedParts: number[];
+  /** Gallery item id — stable across a resume, so it is the primary key. */
+  key: string;
+  sessionId: string;
   patientId: string;
+  fileName: string;
+  fileSize: number;
+  mime: string;
+  partSizeBytes: number;
+  totalParts: number;
+  multipart: boolean;
+  /** ETags this device saw acknowledged. The server re-verifies every one. */
+  partEtags: Record<number, string>;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface OfflineScope {
@@ -69,6 +89,9 @@ const DB_PREFIX = "scalpai-offline";
 
 /** The pre-phase-7 shared database. It has no owner, so it is never kept. */
 export const LEGACY_DB_NAME = "scalpai-offline";
+
+/** The pre-phase-8 localStorage key for uploads — removed, never migrated. */
+export const LEGACY_UPLOAD_STORAGE_KEY = "scalpai-chunked-uploads";
 
 function sanitize(value: string): string {
   const cleaned = value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
@@ -92,6 +115,19 @@ function openScoped(scope: OfflineScope): OfflineDb {
     syncState: "key",
     pendingUploads: "key, createdAt",
   });
+  // v2: pendingUploads carries the server session id and is looked up per
+  // patient. The old rows had no sessionId, so there is nothing to resume from —
+  // they are dropped rather than half-migrated into something that cannot work.
+  db.version(2)
+    .stores({
+      outbox: "id, createdAt, nextAttemptAt",
+      deadLetter: "id, failedAt",
+      syncState: "key",
+      pendingUploads: "key, createdAt, patientId",
+    })
+    .upgrade(async (tx) => {
+      await tx.table("pendingUploads").clear();
+    });
   return db;
 }
 
@@ -148,5 +184,11 @@ export async function purgeLegacyOfflineDb(): Promise<void> {
     await Dexie.delete(LEGACY_DB_NAME);
   } catch {
     // ignore
+  }
+  // Phase 8: and the unscoped localStorage upload state it used to sit next to.
+  try {
+    if (typeof localStorage !== "undefined") localStorage.removeItem(LEGACY_UPLOAD_STORAGE_KEY);
+  } catch {
+    // storage may be unavailable
   }
 }

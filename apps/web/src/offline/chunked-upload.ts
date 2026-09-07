@@ -1,149 +1,276 @@
-import { apiFetch } from "../api/client.js";
+import {
+  MULTIPART_THRESHOLD_BYTES,
+  UPLOAD_PART_URL_BATCH_MAX,
+  partRange,
+} from "@scalpai/shared";
+import { ApiError, apiFetch } from "../api/client.js";
+import { getOfflineDb, type PendingUpload } from "./db.js";
 
-const CHUNK_SIZE = 8 * 1024 * 1024; // 8MB
-const STORAGE_KEY = "scalpai-chunked-uploads";
+/**
+ * Resumable media upload — phase 8 (WEAKNESSES H7/H12, ADR-0041).
+ *
+ * The previous implementation called itself resumable and was not: on resume it
+ * asked the API to initiate a NEW multipart upload for the same file, threw away
+ * every ETag, cleared `completedParts` and re-sent all of it. It also kept that
+ * state in `localStorage`, so it outlived a logout and was the only record of
+ * parts sitting in the bucket.
+ *
+ * What actually happens now:
+ *  1. open a session on the server (it owns `uploadId`, part size, part count);
+ *  2. keep a POINTER to it in the scoped Dexie database;
+ *  3. on resume, ask the server which parts the BUCKET holds and send only the
+ *     missing ones — same `uploadId`, no re-sending;
+ *  4. fetch presigned part URLs a window at a time, and re-fetch a window when a
+ *     signature has expired mid-flight.
+ */
 
-export interface ChunkedUploadState {
-  galleryItemId: string;
-  uploadId: string;
-  fileName: string;
-  fileSize: number;
-  totalParts: number;
-  completedParts: number[];
-  partEtags: Record<number, string>;
-  key: string;
-  patientId: string;
-  createdAt: number;
+export type PendingUploadState = PendingUpload;
+
+interface PartUrl {
+  partNumber: number;
+  url: string;
+  bytes: number;
 }
 
-function loadStates(): ChunkedUploadState[] {
+interface OpenResponse {
+  id: string;
+  sessionId: string;
+  key: string;
+  multipart: boolean;
+  sizeBytes: number;
+  partSizeBytes: number;
+  totalParts: number;
+  expiresAt: string;
+  uploadUrl?: string;
+  parts?: PartUrl[];
+}
+
+interface StatusResponse {
+  sessionId: string;
+  galleryItemId: string;
+  sizeBytes: number;
+  partSizeBytes: number;
+  totalParts: number;
+  multipart: boolean;
+  state: string;
+  uploadedParts: number[];
+}
+
+/* ── durable pointer ─────────────────────────────────────────────── */
+
+async function save(record: PendingUpload): Promise<void> {
+  const db = getOfflineDb();
+  if (!db) return; // signed out: the upload still works, it just cannot be resumed
+  record.updatedAt = Date.now();
+  await db.pendingUploads.put(record);
+}
+
+async function drop(key: string): Promise<void> {
+  const db = getOfflineDb();
+  if (!db) return;
+  await db.pendingUploads.delete(key);
+}
+
+/** Pending uploads for the badge UI. Async because IndexedDB is. */
+export async function getPendingUploads(): Promise<PendingUpload[]> {
+  const db = getOfflineDb();
+  if (!db) return [];
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return await db.pendingUploads.orderBy("createdAt").toArray();
   } catch {
     return [];
   }
 }
 
-function saveStates(states: ChunkedUploadState[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(states));
+async function findResumable(file: File, patientId: string): Promise<PendingUpload | null> {
+  const db = getOfflineDb();
+  if (!db) return null;
+  try {
+    const rows = await db.pendingUploads.where("patientId").equals(patientId).toArray();
+    return rows.find((r) => r.fileName === file.name && r.fileSize === file.size) ?? null;
+  } catch {
+    return null;
+  }
 }
 
-function upsertState(state: ChunkedUploadState): void {
-  const all = loadStates();
-  const idx = all.findIndex((s) => s.galleryItemId === state.galleryItemId);
-  if (idx >= 0) all[idx] = state;
-  else all.push(state);
-  saveStates(all);
-}
+/* ── public entry point ────────────────────────────────────────── */
 
-function removeState(galleryItemId: string): void {
-  saveStates(loadStates().filter((s) => s.galleryItemId !== galleryItemId));
-}
-
-function findPending(fileName: string, fileSize: number): ChunkedUploadState | undefined {
-  return loadStates().find((s) => s.fileName === fileName && s.fileSize === fileSize);
-}
-
-/**
- * §P4: Chunked multipart upload with IndexedDB persistence. On kill/reload,
- * resume from the last successful part. Priority: smalls first.
- */
 export async function uploadChunked(
   file: File,
   patientId: string,
   onProgress?: (pct: number) => void,
 ): Promise<void> {
-  const existing = findPending(file.name, file.size);
-  if (existing) {
-    await resumeUpload(existing, file, onProgress);
-  } else {
-    await startUpload(file, patientId, onProgress);
-  }
+  const existing = await findResumable(file, patientId);
+  if (existing && (await resume(existing, file, onProgress))) return;
+  if (existing) await drop(existing.key);
+  await start(file, patientId, onProgress);
 }
 
-async function startUpload(file: File, patientId: string, onProgress?: (pct: number) => void): Promise<void> {
-  const init = await apiFetch<{ id: string; uploadId: string; partUrls: string[]; totalParts: number; key: string }>(
-    `/patients/${patientId}/gallery/init-multipart`,
-    { method: "POST", body: JSON.stringify({ mime: file.type || "image/jpeg", sizeBytes: file.size }) },
-  );
+async function start(file: File, patientId: string, onProgress?: (pct: number) => void): Promise<void> {
+  const mime = file.type || "image/jpeg";
+  const opened = await apiFetch<OpenResponse>(`/patients/${patientId}/gallery/uploads`, {
+    method: "POST",
+    body: JSON.stringify({ mime, sizeBytes: file.size }),
+  });
 
-  const state: ChunkedUploadState = {
-    galleryItemId: init.id,
-    uploadId: init.uploadId,
+  const record: PendingUpload = {
+    key: opened.id,
+    sessionId: opened.sessionId,
+    patientId,
     fileName: file.name,
     fileSize: file.size,
-    totalParts: init.totalParts,
-    completedParts: [],
+    mime,
+    partSizeBytes: opened.partSizeBytes,
+    totalParts: opened.totalParts,
+    multipart: opened.multipart,
     partEtags: {},
-    key: init.key,
-    patientId,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
-  upsertState(state);
-  await uploadParts(state, file, init.partUrls, onProgress);
-}
+  await save(record);
 
-async function resumeUpload(state: ChunkedUploadState, file: File, onProgress?: (pct: number) => void): Promise<void> {
-  // For resume, we need fresh presigned URLs (old ones may have expired).
-  // Re-init multipart for the same key.
-  const init = await apiFetch<{ uploadId: string; partUrls: string[] }>(
-    `/patients/${state.patientId}/gallery/init-multipart`,
-    { method: "POST", body: JSON.stringify({ mime: file.type || "image/jpeg", sizeBytes: file.size }) },
-  ).catch(() => null);
-
-  if (!init) {
-    removeState(state.galleryItemId);
+  if (!opened.multipart) {
+    if (!opened.uploadUrl) throw new Error("server did not return an upload url");
+    const res = await fetch(opened.uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "content-type": mime },
+    });
+    if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+    onProgress?.(100);
+    await apiFetch(`/gallery/${record.key}/complete`, { method: "POST" });
+    await drop(record.key);
     return;
   }
 
-  state.uploadId = init.uploadId;
-  state.partEtags = {}; // old ETags are invalid for new upload
-  state.completedParts = []; // need to re-upload all
-  upsertState(state);
-  await uploadParts(state, file, init.partUrls, onProgress);
+  await pump(record, file, new Set<number>(), onProgress, opened.parts ?? []);
 }
 
-async function uploadParts(
-  state: ChunkedUploadState,
+/**
+ * Continue an upload the server still considers open. Returns false when the
+ * session is gone or no longer matches the file, so the caller can start over
+ * instead of pretending to resume something that does not exist.
+ */
+async function resume(
+  record: PendingUpload,
   file: File,
-  partUrls: string[],
   onProgress?: (pct: number) => void,
+): Promise<boolean> {
+  let status: StatusResponse;
+  try {
+    status = await apiFetch<StatusResponse>(`/gallery/uploads/${record.sessionId}`);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 409)) return false;
+    throw err;
+  }
+  if (status.state !== "open") return false;
+  if (status.sizeBytes !== record.fileSize || status.totalParts !== record.totalParts) return false;
+  if (!status.multipart) return false;
+
+  // Trust only the parts the BUCKET confirms AND for which this device still has
+  // an ETag; anything else is re-uploaded rather than assumed.
+  const confirmed = new Set(status.uploadedParts.filter((n) => Boolean(record.partEtags[n])));
+  record.partSizeBytes = status.partSizeBytes;
+  await save(record);
+  await pump(record, file, confirmed, onProgress, []);
+  return true;
+}
+
+/**
+ * Send every missing part, then complete. Part URLs are requested one window at
+ * a time and re-requested once if the bucket refuses the signature — a 50MB
+ * upload on a slow uplink outlives the 15 minute TTL of its first URLs.
+ */
+async function pump(
+  record: PendingUpload,
+  file: File,
+  alreadyDone: Set<number>,
+  onProgress: ((pct: number) => void) | undefined,
+  seeded: PartUrl[],
 ): Promise<void> {
-  for (let i = 0; i < state.totalParts; i++) {
-    const partNum = i + 1;
-    if (state.completedParts.includes(partNum)) continue;
+  const done = new Set(alreadyDone);
+  const total = record.totalParts;
+  const report = () => onProgress?.(Math.min(100, Math.round((done.size / total) * 100)));
+  report();
 
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
+  for (let from = 1; from <= total; from += UPLOAD_PART_URL_BATCH_MAX) {
+    const count = Math.min(UPLOAD_PART_URL_BATCH_MAX, total - from + 1);
+    const window: number[] = [];
+    for (let n = from; n < from + count; n++) if (!done.has(n)) window.push(n);
+    if (window.length === 0) continue;
 
-    const res = await fetch(partUrls[i]!, {
-      method: "PUT",
-      body: await chunk.arrayBuffer(),
-      headers: { "content-type": file.type || "image/jpeg" },
-    });
-    if (!res.ok) {
-      upsertState(state);
-      throw new Error(`Part ${partNum} upload failed: ${res.status}`);
+    let urls = from === 1 && seeded.length > 0 ? seeded : await requestPartUrls(record.sessionId, from, count);
+
+    for (const partNumber of window) {
+      const slice = partRange(partNumber, record.fileSize, record.partSizeBytes);
+      const blob = file.slice(slice.start, slice.end);
+
+      let target = urls.find((u) => u.partNumber === partNumber);
+      if (!target) {
+        urls = await requestPartUrls(record.sessionId, partNumber, count);
+        target = urls.find((u) => u.partNumber === partNumber);
+        if (!target) throw new Error(`server did not return a url for part ${partNumber}`);
+      }
+
+      let etag = await putPart(target.url, blob, record.mime);
+      if (etag === null) {
+        // expired or rejected signature: one fresh window, then give up honestly
+        urls = await requestPartUrls(record.sessionId, partNumber, count);
+        const retry = urls.find((u) => u.partNumber === partNumber);
+        if (!retry) throw new Error(`server did not return a url for part ${partNumber}`);
+        etag = await putPart(retry.url, blob, record.mime);
+        if (etag === null) throw new Error(`part ${partNumber} was refused twice`);
+      }
+
+      record.partEtags[partNumber] = etag;
+      await save(record);
+      done.add(partNumber);
+      report();
     }
-    const etag = (res.headers.get("etag") ?? "").replace(/"/g, "");
-    state.completedParts.push(partNum);
-    state.partEtags[partNum] = etag;
-    upsertState(state);
-
-    if (onProgress) onProgress(Math.round((state.completedParts.length / state.totalParts) * 100));
   }
 
-  // all parts done → complete
-  const parts = Object.entries(state.partEtags).map(([n, etag]) => ({ partNumber: Number(n), etag }));
-  await apiFetch(`/gallery/${state.galleryItemId}/complete-multipart`, {
-    method: "POST",
-    body: JSON.stringify({ uploadId: state.uploadId, parts }),
+  const parts = Array.from({ length: total }, (_, i) => {
+    const partNumber = i + 1;
+    const etag = record.partEtags[partNumber];
+    return etag ? { partNumber, etag } : { partNumber };
   });
-  removeState(state.galleryItemId);
+  await apiFetch(`/gallery/uploads/${record.sessionId}/complete`, {
+    method: "POST",
+    body: JSON.stringify({ parts }),
+  });
+  await drop(record.key);
+  onProgress?.(100);
 }
 
-/** §P4: list pending uploads (for badge rendering). */
-export function getPendingUploads(): ChunkedUploadState[] {
-  return loadStates();
+async function requestPartUrls(sessionId: string, from: number, count: number): Promise<PartUrl[]> {
+  const res = await apiFetch<{ parts: PartUrl[]; totalParts: number }>(`/gallery/uploads/${sessionId}/parts`, {
+    method: "POST",
+    body: JSON.stringify({ from, count: Math.min(count, UPLOAD_PART_URL_BATCH_MAX) }),
+  });
+  return res.parts;
 }
+
+/**
+ * `null` means "the signature was refused" — retryable with a fresh URL. Any
+ * other failure is a real error and is thrown, because silently continuing would
+ * complete an upload with a missing part.
+ */
+async function putPart(url: string, body: Blob, mime: string): Promise<string | null> {
+  const res = await fetch(url, { method: "PUT", body, headers: { "content-type": mime } });
+  if (res.status === 400 || res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`part upload failed: ${res.status}`);
+  // Cross-origin buckets do not always expose ETag; the server falls back to the
+  // value the bucket itself reports, so an empty header is not fatal.
+  return (res.headers.get("etag") ?? "").replace(/"/g, "");
+}
+
+/** Abandon an upload: the server drops the parts, the row and the reservation. */
+export async function abortUpload(record: PendingUpload): Promise<void> {
+  try {
+    await apiFetch(`/gallery/uploads/${record.sessionId}`, { method: "DELETE" });
+  } finally {
+    await drop(record.key);
+  }
+}
+
+export { MULTIPART_THRESHOLD_BYTES };
