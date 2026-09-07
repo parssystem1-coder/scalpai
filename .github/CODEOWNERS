@@ -1,0 +1,32 @@
+# Code owners (WEAKNESSES M20).
+#
+# Every path in this repository has an owner, and the paths that decide tenancy,
+# PHI handling, deployment and the gates themselves are listed explicitly - a
+# change there should never be able to merge because nobody was looking.
+#
+# Syntax: last matching pattern wins.
+
+*                                   @parssystem1-coder
+
+# --- Boundaries that carry the security posture -----------------------------
+/packages/db/sql/                   @parssystem1-coder
+/packages/db/src/phi-crypto.ts      @parssystem1-coder
+/packages/db/src/audit-hash.ts      @parssystem1-coder
+/packages/db/src/audit-anchor.ts    @parssystem1-coder
+/packages/db/src/merkle.ts          @parssystem1-coder
+/packages/db/src/report-seal.ts     @parssystem1-coder
+/apps/api/src/auth/                 @parssystem1-coder
+/apps/api/src/tenancy/              @parssystem1-coder
+/apps/api/src/privacy/              @parssystem1-coder
+/apps/api/src/licensing/            @parssystem1-coder
+/packages/shared/src/contracts.ts   @parssystem1-coder
+
+# --- Deployment and operations ---------------------------------------------
+/ops/                               @parssystem1-coder
+/docs/ops/                          @parssystem1-coder
+
+# --- The gates themselves --------------------------------------------------
+/.github/workflows/                 @parssystem1-coder
+/tools/                             @parssystem1-coder
+/docs/adr/                          @parssystem1-coder
+/docs/WEAKNESSES-V2-10-PHASES.md    @parssystem1-coder
