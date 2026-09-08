@@ -121,8 +121,18 @@ export default function DigitalConsentModal({
     <div
       id="consent-modal-overlay"
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-md animate-in fade-in duration-200"
+      role="button"
+      tabIndex={0}
+      aria-label="بستن پنجره رضایت‌نامه"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClose();
+        }
       }}
     >
       <div
@@ -185,7 +195,7 @@ export default function DigitalConsentModal({
                     اینجانب رضایت خود را جهت انجام تصویربرداری ماکرو و درماتوسکوپی دیجیتال از پوست سر و ساقه مو اعلام می‌دارم.
                   </li>
                   <li>
-                    موافقت می‌نمایم داده‌های تصویربرداری جهت پایش روند درمان و آنالیز شدت علائم بالینی (تراکم، قرمزی و پوسته‌ریزی) با حفظ کامل حریم خصوصی پردازش گردند.
+                    موافقت می‌نمایم داده‌های تصویربرداری جهت پایش روند درمان و آنالیز شدت علائم بالینی (تراکم، قرمزی و پوسته‌ریزی) با حفط کامل حریم خصوصی پردازش گردند.
                   </li>
                   <li>
                     از برنامه‌های مراقبتی، توصیه‌های بهداشتی و پروتکل‌های پیگیری کلینیک مطلع شده‌ام.
@@ -193,7 +203,7 @@ export default function DigitalConsentModal({
                 </ul>
               </div>
               <div className="space-y-2.5 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 text-xs font-medium text-[oklch(25%_0.02_20)]">
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-photo">
                   <input
                     id="consent-check-photo"
                     type="checkbox"
@@ -203,7 +213,7 @@ export default function DigitalConsentModal({
                   />
                   <span>تایید رضایت تصویربرداری تشخیصی تریکوسکوپی و ثبت در پرونده</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-ai">
                   <input
                     id="consent-check-ai"
                     type="checkbox"
@@ -213,7 +223,7 @@ export default function DigitalConsentModal({
                   />
                   <span>موافقت با تحلیل کمکی الگوهای پوست سر و پردازش شاخص‌های تریکولوژی</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-privacy">
                   <input
                     id="consent-check-privacy"
                     type="checkbox"
