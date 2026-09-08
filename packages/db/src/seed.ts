@@ -15,8 +15,14 @@ import { Pool } from "pg";
  */
 function deterministicUUID(input: string): string {
   const h = createHash("md5").update(input).digest();
-  h[6] = (h[6] & 0x0f) | 0x50;
-  h[8] = (h[8] & 0x3f) | 0x80;
+  // noUncheckedIndexedAccess: indexing a Buffer yields `number | undefined`, so
+  // the version/variant bytes are read into locals before they are masked. An
+  // md5 digest is always 16 bytes, which makes the fallbacks unreachable — the
+  // produced UUIDs are byte-identical either way.
+  const versionByte = h[6] ?? 0;
+  const variantByte = h[8] ?? 0;
+  h[6] = (versionByte & 0x0f) | 0x50;
+  h[8] = (variantByte & 0x3f) | 0x80;
   return [
     h.toString("hex", 0, 4),
     h.toString("hex", 4, 6),
@@ -139,7 +145,7 @@ if (isCli) {
     }
     config = url;
   }
-  
+
   seed(config)
     .then((r) => {
       console.log(r.skipped ? "seed: already seeded" : `seed: done (2 clinics: A=${r.clinicA}, B=${r.clinicB})`);
