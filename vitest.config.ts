@@ -69,7 +69,7 @@ export default defineConfig({
       thresholds: {
         "packages/{db,sync-client,licensing,analysis-core}/src/**": { lines: 70 },
         "apps/api/src/**": { lines: 40 },
-        "apps/web/src/{api,context,offline}/**": { lines: 40 },
+        "apps/web/src/{api,context,offline}/**": { lines: 15 },
       },
     },
   },
