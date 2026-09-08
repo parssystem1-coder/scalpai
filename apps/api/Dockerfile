@@ -26,6 +26,11 @@ ENV HOME=/home/node
 ENV npm_config_cache=/tmp/.npm
 ENV npm_config_update_notifier=false
 
+# M17: tools/ci/image-scan.sh blocks the build on any FIXABLE CRITICAL, so the
+# base package set is patched at build time. The node tag stays pinned - this
+# only pulls Alpine security updates for the layer it already ships.
+RUN apk upgrade --no-cache
+
 # Runtime libvips for sharp.
 RUN apk add --no-cache vips libc6-compat
 
