@@ -56,9 +56,17 @@ function AddPatientForm() {
     },
   });
 
+  // M19: form onSubmit expects a void handler; handleSubmit() returns a
+  // promise-returning one (no-misused-promises).
+  const submit = handleSubmit((dto) => {
+    mutation.mutate(dto);
+  });
+
   return (
     <form
-      onSubmit={handleSubmit((dto) => mutation.mutate(dto))}
+      onSubmit={(e) => {
+        void submit(e);
+      }}
       noValidate
       data-testid="patient-form"
       aria-label={t("patients.formAria")}

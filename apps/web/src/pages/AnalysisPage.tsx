@@ -89,7 +89,10 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
   useEffect(() => {
     if (startedRef.current || !viewUrlFromState) return;
     startedRef.current = true;
-    (async () => {
+    // M19: nothing awaits this bootstrap and every failure inside it already
+    // lands in setError, so the promise is discarded explicitly
+    // (no-floating-promises).
+    void (async () => {
       try {
         const t0 = performance.now();
         const res = await fetch(viewUrlFromState);
@@ -113,8 +116,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
         setScores(out.scores);
         setAdjusted(out.scores);
         setProvenance(prov);
-        // M19: wrap save mutate with void (line 630, 662)
-        void save.mutate({
+        save.mutate({
           scores: out.scores,
           severity: out.severity,
           modelVersion: out.modelVersion,
@@ -194,7 +196,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
               <button
                 type="button"
                 onClick={() =>
-                  void review.mutate({
+                  review.mutate({
                     verdict: "adjust",
                     adjustedScores: adjusted,
                     note: note || undefined,
@@ -206,7 +208,7 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
               </button>
               <button
                 type="button"
-                onClick={() => void review.mutate({ verdict: "confirm" })}
+                onClick={() => review.mutate({ verdict: "confirm" })}
                 disabled={!saved || review.isPending}
                 data-testid="confirm"
               >
