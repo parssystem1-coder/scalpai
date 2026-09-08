@@ -334,7 +334,7 @@ jobs:
       S3_SECRET_KEY: minioadmin-dev-only
       BACKUP_OFFSITE_ENDPOINT: http://127.0.0.1:9000
       BACKUP_OFFSITE_BUCKET: scalpai-ci-offsite
-      BACKUP_OFFSITE_ACCESS_KEY: scalpai_offsite_ci
+      BACKUP_OFFSITE_ACCESS_KEY: scalpai_offsite_dev_only
       BACKUP_OFFSITE_SECRET_KEY: offsite-append-only-dev-only
       BACKUP_OFFSITE_RETENTION_DAYS: "1"
       BACKUP_OFFSITE_LOCK_MODE: COMPLIANCE

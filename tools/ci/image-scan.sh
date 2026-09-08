@@ -31,7 +31,13 @@ compose() {
 resolve_image() {
   local service="$1" ref=""
 
+  # Method 1: derive from compose config (works before containers exist)
   ref=$(compose config --images "$service" 2>/dev/null | head -n 1)
+  # Method 2: if the image is already local, find it by name pattern
+  if [ -z "$ref" ]; then
+    ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E "(^|/)${service}:" | head -n 1)
+  fi
+  # Method 3: fallback to compose images (needs running containers)
   if [ -z "$ref" ]; then
     ref=$(compose images -q "$service" 2>/dev/null | head -n 1)
   fi

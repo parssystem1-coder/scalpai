@@ -19,7 +19,7 @@
 # to the backup and then claim the copy is undeletable.
 #
 # Wire-up in .github/workflows/ci.yml (job backup-restore):
-#   BACKUP_OFFSITE_ACCESS_KEY: scalpai_offsite_ci
+#   BACKUP_OFFSITE_ACCESS_KEY: scalpai_offsite_dev_only
 #   BACKUP_OFFSITE_SECRET_KEY: offsite-append-only-dev-only
 # and, right after `mc mb --with-lock --ignore-existing local/scalpai-ci-offsite`
 # (with MC_HOST_local exported for the root alias):
