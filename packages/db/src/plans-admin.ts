@@ -33,7 +33,10 @@ export function validatePlanInput(input: unknown): Required<PlatformPlanInput> {
   if (typeof input !== "object" || input === null) throw new Error("plan payload must be an object");
   const raw = input as Record<string, unknown>;
 
-  const code = String(raw.code ?? "");
+  // M19: `String(raw.code)` stringified an `unknown` — an object payload turned
+  // into the literal "[object Object]" on its way to the error message
+  // (no-base-to-string). A code that is not a string is simply not a code.
+  const code = typeof raw.code === "string" ? raw.code : "";
   if (!CODE_RE.test(code)) throw new Error(`invalid plan code: ${code}`);
 
   const name = raw.name;

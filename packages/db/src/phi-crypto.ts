@@ -86,6 +86,19 @@ interface RawKeyEntry {
   createdAt?: unknown;
 }
 
+/**
+ * M19: `new Date(String(entry.createdAt))` ran base-to-string over an `unknown`,
+ * so a nested object in the key ring became the literal "[object Object]" and
+ * then an Invalid Date. The timestamp is narrowed instead, and a shape we cannot
+ * interpret is refused outright rather than being coerced.
+ */
+function parseCreatedAt(value: unknown, source: string, kid: string): Date {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return new Date(value.getTime());
+  if (typeof value === "string" || typeof value === "number") return new Date(value);
+  throw new PhiCryptoError(`${source}: key '${kid}' has an invalid createdAt`);
+}
+
 function parseKeyRing(json: string, source: string): PhiKeyRing {
   let parsed: unknown;
   try {
@@ -117,7 +130,7 @@ function parseKeyRing(json: string, source: string): PhiKeyRing {
     const state = entry.state === "retired" ? "retired" : entry.state === "active" ? "active" : null;
     if (!state) throw new PhiCryptoError(`${source}: key '${kid}' needs state 'active' or 'retired'`);
 
-    const createdAt = entry.createdAt ? new Date(String(entry.createdAt)) : new Date(0);
+    const createdAt = parseCreatedAt(entry.createdAt, source, kid);
     if (Number.isNaN(createdAt.getTime())) {
       throw new PhiCryptoError(`${source}: key '${kid}' has an invalid createdAt`);
     }
