@@ -14,29 +14,9 @@ import { appendAudit } from "./core.repo.js";
 import { enqueueStorageOrphans } from "./storage-orphans.repo.js";
 import type { Tx } from "../tenant.js";
 
-/**
- * Retention and patient purge (WEAKNESSES M21).
- *
- * "Delete the patient" used to mean a soft delete and nothing else: images stayed
- * in MinIO, analyses stayed in Postgres, the ledger kept replaying the row to
- * every device. A real purge needs four things and this module enforces all
- * four:
- *
- *  1. an explicit SCOPE — you say what gets destroyed, not "everything-ish";
- *  2. TWO-PERSON approval — the requester cannot approve their own purge (also a
- *     DB CHECK, so a bug in this file cannot bypass it);
- *  3. a GRACE window — nothing is destroyed the same second it is requested;
- *  4. EVIDENCE — per-table counts and queued object keys land in an audit row.
- *
- * `audit_log` is never in scope. It is the append-only record of what happened,
- * including the purge itself, and it holds no PHI by construction (see the
- * meta guard in phi.ts).
- */
-
 export const PURGE_SCOPES = ["gallery", "analyses", "consents", "plans", "sessions", "ledger", "patient"] as const;
 export type PurgeScope = (typeof PURGE_SCOPES)[number];
 
-/** Defaults in days. `null` = never purge automatically. */
 export const RETENTION_DEFAULTS: Record<string, number | null> = {
   patient: 3650,
   gallery: 3650,
@@ -59,11 +39,9 @@ export function assertPurgeScope(scope: readonly string[]): PurgeScope[] {
   if (scope.length === 0) throw new RetentionError("scope must name at least one entity");
   const unknown = scope.filter((s) => !(PURGE_SCOPES as readonly string[]).includes(s));
   if (unknown.length > 0) throw new RetentionError(`unknown purge scope: ${unknown.join(", ")}`);
-  if (scope.includes("audit_log" as PurgeScope)) {
+  if (scope.includes("audit_log")) {
     throw new RetentionError("audit_log is append-only and can never be purged");
   }
-  // Destroying the patient row while its children survive would leave dangling
-  // clinical data — refuse the combination instead of half-doing it.
   if (scope.includes("patient")) {
     const required: PurgeScope[] = ["gallery", "analyses", "consents", "plans", "sessions", "ledger"];
     const missing = required.filter((r) => !scope.includes(r));
@@ -73,8 +51,6 @@ export function assertPurgeScope(scope: readonly string[]): PurgeScope[] {
   }
   return [...new Set(scope)] as PurgeScope[];
 }
-
-/* ── policies ──────────────────────────────────────────────────────── */
 
 export async function upsertRetentionPolicy(
   tx: Tx,
@@ -119,8 +95,6 @@ export async function resolveGraceDays(tx: Tx, clinicId: string): Promise<number
     .limit(1);
   return rows[0]?.graceDays ?? PURGE_GRACE_DAYS_DEFAULT;
 }
-
-/* ── request → approve → execute ────────────────────────────────────────── */
 
 export interface PurgeRequestInput {
   patientId: string;
@@ -229,11 +203,6 @@ export interface PurgeEvidence {
   executedAt: string;
 }
 
-/**
- * Destroy the data. Runs inside the caller's transaction so the deletes, the
- * orphan queue rows and the audit trail commit together — there is no window
- * where the row is gone but the object is not queued.
- */
 export async function executePurge(
   tx: Tx,
   clinicId: string,
@@ -250,13 +219,13 @@ export async function executePurge(
   if (!request) throw new RetentionError("purge request not found");
   if (request.state !== "approved") throw new RetentionError(`purge request must be approved (is '${request.state}')`);
   if (!opts.ignoreGrace) {
-    const executableAt = request.executableAt as Date | null;
+    const executableAt = request.executableAt;
     if (executableAt && executableAt.getTime() > Date.now()) {
       throw new RetentionError(`grace window has not elapsed (executable at ${executableAt.toISOString()})`);
     }
   }
 
-  const scope = assertPurgeScope(request.scope as string[]);
+  const scope = assertPurgeScope(request.scope);
   const patientId = request.patientId;
   const deleted: Record<string, number> = {};
   let objectsQueued = 0;
@@ -266,7 +235,6 @@ export async function executePurge(
       .select({ id: galleryItems.id, storageKey: galleryItems.storageKey, thumbKey: galleryItems.thumbKey })
       .from(galleryItems)
       .where(and(eq(galleryItems.clinicId, clinicId), eq(galleryItems.patientId, patientId)));
-    // Queue the objects BEFORE the rows go away — otherwise the keys are lost.
     objectsQueued += await enqueueStorageOrphans(
       tx,
       clinicId,
@@ -315,8 +283,6 @@ export async function executePurge(
   }
 
   if (scope.includes("ledger")) {
-    // The ledger replays mutations to every device; leaving a purged patient's
-    // rows there would resurrect them on the next pull.
     const removed = await tx.execute(sql`
       DELETE FROM mutations
        WHERE clinic_id = ${clinicId}
@@ -355,7 +321,6 @@ export async function executePurge(
     action: "purge.executed",
     entity: "purge_request",
     entityId: id,
-    // Counts and ids only — never the data that was destroyed.
     meta: { patientId, scope, deleted, objectsQueued },
   });
 

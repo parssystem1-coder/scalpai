@@ -85,7 +85,10 @@ export const ENGLISH_WEEKDAYS = [
  */
 export function toPersianDigits(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
-  return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+  // M19: indexing a string yields `string | undefined`, which String#replace
+  // will not accept as a callback result. Falling back to the matched digit
+  // means an unexpected match can never render the text "undefined".
+  return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)] ?? d);
 }
 
 /**
@@ -101,6 +104,9 @@ export function gregorianToJalali(
   let jy = gy <= 1600 ? 0 : 979;
   gy -= gy <= 1600 ? 621 : 1600;
   const gy2 = gm > 2 ? gy + 1 : gy;
+  // M19: `gm` is 1..12 for every caller (it comes from `wallClockIn`), so the
+  // guard is a type-level one and the table read below is always in range.
+  const cumulativeDaysBeforeMonth = g_d_m[gm - 1] ?? 0;
   let days =
     365 * gy +
     Math.floor((gy2 + 3) / 4) -
@@ -108,7 +114,7 @@ export function gregorianToJalali(
     Math.floor((gy2 + 399) / 400) -
     80 +
     gd +
-    g_d_m[gm - 1];
+    cumulativeDaysBeforeMonth;
   jy += 33 * Math.floor(days / 12053);
   days %= 12053;
   jy += 4 * Math.floor(days / 1461);
@@ -154,8 +160,13 @@ export function jalaliToGregorian(
   }
   const sal_a = [0, 31, (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let gm = 0;
-  while (gm < 13 && days >= sal_a[gm]) {
-    days -= sal_a[gm];
+  // M19: the original condition read `sal_a[gm]` twice per iteration under a
+  // `gm < 13` bound. Reading it once and breaking on an out-of-range index is
+  // the same loop, minus two `number | undefined` reads.
+  while (gm < 13) {
+    const monthDays = sal_a[gm];
+    if (monthDays === undefined || days < monthDays) break;
+    days -= monthDays;
     gm++;
   }
   return { year: gy, month: gm, day: days + 1 };

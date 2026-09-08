@@ -141,7 +141,7 @@ export function mergePlanLimits(
 }
 
 function rowsOf<T>(result: unknown): T[] {
-  return ((result as { rows?: T[] }).rows ?? []) as T[];
+  return ((result as { rows?: T[] }).rows ?? []);
 }
 
 /** First day of the clinic-local month — the period every counter is keyed by. */

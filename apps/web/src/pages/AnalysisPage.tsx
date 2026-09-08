@@ -30,16 +30,6 @@ const SCORE_LABELS: Array<{ key: keyof Scores }> = [
   { key: "densityProxy" },
 ];
 
-/**
- * Phase 10 (H13). Analysis runs on the device (§3), so the server can never
- * recompute the numbers it is asked to store. The client therefore has to say
- * WHAT it analysed and WITH WHAT: the sha256 of the exact RGBA buffer handed to
- * the engine, the buffer's geometry, and a reference to a registered model
- * manifest. The API verifies that reference against the platform registry.
- *
- * The non-diagnostic label is rendered as part of the RESULT, not as small print
- * elsewhere on the page, so a score can never appear without its scope.
- */
 function buildProvenance(imageData: ImageData): AnalysisProvenanceDto {
   const model = ANALYSIS_MODEL_REGISTRY[0]!;
   return {
@@ -99,7 +89,10 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
   useEffect(() => {
     if (startedRef.current || !viewUrlFromState) return;
     startedRef.current = true;
-    (async () => {
+    // M19: nothing awaits this bootstrap and every failure inside it already
+    // lands in setError, so the promise is discarded explicitly
+    // (no-floating-promises).
+    void (async () => {
       try {
         const t0 = performance.now();
         const res = await fetch(viewUrlFromState);
@@ -114,8 +107,6 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
         if (!ctx) throw new Error("canvas unavailable");
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        // Hash the SAME buffer the engine is about to read, before anything can
-        // touch it — a digest of a different buffer proves nothing.
         const prov = buildProvenance(imageData);
         const engine = createEngine();
         const out = await engine.analyze({
@@ -157,7 +148,6 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
       {scores && (
         <>
-          {/* H13: the scope of the result travels WITH the result. */}
           <p data-testid="non-diagnostic-label" style={{ background: "#FFF7E6", border: "1px solid #E6C067", padding: "8px 12px", borderRadius: 8 }}>
             {nonDiagnostic}
           </p>
@@ -166,10 +156,9 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
             {t("analysis.elapsed")} <strong data-testid="elapsed">{faNum(elapsedMs)}</strong> {t("analysis.msUnit")}
           </p>
           <ul style={{ listStyle: "none", padding: 0 }}>
-              {SCORE_LABELS.map(({ key }) => (
+            {SCORE_LABELS.map(({ key }) => (
               <li key={key}>
-                {t(`analysis.${key}`)}:{" "}
-                <strong data-testid={`score-${key}`}>{faNum(adjusted?.[key] ?? scores[key])}</strong> / {faNum(100)}
+                {t(`analysis.${key}`)}: <strong data-testid={`score-${key}`}>{faNum(adjusted?.[key] ?? scores[key])}</strong> / {faNum(100)}
               </li>
             ))}
           </ul>
@@ -179,16 +168,14 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
           {provenance && (
             <p style={{ fontSize: 12, color: "#6b6560", wordBreak: "break-all" }}>
-              <span data-testid="provenance-model">{provenance.model.id}@{provenance.model.version}</span>{" "}
-              · {provenance.pixelWidth}×{provenance.pixelHeight} ·{" "}
-              <code data-testid="provenance-digest">sha256:{provenance.imageSha256}</code>
+              <span data-testid="provenance-model">{provenance.model.id}@{provenance.model.version}</span> · {provenance.pixelWidth}×{provenance.pixelHeight} · <code data-testid="provenance-digest">sha256:{provenance.imageSha256}</code>
             </p>
           )}
 
           {!reviewDone ? (
             <section>
               <h2>{t("analysis.reviewTitle")}</h2>
-            {SCORE_LABELS.map(({ key }) => (
+              {SCORE_LABELS.map(({ key }) => (
                 <label key={key} style={{ display: "block" }}>
                   {t(`analysis.${key}`)}
                   <input

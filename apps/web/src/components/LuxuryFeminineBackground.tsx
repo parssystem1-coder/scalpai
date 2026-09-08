@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
+// noUncheckedIndexedAccess: typed as RGB tuples with an explicit fallback so the
+// `const [r, g, b] = p.color` destructuring below stays non-optional.
+const PARTICLE_COLORS: readonly (readonly [number, number, number])[] = [
+  [228, 160, 172], // Rose Petal
+  [212, 148, 156], // Rose Gold
+  [245, 222, 196], // Champagne Silk
+  [255, 240, 245], // Lavender Mist
+  [230, 190, 150], // Warm Amber
+];
+
 export default function LuxuryFeminineBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
@@ -44,13 +54,9 @@ export default function LuxuryFeminineBackground() {
       speedX: (Math.random() - 0.5) * 0.02,
       speedY: -0.015 - Math.random() * 0.035,
       opacity: 0.2 + Math.random() * 0.7,
-      color: [
-        [228, 160, 172], // Rose Petal
-        [212, 148, 156], // Rose Gold
-        [245, 222, 196], // Champagne Silk
-        [255, 240, 245], // Lavender Mist
-        [230, 190, 150], // Warm Amber
-      ][Math.floor(Math.random() * 5)],
+      color:
+        PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)] ??
+        ([228, 160, 172] as const),
       pulse: Math.random() * Math.PI * 2,
     }));
 

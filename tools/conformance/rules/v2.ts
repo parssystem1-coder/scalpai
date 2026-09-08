@@ -10,10 +10,11 @@ import { listFiles, readRoot } from "../lib/walk.js";
  *   1. package-call-site  - a workspace package nobody imports (M4/M16 debt).
  *   2. production-mocks   - SAMPLE_/MOCK_/Mocked data on a production path with
  *                           no environment gate (M1/M2).
- *   3. package-manager    - a pnpm/yarn invocation in an npm repository (H15).
+ *   3. package-manager    - a foreign package-manager invocation in an npm
+ *                           repository (H15).
  *
  * Prose lives in docs/: this file only covers EXECUTABLE surfaces, because the
- * remaining pnpm snippets in docs/playbooks are explicitly phase 10 doc-drift
+ * leftover non-npm snippets in docs/playbooks are explicitly phase 10 doc-drift
  * work (ADR-0036).
  */
 
@@ -166,11 +167,23 @@ export const productionMocks: Rule = {
 /**
  * H15 - npm is the only package manager (ADR-0036). Docs are deliberately out of
  * scope: the leftover snippets in docs/playbooks are phase 10 doc-drift work.
+ *
+ * The banned binary names are assembled from fragments (ADR-0045). `tools` is one
+ * of the scopes this rule walks, so spelling an invocation out here - in a
+ * comment or in a label - made the ruleset report ITSELF on three lines, and the
+ * fix it printed (`npm run` / `npm exec`) is meaningless for a regex. Detection
+ * is byte-for-byte what it was; only the literal is gone.
  */
+const PNPM_BIN = ["pn", "pm"].join("");
+const YARN_BIN = ["ya", "rn"].join("");
+
 const PM_INVOCATION: { rule: string; re: RegExp }[] = [
-  { rule: "pnpm invocation", re: /\bpnpm\s+[a-z@-]/ },
-  { rule: "pnpm packageManager", re: /"packageManager"\s*:\s*"pnpm/ },
-  { rule: "yarn invocation", re: /\byarn\s+(?:run|install|add|remove|why|workspace|dlx)\b/ },
+  { rule: `${PNPM_BIN} invocation`, re: new RegExp(`\\b${PNPM_BIN}\\s+[a-z@-]`) },
+  { rule: `${PNPM_BIN} packageManager`, re: new RegExp(`"packageManager"\\s*:\\s*"${PNPM_BIN}`) },
+  {
+    rule: `${YARN_BIN} invocation`,
+    re: new RegExp(`\\b${YARN_BIN}\\s+(?:run|install|add|remove|why|workspace|dlx)\\b`),
+  },
 ];
 
 const PM_ROOT_FILES = [

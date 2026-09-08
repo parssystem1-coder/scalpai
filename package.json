@@ -8,7 +8,8 @@
     "dev": "npm run dev --workspace=@scalpai/app-web",
     "build": "npm exec -- turbo run build",
     "build:vercel": "npm exec -- turbo run build --filter=@scalpai/app-web... && rm -rf dist && cp -r apps/web/dist dist",
-    "typecheck": "npm exec -- turbo run typecheck",
+    "typecheck": "npm exec -- turbo run typecheck && npm run typecheck:repo",
+    "typecheck:repo": "tsc --noEmit -p tsconfig.repo.json",
     "lint": "eslint .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -38,8 +39,10 @@
     "@swc/core": "^1.16.1",
     "@testing-library/dom": "^10.4.1",
     "@types/node": "^26.3.0",
-    "@types/three": "^0.185.4",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.9.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
@@ -49,13 +52,6 @@
     "typescript-eslint": "^8.68.0",
     "unplugin-swc": "^1.5.11",
     "vitest": "^4.1.11"
-  },
-  "dependencies": {
-    "@vitest/coverage-v8": "^4.1.11",
-    "lucide-react": "^1.37.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "three": "^0.185.1"
   },
   "workspaces": [
     "apps/*",

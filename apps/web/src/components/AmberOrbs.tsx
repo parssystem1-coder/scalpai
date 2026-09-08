@@ -33,7 +33,10 @@ export const AmberOrbs: React.FC = () => {
       const normY = mouseY - window.innerHeight / 2;
 
       orbs?.forEach((el, idx) => {
+        // noUncheckedIndexedAccess: the DOM nodes are rendered from ORB_CONFIGS,
+        // so indexes always line up; the guard is defensive only.
         const cfg = ORB_CONFIGS[idx];
+        if (!cfg) return;
         const waveY = Math.sin(time * cfg.speedY + cfg.phase) * cfg.ampY + Math.cos(time * cfg.speedY * 0.5) * (cfg.ampY * 0.35);
         const waveX = Math.cos(time * cfg.speedX + cfg.phase) * cfg.ampX + Math.sin(time * cfg.speedX * 0.7) * (cfg.ampX * 0.3);
         const breathScale = 1 + Math.sin(time * cfg.speedY * 0.8 + cfg.phase) * 0.045;

@@ -30,6 +30,10 @@ export const SignInForm: React.FC<SignInFormProps> = ({
     },
   });
 
+  // M19: handleSubmit() returns a promise-returning handler where the DOM expects
+  // a void one — discard it explicitly (no-misused-promises).
+  const submit = handleSubmit(onSubmit);
+
   return (
     <div className="animate-fadeIn">
       <h1 className="font-serif text-3xl font-normal mb-1">Welcome Back</h1>
@@ -37,7 +41,13 @@ export const SignInForm: React.FC<SignInFormProps> = ({
         Sign in to your active professional scalp suite
       </p>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5" noValidate>
+      <form
+        onSubmit={(e) => {
+          void submit(e);
+        }}
+        className="space-y-3.5"
+        noValidate
+      >
         <div>
           <div className="relative">
             <input

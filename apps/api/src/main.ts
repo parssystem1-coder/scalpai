@@ -90,7 +90,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: false }));
   app.setGlobalPrefix("/api/v1");
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors(buildCorsOptions());
+  app.enableCors(buildCorsOptions() as Parameters<typeof app.enableCors>[0]);
   await registerSecurityHeaders(app);
   app.enableShutdownHooks();
   installShutdownHandlers(app);
@@ -108,7 +108,9 @@ async function bootstrap(): Promise<void> {
   const staticRoot = candidateStaticRoots.find((dir) => existsSync(dir));
   if (staticRoot) {
     logEvent("info", { event: "web.static_root", path: staticRoot });
-    await app.useStaticAssets({ root: staticRoot, prefix: "/", decorateReply: false });
+    // M19: useStaticAssets() is synchronous and returns the app instance — there
+    // is nothing to await here (await-thenable).
+    app.useStaticAssets({ root: staticRoot, prefix: "/", decorateReply: false });
   }
 
   const port = resolvePort();

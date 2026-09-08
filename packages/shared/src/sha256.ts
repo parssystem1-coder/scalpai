@@ -10,6 +10,13 @@
  *
  * It is deliberately NOT used for anything security-critical on the server side:
  * signing and sealing stay in `@scalpai/db` on top of `node:crypto`.
+ *
+ * M19 / `noUncheckedIndexedAccess`: every read from `K`, `w` and `H` below is
+ * typed `number | undefined`. FIPS 180-4 bounds all of them at compile time (the
+ * schedule is 0..63 over a 64-entry array, `K` is 64 constants, `H` is 8), so
+ * they are asserted rather than defaulted: a `?? 0` fallback would add a branch
+ * per round to the hottest loop in the codebase, and if it ever did fire it
+ * would silently return a WRONG digest instead of failing.
  */
 
 const K = [
@@ -47,24 +54,27 @@ export function sha256Hex(bytes: Uint8Array | Uint8ClampedArray): string {
   for (let off = 0; off < total; off += 64) {
     for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4, false);
     for (let i = 16; i < 64; i++) {
-      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+      // Hoisted: each neighbour was read three times.
+      const w15 = w[i - 15]!;
+      const w2 = w[i - 2]!;
+      const s0 = rotr(w15, 7) ^ rotr(w15, 18) ^ (w15 >>> 3);
+      const s1 = rotr(w2, 17) ^ rotr(w2, 19) ^ (w2 >>> 10);
+      w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
     }
 
-    let a = H[0];
-    let b = H[1];
-    let c = H[2];
-    let d = H[3];
-    let e = H[4];
-    let f = H[5];
-    let g = H[6];
-    let h = H[7];
+    let a = H[0]!;
+    let b = H[1]!;
+    let c = H[2]!;
+    let d = H[3]!;
+    let e = H[4]!;
+    let f = H[5]!;
+    let g = H[6]!;
+    let h = H[7]!;
 
     for (let i = 0; i < 64; i++) {
       const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
       const ch = (e & f) ^ (~e & g);
-      const t1 = (h + S1 + ch + K[i] + w[i]) >>> 0;
+      const t1 = (h + S1 + ch + K[i]! + w[i]!) >>> 0;
       const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
       const maj = (a & b) ^ (a & c) ^ (b & c);
       const t2 = (S0 + maj) >>> 0;
@@ -78,18 +88,18 @@ export function sha256Hex(bytes: Uint8Array | Uint8ClampedArray): string {
       a = (t1 + t2) >>> 0;
     }
 
-    H[0] = (H[0] + a) >>> 0;
-    H[1] = (H[1] + b) >>> 0;
-    H[2] = (H[2] + c) >>> 0;
-    H[3] = (H[3] + d) >>> 0;
-    H[4] = (H[4] + e) >>> 0;
-    H[5] = (H[5] + f) >>> 0;
-    H[6] = (H[6] + g) >>> 0;
-    H[7] = (H[7] + h) >>> 0;
+    H[0] = (H[0]! + a) >>> 0;
+    H[1] = (H[1]! + b) >>> 0;
+    H[2] = (H[2]! + c) >>> 0;
+    H[3] = (H[3]! + d) >>> 0;
+    H[4] = (H[4]! + e) >>> 0;
+    H[5] = (H[5]! + f) >>> 0;
+    H[6] = (H[6]! + g) >>> 0;
+    H[7] = (H[7]! + h) >>> 0;
   }
 
   let out = "";
-  for (let i = 0; i < 8; i++) out += H[i].toString(16).padStart(8, "0");
+  for (let i = 0; i < 8; i++) out += H[i]!.toString(16).padStart(8, "0");
   return out;
 }
 

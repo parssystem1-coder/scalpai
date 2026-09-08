@@ -100,14 +100,14 @@ export async function upsertPlan(tx: Tx, input: PlanUpsertInput): Promise<void> 
     .insert(plans)
     .values({
       code: input.code,
-      name: input.name as object,
+      name: input.name,
       price: input.price,
       interval: input.interval,
       limits: input.limits,
     })
     .onConflictDoUpdate({
       target: plans.code,
-      set: { name: input.name as object, price: input.price, interval: input.interval, limits: input.limits },
+      set: { name: input.name, price: input.price, interval: input.interval, limits: input.limits },
     });
   await tx.delete(planFeatures).where(eq(planFeatures.planCode, input.code));
   if (input.features.length > 0) {

@@ -268,7 +268,12 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
           {/* Form */}
           <form
-            onSubmit={onSubmit}
+            // M19: handleSubmit() hands back a promise-returning handler and the DOM
+            // onSubmit contract is void — discard it explicitly
+            // (no-misused-promises). Failures are already caught into serverError.
+            onSubmit={(e) => {
+              void onSubmit(e);
+            }}
             noValidate
             data-testid="login-form"
             style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}

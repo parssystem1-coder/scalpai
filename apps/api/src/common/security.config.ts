@@ -1,5 +1,3 @@
-import type { INestApplication } from "@nestjs/common";
-
 /**
  * Boot-time security configuration (WEAKNESSES C7/R2 + H1).
  *
@@ -8,7 +6,31 @@ import type { INestApplication } from "@nestjs/common";
  * `NODE_ENV !== "production"` escape hatch left in the CORS path.
  */
 
-export type CorsOptions = Parameters<INestApplication["enableCors"]>[0];
+/**
+ * The CORS option bag we hand to Nest.
+ *
+ * Phase 10 (M19): this used to be `Parameters<INestApplication["enableCors"]>[0]`,
+ * which resolves to a union containing `CorsOptionsDelegate<any>` — so every
+ * `enableCors(buildCorsOptions())` call site was a no-unsafe-argument error even
+ * though this module never writes `any` itself. Declaring the bag structurally
+ * keeps the call sites fully typed and still assignable to Nest's own
+ * CorsOptions.
+ */
+export interface CorsOptions {
+  origin?:
+    | boolean
+    | string
+    | RegExp
+    | (string | RegExp)[]
+    | ((requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => void);
+  methods?: string | string[];
+  allowedHeaders?: string | string[];
+  exposedHeaders?: string | string[];
+  credentials?: boolean;
+  maxAge?: number;
+  preflightContinue?: boolean;
+  optionsSuccessStatus?: number;
+}
 
 /** Localhost origins the dev/test tooling actually uses (never applied in production). */
 const DEV_ORIGINS = [
@@ -84,7 +106,7 @@ export function buildCorsOptions(): CorsOptions {
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ALLOWED_HEADERS,
     maxAge: 600,
-  } as CorsOptions;
+  };
 }
 
 /** Refresh cookies are Secure everywhere except explicit local http development. */

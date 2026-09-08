@@ -53,8 +53,14 @@ export function measureQuality(img: GrayImage): QualityMetrics {
     throw new Error("image too small for quality analysis");
   }
 
+  // M19 / `noUncheckedIndexedAccess`: every `data[i]` is typed `number |
+  // undefined`. Each index below is provably in range — this loop is bounded by
+  // `data.length`, and the loop further down only walks the interior of the
+  // plane, whose existence the `minDimension` guard above proves. The `?? 0`
+  // fallbacks are type-level guards that cannot be reached at runtime, so the
+  // reported metrics are unchanged.
   let sum = 0;
-  for (let i = 0; i < data.length; i++) sum += data[i];
+  for (let i = 0; i < data.length; i++) sum += data[i] ?? 0;
   const brightnessMean = sum / data.length;
 
   // Laplacian (4-neighbourhood) over the interior; variance of response.
@@ -67,12 +73,18 @@ export function measureQuality(img: GrayImage): QualityMetrics {
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const i = y * width + x;
-      const lap = 4 * data[i] - data[i - 1] - data[i + 1] - data[i - width] - data[i + width];
+      // Read each neighbour once; the Laplacian and the gradient share them.
+      const center = data[i] ?? 0;
+      const left = data[i - 1] ?? 0;
+      const right = data[i + 1] ?? 0;
+      const up = data[i - width] ?? 0;
+      const down = data[i + width] ?? 0;
+      const lap = 4 * center - left - right - up - down;
       lapSum += lap;
       lapSqSum += lap * lap;
       lapCount++;
-      const gx = data[i + 1] - data[i - 1];
-      const gy = data[i + width] - data[i - width];
+      const gx = right - left;
+      const gy = down - up;
       if (Math.hypot(gx, gy) > 24) edgePixels++;
       gradCount++;
     }

@@ -132,7 +132,7 @@ function boundedStream(source: Readable, maxBytes: number): Readable {
       done(null, chunk);
     },
   });
-  source.on("error", (err) => limiter.destroy(err as Error));
+  source.on("error", (err) => limiter.destroy(err));
   return source.pipe(limiter);
 }
 
@@ -482,10 +482,7 @@ export class StorageService implements OnModuleInit {
       const walk = async (dir: string): Promise<void> => {
         let entries: Array<{ name: string; isDirectory(): boolean }>;
         try {
-          entries = (await readdir(dir, { withFileTypes: true })) as unknown as Array<{
-            name: string;
-            isDirectory(): boolean;
-          }>;
+          entries = await readdir(dir, { withFileTypes: true });
         } catch {
           return; // clinic has no objects yet
         }

@@ -65,7 +65,7 @@ export default function DigitalConsentModal({
           templateVersion: payload.templateVersion,
           signaturePayload: payload.signaturePayload,
           signedAt: new Date().toISOString(),
-        } as ConsentRecord;
+        };
       }
       return apiFetch<ConsentRecord>(`/patients/${patientId}/consents`, {
         method: "POST",
@@ -121,15 +121,24 @@ export default function DigitalConsentModal({
     <div
       id="consent-modal-overlay"
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-md animate-in fade-in duration-200"
+      role="button"
+      tabIndex={0}
+      aria-label="بستن پنجره رضایت‌نامه"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClose();
+        }
       }}
     >
       <div
         id="consent-modal-container"
         className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/80 bg-white/95 backdrop-blur-2xl text-[oklch(20%_0.02_20)] shadow-2xl"
       >
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-black/5 bg-white/60 px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-[oklch(20%_0.02_20)]">
@@ -148,8 +157,6 @@ export default function DigitalConsentModal({
             ✕
           </button>
         </div>
-
-        {/* Tab switcher */}
         <div className="flex border-b border-black/5 bg-stone-50/50 px-6 pt-2">
           <button
             id="tab-new-consent"
@@ -176,12 +183,9 @@ export default function DigitalConsentModal({
             تاریخچه رضایت‌نامه‌ها ({historyList.length})
           </button>
         </div>
-
-        {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === "new" ? (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Clinical Clauses */}
               <div className="rounded-2xl border border-[oklch(62%_0.09_16/0.2)] bg-rose-50/40 p-4 text-sm leading-relaxed text-[oklch(25%_0.02_20)]">
                 <div className="mb-2 font-bold text-[oklch(20%_0.02_20)]">
                   مفاد رضایت‌آگاهانه خدمات تریکولوژی و تصویربرداری درماتوسکوپی:
@@ -191,17 +195,15 @@ export default function DigitalConsentModal({
                     اینجانب رضایت خود را جهت انجام تصویربرداری ماکرو و درماتوسکوپی دیجیتال از پوست سر و ساقه مو اعلام می‌دارم.
                   </li>
                   <li>
-                    موافقت می‌نمایم داده‌های تصویربرداری جهت پایش روند درمان و آنالیز شدت علائم بالینی (تراکم، قرمزی و پوسته‌ریزی) با حفظ کامل حریم خصوصی پردازش گردند.
+                    موافقت می‌نمایم داده‌های تصویربرداری جهت پایش روند درمان و آنالیز شدت علائم بالینی (تراکم، قرمزی و پوسته‌ریزی) با حفط کامل حریم خصوصی پردازش گردند.
                   </li>
                   <li>
                     از برنامه‌های مراقبتی، توصیه‌های بهداشتی و پروتکل‌های پیگیری کلینیک مطلع شده‌ام.
                   </li>
                 </ul>
               </div>
-
-              {/* Checkboxes */}
               <div className="space-y-2.5 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 text-xs font-medium text-[oklch(25%_0.02_20)]">
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-photo">
                   <input
                     id="consent-check-photo"
                     type="checkbox"
@@ -211,8 +213,7 @@ export default function DigitalConsentModal({
                   />
                   <span>تایید رضایت تصویربرداری تشخیصی تریکوسکوپی و ثبت در پرونده</span>
                 </label>
-
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-ai">
                   <input
                     id="consent-check-ai"
                     type="checkbox"
@@ -222,8 +223,7 @@ export default function DigitalConsentModal({
                   />
                   <span>موافقت با تحلیل کمکی الگوهای پوست سر و پردازش شاخص‌های تریکولوژی</span>
                 </label>
-
-                <label className="flex cursor-pointer items-center gap-2.5">
+                <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-privacy">
                   <input
                     id="consent-check-privacy"
                     type="checkbox"
@@ -234,8 +234,6 @@ export default function DigitalConsentModal({
                   <span>تایید صحت اطلاعات شناسنامه‌ای و آگاهی از شرایط محرمانگی داده‌ها</span>
                 </label>
               </div>
-
-              {/* Signature Canvas Area */}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
@@ -254,8 +252,6 @@ export default function DigitalConsentModal({
                   <SignatureCanvas ref={signatureRef} id="patient-touch-signature" />
                 </div>
               </div>
-
-              {/* Status messages */}
               {errorMsg && (
                 <div id="consent-error-box" className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-800" role="alert">
                   {errorMsg}
@@ -266,8 +262,6 @@ export default function DigitalConsentModal({
                   {successMsg}
                 </div>
               )}
-
-              {/* Submit button */}
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -287,7 +281,6 @@ export default function DigitalConsentModal({
               </div>
             </form>
           ) : (
-            /* History Tab */
             <div className="space-y-4">
               {consentsQuery.isLoading ? (
                 <p className="text-center text-xs text-stone-500">{t("common.loading")}</p>
@@ -314,7 +307,6 @@ export default function DigitalConsentModal({
                         زمان ثبت: {new Date(c.signedAt).toLocaleString("fa-IR")}
                       </p>
                     </div>
-
                     {c.signaturePayload ? (
                       <div className="flex flex-col sm:flex-row items-center gap-3">
                         <div className="flex flex-col items-center">
@@ -342,7 +334,6 @@ export default function DigitalConsentModal({
           )}
         </div>
       </div>
-
       {selectedCertConsent && (
         <ConsentCertificateModal
           consent={selectedCertConsent}

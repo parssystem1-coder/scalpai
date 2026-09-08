@@ -68,7 +68,8 @@ export class LicenseService {
     }
 
     const [header, payload, signature] = parts as [string, string, string];
-    let signatureOk = false;
+    // M19: assigned on both paths below, so an initialiser here would be dead.
+    let signatureOk: boolean;
     try {
       signatureOk = verifySignature(
         null,

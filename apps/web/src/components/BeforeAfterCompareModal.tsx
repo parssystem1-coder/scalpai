@@ -49,7 +49,7 @@ export default function BeforeAfterCompareModal({
 }: BeforeAfterCompareModalProps) {
   const [photoAId, setPhotoAId] = useState<string>("");
   const [photoBId, setPhotoBId] = useState<string>("");
-  const [sliderPosition, setSliderPosition] = useState<number>(50); // percentage 0 to 100
+  const [sliderPosition, setSliderPosition] = useState<number>(50);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"split" | "side_by_side">("split");
   const [filterArea, setFilterArea] = useState<string>("all");
@@ -57,9 +57,10 @@ export default function BeforeAfterCompareModal({
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize selected photos
   useEffect(() => {
     if (!isOpen) return;
+    const firstPhoto = photos[0];
+    const secondPhoto = photos[1];
 
     if (photos.length >= 2) {
       const pA = defaultPhotoIdA
@@ -67,26 +68,29 @@ export default function BeforeAfterCompareModal({
         : photos[photos.length - 1];
       const pB = defaultPhotoIdB
         ? photos.find((p) => p.id === defaultPhotoIdB)
-        : photos[0];
+        : firstPhoto;
 
-      setPhotoAId(pA?.id || photos[0].id);
-      setPhotoBId(pB?.id || (photos[1] ? photos[1].id : photos[0].id));
+      setPhotoAId(pA?.id ?? firstPhoto?.id ?? "");
+      setPhotoBId(pB?.id ?? secondPhoto?.id ?? firstPhoto?.id ?? "");
     } else if (photos.length === 1) {
-      setPhotoAId(photos[0].id);
-      setPhotoBId(photos[0].id);
+      setPhotoAId(firstPhoto?.id ?? "");
+      setPhotoBId(firstPhoto?.id ?? "");
     }
   }, [isOpen, photos, defaultPhotoIdA, defaultPhotoIdB]);
 
   const photoA = photos.find((p) => p.id === photoAId) || photos[0];
   const photoB = photos.find((p) => p.id === photoBId) || photos[1] || photos[0];
 
-  // Dragging slider logic
   const handleMove = (clientX: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = clientX - rect.left;
     const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
     setSliderPosition(percentage);
+  };
+
+  const nudgeSlider = (delta: number) => {
+    setSliderPosition((prev) => Math.max(0, Math.min(100, prev + delta)));
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -96,7 +100,9 @@ export default function BeforeAfterCompareModal({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
-    handleMove(e.touches[0].clientX);
+    const touch = e.touches[0];
+    if (!touch) return;
+    handleMove(touch.clientX);
   };
 
   const stopDragging = () => setIsDragging(false);
@@ -116,31 +122,26 @@ export default function BeforeAfterCompareModal({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Dark luxury background
-      ctx.fillStyle = "#0c0a09"; // stone-950
+      ctx.fillStyle = "#0c0a09";
       ctx.fillRect(0, 0, 1200, 760);
 
-      // Gold/Cyan luxury border
-      ctx.strokeStyle = "#0891b2"; // cyan-600
+      ctx.strokeStyle = "#0891b2";
       ctx.lineWidth = 4;
       ctx.strokeRect(16, 16, 1168, 728);
 
-      // Inner subtle border
       ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
       ctx.lineWidth = 1;
       ctx.strokeRect(24, 24, 1152, 712);
 
-      // Header Banner
       ctx.fillStyle = "#1c1917";
       ctx.fillRect(25, 25, 1150, 90);
 
-      // Header text
-      ctx.fillStyle = "#f59e0b"; // amber-500
+      ctx.fillStyle = "#f59e0b";
       ctx.font = "bold 22px system-ui, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText("ScalpAI Trichology • کارنامه بالینی مقایسه تریکوسکوپی", 1140, 60);
 
-      ctx.fillStyle = "#a8a29e"; // stone-400
+      ctx.fillStyle = "#a8a29e";
       ctx.font = "14px system-ui, sans-serif";
       ctx.fillText(
         `بیمار: ${patientName}  |  ناحیه: ${AREA_LABELS[photoA.area] || photoA.area}  |  تاریخ صدور: ${new Date().toLocaleDateString("fa-IR")}`,
@@ -148,7 +149,6 @@ export default function BeforeAfterCompareModal({
         90
       );
 
-      // Optical verification badge on top left
       ctx.textAlign = "left";
       ctx.fillStyle = "#06b6d4";
       ctx.font = "bold 13px monospace";
@@ -157,13 +157,12 @@ export default function BeforeAfterCompareModal({
       ctx.font = "12px monospace";
       ctx.fillText("CALIBRATED OPTICAL RESOLUTION: 0.1mm GRID", 50, 88);
 
-      // Helper to load image
       const loadImage = (url: string): Promise<HTMLImageElement> => {
         return new Promise((resolve, reject) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => resolve(img);
-          img.onerror = () => reject();
+          img.onerror = () => reject(new Error(`Failed to load comparison image: ${url}`));
           img.src = url;
         });
       };
@@ -177,7 +176,6 @@ export default function BeforeAfterCompareModal({
       const boxHeight = 420;
       const boxY = 135;
 
-      // Draw Photo A frame (Left)
       const boxAX = 50;
       ctx.fillStyle = "#171717";
       ctx.fillRect(boxAX, boxY, boxWidth, boxHeight);
@@ -188,10 +186,9 @@ export default function BeforeAfterCompareModal({
       ctx.lineWidth = 2;
       ctx.strokeRect(boxAX, boxY, boxWidth, boxHeight);
 
-      // Photo A label banner
       ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
       ctx.fillRect(boxAX, boxY, boxWidth, 42);
-      ctx.fillStyle = "#fde68a"; // amber-200
+      ctx.fillStyle = "#fde68a";
       ctx.font = "bold 15px system-ui, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(`فریم پایه (قبل / Baseline) • ${photoA.date}`, boxAX + boxWidth - 15, boxY + 27);
@@ -200,7 +197,6 @@ export default function BeforeAfterCompareModal({
       ctx.font = "bold 13px monospace";
       ctx.fillText(`تراکم: ${photoA.density} تار/cm²`, boxAX + 15, boxY + 27);
 
-      // Draw Photo B frame (Right)
       const boxBX = 620;
       ctx.fillStyle = "#171717";
       ctx.fillRect(boxBX, boxY, boxWidth, boxHeight);
@@ -211,10 +207,9 @@ export default function BeforeAfterCompareModal({
       ctx.lineWidth = 2;
       ctx.strokeRect(boxBX, boxY, boxWidth, boxHeight);
 
-      // Photo B label banner
       ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
       ctx.fillRect(boxBX, boxY, boxWidth, 42);
-      ctx.fillStyle = "#a7f3d0"; // emerald-200
+      ctx.fillStyle = "#a7f3d0";
       ctx.font = "bold 15px system-ui, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(`فریم پیگیری (بعد / Follow-up) • ${photoB.date}`, boxBX + boxWidth - 15, boxY + 27);
@@ -223,14 +218,12 @@ export default function BeforeAfterCompareModal({
       ctx.font = "bold 13px monospace";
       ctx.fillText(`تراکم: ${photoB.density} تار/cm²`, boxBX + 15, boxY + 27);
 
-      // Bottom Comparison Analytics Ribbon
       const ribbonY = 575;
       ctx.fillStyle = "#1c1917";
       ctx.fillRect(50, ribbonY, 1100, 130);
       ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
       ctx.strokeRect(50, ribbonY, 1100, 130);
 
-      // Delta metric text
       ctx.textAlign = "right";
       ctx.fillStyle = "#e7e5e4";
       ctx.font = "bold 15px system-ui, sans-serif";
@@ -245,13 +238,12 @@ export default function BeforeAfterCompareModal({
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillText(
         densityDelta >= 0
-          ? "روند رشد فولیکولی مثبت و افزایش موهای ترمینال در پی دوره درمانی مشاهده شد."
+          ? "روند رشد فولیکولی مبت و افزایش موهای ترمینال در پی دوره درمانی مشاهده شد."
           : "کاهش یا عدم تغییر محسوس تراکم موضعی • نیازمند بررسی رژیم ماینوکسیدیل و تغذیه پاپیلاری.",
         1120,
         ribbonY + 105
       );
 
-      // Left stats on ribbon
       ctx.textAlign = "left";
       ctx.fillStyle = "#78716c";
       ctx.font = "12px monospace";
@@ -262,7 +254,6 @@ export default function BeforeAfterCompareModal({
         ctx.fillText(`CLINICAL SIGNS: ${photoB.tags.join(" • ")}`, 70, ribbonY + 88);
       }
 
-      // Trigger download
       const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       const safeName = patientName.replace(/\s+/g, "_");
@@ -281,6 +272,11 @@ export default function BeforeAfterCompareModal({
     }
   };
 
+  // M19: wrap async handler with void (line 37, 58, 110)
+  const exportComparisonCard = () => {
+    void handleExportComparisonCard();
+  };
+
   useEffect(() => {
     const handleGlobalMouseUp = () => setIsDragging(false);
     window.addEventListener("mouseup", handleGlobalMouseUp);
@@ -289,7 +285,6 @@ export default function BeforeAfterCompareModal({
 
   if (!isOpen) return null;
 
-  // Calculate delta metrics if density values exist
   const densityDelta =
     photoA && photoB ? photoB.density - photoA.density : 0;
   const densityPercentChange =
@@ -306,14 +301,23 @@ export default function BeforeAfterCompareModal({
     <div
       id="before-after-modal-backdrop"
       className="fixed inset-0 z-[85] flex items-center justify-center bg-black/90 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-y-auto"
+      role="button"
+      tabIndex={0}
+      aria-label="پایان جابجایی نشانگر مقایسه"
       onMouseUp={stopDragging}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          stopDragging();
+        }
+      }}
     >
       <div
         id="before-after-container"
         className="relative my-auto w-full max-w-5xl rounded-3xl bg-stone-950 text-stone-100 shadow-2xl border border-stone-800 flex flex-col max-h-[96vh] overflow-hidden"
         dir="rtl"
       >
-        {/* Header */}
         <div className="flex flex-wrap items-center justify-between px-6 py-4 bg-stone-900/90 border-b border-stone-800 gap-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-cyan-950 border border-cyan-800 flex items-center justify-center text-cyan-400">
@@ -333,9 +337,7 @@ export default function BeforeAfterCompareModal({
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
-            {/* View Mode Toggle */}
             <div className="flex items-center bg-stone-800/80 p-1 rounded-xl border border-stone-700 text-xs">
               <button
                 type="button"
@@ -362,8 +364,6 @@ export default function BeforeAfterCompareModal({
                 <span>موازی (Side-by-Side)</span>
               </button>
             </div>
-
-            {/* Zoom Controls */}
             <div className="flex items-center gap-1 bg-stone-800/80 p-1 rounded-xl border border-stone-700 text-xs">
               <button
                 type="button"
@@ -374,11 +374,9 @@ export default function BeforeAfterCompareModal({
                 {zoomLevel}x
               </button>
             </div>
-
-            {/* Export Card Button */}
             <button
               type="button"
-              onClick={handleExportComparisonCard}
+              onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               title="صدور کارنامه تصویری قبل و بعد برای تحویل به بیمار یا چاپ"
@@ -386,7 +384,6 @@ export default function BeforeAfterCompareModal({
               <Download className="w-3.5 h-3.5 text-amber-200" />
               <span>{isExporting ? "در حال صدور..." : "صدور کارت مقایسه"}</span>
             </button>
-
             <button
               type="button"
               onClick={onClose}
@@ -396,8 +393,6 @@ export default function BeforeAfterCompareModal({
             </button>
           </div>
         </div>
-
-        {/* Export Feedback Banner */}
         {exportFeedback && (
           <div className="px-6 py-2.5 bg-emerald-950/90 border-b border-emerald-800 text-emerald-300 text-xs font-bold flex items-center justify-between animate-in fade-in duration-200">
             <div className="flex items-center gap-2">
@@ -413,11 +408,8 @@ export default function BeforeAfterCompareModal({
             </button>
           </div>
         )}
-
-        {/* Photo Selection Ribbon */}
         <div className="px-6 py-3 bg-stone-900/50 border-b border-stone-800 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
           <div className="flex flex-wrap items-center gap-4 flex-1">
-            {/* Select Image A (قبل) */}
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-stone-800 text-amber-300 border border-amber-500/30 font-bold text-[11px]">
                 فریم اول (قبل / Baseline):
@@ -434,10 +426,7 @@ export default function BeforeAfterCompareModal({
                 ))}
               </select>
             </div>
-
             <ArrowRight className="w-4 h-4 text-stone-500 hidden md:block" />
-
-            {/* Select Image B (بعد) */}
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-stone-800 text-emerald-300 border border-emerald-500/30 font-bold text-[11px]">
                 فریم دوم (بعد / Follow-up):
@@ -455,8 +444,6 @@ export default function BeforeAfterCompareModal({
               </select>
             </div>
           </div>
-
-          {/* Area filter */}
           <div className="flex items-center gap-1.5 text-stone-400">
             <span>فیلتر ناحیه:</span>
             <select
@@ -472,8 +459,6 @@ export default function BeforeAfterCompareModal({
             </select>
           </div>
         </div>
-
-        {/* Delta Clinical Metrics Bar */}
         <div className="px-6 py-2.5 bg-cyan-950/25 border-b border-cyan-900/40 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
@@ -493,14 +478,12 @@ export default function BeforeAfterCompareModal({
                 ({densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}٪)
               </span>
             </div>
-
             <div className="flex items-center gap-2 text-stone-400">
               <span>ضخامت کالیبر:</span>
               <span className="font-mono text-stone-200">
                 {photoA?.thickness} ← {photoB?.thickness}
               </span>
             </div>
-
             <div className="flex items-center gap-2 text-stone-400 hidden sm:flex">
               <span>فاصله پایش:</span>
               <span className="text-stone-200 font-mono">
@@ -508,18 +491,17 @@ export default function BeforeAfterCompareModal({
               </span>
             </div>
           </div>
-
           <div className="text-[11px] font-mono text-cyan-400/90 bg-stone-900/80 px-2.5 py-1 rounded-lg border border-cyan-800/50">
             CALIBRATED OPTICAL REGISTRATION: PASS
           </div>
         </div>
-
-        {/* Main Visual Comparison Stage */}
         <div className="p-4 md:p-6 flex-1 flex flex-col justify-center items-center overflow-hidden bg-black/60">
           {viewMode === "split" ? (
-            /* Mode 1: Interactive Split Slider */
             <div
               ref={containerRef}
+              role="button"
+              tabIndex={0}
+              aria-label="نشانگر مقایسه قبل و بعد - با کلیدهای جهتنما جابجا کنید"
               className="relative w-full max-w-3xl aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-stone-800 bg-black cursor-ew-resize select-none"
               onMouseDown={(e) => {
                 setIsDragging(true);
@@ -528,11 +510,29 @@ export default function BeforeAfterCompareModal({
               onMouseMove={handleMouseMove}
               onTouchStart={(e) => {
                 setIsDragging(true);
-                handleMove(e.touches[0].clientX);
+                const touch = e.touches[0];
+                if (touch) handleMove(touch.clientX);
               }}
               onTouchMove={handleTouchMove}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  nudgeSlider(-5);
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  nudgeSlider(5);
+                } else if (e.key === "Home") {
+                  e.preventDefault();
+                  setSliderPosition(0);
+                } else if (e.key === "End") {
+                  e.preventDefault();
+                  setSliderPosition(100);
+                } else if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSliderPosition(50);
+                }
+              }}
             >
-              {/* Image B (Underneath / Full / After) */}
               <img
                 src={photoB?.url || photoA?.url}
                 alt="After"
@@ -540,8 +540,6 @@ export default function BeforeAfterCompareModal({
                 style={{ transform: `scale(${zoomLevel})` }}
                 draggable={false}
               />
-
-              {/* Image A (Clipped Overlay / Before) */}
               <div
                 className="absolute inset-0 overflow-hidden"
                 style={{
@@ -556,8 +554,6 @@ export default function BeforeAfterCompareModal({
                   draggable={false}
                 />
               </div>
-
-              {/* Split Line & Handle */}
               <div
                 className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-20 pointer-events-none"
                 style={{ left: `${sliderPosition}%` }}
@@ -566,9 +562,6 @@ export default function BeforeAfterCompareModal({
                   <Split className="w-4 h-4" />
                 </div>
               </div>
-
-              {/* Labels & Tags Overlay */}
-              {/* Left Side Label (Before) */}
               <div className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-stone-950/85 backdrop-blur-md border border-amber-500/40 text-xs font-bold text-amber-300 z-10 flex flex-col gap-0.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -578,8 +571,6 @@ export default function BeforeAfterCompareModal({
                   تراکم: {photoA?.density} • ضخامت: {photoA?.thickness}
                 </span>
               </div>
-
-              {/* Right Side Label (After) */}
               <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-stone-950/85 backdrop-blur-md border border-emerald-500/40 text-xs font-bold text-emerald-300 z-10 flex flex-col gap-0.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -589,16 +580,12 @@ export default function BeforeAfterCompareModal({
                   تراکم: {photoB?.density} • ضخامت: {photoB?.thickness}
                 </span>
               </div>
-
-              {/* Slider instruction tooltip */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-stone-900/80 backdrop-blur-md text-stone-400 text-[11px] border border-stone-800 pointer-events-none z-10">
                 نشانگر را به چپ و راست بکشید تا تغییرات مو مقایسه شود
               </div>
             </div>
           ) : (
-            /* Mode 2: Side-by-Side Dual View */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
-              {/* Card A (Before) */}
               <div className="rounded-2xl bg-stone-900/70 border border-stone-800 overflow-hidden flex flex-col">
                 <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-900/40 flex items-center justify-between text-xs">
                   <span className="font-bold text-amber-300 flex items-center gap-1.5">
@@ -634,8 +621,6 @@ export default function BeforeAfterCompareModal({
                   <span>کالیبر: {photoA?.thickness}</span>
                 </div>
               </div>
-
-              {/* Card B (After) */}
               <div className="rounded-2xl bg-stone-900/70 border border-stone-800 overflow-hidden flex flex-col">
                 <div className="px-4 py-2 bg-emerald-950/30 border-b border-emerald-900/40 flex items-center justify-between text-xs">
                   <span className="font-bold text-emerald-300 flex items-center gap-1.5">
@@ -674,18 +659,15 @@ export default function BeforeAfterCompareModal({
             </div>
           )}
         </div>
-
-        {/* Footer Actions */}
         <div className="flex items-center justify-between px-6 py-3.5 bg-stone-900/90 border-t border-stone-800 shrink-0">
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <Layers className="w-4 h-4 text-cyan-400" />
             <span>نرم‌افزار مقایسه طولی تراکم مو و قطر تارها بر پایه پردازش تصویر ScalpAI</span>
           </div>
-
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleExportComparisonCard}
+              onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               title="دانلود کارنامه مقایسه در ابعاد بزرگ برای واتساپ، پرینت یا پرونده بیمار"
@@ -693,7 +675,6 @@ export default function BeforeAfterCompareModal({
               <Download className="w-4 h-4 text-amber-200" />
               <span>{isExporting ? "در حال صدور کارنامه..." : "صدور کارنامه تصویری (PNG)"}</span>
             </button>
-
             <button
               type="button"
               onClick={onClose}

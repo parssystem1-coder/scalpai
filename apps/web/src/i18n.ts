@@ -17,7 +17,7 @@ const fa = {
   },
   home: { title: "خوش آمدید", logout: "خروج" },
   common: {
-    loading: "در حال بارگذاری…",
+    loading: "در حال بارگزاری…",
     delete: "حذف",
     back: "بازگشت",
     langLabel: "زبان",
@@ -222,7 +222,9 @@ if (typeof document !== "undefined") {
 export function faNum(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return "";
   if (i18n.language !== "fa") return String(value);
-  return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+  // noUncheckedIndexedAccess: the /\d/ match guarantees an index of 0-9, so the
+  // `?? d` fallback is unreachable; it only satisfies replace()'s string return.
+  return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)] ?? d);
 }
 
 export function toggleLang(): void {

@@ -29,14 +29,14 @@ const SAFE_PATIENT_FIELDS = new Set(["firstName", "lastName", "phone", "gender",
 const SAFE_PLAN_FIELDS = new Set(["items", "startDate", "reviewIntervals"]);
 const PATIENT_CREATE_FIELDS = ["firstName", "lastName", "phone", "gender", "birthDate"] as const;
 
-/** Maximum rows a single pull page may return. */
 export const PULL_LIMIT_MAX = 500;
 
-/**
- * A refusal the client must fix (unknown entity, missing base version, PHI in
- * cleartext). Thrown inside the item's savepoint so nothing it touched survives,
- * and reported per item instead of failing the batch (WEAKNESSES H4).
- */
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
+  return "";
+}
+
 class MutationRejected extends Error {
   constructor(public reason: string) {
     super(reason);
@@ -46,13 +46,12 @@ class MutationRejected extends Error {
 
 export class SyncCursorError extends Error {
   constructor(cursor: unknown) {
-    const raw = typeof cursor === "string" ? cursor : Array.isArray(cursor) ? String(cursor[0] ?? "") : String(cursor ?? "");
+    const raw = typeof cursor === "string" ? cursor : Array.isArray(cursor) ? asText(cursor[0]) : asText(cursor);
     super(`sync cursor '${raw.slice(0, 40)}' is malformed`);
     this.name = "SyncCursorError";
   }
 }
 
-/** What the server actually wrote — the ledger broadcasts THIS, not the request. */
 interface ApplyOutcome {
   delta: Record<string, unknown>;
   entityId: string | null;
@@ -60,9 +59,6 @@ interface ApplyOutcome {
   conflicts: string[];
 }
 
-/** Names that are unsafe to replay as readable values. Names/phone are required
- * to create the patient and are therefore accepted at apply time, but they never
- * survive into the persisted pull ledger (redactPhiPayload does that). */
 function findForbiddenPhi(payload: Record<string, unknown>): string | null {
   for (const [key, value] of Object.entries(payload)) {
     if (key === "notesEncrypted") {
@@ -76,11 +72,6 @@ function findForbiddenPhi(payload: Record<string, unknown>): string | null {
   return null;
 }
 
-/**
- * `field_versions` is keyed by COLUMN name (`first_name`); a mutation patch is
- * keyed by field name (`firstName`). The mapping is read from the drizzle table
- * itself, so a renamed column can never silently stop matching.
- */
 function camelFieldVersions(table: unknown, raw: unknown): Record<string, number> {
   const source = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const byDbName = new Map<string, string>();
@@ -110,9 +101,9 @@ async function applyPatientCreate(ctx: PushCtx, env: MutationEnvelope): Promise<
     .insert(patients)
     .values({
       clinicId: ctx.clinicId,
-      firstName: String(env.payload.firstName ?? ""),
-      lastName: String(env.payload.lastName ?? ""),
-      phone: String(env.payload.phone ?? ""),
+      firstName: asText(env.payload.firstName),
+      lastName: asText(env.payload.lastName),
+      phone: asText(env.payload.phone),
       gender: (env.payload.gender as string) ?? null,
       birthDate: (env.payload.birthDate as string) ?? null,
       createdBy: ctx.userId,
@@ -161,7 +152,6 @@ async function applyPatientUpdate(ctx: PushCtx, env: MutationEnvelope): Promise<
     fields[key] = value;
   }
   if (Object.keys(fields).length === 0) {
-    // Everything the client sent is server-owned: applied, nothing written.
     return { delta: {}, entityId: id, rowVersion: current.rowVersion, conflicts: merge.conflicts };
   }
 
@@ -296,11 +286,6 @@ async function applyEntity(ctx: PushCtx, env: MutationEnvelope): Promise<ApplyOu
 
 type Isolated<T> = { ok: true; value: T } | { ok: false; error: unknown };
 
-/**
- * WEAKNESSES H4: one mutation, one savepoint. A failing item is rolled back to
- * its own savepoint and the batch keeps going, instead of poisoning the whole
- * transaction (which used to mean 19 valid mutations lost because of item 20).
- */
 async function runIsolated<T>(tx: Tx, label: string, fn: () => Promise<T>): Promise<Isolated<T>> {
   const name = `sp_${label.replace(/[^a-zA-Z0-9_]/g, "_")}`;
   await tx.execute(sql.raw(`SAVEPOINT ${name}`));
@@ -319,13 +304,9 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "23505";
 }
 
-/**
- * Never echo the driver message: a CHECK/unique violation quotes the offending
- * ROW, which for `patients` is PHI. The sqlstate is enough to debug.
- */
 function databaseReason(error: unknown): string {
   const code =
-    typeof error === "object" && error !== null ? String((error as { code?: unknown }).code ?? "unknown") : "unknown";
+    typeof error === "object" && error !== null ? asText((error as { code?: unknown }).code) || "unknown" : "unknown";
   return `database refused the mutation (sqlstate ${code})`;
 }
 
@@ -376,8 +357,6 @@ export async function processPushBatch(ctx: PushCtx, envelopes: MutationEnvelope
 
     const outcome = await runIsolated(ctx.tx, `sync_${index}`, async () => {
       const applied = await applyEntity(ctx, env);
-      // H3: the ledger row is written only for an APPLIED mutation, and it carries
-      // the delta the server wrote — never the client's raw wish list.
       await ctx.tx.insert(mutations).values({
         clinicId: ctx.clinicId,
         userId: ctx.userId,
@@ -385,8 +364,6 @@ export async function processPushBatch(ctx: PushCtx, envelopes: MutationEnvelope
         entity: env.entity,
         op: env.op,
         payload: ledgerPayload(applied),
-        // The column default does the same thing; stating it keeps the commit
-        // watermark explicit at the only place that writes the ledger (H5).
         commitXid: sql`pg_current_xact_id()`,
       });
       return applied;
@@ -405,7 +382,6 @@ export async function processPushBatch(ctx: PushCtx, envelopes: MutationEnvelope
       continue;
     }
     if (isUniqueViolation(outcome.error)) {
-      // A concurrent push of the same id won the race — that IS the dedupe.
       results.push({ clientMutationId: id, status: "duplicate" });
       continue;
     }
@@ -421,7 +397,6 @@ export interface SyncPullItem {
   payload: unknown;
   serverSeq: number;
   at: string;
-  /** Cursor to resume AFTER this item. */
   cursor: string;
 }
 
@@ -442,26 +417,16 @@ interface RawMutationRow {
 
 function toIso(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
-  const parsed = new Date(String(value));
+  const parsed = new Date(asText(value));
   return Number.isNaN(parsed.getTime()) ? new Date(0).toISOString() : parsed.toISOString();
 }
 
-/**
- * Cursor-based pull with COMMIT-SAFE ordering (WEAKNESSES H5).
- *
- * `commit_xid < pg_snapshot_xmin(pg_current_snapshot())` is the whole trick: rows
- * are only served once no still-running transaction could insert a row that would
- * sort BEFORE them. Combined with the (commit_xid, server_seq) cursor, a client
- * can never skip a mutation because a writer was slow to commit.
- */
 export async function pullMutations(
   tx: Tx,
   clinicId: string,
   cursorValue: string,
   limit: number,
 ): Promise<SyncPullPage> {
-  // A non-string cursor is parameter tampering (array/object query params), not a
-  // decodable cursor: refuse it before it ever reaches decodeCursor.
   if (typeof cursorValue !== "string") throw new SyncCursorError(cursorValue);
   const cursor = decodeCursor(cursorValue);
   if (!cursor) throw new SyncCursorError(cursorValue);
@@ -482,12 +447,12 @@ export async function pullMutations(
   const hasMore = rows.length > size;
   const page = hasMore ? rows.slice(0, size) : rows;
   const items: SyncPullItem[] = page.map((row) => ({
-    entity: String(row.entity),
-    op: String(row.op),
+    entity: asText(row.entity),
+    op: asText(row.op),
     payload: row.payload,
     serverSeq: Number(row.server_seq),
     at: toIso(row.at),
-    cursor: encodeCursor({ xid: String(row.commit_xid), seq: Number(row.server_seq) }),
+    cursor: encodeCursor({ xid: asText(row.commit_xid), seq: Number(row.server_seq) }),
   }));
   const last = items[items.length - 1];
   return { items, cursor: last ? last.cursor : encodeCursor(cursor), hasMore };

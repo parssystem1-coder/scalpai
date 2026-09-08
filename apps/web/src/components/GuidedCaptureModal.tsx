@@ -99,7 +99,9 @@ const ZONE_SIMULATION_IMAGES: Record<string, string> = {
   "step-occiput": "/trichoscopy/occiput.jpg",
 };
 
-const INITIAL_STEPS: CaptureAngleStep[] = [
+// noUncheckedIndexedAccess: typed as a non-empty tuple so INITIAL_STEPS[0] is a
+// CaptureAngleStep (not | undefined) and can back the currentStep fallback.
+const INITIAL_STEPS: [CaptureAngleStep, ...CaptureAngleStep[]] = [
   {
     id: "step-frontal",
     zoneName: { fa: "خط رویش قدامی (Frontal)", en: "Frontal Hairline" },
@@ -240,7 +242,7 @@ export default function GuidedCaptureModal({
           if (videoInputs.length > 0 && !deviceId) {
             const activeTrack = stream.getVideoTracks()[0];
             const activeId = activeTrack?.getSettings?.()?.deviceId;
-            setSelectedDeviceId(activeId || videoInputs[0].deviceId);
+            setSelectedDeviceId(activeId || videoInputs[0]?.deviceId || "");
           }
         } catch (enumErr) {
           console.warn("Error enumerating devices:", enumErr);
@@ -301,6 +303,11 @@ export default function GuidedCaptureModal({
         const imgData = sCtx.getImageData(0, 0, 100, 100);
         const data = imgData.data;
 
+        // noUncheckedIndexedAccess: the sampled buffer is always 100x100x4, so the
+        // `?? 0` fallbacks are unreachable and the luma maths is unchanged.
+        const luma = (offset: number) =>
+          (data[offset] ?? 0) * 0.299 + (data[offset + 1] ?? 0) * 0.587 + (data[offset + 2] ?? 0) * 0.114;
+
         let gradSum = 0;
         let count = 0;
         for (let y = 1; y < 99; y += 2) {
@@ -310,10 +317,10 @@ export default function GuidedCaptureModal({
             const up = ((y - 1) * 100 + x) * 4;
             const down = ((y + 1) * 100 + x) * 4;
 
-            const lumL = data[left] * 0.299 + data[left + 1] * 0.587 + data[left + 2] * 0.114;
-            const lumR = data[right] * 0.299 + data[right + 1] * 0.587 + data[right + 2] * 0.114;
-            const lumU = data[up] * 0.299 + data[up + 1] * 0.587 + data[up + 2] * 0.114;
-            const lumD = data[down] * 0.299 + data[down + 1] * 0.587 + data[down + 2] * 0.114;
+            const lumL = luma(left);
+            const lumR = luma(right);
+            const lumU = luma(up);
+            const lumD = luma(down);
 
             const dx = lumR - lumL;
             const dy = lumD - lumU;
@@ -343,7 +350,9 @@ export default function GuidedCaptureModal({
     };
   }, [stopCamera]);
 
-  const currentStep = steps[activeStepIndex] || steps[0];
+  // noUncheckedIndexedAccess: steps is seeded from INITIAL_STEPS and never emptied,
+  // so this resolves to a concrete step and downstream reads stay non-optional.
+  const currentStep: CaptureAngleStep = steps[activeStepIndex] ?? steps[0] ?? INITIAL_STEPS[0];
   const capturedCount = steps.filter((s) => s.isCaptured).length;
   const isAllCaptured = capturedCount === steps.length;
 
@@ -577,7 +586,17 @@ export default function GuidedCaptureModal({
             return (
               <div
                 key={step.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isActive}
                 onClick={() => setActiveStepIndex(idx)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setActiveStepIndex(idx);
+                  }
+                }}
                 className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer relative group ${
                   isActive
                     ? "bg-cyan-950/60 border-cyan-500 text-white shadow-xs"
@@ -627,7 +646,7 @@ export default function GuidedCaptureModal({
                 if (isLiveCamera) {
                   stopCamera();
                 } else {
-                  startCamera(selectedDeviceId);
+                  void startCamera(selectedDeviceId);
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
@@ -659,7 +678,7 @@ export default function GuidedCaptureModal({
                 onChange={(e) => {
                   setSelectedDeviceId(e.target.value);
                   if (isLiveCamera) {
-                    startCamera(e.target.value);
+                    void startCamera(e.target.value);
                   }
                 }}
                 className="bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-xs text-stone-200 focus:outline-none"
@@ -942,7 +961,7 @@ export default function GuidedCaptureModal({
                   setFocusQuality(focusQuality === "pass" ? "warn" : "pass");
                 }}
                 className="p-3 rounded-2xl bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                title={isFa ? "شبیه‌سازی بازتنظیم فوکوس" : "Calibrate Focus"}
+                title={isFa ? "شبیه‌سازی بازتنطیم فوکوس" : "Calibrate Focus"}
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
@@ -1031,7 +1050,7 @@ export default function GuidedCaptureModal({
                   </div>
                   {(stepTags[currentStep.id]?.length ?? 0) > 0 && (
                     <span className="text-[10px] text-cyan-400 font-mono">
-                      {stepTags[currentStep.id].length} نشانه انتخاب‌شده
+                      {stepTags[currentStep.id]?.length} نشانه انتخاب‌شده
                     </span>
                   )}
                 </div>
@@ -1070,7 +1089,7 @@ export default function GuidedCaptureModal({
                     <div className="flex flex-col items-center gap-1.5 shrink-0">
                       <div className="w-12 h-12 rounded-lg border border-cyan-500/40 overflow-hidden shadow-xs relative group">
                         <img
-                          src={capturedFrames[currentStep.id]}
+                          src={capturedFrames[currentStep.id] ?? ""}
                           alt="Thumbnail"
                           className="w-full h-full object-cover"
                         />
@@ -1122,4 +1141,3 @@ export default function GuidedCaptureModal({
     </div>
   );
 }
-

@@ -17,11 +17,16 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
     resolver: zodResolver(registerSchema),
   });
 
+  // M19: handleSubmit() returns a promise-returning handler, and onSubmit expects
+  // a void one — discard it explicitly (no-misused-promises). react-hook-form
+  // already surfaces validation failures through formState.
+  const submit = handleSubmit(onSubmit);
+
   return (
     <div className="animate-fadeIn">
       <h1 className="font-serif text-3xl font-normal mb-1">Open Registration</h1>
       <p className="text-xs font-light text-[oklch(42%_0.02_20)] mb-4">
-        ثبت‌نام مستقیم و آزاد برای تمامی آرایشگران، تریکولوژیست‌ها و سالن‌های زیبایی
+        ثبت‌نام مستقیم و آزاد برای تمامی آرایشگران، تریکولوژیست‌ها و سالون‌های زیبایی
       </p>
 
       {/* Subscription Callout */}
@@ -32,7 +37,13 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5" noValidate>
+      <form
+        onSubmit={(e) => {
+          void submit(e);
+        }}
+        className="space-y-3.5"
+        noValidate
+      >
         <div>
           <div className="relative">
             <input

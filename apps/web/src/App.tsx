@@ -34,7 +34,9 @@ function AppRoutes() {
   const handleLogout = () => {
     logout();
     showToast("خروج موفق", "از حساب کلینیک خارج شدید.");
-    navigate("/");
+    // M19: navigate() is thenable — nothing awaits a route change, so the
+    // promise is discarded explicitly (no-floating-promises).
+    void navigate("/");
   };
 
   const userEmail = user?.email ?? "";
@@ -55,7 +57,7 @@ function AppRoutes() {
           element={
             <LoginPage
               onLoggedIn={() => {
-                navigate("/dashboard");
+                void navigate("/dashboard");
               }}
             />
           }
@@ -99,7 +101,9 @@ function AppRoutes() {
               <div className="max-w-5xl mx-auto">
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
+                  onClick={() => {
+                    void navigate(-1);
+                  }}
                   className="mb-4 px-4 py-2 bg-white/80 rounded-xl text-sm font-bold shadow-xs border border-white cursor-pointer"
                 >
                   ← بازگشت
@@ -107,7 +111,7 @@ function AppRoutes() {
                 <ProPlansView
                   onSelectPlan={() => {
                     showToast("پلن فعال شد", "پلن با موفقیت انتخاب شد.");
-                    navigate("/dashboard");
+                    void navigate("/dashboard");
                   }}
                 />
               </div>

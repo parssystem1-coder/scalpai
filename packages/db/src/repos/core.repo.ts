@@ -97,7 +97,7 @@ export async function verifyChain(tx: Tx, clinicId?: string): Promise<boolean> {
         entity: r.entity,
         entityId: r.entityId,
         meta: r.meta ?? null,
-        at: r.at as Date,
+        at: r.at,
       },
       prev,
     );

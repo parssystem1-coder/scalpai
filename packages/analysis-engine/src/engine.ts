@@ -11,19 +11,25 @@ const clamp100 = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
  *  redness        → excess of red channel over green/blue average
  *  flakeTexture   → Laplacian variance mapped through log curve (flakes/scales)
  *  densityProxy   → edge-pixel ratio mapped through a soft curve (hair density)
+ *
+ * M19: the whole pipeline is synchronous — there was never an `await` in here —
+ * so the method is a plain function that hands back an already-resolved promise
+ * to keep the AnalysisEngine contract (require-await).
  */
 export const heuristicEngine: AnalysisEngine = {
   backend: "heuristic",
-  async analyze({ image }: AnalysisInput): Promise<AnalysisOutput> {
+  analyze({ image }: AnalysisInput): Promise<AnalysisOutput> {
     const { data, width, height } = validate(image);
 
     // --- redness on RGB ---
     let excess = 0;
     const px = width * height;
     for (let i = 0; i < px; i++) {
-      const r = data[i * 4];
-      const g = data[i * 4 + 1];
-      const b = data[i * 4 + 2];
+      // noUncheckedIndexedAccess: buffer length is guaranteed by validate(),
+      // so the `?? 0` fallbacks are unreachable and behaviour is unchanged.
+      const r = data[i * 4] ?? 0;
+      const g = data[i * 4 + 1] ?? 0;
+      const b = data[i * 4 + 2] ?? 0;
       const e = r - (g + b) / 2;
       if (e > 12) excess += e; // ignore sensor noise floor
     }
@@ -37,18 +43,18 @@ export const heuristicEngine: AnalysisEngine = {
     const densityProxy = clamp100(100 * (1 - Math.exp(-m.edgePixelRatio / 0.22)));
 
     const severity = clamp100(redness * 0.4 + flakeTexture * 0.35 + densityProxy * 0.25);
-    return {
+    return Promise.resolve({
       scores: { redness, flakeTexture, densityProxy },
       severity,
       modelVersion: "heuristic-v0",
-    };
+    });
   },
 };
 
 function validate(img: RgbaImage): Required<RgbaImage> & { data: Uint8ClampedArray | Uint8Array } {
   if (!img.data || img.width < 16 || img.height < 16) throw new Error("analysis input too small");
   if (img.data.length < img.width * img.height * 4) throw new Error("rgba buffer too small");
-  return img as Required<RgbaImage> & { data: Uint8ClampedArray | Uint8Array };
+  return img;
 }
 
 /** Factory — the single seam call sites use. */

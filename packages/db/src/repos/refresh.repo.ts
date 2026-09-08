@@ -53,7 +53,7 @@ function mapRow(row: RawRefreshRow): RefreshTokenRow {
 }
 
 function rowsOf<T>(res: unknown): T[] {
-  return ((res as { rows?: T[] }).rows ?? []) as T[];
+  return ((res as { rows?: T[] }).rows ?? []);
 }
 
 export async function findByHash(tx: Tx, presented: string): Promise<RefreshTokenRow | null> {

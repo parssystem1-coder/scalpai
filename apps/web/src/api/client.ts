@@ -66,7 +66,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       ...(init?.headers ?? {}),
     },
   });
-  const body = await res.json().catch(() => null);
+  // M19: Response.json() is typed Promise<any>. Annotating the body as unknown
+  // keeps the two casts below the only places a shape is asserted.
+  const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const err = body as { code?: string; message?: string; details?: unknown } | null;
     throw new ApiError(res.status, err?.code ?? "ERROR", err?.message ?? "خطای نامشخص", err?.details);

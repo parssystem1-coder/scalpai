@@ -104,7 +104,7 @@ export class MetricsRegistry {
     series.sum += seconds;
     series.total += 1;
     LATENCY_BUCKETS_SECONDS.forEach((bucket, i) => {
-      if (seconds <= bucket) series!.counts[i] = (series!.counts[i] ?? 0) + 1;
+      if (seconds <= bucket) series.counts[i] = (series.counts[i] ?? 0) + 1;
     });
   }
 

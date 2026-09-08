@@ -239,11 +239,11 @@ const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
 };
 
 export const SECTIONS = [
-  { id: "patients", label: "پرونده و مراجعین", icon: Users },
-  { id: "scalp-map", label: "نقشه زنده سر (Scalp Map)", icon: Activity },
-  { id: "gallery", label: "ویژن تریکوسکوپی 4K", icon: Camera },
-  { id: "ai-studio", label: "استودیوی محاسباتی AI", icon: Sparkles },
-  { id: "3d-model", label: "هولوگرام ۳ بعدی ساقه مو", icon: Layers },
+  { id: "patients", label: "پرونده و مراجعین", icon: Users as React.ComponentType<{className?: string}> },
+  { id: "scalp-map", label: "نقشه زنده سر (Scalp Map)", icon: Activity as React.ComponentType<{className?: string}> },
+  { id: "gallery", label: "ویژن تریکوسکوپی 4K", icon: Camera as React.ComponentType<{className?: string}> },
+  { id: "ai-studio", label: "استودیوی محاسباتی AI", icon: Sparkles as React.ComponentType<{className?: string}> },
+  { id: "3d-model", label: "هولوگرام ۳ بعدی ساقه مو", icon: Layers as React.ComponentType<{className?: string}> },
 ] as const;
 
 export type SectionId = (typeof SECTIONS)[number]["id"];
@@ -287,6 +287,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
       for (let i = SECTIONS.length - 1; i >= 0; i--) {
         const sec = SECTIONS[i];
+        if (!sec) continue;
         const el = document.getElementById(`section-${sec.id}`);
         if (el && el.offsetTop <= scrollPos) {
           setActiveSection(sec.id);
@@ -299,7 +300,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]!);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
@@ -486,10 +487,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   };
 
   const handleLightboxTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
     if (isCaliperActive) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.touches[0].clientX - rect.left;
-      const y = e.touches[0].clientY - rect.top;
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
       setCaliperStart({ x, y });
       setCaliperEnd({ x, y });
       setIsDrawingCaliper(true);
@@ -498,23 +501,25 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     if (e.touches.length === 1 && lightboxZoom > 1) {
       setIsLightboxPanning(true);
       lightboxTouchStart.current = {
-        x: e.touches[0].clientX - lightboxPan.x,
-        y: e.touches[0].clientY - lightboxPan.y,
+        x: touch.clientX - lightboxPan.x,
+        y: touch.clientY - lightboxPan.y,
       };
     }
   };
 
   const handleLightboxTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
     if (isCaliperActive && isDrawingCaliper) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.touches[0].clientX - rect.left;
-      const y = e.touches[0].clientY - rect.top;
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
       setCaliperEnd({ x, y });
       return;
     }
     if (!isLightboxPanning || lightboxZoom <= 1 || e.touches.length !== 1) return;
-    const newX = e.touches[0].clientX - lightboxTouchStart.current.x;
-    const newY = e.touches[0].clientY - lightboxTouchStart.current.y;
+    const newX = touch.clientX - lightboxTouchStart.current.x;
+    const newY = touch.clientY - lightboxTouchStart.current.y;
     const maxPan = (lightboxZoom - 1) * 450;
     setLightboxPan({
       x: Math.max(-maxPan, Math.min(maxPan, newX)),
@@ -631,7 +636,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           ...prev,
           [selectedPatient.id]: [...newImagesList, ...(prev[selectedPatient.id] || [])],
         }));
-        setActiveInspectedPhoto(newImagesList[0]);
+        setActiveInspectedPhoto(newImagesList[0] ?? null);
         setUploadFeedback(`${newImagesList.length} فریم تریکوسکوپی با وضوح بالا در گالری و هود هوش مصنوعی ذخیره گردید.`);
         setTimeout(() => setUploadFeedback(null), 6000);
       }
@@ -651,7 +656,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     if (activeInspectedPhoto?.id === photoId) {
       const currentList = localImages[selectedPatient.id] || [];
       const remaining = currentList.filter((img) => img.id !== photoId);
-      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] : null);
+      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] ?? null : null);
     }
 
     if (previewPhotoModal?.id === photoId) {
@@ -883,7 +888,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           {/* Module Tabs (Luxury Frosted Glass Pills with Smooth Scroll) */}
           <nav className="hidden lg:flex items-center gap-1.5 mr-6 p-1.5 bg-white/70 backdrop-blur-2xl rounded-2xl border border-white/80 shadow-[0_2px_12px_oklch(30%_0.04_15/0.05)]">
             {SECTIONS.map((sec, idx) => {
-              const Icon = sec.icon;
+              const Icon = sec.icon as React.ComponentType<{className?: string}>;
               const isActive = activeSection === sec.id;
               return (
                 <button
@@ -1001,7 +1006,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       {/* Mobile/Tablet Secondary Tab Bar (Persistently Sticky Below Header) */}
       <div className="lg:hidden sticky top-[61px] sm:top-[65px] z-40 px-3 sm:px-4 py-2 bg-[oklch(98%_0.01_28/0.92)] backdrop-blur-2xl border-b border-white/70 shadow-xs flex items-center gap-2 overflow-x-auto no-scrollbar">
         {SECTIONS.map((sec, idx) => {
-          const Icon = sec.icon;
+          const Icon = sec.icon as React.ComponentType<{className?: string}>;
           const isActive = activeSection === sec.id;
           return (
             <button
@@ -1083,6 +1088,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                       >
                         <div
                           onClick={() => setSelectedPatient(patient)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedPatient(patient); }}
                           className={`p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between backdrop-blur-xl ${
                             isSelected
                               ? "bg-gradient-to-r from-white/95 via-rose-50/70 to-white/95 border-[oklch(62%_0.09_16/0.7)] shadow-lg shadow-[oklch(62%_0.09_16/0.12)] ring-2 ring-[oklch(62%_0.09_16/0.25)]"
@@ -1400,6 +1408,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
               <div
                 onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -1475,6 +1486,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                           <div
                             className="relative aspect-4/3 bg-stone-900/10 overflow-hidden cursor-pointer group"
                             onClick={() => setActiveInspectedPhoto(photo)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveInspectedPhoto(photo); }}
                             title="کلیک برای بازرسی در هود هوش مصنوعی"
                           >
                             <img
@@ -1612,7 +1626,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 </div>
 
                 <button
-                  onClick={handleRunAiAnalysis}
+                  onClick={() => { void handleRunAiAnalysis(); }}
                   disabled={isAnalyzing}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-md shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 disabled:opacity-60 transition-all active:scale-95"
                 >
@@ -1858,8 +1872,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
             <form onSubmit={handleAddPatient} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام</label>
+                <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام</label>
                 <input
+                  id="patient-firstName"
                   type="text"
                   required
                   value={newPatient.firstName}
@@ -1870,8 +1885,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام خانوادگی</label>
+                <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام خانوادگی</label>
                 <input
+                  id="patient-lastName"
                   type="text"
                   required
                   value={newPatient.lastName}
@@ -1882,8 +1898,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">شماره تماس</label>
+                <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">شماره تماس</label>
                 <input
+                  id="patient-phone"
                   type="tel"
                   value={newPatient.phone}
                   onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
@@ -1893,8 +1910,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">عارضه یا وضعیت اولیه</label>
+                <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">عارضه یا وضعیت اولیه</label>
                 <input
+                  id="patient-condition"
                   type="text"
                   value={newPatient.condition}
                   onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
@@ -2007,10 +2025,16 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
             resetLightboxZoom();
             setPreviewPhotoModal(null);
           }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { resetLightboxZoom(); setPreviewPhotoModal(null); } }}
         >
           <div
             className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
             onClick={(e) => e.stopPropagation()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
             dir="rtl"
           >
             {/* Header with Title & Quick Zoom Controls */}
@@ -2121,6 +2145,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
             {/* Interactive Zoomable Viewport */}
             <div
+              role="button"
+              tabIndex={0}
               className={`relative h-[55vh] sm:h-[65vh] min-h-[380px] bg-black flex items-center justify-center overflow-hidden select-none ${
                 lightboxZoom > 1
                   ? isLightboxPanning

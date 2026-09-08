@@ -113,7 +113,7 @@ async function loadClinicChain(tx: Tx, clinicId: string): Promise<AuditChainRow[
     entity: r.entity,
     entityId: r.entityId,
     meta: r.meta ?? null,
-    at: r.at as Date,
+    at: r.at,
     prevHash: r.prevHash,
     rowHash: r.rowHash,
   }));
@@ -310,7 +310,7 @@ export async function verifyStoredAnchor(
       lastLogId: String(record.lastLogId),
       lastRowHash: record.lastRowHash,
       merkleRoot: record.merkleRoot,
-      createdAt: canonicalTimestamp(record.createdAt as Date),
+      createdAt: canonicalTimestamp(record.createdAt),
     };
     if (!verifyAnchorSignature(anchor, record.signature, pem)) {
       return { ok: false, reason: "anchor signature invalid" };

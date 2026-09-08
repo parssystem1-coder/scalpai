@@ -34,7 +34,7 @@ export async function createAnalysis(tx: Tx, clinicId: string, input: AnalysisCr
       patientId: input.patientId,
       galleryItemId: input.galleryItemId,
       type: "heuristic",
-      result: input.result as object,
+      result: input.result,
       modelVersion: input.modelVersion,
       createdBy: input.userId,
     })

@@ -47,9 +47,14 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
     return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
   }, "");
 
-  const areaD = `${pathD} L ${points[points.length - 1].x} ${height - padding} L ${
-    points[0].x
-  } ${height - padding} Z`;
+  // noUncheckedIndexedAccess: data is never empty (defaults to DEFAULT_TIMELINE),
+  // so the empty-string fallback is unreachable.
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  const areaD =
+    firstPoint && lastPoint
+      ? `${pathD} L ${lastPoint.x} ${height - padding} L ${firstPoint.x} ${height - padding} Z`
+      : "";
 
   return (
     <div className="p-6 rounded-3xl bg-white/55 border border-white/80 backdrop-blur-xl shadow-md relative overflow-hidden">

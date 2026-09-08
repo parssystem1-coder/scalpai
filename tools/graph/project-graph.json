@@ -82,12 +82,6 @@
       "dependsOn": []
     },
     {
-      "name": "@scalpai/notify",
-      "kind": "package",
-      "dir": "packages/notify",
-      "dependsOn": []
-    },
-    {
       "name": "@scalpai/shared",
       "kind": "package",
       "dir": "packages/shared",
@@ -100,17 +94,11 @@
       "dependsOn": [
         "@scalpai/shared"
       ]
-    },
-    {
-      "name": "@scalpai/ui",
-      "kind": "package",
-      "dir": "packages/ui",
-      "dependsOn": []
     }
   ],
   "counts": {
     "apps": 5,
-    "packages": 9,
+    "packages": 7,
     "dependencyEdges": 13
   }
 }

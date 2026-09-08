@@ -33,6 +33,14 @@ const SAMPLE_DETECTIONS: FollicleDetection[] = [
   { id: "f8", x: 18, y: 55, type: "single", caliber: 58, confidence: 92 },
 ];
 
+/** Persian label for the follicular-unit type — also what the marker announces. */
+const TYPE_LABEL_FA: Record<FollicleDetection["type"], string> = {
+  single: "واحد تک‌تاری",
+  double: "واحد دوتاری",
+  triple: "واحد سه‌تاری",
+  empty: "واحد خالی",
+};
+
 export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps> = ({
   imageUrl,
   areaName,
@@ -147,11 +155,26 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
                 ? "border-amber-400 text-amber-200 bg-amber-950/70"
                 : "border-gray-500 text-gray-300 bg-gray-900/70";
 
+            // M19/jsx-a11y: this marker used to be a bare <div onClick> — mouse
+            // only, and absent from both the tab order and the accessibility
+            // tree. role + tabIndex + a keyboard handler make it a real control.
+            const select = () => setSelectedFollicle(f);
+
             return (
               <div
                 key={f.id}
-                onClick={() => setSelectedFollicle(f)}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300 ${
+                role="button"
+                tabIndex={0}
+                aria-pressed={isHovered}
+                aria-label={`${TYPE_LABEL_FA[f.type]} — کالیبر ${f.caliber} میکرومتر، اطمینان مدل ${f.confidence} درصد`}
+                onClick={select}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    select();
+                  }
+                }}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 ${
                   isHovered ? "scale-125 z-30" : "scale-100 z-10"
                 }`}
                 style={{ left: `${f.x}%`, top: `${f.y}%` }}

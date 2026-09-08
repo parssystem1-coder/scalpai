@@ -91,10 +91,20 @@ export const HairCanvas: React.FC = () => {
         rightEdge.push({ x: pt.x - pt.nx * (pt.coreRadius * 0.95), y: pt.y - pt.ny * (pt.coreRadius * 0.95) });
       }
 
+      // noUncheckedIndexedAccess: both edges always hold steps+1 points, so the
+      // guards below are unreachable and the traced path is unchanged.
       context.beginPath();
-      context.moveTo(leftEdge[0].x, leftEdge[0].y);
-      for (let i = 1; i <= steps; i++) context.lineTo(leftEdge[i].x, leftEdge[i].y);
-      for (let i = steps; i >= 0; i--) context.lineTo(rightEdge[i].x, rightEdge[i].y);
+      const start = leftEdge[0];
+      if (!start) return;
+      context.moveTo(start.x, start.y);
+      for (let i = 1; i <= steps; i++) {
+        const pt = leftEdge[i];
+        if (pt) context.lineTo(pt.x, pt.y);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const pt = rightEdge[i];
+        if (pt) context.lineTo(pt.x, pt.y);
+      }
       context.closePath();
     };
 

@@ -46,7 +46,7 @@ function AddPatientForm() {
     mutationFn: async (dto: PatientDto) => {
       if (!isOnline) {
         await enqueue("patients", "create", dto);
-        return { id: "pending", firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone } as PatientRow;
+        return { id: "pending", firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone };
       }
       return apiFetch<PatientRow>("/patients", { method: "POST", body: JSON.stringify(dto) });
     },
@@ -56,9 +56,17 @@ function AddPatientForm() {
     },
   });
 
+  // M19: form onSubmit expects a void handler; handleSubmit() returns a
+  // promise-returning one (no-misused-promises).
+  const submit = handleSubmit((dto) => {
+    mutation.mutate(dto);
+  });
+
   return (
     <form
-      onSubmit={handleSubmit((dto) => mutation.mutate(dto))}
+      onSubmit={(e) => {
+        void submit(e);
+      }}
       noValidate
       data-testid="patient-form"
       aria-label={t("patients.formAria")}
@@ -85,7 +93,6 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
     retry: false,
   });
 
-  // Session expired mid-use -> drop token so login page returns.
   if (query.error instanceof ApiError && query.error.status === 401) {
     clearAccessToken();
     onLoggedOut();
@@ -153,7 +160,6 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
           </tbody>
         </table>
       )}
-
       {selectedPatientForConsent && (
         <DigitalConsentModal
           patientId={selectedPatientForConsent.id}

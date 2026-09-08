@@ -4,6 +4,10 @@
 - **Date:** 2026-09-07
 - **Supersedes / relates to:** ADR-0036 (single deployment topology), ADR-0037
   (evidence-carrying gates), ADR-0041, ADR-0042
+- **Partially superseded by:** ADR-0044, which closes **M4/M16** and **R14** -
+  listed below as not addressed. This document is a dated record of what was
+  true when it was accepted, not a status board; the body is left exactly as
+  written. Live status is `docs/WEAKNESSES-V2-10-PHASES.md`.
 - **Weaknesses addressed:** H10, H13, M2, M3, M7/R13, M10, M11, M13, M18, M20
 - **Weaknesses explicitly NOT addressed:** M1, M4/M16, M5, M14, M15, M19, L1, L2, R14
 
@@ -134,7 +138,7 @@ corrected to stop naming families nothing loads any more.
   requests that are plausibly client-side routes.
 - **M13** `formatRelativeTime` clamped the elapsed time to zero, so every
   future-dated value - a booking, a licence expiry, a quota period end - rendered
-  as "چند لحظه پیش". Both formatters also accept an IANA `timeZone`, so the
+  as "چند لحطه پیش". Both formatters also accept an IANA `timeZone`, so the
   clinic's day boundary decides the date instead of the viewer's browser;
   `clinics.timezone` has been the server's source of truth since phase 8.
 
@@ -157,6 +161,12 @@ ticked:
 The corresponding lines in `docs/WEAKNESSES-V2-10-PHASES.md` stay `[ ]`, and the
 phase-level box stays open. Two conformance exceptions remain registered against
 this ADR for the same reason, so the rules stay ENABLED rather than weakened.
+
+> **Update (ADR-0044, 2026-09-08):** M4/M16 and R14 above are now closed. The
+> lockfile constraint was not routed around - the manifests are edited and the
+> lockfile regenerated with npm in the same change, which is what the gate always
+> asked for. Both `package-call-site` exceptions are removed. The two
+> `production-mocks` exceptions for M1 remain registered against this ADR.
 
 ## Consequences
 
