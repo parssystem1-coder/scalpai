@@ -2,8 +2,13 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { rgbaToGray, computeQuality, QUALITY_THRESHOLDS, type GrayImage } from "./index.js";
 
+/** The pipeline type, derived from the imported value: the ESM default import
+ *  does not put a `sharp` namespace in scope, so `sharp.Sharp` is not a type
+ *  here (TS2503). This spelling holds however sharp ships its type exports. */
+type SharpPipeline = ReturnType<typeof sharp>;
+
 /** Deterministic pseudo-noise scene — stands in for a real macro photo. */
-function noisyScene(width = 480, height = 360): sharp.Sharp {
+function noisyScene(width = 480, height = 360): SharpPipeline {
   const raw = Buffer.alloc(width * height * 3);
   let seed = 42;
   const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 0xffffffff);
@@ -16,7 +21,7 @@ function noisyScene(width = 480, height = 360): sharp.Sharp {
   return sharp(raw, { raw: { width, height, channels: 3 } });
 }
 
-async function render(pipeline: sharp.Sharp): Promise<GrayImage> {
+async function render(pipeline: SharpPipeline): Promise<GrayImage> {
   const { data, info } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return rgbaToGray(data, info.width, info.height);
 }

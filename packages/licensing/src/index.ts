@@ -58,12 +58,18 @@ export function verifyLicense(
   }
 ): LicenseValidationResult {
   try {
-    const parts = token.split(".");
-    if (parts.length !== 3) {
+    const [b64Header, b64Payload, b64Signature, ...rest] = token.split(".");
+
+    // M19 / `noUncheckedIndexedAccess`: a `length !== 3` check does not narrow a
+    // `string[]` to a 3-tuple, so each segment stays `string | undefined`.
+    // Guarding the segments themselves is both what the compiler needs and
+    // stricter than the length check was: a token with an empty segment used to
+    // reach `Buffer.from("", "base64url")` and fail as a bad signature instead
+    // of being reported as malformed.
+    if (!b64Header || !b64Payload || !b64Signature || rest.length > 0) {
       return { valid: false, state: "invalid_signature", error: "Malformed license token" };
     }
 
-    const [b64Header, b64Payload, b64Signature] = parts;
     const dataToVerify = `${b64Header}.${b64Payload}`;
     const signature = Buffer.from(b64Signature, "base64url");
 
@@ -73,7 +79,7 @@ export function verifyLicense(
     }
 
     const payloadJson = Buffer.from(b64Payload, "base64url").toString("utf-8");
-    const claims: LicenseClaims = JSON.parse(payloadJson);
+    const claims = JSON.parse(payloadJson) as LicenseClaims;
 
     const now = options?.now ?? Math.floor(Date.now() / 1000);
     const lastSeenClock = options?.lastSeenClock ?? 0;
@@ -104,12 +110,15 @@ export function verifyLicense(
 
     if (now <= expirationWithGrace) {
       const daysRemainingInGrace = Math.max(0, Math.ceil((expirationWithGrace - now) / 86400));
+      // `.slice(0, 10)` instead of `.split("T")[0]`: same YYYY-MM-DD, but the
+      // result is a `string`, not `string | undefined`.
+      const expiredOn = new Date(claims.expiresAt * 1000).toISOString().slice(0, 10);
       return {
         valid: true,
         state: "grace_period",
         claims,
         daysRemaining: daysRemainingInGrace,
-        error: `License expired on ${new Date(claims.expiresAt * 1000).toISOString().split("T")[0]}. Grace period active (${daysRemainingInGrace} days remaining).`,
+        error: `License expired on ${expiredOn}. Grace period active (${daysRemainingInGrace} days remaining).`,
       };
     }
 
