@@ -21,8 +21,6 @@ const MARKERS: DiagnosticMarker[] = [
 export default function LuxuryScalp3D() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<VisualMode>("silk");
-  // noUncheckedIndexedAccess: MARKERS is a non-empty literal, so the null branch
-  // is unreachable and the initial selection is still the first marker.
   const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0] ?? null);
   const [_isHovered, setIsHovered] = useState(false);
 
@@ -33,12 +31,10 @@ export default function LuxuryScalp3D() {
     const width = container.clientWidth || 600;
     const height = container.clientHeight || 550;
 
-    // 1. Scene & Camera
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 0, 6.2);
 
-    // 2. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -46,7 +42,6 @@ export default function LuxuryScalp3D() {
     renderer.toneMappingExposure = 1.1;
     container.appendChild(renderer.domElement);
 
-    // 3. Lighting (Warm Champagne & Soft Studio Glow)
     const ambientLight = new THREE.AmbientLight(0xfff8f0, 1.4);
     scene.add(ambientLight);
 
@@ -62,11 +57,9 @@ export default function LuxuryScalp3D() {
     roseLight.position.set(3, -3, 2);
     scene.add(roseLight);
 
-    // 4. Object Groups
     const masterGroup = new THREE.Group();
     scene.add(masterGroup);
 
-    // Silk Wave Curves
     const silkCurvesGroup = new THREE.Group();
     masterGroup.add(silkCurvesGroup);
 
@@ -110,7 +103,6 @@ export default function LuxuryScalp3D() {
       silkCurvesGroup.add(strandMesh);
     }
 
-    // Core Crystal Follicle / Hair Bulb (Translucent core)
     const follicleGroup = new THREE.Group();
     masterGroup.add(follicleGroup);
 
@@ -129,7 +121,6 @@ export default function LuxuryScalp3D() {
     const bulbMesh = new THREE.Mesh(bulbGeo, bulbMat);
     follicleGroup.add(bulbMesh);
 
-    // Inner glowing core
     const innerCoreGeo = new THREE.SphereGeometry(0.35, 32, 32);
     const innerCoreMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(0xd4af37),
@@ -140,7 +131,6 @@ export default function LuxuryScalp3D() {
     const innerCoreMesh = new THREE.Mesh(innerCoreGeo, innerCoreMat);
     follicleGroup.add(innerCoreMesh);
 
-    // Outer Diagnostic Rings / Torus
     const ringGeo1 = new THREE.TorusGeometry(1.6, 0.012, 16, 100);
     const ringMat1 = new THREE.MeshBasicMaterial({ color: 0xd4af37, transparent: true, opacity: 0.6 });
     const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
@@ -153,7 +143,6 @@ export default function LuxuryScalp3D() {
     ring2.rotation.y = Math.PI / 3.5;
     masterGroup.add(ring2);
 
-    // Sparkle Particle Field (Golden & Pearl Micro-dust)
     const particleCount = 180;
     const particleGeo = new THREE.BufferGeometry();
     const particlePos = new Float32Array(particleCount * 3);
@@ -177,7 +166,6 @@ export default function LuxuryScalp3D() {
     const particleField = new THREE.Points(particleGeo, particleMat);
     masterGroup.add(particleField);
 
-    // 5. Interactive Mouse Parallax
     let mouseX = 0;
     let mouseY = 0;
     let targetX = 0;
@@ -193,7 +181,6 @@ export default function LuxuryScalp3D() {
 
     container.addEventListener("pointermove", handlePointerMove);
 
-    // 6. Resize Observer
     const resizeObserver = new ResizeObserver(() => {
       if (!container) return;
       const newWidth = container.clientWidth;
@@ -205,7 +192,6 @@ export default function LuxuryScalp3D() {
     });
     resizeObserver.observe(container);
 
-    // 7. Animation Loop
     let animationFrameId: number;
     const clock = new THREE.Clock();
 
@@ -213,7 +199,6 @@ export default function LuxuryScalp3D() {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth mouse interpolation
       mouseX += (targetX - mouseX) * 0.05;
       mouseY += (targetY - mouseY) * 0.05;
 
@@ -223,11 +208,9 @@ export default function LuxuryScalp3D() {
       ring1.rotation.z = elapsedTime * 0.35;
       ring2.rotation.z = -elapsedTime * 0.25;
 
-      // Gentle pulsing of the inner follicle core
       const pulse = 1 + Math.sin(elapsedTime * 2.5) * 0.08;
       innerCoreMesh.scale.set(pulse, pulse, pulse);
 
-      // Micro-wave in particle system
       particleField.rotation.y = elapsedTime * 0.06;
 
       renderer.render(scene, camera);
@@ -265,7 +248,6 @@ export default function LuxuryScalp3D() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Three.js Container */}
       <div
         ref={containerRef}
         style={{
@@ -277,12 +259,9 @@ export default function LuxuryScalp3D() {
           cursor: "grab",
         }}
       />
-
-      {/* Floating 3D Diagnostic Node Markers */}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
         {MARKERS.map((m, idx) => {
           const isSelected = selectedMarker?.id === m.id;
-          // Calculate stylized 2D positions aligned with the 3D space
           const positions = [
             { top: "18%", right: "8%" },
             { top: "24%", left: "10%" },
@@ -342,8 +321,6 @@ export default function LuxuryScalp3D() {
           );
         })}
       </div>
-
-      {/* Floating Mode Switcher on Bottom of 3D Scene */}
       <div
         style={{
           position: "absolute",
@@ -415,8 +392,6 @@ export default function LuxuryScalp3D() {
           🌐 اسکن رادیال AI
         </button>
       </div>
-
-      {/* Subtle interaction tip */}
       <div
         style={{
           position: "absolute",

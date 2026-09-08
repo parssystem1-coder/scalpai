@@ -20,7 +20,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
   const [isFlushing, setIsFlushing] = useState(false);
   const [flushResult, setFlushResult] = useState<string | null>(null);
 
-  // Simulated conflict audit log for clinical visibility (LWW demonstration)
   const conflictResolutions = [
     {
       id: "res-01",
@@ -82,7 +81,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
         className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
         dir={isFa ? "rtl" : "ltr"}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${isOnline ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
@@ -105,10 +103,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
             <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Body */}
         <div className="p-6 space-y-6 overflow-y-auto max-h-[80vh]">
-          {/* Connectivity & Outbox Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
               <span className="block text-[11px] text-stone-500 mb-1">{isFa ? "وضعیت اتصال شبکه:" : "Network State:"}</span>
@@ -119,7 +114,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
                 </strong>
               </div>
             </div>
-
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
               <span className="block text-[11px] text-stone-500 mb-1">{isFa ? "جهش‌های در صف انتظار:" : "Pending Outbox Queue:"}</span>
               <div className="flex items-center gap-2">
@@ -129,7 +123,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
                 </strong>
               </div>
             </div>
-
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-center">
               <button
                 type="button"
@@ -144,15 +137,12 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
               </button>
             </div>
           </div>
-
           {flushResult && (
             <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{flushResult}</span>
             </div>
           )}
-
-          {/* Pending Outbox Queue Details */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
@@ -161,7 +151,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
               </div>
               <span className="text-[11px] font-mono text-stone-500">{outboxItems.length} {isFa ? "رکورد پایدار" : "records"}</span>
             </div>
-
             {outboxItems.length === 0 ? (
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-center text-xs text-stone-500">
                 {isFa ? "صف محلی خالی است. تمام تغییرات با سرور همگام هستند." : "Outbox is clean. All local data is fully synced."}
@@ -187,14 +176,11 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
               </div>
             )}
           </div>
-
-          {/* Conflict Resolution Log (Field LWW) */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
               <GitCompare className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
               <span>{isFa ? "تاریخچه بازرسی و حل تعارض‌های همزمانی (Field-level LWW):" : "Conflict Resolution Log (Field-level LWW):"}</span>
             </div>
-
             <div className="space-y-2">
               {conflictResolutions.map((c) => (
                 <div key={c.id} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-xs space-y-1.5">
@@ -221,8 +207,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
             </div>
           </div>
         </div>
-
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-t border-stone-200">
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
             <AlertCircle className="w-3.5 h-3.5" />

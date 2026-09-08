@@ -85,7 +85,6 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
     retry: false,
   });
 
-  // Session expired mid-use -> drop token so login page returns.
   if (query.error instanceof ApiError && query.error.status === 401) {
     clearAccessToken();
     onLoggedOut();
@@ -153,7 +152,6 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
           </tbody>
         </table>
       )}
-
       {selectedPatientForConsent && (
         <DigitalConsentModal
           patientId={selectedPatientForConsent.id}
