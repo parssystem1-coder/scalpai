@@ -67,6 +67,10 @@ export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
     }
   };
 
+  // noUncheckedIndexedAccess: currentMolIndex is always kept in range by the
+  // modulo above, so the fallback to MOLECULES[0] is unreachable.
+  const currentMolecule = MOLECULES[currentMolIndex] ?? MOLECULES[0];
+
   return (
     <div
       onMouseMove={handleMouseMove}
@@ -285,12 +289,12 @@ export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h4 className="font-serif text-lg font-semibold text-[oklch(20%_0.02_20)]">{MOLECULES[currentMolIndex].name}</h4>
+                <h4 className="font-serif text-lg font-semibold text-[oklch(20%_0.02_20)]">{currentMolecule?.name}</h4>
                 <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded bg-[oklch(62%_0.09_16)] text-white uppercase">
-                  {MOLECULES[currentMolIndex].badge}
+                  {currentMolecule?.badge}
                 </span>
               </div>
-              <p className="text-xs text-[oklch(42%_0.02_20)] mt-0.5 leading-snug">{MOLECULES[currentMolIndex].desc}</p>
+              <p className="text-xs text-[oklch(42%_0.02_20)] mt-0.5 leading-snug">{currentMolecule?.desc}</p>
             </div>
           </div>
         </section>
