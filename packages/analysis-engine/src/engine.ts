@@ -13,43 +13,58 @@ const clamp100 = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
  *  densityProxy   → edge-pixel ratio mapped through a soft curve (hair density)
  *
  * M19: the whole pipeline is synchronous — there was never an `await` in here —
- * so the method is a plain function that hands back an already-resolved promise
- * to keep the AnalysisEngine contract (require-await).
+ * so the scoring itself is a plain function (`score`) and `analyze` hands back
+ * an already-resolved promise to keep the AnalysisEngine contract
+ * (require-await).
+ *
+ * The contract says `analyze` RETURNS a promise, so a rejected input has to
+ * arrive as a REJECTION. Validation used to throw synchronously out of the call
+ * expression itself: no promise was ever created, so nothing holding the result
+ * — `.catch()`, `.rejects`, an error boundary around a stored promise — could
+ * observe the failure. Only the error path moved; the scoring stays sync.
  */
 export const heuristicEngine: AnalysisEngine = {
   backend: "heuristic",
   analyze({ image }: AnalysisInput): Promise<AnalysisOutput> {
-    const { data, width, height } = validate(image);
-
-    // --- redness on RGB ---
-    let excess = 0;
-    const px = width * height;
-    for (let i = 0; i < px; i++) {
-      // noUncheckedIndexedAccess: buffer length is guaranteed by validate(),
-      // so the `?? 0` fallbacks are unreachable and behaviour is unchanged.
-      const r = data[i * 4] ?? 0;
-      const g = data[i * 4 + 1] ?? 0;
-      const b = data[i * 4 + 2] ?? 0;
-      const e = r - (g + b) / 2;
-      if (e > 12) excess += e; // ignore sensor noise floor
+    try {
+      return Promise.resolve(score(image));
+    } catch (err) {
+      return Promise.reject(err instanceof Error ? err : new Error(String(err)));
     }
-    const redness = clamp100((excess / px / 90) * 100);
-
-    // --- texture + density on luma (reuse analysis-core primitives) ---
-    const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-    const gray = rgbaToGray(view, width, height);
-    const m = measureQuality(gray);
-    const flakeTexture = clamp100(Math.log1p(m.blurVariance / 6) * 24);
-    const densityProxy = clamp100(100 * (1 - Math.exp(-m.edgePixelRatio / 0.22)));
-
-    const severity = clamp100(redness * 0.4 + flakeTexture * 0.35 + densityProxy * 0.25);
-    return Promise.resolve({
-      scores: { redness, flakeTexture, densityProxy },
-      severity,
-      modelVersion: "heuristic-v0",
-    });
   },
 };
+
+function score(image: RgbaImage): AnalysisOutput {
+  const { data, width, height } = validate(image);
+
+  // --- redness on RGB ---
+  let excess = 0;
+  const px = width * height;
+  for (let i = 0; i < px; i++) {
+    // noUncheckedIndexedAccess: buffer length is guaranteed by validate(),
+    // so the `?? 0` fallbacks are unreachable and behaviour is unchanged.
+    const r = data[i * 4] ?? 0;
+    const g = data[i * 4 + 1] ?? 0;
+    const b = data[i * 4 + 2] ?? 0;
+    const e = r - (g + b) / 2;
+    if (e > 12) excess += e; // ignore sensor noise floor
+  }
+  const redness = clamp100((excess / px / 90) * 100);
+
+  // --- texture + density on luma (reuse analysis-core primitives) ---
+  const view = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  const gray = rgbaToGray(view, width, height);
+  const m = measureQuality(gray);
+  const flakeTexture = clamp100(Math.log1p(m.blurVariance / 6) * 24);
+  const densityProxy = clamp100(100 * (1 - Math.exp(-m.edgePixelRatio / 0.22)));
+
+  const severity = clamp100(redness * 0.4 + flakeTexture * 0.35 + densityProxy * 0.25);
+  return {
+    scores: { redness, flakeTexture, densityProxy },
+    severity,
+    modelVersion: "heuristic-v0",
+  };
+}
 
 function validate(img: RgbaImage): Required<RgbaImage> & { data: Uint8ClampedArray | Uint8Array } {
   if (!img.data || img.width < 16 || img.height < 16) throw new Error("analysis input too small");

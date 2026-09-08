@@ -28,6 +28,7 @@ import { StorageService } from "../src/media/storage.service.js";
  *  - keys outside the clinic-scoped allowlist are rejected
  *  - bodies are size-capped
  *  - audit entries are created for successful reads/writes
+ *  - a `part` write stores its OWN object (phase 8), it is not appended
  */
 
 let app: NestFastifyApplication;
@@ -50,6 +51,11 @@ function deterministicUUID(input: string): string {
 
 const CID = deterministicUUID("clinic-a.dev");
 const PFX = `clinic-${CID}/test`;
+
+/** The ETag the mock driver mints for a part: md5 of the bytes, like S3. */
+function partEtag(body: Buffer): string {
+  return `"${createHash("md5").update(body).digest("hex")}"`;
+}
 
 beforeAll(async () => {
   await migrate(process.env.MIGRATE_DATABASE_URL!);
@@ -160,18 +166,71 @@ describe("mock-s3 PUT body validation", () => {
   });
 });
 
-describe("mock-s3 multipart append", () => {
-  it("accepts part writes and reassembles", async () => {
+/**
+ * Phase 8: a part write is NOT an append. Each part becomes its own
+ * content-addressed object and the target key only exists once the upload is
+ * completed, which is what makes part order, retries and resume mean something
+ * in the dev/test driver (H7). These tests assert that contract instead of the
+ * append behaviour the driver deliberately stopped implementing.
+ */
+describe("mock-s3 multipart part writes (phase 8)", () => {
+  it("stores every part as its own object with its own etag", async () => {
     const key = `${PFX}/multipart-${Date.now()}.bin`;
-    const q1 = signed(key, 1);
-    const res1 = await http.put("/api/v1/mock-s3").query(q1).set("Content-Type", "application/octet-stream").send(Buffer.from("part-one-"));
+    const one = Buffer.from("part-one-");
+    const two = Buffer.from("part-two");
+
+    const res1 = await http
+      .put("/api/v1/mock-s3")
+      .query(signed(key, 1))
+      .set("Content-Type", "application/octet-stream")
+      .send(one);
     expect(res1.status).toBe(200);
+    expect(res1.body.ok).toBe(true);
+    expect(res1.body.bytes).toBe(one.length);
+    expect(res1.body.etag).toBe(partEtag(one));
 
-    const q2 = signed(key, 2);
-    const res2 = await http.put("/api/v1/mock-s3").query(q2).set("Content-Type", "application/octet-stream").send(Buffer.from("part-two"));
+    const res2 = await http
+      .put("/api/v1/mock-s3")
+      .query(signed(key, 2))
+      .set("Content-Type", "application/octet-stream")
+      .send(two);
     expect(res2.status).toBe(200);
+    expect(res2.body.bytes).toBe(two.length);
+    expect(res2.body.etag).toBe(partEtag(two));
+    // Content-addressed: two different parts can never share an ETag.
+    expect(res2.body.etag).not.toBe(res1.body.etag);
 
-    const resGet = await http.get("/api/v1/mock-s3").query(signed(key));
-    expect(resGet.status).toBe(200);
+    // Each part is a real, independently readable object.
+    for (const part of [1, 2]) {
+      const partRes = await http.get("/api/v1/mock-s3").query(signed(StorageService.mockPartKey(key, part)));
+      expect(partRes.status).toBe(200);
+    }
+
+    // The target itself does NOT exist yet: parts are not appended to it.
+    const targetRes = await http.get("/api/v1/mock-s3").query(signed(key));
+    expect(targetRes.status).not.toBe(200);
+    expect([403, 404]).toContain(targetRes.status);
+  });
+
+  it("re-uploading a part replaces it and keeps the etag content-addressed", async () => {
+    const key = `${PFX}/multipart-retry-${Date.now()}.bin`;
+    const first = Buffer.from("first-attempt");
+    const retry = Buffer.from("retried-attempt-with-different-bytes");
+
+    const res1 = await http
+      .put("/api/v1/mock-s3")
+      .query(signed(key, 1))
+      .set("Content-Type", "application/octet-stream")
+      .send(first);
+    expect(res1.body.etag).toBe(partEtag(first));
+
+    const res2 = await http
+      .put("/api/v1/mock-s3")
+      .query(signed(key, 1))
+      .set("Content-Type", "application/octet-stream")
+      .send(retry);
+    expect(res2.status).toBe(200);
+    expect(res2.body.bytes).toBe(retry.length);
+    expect(res2.body.etag).toBe(partEtag(retry));
   });
 });
