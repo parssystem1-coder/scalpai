@@ -26,13 +26,13 @@ let db: DbService;
 const A = { email: "owner@clinic-a.test", password: "Dev12345!" };
 const B = { email: "owner@clinic-b.test", password: "Dev12345!" };
 
-
 let phoneSeq = 0;
 /** Unique-per-call 11-digit mobile — same-ms callers must never collide (partial unique index!). */
 function nextPhone(): string {
   const seq = ++phoneSeq;
   return `0912${String(Date.now()).slice(-6)}${seq}`.slice(0, 11);
 }
+
 async function login(creds: { email: string; password: string }): Promise<string> {
   const res = await http.post("/api/v1/auth/login").send(creds);
   expect(res.status).toBe(201);
@@ -85,7 +85,7 @@ interface InitResult {
 
 async function initUpload(token: string, pid: string): Promise<InitResult> {
   const res = await http
-    .post(`/api/v1/patients/${pid}/gallery/init`)
+    .post(`/api/v1/patients/${pid}/gallery/uploads`)
     .set("Authorization", `Bearer ${token}`)
     .send({ mime: "image/jpeg", sizeBytes: 200_000 });
   return { status: res.status, id: res.body.id, uploadUrl: res.body.uploadUrl };
@@ -173,7 +173,7 @@ describe("media pipeline (playbook 2.1)", () => {
   });
 
   it("rejects unauthenticated init", async () => {
-    expect((await http.post("/api/v1/patients/x/gallery/init").send({ mime: "image/jpeg", sizeBytes: 2000 })).status).toBe(401);
+    expect((await http.post("/api/v1/patients/x/gallery/uploads").send({ mime: "image/jpeg", sizeBytes: 2000 })).status).toBe(401);
   });
 });
 
