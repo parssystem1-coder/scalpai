@@ -18,6 +18,11 @@ import { describe, expect, it } from "vitest";
  * `BACKUP_ENCRYPTION_PASSPHRASE` is gone - encryption is now age with a mounted
  * recipients file - so the "every secret is mandatory" check tracks the new
  * variables. The rule it enforces is unchanged: no shared default, ever.
+ *
+ * M17 note: the API image ships production dependencies only, and the migration
+ * runs from compiled output. Those are the two halves of one decision - a
+ * runtime that needs a TypeScript runner needs the whole dev tree with it - so
+ * they are asserted together below.
  */
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -119,7 +124,7 @@ describe("C8 - runtime never uses the database owner role", () => {
 describe("C8 - migrations are a separate one-shot service the app waits for", () => {
   it("declares a migrate service that runs once", () => {
     expect(prod).toMatch(/^ {2}migrate:$/m);
-    expect(prod).toContain('command: ["npm", "run", "db:migrate"]');
+    expect(prod).toContain('command: ["npm", "run", "db:migrate:prod"]');
     expect(prod).toContain('restart: "no"');
   });
 
@@ -172,6 +177,42 @@ describe("C8/H16 - images build from the lockfile with real native modules", () 
     expect(steps).toContain("npm ci --legacy-peer-deps");
     expect(steps).not.toContain("npm install");
     expect(steps).not.toContain("if [ -f package-lock.json ]");
+  });
+});
+
+/**
+ * M17 - what the image SHIPS, not only what it builds.
+ *
+ * The api image used to copy the builder's whole node_modules, dev tree
+ * included, because the one-shot migrate service needed a TypeScript runner from
+ * that same image. `npm run audit:ci` runs with --omit=dev, so nothing in the
+ * pipeline described the packages the image actually carried - image-scan.sh
+ * was the first gate that looked, and it failed on them.
+ */
+describe("M17 - the API runtime carries production dependencies only", () => {
+  it("resolves the runtime tree from the same lockfile with --omit=dev", () => {
+    const directives = code(apiDockerfile);
+    expect(directives).toContain("npm ci --omit=dev --legacy-peer-deps");
+    expect(directives).toContain("AS prod-deps");
+    expect(directives).toContain("COPY --from=prod-deps /app ./");
+  });
+
+  it("never copies the builder's node_modules into the runtime", () => {
+    expect(code(apiDockerfile)).not.toMatch(/COPY --from=builder[^\n]*node_modules/);
+  });
+
+  it("takes only compiled output from the builder", () => {
+    const copies = [...code(apiDockerfile).matchAll(/^COPY --from=builder \S+ (\S+)$/gm)].map((m) => m[1]!);
+    expect(copies.length).toBeGreaterThan(0);
+    for (const target of copies) expect(target, `${target} is not compiled output`).toMatch(/\/dist$/);
+  });
+
+  it("migrates from compiled output, so no TypeScript runner has to be installed", () => {
+    expect(rootPkg.scripts["db:migrate:prod"]).toBe("node packages/db/dist/migrate-cli.js");
+    // The source-based script stays: CI, nightly and the drill all call it
+    // straight after `npm ci`, before anything has been built.
+    expect(rootPkg.scripts["db:migrate"]).toContain("packages/db/src/migrate-cli.ts");
+    expect(ci).toContain("run-gate.sh db-migrate npm run db:migrate");
   });
 });
 

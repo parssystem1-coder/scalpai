@@ -62,12 +62,16 @@ services:
   # One-shot schema owner. Runs as the OWNER role, applies every migration and
   # provisions the scalpai_app / scalpai_auth roles (ADR-0029), then exits.
   # The API waits for a successful exit - it can never race the schema.
+  #
+  # M17: the COMPILED migration CLI (packages/db/dist/migrate-cli.js). A
+  # production image that has to keep a TypeScript runner installed in order to
+  # migrate is a production image that ships its whole dev tree to be scanned.
   migrate:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
     working_dir: /app
-    command: ["npm", "run", "db:migrate"]
+    command: ["npm", "run", "db:migrate:prod"]
     restart: "no"
     environment:
       - NODE_ENV=production
