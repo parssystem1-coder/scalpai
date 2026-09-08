@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, Wifi, WifiOff, CheckCircle2, AlertCircle, ArrowUpRight, Database, X, GitCompare, Layers } from "lucide-react";
 import { useSync } from "../offline/SyncProvider.js";
@@ -42,19 +42,19 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
     },
   ];
 
-  const loadOutbox = async () => {
+  const loadOutbox = useCallback(async () => {
     try {
       setOutboxItems(await listOutbox());
     } catch {
       setOutboxItems([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       void loadOutbox();
     }
-  }, [isOpen, pendingCount]);
+  }, [isOpen, pendingCount, loadOutbox]);
 
   if (!isOpen) return null;
 
@@ -133,7 +133,9 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-center">
               <button
                 type="button"
-                onClick={handleManualSync}
+                onClick={() => {
+                  void handleManualSync();
+                }}
                 disabled={isFlushing || !isOnline}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold rose-gold-gradient text-white shadow-xs hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
               >
