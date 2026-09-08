@@ -61,19 +61,23 @@ export default function BeforeAfterCompareModal({
   useEffect(() => {
     if (!isOpen) return;
 
+    // noUncheckedIndexedAccess: keep the positional lookups in guarded locals.
+    const firstPhoto = photos[0];
+    const secondPhoto = photos[1];
+
     if (photos.length >= 2) {
       const pA = defaultPhotoIdA
         ? photos.find((p) => p.id === defaultPhotoIdA)
         : photos[photos.length - 1];
       const pB = defaultPhotoIdB
         ? photos.find((p) => p.id === defaultPhotoIdB)
-        : photos[0];
+        : firstPhoto;
 
-      setPhotoAId(pA?.id || photos[0].id);
-      setPhotoBId(pB?.id || (photos[1] ? photos[1].id : photos[0].id));
+      setPhotoAId(pA?.id ?? firstPhoto?.id ?? "");
+      setPhotoBId(pB?.id ?? secondPhoto?.id ?? firstPhoto?.id ?? "");
     } else if (photos.length === 1) {
-      setPhotoAId(photos[0].id);
-      setPhotoBId(photos[0].id);
+      setPhotoAId(firstPhoto?.id ?? "");
+      setPhotoBId(firstPhoto?.id ?? "");
     }
   }, [isOpen, photos, defaultPhotoIdA, defaultPhotoIdB]);
 
@@ -96,7 +100,9 @@ export default function BeforeAfterCompareModal({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
-    handleMove(e.touches[0].clientX);
+    const touch = e.touches[0];
+    if (!touch) return;
+    handleMove(touch.clientX);
   };
 
   const stopDragging = () => setIsDragging(false);
@@ -534,7 +540,8 @@ export default function BeforeAfterCompareModal({
               onMouseMove={handleMouseMove}
               onTouchStart={(e) => {
                 setIsDragging(true);
-                handleMove(e.touches[0].clientX);
+                const touch = e.touches[0];
+                if (touch) handleMove(touch.clientX);
               }}
               onTouchMove={handleTouchMove}
             >
