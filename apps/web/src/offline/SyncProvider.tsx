@@ -38,15 +38,18 @@ interface SyncCtx {
   syncNow: () => Promise<void>;
 }
 
+// M19: the placeholders below are not async — there is nothing to await in a
+// throw or in `0`, and the promise-returning contract is kept either way
+// (require-await).
 const Ctx = createContext<SyncCtx>({
   isOnline: true,
   pendingCount: 0,
   deadLetterCount: 0,
   lastPullAt: null,
-  enqueue: async () => {
+  enqueue: () => {
     throw new Error("sync not ready");
   },
-  flush: async () => 0,
+  flush: () => Promise.resolve(0),
   syncNow: async () => {},
 });
 
