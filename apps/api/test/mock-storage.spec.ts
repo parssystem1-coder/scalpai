@@ -8,6 +8,7 @@ import { loadEnv } from "@scalpai/db";
 
 loadEnv();
 
+import { createHash } from "node:crypto";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
@@ -33,8 +34,21 @@ let app: NestFastifyApplication;
 let http: ReturnType<typeof request>;
 let db: DbService;
 
-/** Valid clinic UUID for KEY_PATTERN compliance (requires 36-char UUID). */
-const CID = "00000000-0000-0000-0000-000000000001";
+/** Derive the same deterministic UUID seed.ts uses. */
+function deterministicUUID(input: string): string {
+  const h = createHash("md5").update(input).digest();
+  h[6] = (h[6] & 0x0f) | 0x50;
+  h[8] = (h[8] & 0x3f) | 0x80;
+  return [
+    h.toString("hex", 0, 4),
+    h.toString("hex", 4, 6),
+    h.toString("hex", 6, 8),
+    h.toString("hex", 8, 10),
+    h.toString("hex", 10, 16),
+  ].join("-");
+}
+
+const CID = deterministicUUID("clinic-a.dev");
 const PFX = `clinic-${CID}/test`;
 
 beforeAll(async () => {
@@ -62,7 +76,7 @@ afterAll(async () => {
 }, 30_000);
 
 function signed(key: string, part?: number) {
-  const exp = Date.now() + 300_000; // 5 minutes from now, in milliseconds
+  const exp = Date.now() + 300_000;
   const sig = StorageService.signMockKey(key, exp);
   const q: Record<string, string | number> = { key, exp, sig };
   if (part !== undefined) q.part = part;
@@ -84,7 +98,7 @@ describe("mock-s3 signature enforcement (C1/R1)", () => {
 
   it("rejects GET with expired signature", async () => {
     const key = `${PFX}/expired.jpg`;
-    const exp = Date.now() - 3_600_000; // 1 hour ago in ms
+    const exp = Date.now() - 3_600_000;
     const sig = StorageService.signMockKey(key, exp);
     const res = await http.get("/api/v1/mock-s3").query({ key, exp, sig });
     expect(res.status).toBe(403);
