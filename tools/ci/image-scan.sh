@@ -20,28 +20,63 @@ compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
-# The scan runs straight after `compose build`, BEFORE anything is booted.
-# `compose images` only reports the images of CREATED containers, so at this
-# point it is empty for every service - which is why this gate used to claim
-# nothing had been built. `compose config --images` reports the tag compose
-# builds/uses for the service (api and web declare `build:` with no `image:`,
-# so that is the derived <project>-<service> tag), which is exactly what the
-# build step just produced. `compose images` stays as a fallback for callers
-# that scan an already-running stack.
-resolve_image() {
-  local service="$1" ref=""
+image_exists() {
+  [ -n "${1:-}" ] && docker image inspect "$1" >/dev/null 2>&1
+}
 
-  # Find images whose name ends with -<service> (compose naming: <project>-<service>)
-  ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-    | grep -E "-${service}:[^<]" | head -n 1)
-  if [ -n "$ref" ] && docker image inspect "$ref" >/dev/null 2>&1; then
+# The project name compose derives build-only image tags from: prod.yml pins
+# `name: scalpai`, and `compose config` prints the resolved value on a
+# top-level `name:` line (an exported COMPOSE_PROJECT_NAME still wins there).
+compose_project() {
+  local name=""
+  name=$(compose config 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1)
+  printf '%s\n' "${name:-${COMPOSE_PROJECT_NAME:-}}"
+}
+
+# The scan runs straight after `compose build`, BEFORE anything is booted, so
+# `compose images` - which only knows the images of CREATED containers - is
+# empty at this point and can only ever be a last-resort fallback.
+#
+# ROOT CAUSE of the repeated "no image was built" failures: the previous
+# revision matched with `grep -E "-${service}:[^<]"`. A pattern beginning with
+# `-` is swallowed by grep as an option bundle ("grep: invalid option -- 'p'",
+# exit 2), so the match never ran against the images that had just been built.
+# Every pattern below is passed after `--`, and resolution now starts from the
+# project name compose itself reports instead of guessing at a tag.
+resolve_image() {
+  local service="$1" project ref=""
+  project=$(compose_project)
+
+  # 1. The tag compose gives a service that declares `build:` with no `image:`.
+  if [ -n "$project" ]; then
+    for ref in "${project}-${service}:latest" "${project}-${service}" "${project}_${service}:latest"; do
+      if image_exists "$ref"; then
+        printf '%s\n' "$ref"
+        return 0
+      fi
+    done
+  fi
+
+  # 2. What compose itself reports as the image for the service.
+  ref=$(compose config --images "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
+  if image_exists "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
 
-  # Fallback: compose images (needs running containers)
-  ref=$(compose images -q "$service" 2>/dev/null | grep -v '^$' | head -n 1)
-  if [ -n "$ref" ] && docker image inspect "$ref" >/dev/null 2>&1; then
+  # 3. Any local image whose repository ends in -<service> / _<service>.
+  ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+    | grep -E -- "[-_]${service}:" \
+    | grep -v -- ':<none>$' \
+    | head -n 1)
+  if image_exists "$ref"; then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+
+  # 4. An already-running stack (callers that scan a booted deployment).
+  ref=$(compose images -q "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
+  if image_exists "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
@@ -57,6 +92,9 @@ for service in $services; do
   ref=$(resolve_image "$service")
   if [ -z "$ref" ]; then
     echo "::error::no image was built for compose service '$service'"
+    # A resolution failure has to be debuggable from the evidence log alone.
+    echo "--- compose project: '$(compose_project)' / images on this runner ---"
+    docker images --format '{{.Repository}}:{{.Tag}}  {{.ID}}  {{.CreatedSince}}' || true
     fail=1
     continue
   fi

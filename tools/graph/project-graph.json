@@ -32,6 +32,7 @@
       "dependsOn": [
         "@scalpai/analysis-core",
         "@scalpai/db",
+        "@scalpai/licensing",
         "@scalpai/shared",
         "@scalpai/sync-client"
       ]
@@ -99,6 +100,6 @@
   "counts": {
     "apps": 5,
     "packages": 7,
-    "dependencyEdges": 13
+    "dependencyEdges": 14
   }
 }

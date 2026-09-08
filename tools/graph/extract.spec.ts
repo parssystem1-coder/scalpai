@@ -35,7 +35,7 @@ describe("project graph extractor (v0)", () => {
   it("counts are consistent with module list in the real repo", () => {
     const g = build();
     expect(g.counts.apps).toBe(5);
-    expect(g.counts.packages).toBe(9);
+    expect(g.counts.packages).toBe(7);
     expect(g.modules).toHaveLength(g.counts.apps + g.counts.packages);
   });
 

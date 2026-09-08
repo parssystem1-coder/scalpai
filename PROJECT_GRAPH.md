@@ -4,7 +4,7 @@
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 
-**At a glance:** 5 apps · 7 packages · 13 internal dependency edges
+**At a glance:** 5 apps · 7 packages · 14 internal dependency edges
 
 ## Modules
 
@@ -13,7 +13,7 @@ Descriptive only: answers *what exists*. Correctness is the conformance harness'
 | `@scalpai/analysis-core` | package | `packages/analysis-core` | — |
 | `@scalpai/analysis-engine` | package | `packages/analysis-engine` | `@scalpai/analysis-core`, `@scalpai/shared` |
 | `@scalpai/app-admin` | app | `apps/admin` | — |
-| `@scalpai/app-api` | app | `apps/api` | `@scalpai/analysis-core`, `@scalpai/db`, `@scalpai/shared`, `@scalpai/sync-client` |
+| `@scalpai/app-api` | app | `apps/api` | `@scalpai/analysis-core`, `@scalpai/db`, `@scalpai/licensing`, `@scalpai/shared`, `@scalpai/sync-client` |
 | `@scalpai/app-desktop` | app | `apps/desktop` | — |
 | `@scalpai/app-portal` | app | `apps/portal` | — |
 | `@scalpai/app-web` | app | `apps/web` | `@scalpai/analysis-engine`, `@scalpai/education`, `@scalpai/shared`, `@scalpai/sync-client` |

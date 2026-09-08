@@ -30,10 +30,22 @@ interface ModuleNode {
   dependsOn: string[];
 }
 
+/**
+ * A fixed, NAMED set of counts - not an open string map. Under
+ * `noUncheckedIndexedAccess` a `Record<string, number>` makes every
+ * `counts.apps` read `number | undefined` at the call site (TS18048), which is
+ * a lie about a value this module always emits.
+ */
+export interface GraphCounts {
+  apps: number;
+  packages: number;
+  dependencyEdges: number;
+}
+
 export interface Graph {
   generatedFrom: { commit: string; dirty: boolean };
   modules: ModuleNode[];
-  counts: Record<string, number>;
+  counts: GraphCounts;
 }
 
 function cmp(a: string, b: string): number {
