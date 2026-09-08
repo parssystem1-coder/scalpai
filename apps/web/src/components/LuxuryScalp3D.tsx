@@ -21,7 +21,9 @@ const MARKERS: DiagnosticMarker[] = [
 export default function LuxuryScalp3D() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<VisualMode>("silk");
-  const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0]);
+  // noUncheckedIndexedAccess: MARKERS is a non-empty literal, so the null branch
+  // is unreachable and the initial selection is still the first marker.
+  const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0] ?? null);
   const [_isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
