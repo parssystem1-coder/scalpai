@@ -26,7 +26,13 @@ function deterministicUUID(input: string): string {
   ].join("-");
 }
 
-export async function seed(config: string | import("pg").PoolConfig): Promise<{ skipped?: boolean; clinicA?: string; clinicB?: string }> {
+interface SeedResult {
+  skipped?: boolean;
+  clinicA?: string;
+  clinicB?: string;
+}
+
+export async function seed(config: string | import("pg").PoolConfig): Promise<SeedResult> {
   const poolConfig = typeof config === "string" ? { connectionString: config, max: 1 } : { ...config, max: 1 };
   const pool = new Pool(poolConfig);
   const client = await pool.connect();
