@@ -153,9 +153,17 @@ export class AuthService {
     }
   }
 
+  /**
+   * M19: `jwt.decode(token, { complete: true })` is typed as `any`, so the old
+   * one-liner leaked `any` through the assignment, the `.header` access and the
+   * return value. The header is attacker-supplied data — treat it as unknown and
+   * hand back a `kid` only when it really is a string.
+   */
   private tokenKid(token: string): string | null {
-    const decoded = this.jwt.decode(token, { complete: true });
-    return decoded?.header?.kid ?? null;
+    const decoded: unknown = this.jwt.decode(token, { complete: true });
+    if (typeof decoded !== "object" || decoded === null || !("header" in decoded)) return null;
+    const { header } = decoded as { header?: { kid?: unknown } };
+    return typeof header?.kid === "string" ? header.kid : null;
   }
 
   /**
