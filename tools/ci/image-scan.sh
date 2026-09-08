@@ -25,29 +25,29 @@ image_exists() {
 }
 
 # The project name compose derives build-only image tags from: prod.yml pins
-# `name: scalpai`, and `compose config` prints the resolved value on a
-# top-level `name:` line (an exported COMPOSE_PROJECT_NAME still wins there).
+# name: scalpai, and compose config prints the resolved value.
 compose_project() {
   local name=""
+  # Two tries: first as if compose can render config (normal case), second as
+  # a fallback for when env file has missing secrets (CI sometimes generates
+  # placeholders that don't resolve). A safe fallback is the COMPOSE_PROJECT_NAME
+  # env var, which docker compose itself checks.
   name=$(compose config 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1)
-  printf '%s\n' "${name:-${COMPOSE_PROJECT_NAME:-}}"
+  [ -n "$name" ] && printf '%s\n' "$name" && return 0
+  name="${COMPOSE_PROJECT_NAME:-}"
+  [ -n "$name" ] && printf '%s\n' "$name" && return 0
+  return 1
 }
 
-# The scan runs straight after `compose build`, BEFORE anything is booted, so
-# `compose images` - which only knows the images of CREATED containers - is
-# empty at this point and can only ever be a last-resort fallback.
-#
-# ROOT CAUSE of the repeated "no image was built" failures: the previous
-# revision matched with `grep -E "-${service}:[^<]"`. A pattern beginning with
-# `-` is swallowed by grep as an option bundle ("grep: invalid option -- 'p'",
-# exit 2), so the match never ran against the images that had just been built.
-# Every pattern below is passed after `--`, and resolution now starts from the
-# project name compose itself reports instead of guessing at a tag.
+# Resolution order: try compose's derived tag, then what compose reports,
+# then any image matching the service name, then compose images as last resort.
+# The grep patterns all use -- to stop option parsing, so a pattern can start
+# with - without being swallowed as an option.
 resolve_image() {
   local service="$1" project ref=""
-  project=$(compose_project)
+  project=$(compose_project) || true
 
-  # 1. The tag compose gives a service that declares `build:` with no `image:`.
+  # 1. The default tag for a service with build: and no image: key.
   if [ -n "$project" ]; then
     for ref in "${project}-${service}:latest" "${project}-${service}" "${project}_${service}:latest"; do
       if image_exists "$ref"; then
@@ -57,26 +57,26 @@ resolve_image() {
     done
   fi
 
-  # 2. What compose itself reports as the image for the service.
+  # 2. What compose itself reports for this service.
   ref=$(compose config --images "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
-  if image_exists "$ref"; then
+  if [ -n "$ref" ] && image_exists "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
 
-  # 3. Any local image whose repository ends in -<service> / _<service>.
+  # 3. Any image in docker images whose name ends in -<service> or _<service>.
+  # Filter out <none> tags (dangling layers).
   ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-    | grep -E -- "[-_]${service}:" \
-    | grep -v -- ':<none>$' \
+    | grep -E -- "[-_]${service}:[a-z0-9]" \
     | head -n 1)
-  if image_exists "$ref"; then
+  if [ -n "$ref" ] && image_exists "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
 
-  # 4. An already-running stack (callers that scan a booted deployment).
+  # 4. Last resort: an already-running stack.
   ref=$(compose images -q "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
-  if image_exists "$ref"; then
+  if [ -n "$ref" ] && image_exists "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
@@ -92,12 +92,14 @@ for service in $services; do
   ref=$(resolve_image "$service")
   if [ -z "$ref" ]; then
     echo "::error::no image was built for compose service '$service'"
-    # A resolution failure has to be debuggable from the evidence log alone.
-    echo "--- compose project: '$(compose_project)' / images on this runner ---"
-    docker images --format '{{.Repository}}:{{.Tag}}  {{.ID}}  {{.CreatedSince}}' || true
+    # A resolution failure has to be debuggable from the log alone.
+    echo "--- debug: compose project: '$(compose_project || echo 'unresolvable')' ---"
+    echo "--- debug: docker images on this runner ---"
+    docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}' || true
     fail=1
     continue
   fi
+
   echo "=== $service ($ref): HIGH + CRITICAL report ==="
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
