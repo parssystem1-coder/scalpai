@@ -31,22 +31,22 @@ compose() {
 resolve_image() {
   local service="$1" ref=""
 
-  # Method 1: derive from compose config (works before containers exist)
-  ref=$(compose config --images "$service" 2>/dev/null | head -n 1)
-  # Method 2: if the image is already local, find it by name pattern
-  if [ -z "$ref" ]; then
-    ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E "(^|/)${service}:" | head -n 1)
-  fi
-  # Method 3: fallback to compose images (needs running containers)
-  if [ -z "$ref" ]; then
-    ref=$(compose images -q "$service" 2>/dev/null | head -n 1)
+  # Find images whose name ends with -<service> (compose naming: <project>-<service>)
+  ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+    | grep -E "-${service}:[^<]" | head -n 1)
+  if [ -n "$ref" ] && docker image inspect "$ref" >/dev/null 2>&1; then
+    printf '%s\n' "$ref"
+    return 0
   fi
 
-  [ -n "$ref" ] || return 1
-  # A resolved name is not proof: the image has to be present locally.
-  docker image inspect "$ref" >/dev/null 2>&1 || return 1
+  # Fallback: compose images (needs running containers)
+  ref=$(compose images -q "$service" 2>/dev/null | grep -v '^$' | head -n 1)
+  if [ -n "$ref" ] && docker image inspect "$ref" >/dev/null 2>&1; then
+    printf '%s\n' "$ref"
+    return 0
+  fi
 
-  printf '%s\n' "$ref"
+  return 1
 }
 
 mkdir -p "$CACHE_DIR"
