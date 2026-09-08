@@ -273,7 +273,19 @@ export default function LuxuryScalp3D() {
           return (
             <div
               key={m.id}
+              // M19/jsx-a11y: the marker chips were bare <div onClick> — mouse only
+              // and invisible to the keyboard and to assistive tech.
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`${m.title}: ${m.value}`}
               onClick={() => setSelectedMarker(m)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedMarker(m);
+                }
+              }}
               style={{
                 position: "absolute",
                 ...pos,
