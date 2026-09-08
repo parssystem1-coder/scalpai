@@ -586,7 +586,17 @@ export default function GuidedCaptureModal({
             return (
               <div
                 key={step.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isActive}
                 onClick={() => setActiveStepIndex(idx)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setActiveStepIndex(idx);
+                  }
+                }}
                 className={`p-2.5 rounded-xl border text-right transition-all cursor-pointer relative group ${
                   isActive
                     ? "bg-cyan-950/60 border-cyan-500 text-white shadow-xs"
@@ -636,7 +646,7 @@ export default function GuidedCaptureModal({
                 if (isLiveCamera) {
                   stopCamera();
                 } else {
-                  startCamera(selectedDeviceId);
+                  void startCamera(selectedDeviceId);
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
@@ -668,7 +678,7 @@ export default function GuidedCaptureModal({
                 onChange={(e) => {
                   setSelectedDeviceId(e.target.value);
                   if (isLiveCamera) {
-                    startCamera(e.target.value);
+                    void startCamera(e.target.value);
                   }
                 }}
                 className="bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-xs text-stone-200 focus:outline-none"
@@ -951,7 +961,7 @@ export default function GuidedCaptureModal({
                   setFocusQuality(focusQuality === "pass" ? "warn" : "pass");
                 }}
                 className="p-3 rounded-2xl bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                title={isFa ? "شبیه‌سازی بازتنظیم فوکوس" : "Calibrate Focus"}
+                title={isFa ? "شبیه‌سازی بازتنطیم فوکوس" : "Calibrate Focus"}
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
@@ -1131,4 +1141,3 @@ export default function GuidedCaptureModal({
     </div>
   );
 }
-
