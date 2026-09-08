@@ -209,10 +209,10 @@ export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
             {activeTab === "signin" && (
               <SignInForm
                 onSubmit={() => {
-                  navigate("/login");
+                  void navigate("/login");
                 }}
                 onDemoLogin={() => {
-                  navigate("/login");
+                  void navigate("/login");
                 }}
                 onForgotPassword={() => showToast("بازیابی رمز", "لینک بازنشانی رمز به ایمیل ارسال شد.")}
               />
@@ -220,7 +220,7 @@ export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
             {activeTab === "register" && (
               <RegisterForm
                 onSubmit={() => {
-                  navigate("/login");
+                  void navigate("/login");
                 }}
               />
             )}
