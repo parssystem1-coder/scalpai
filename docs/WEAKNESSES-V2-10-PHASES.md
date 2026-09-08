@@ -2,7 +2,7 @@
 
 > وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ M19 بسته شد. ۶ مورد باز مانده: M1، M5، M14، M15، L1/W01/W22/W23 و L2.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
-> تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
+> تاریخ آخرین بروزرسانی: 2026-09-08 · مخزن: `parssystem1-coder/scalpai`
 
 ## حکم ممیزی
 
@@ -208,9 +208,12 @@
 
 **هدف خروج:** ادعاهای محصول، معماری و UX با واقعیت کد یکی باشند.
 
+**وضعیت:** ۱۳ از ۱۹ مورد تکمیل شد؛ ۷ باقی‌مانده برای نشست بعدی.
+
+### تکمیل‌شده (۱۳ مورد):
+
 - [x] **H10** پارامتر `q/search` یکسان و تست regression برای search واقعی اضافه شود؛ trigram index واقعاً استفاده شود.
 - [x] **H13** تحلیل client را با image hash، model manifest/version، signature یا server verification قابل اثبات کن؛ label «کمکی و غیرتشخیصی» اجباری.
-- [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
 - [x] **M2** licensing واقعاً به endpoint و verify Ed25519 وصل شود؛ متن «Verified» از mock نیاید.
 - [x] **M3** desktop یا Electron واقعی شود یا ادعای سخت‌افزار از scope و docs حذف شود.
 - [x] **M4/M16** packageهای scaffold/BOM، کدهای unused، duplicate audit-anchor و assetهای بدون reference حذف یا ثبت شوند. (بسته شده در branch feat/phase10-batch1-debt-removal — ADR-0044: `packages/ui` و `packages/notify` حذف شدند (بدون هیچ import و بدون manifest وابسته از ابتدا)؛ `ops/audit-anchor.ts` حذف شد چون hash روی زنجیره‌ی به‌هم‌چسبیده را «Merkle root» می‌نامید و chain verifier آن هرگز row hash را recompute نمی‌کرد — پیاده‌سازی واقعی `packages/db/src/audit-anchor.ts` است؛ درخت `src/assets/images` ریشه حذف شد (۸ فایل، ۶.۰ مگابایت، بدون هیچ reference). **هر دو استثنای `package-call-site` از `exceptions.json` برداشته شد** تا rule بر اساس واقعیت سبز شود نه با ثبت استثنا. شواهد: بلوک `M4/M16` در `tools/quality/product.phase10.spec.ts`)
@@ -221,8 +224,18 @@
 - [x] **M18** فونت‌ها self-host و تعدادشان کم شود؛ third-party CDN برای self-hosted حذف شود.
 - [x] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند. `noUncheckedIndexedAccess`، `noImplicitOverride`، `noImplicitReturns`، `noFallthroughCasesInSwitch` در `tooling/tsconfig/base.json` فعال شد؛ ESLint با `type-aware` rules، `react-hooks` و `jsx-a11y` پیکربندی شد؛ `typesafety.phase10-m19.spec.ts` نوشته شد؛ تمام خطاهای typecheck در `app-web` و `app-api` (بیش از ۱۰۰ خطا) بسته شد؛ تمام ۷۲ خطای lint (jsx-a11y، no-floating-promises، no-misused-promises، no-unsafe-*) در ۲۴ فایل اصلاح شد. ADR-0046 مستند شد.
 - [x] **M20** README، LICENSE، SECURITY.md، `.env.example`، CODEOWNERS، PR template و Dependabot اضافه شوند.
+- [x] **M7/R13** Firebase/metadata و هر secret/scaffold غیرمصرفی بررسی، حذف یا rotate شود؛ secret scan باید json/yaml/ops/root را هم ببیند.
+- [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
+- [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
+
+### باقی‌مانده (۷ مورد) برای نشست بعدی:
+
+- [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
+- [ ] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند.
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
+- [ ] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند.
+- [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036)
 - [ ] **L2** dashboard بزرگ به component/hookهای کوچک‌تر و یک سیستم style استاندارد شکسته شود.
 - [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036. توجه: ADR-0044 در گذر، هدر همین فایل و ادعای `pnpm graph` در `PROJECT_GRAPH.md` را اصلاح کرد؛ آن اصلاح این آیتم نیست)
 - [x] **PR #21** به‌دلیل base قدیمی و diff آرایشی rebase/بسته شود؛ **PR #23** چون diff مؤثر ندارد بسته شود. (تأیید شد: هر دو در 2026-09-06 بدون merge بسته شده‌اند — #21 با +13/-12 روی یک فایل و base سه کامیت عقب‌تر از main، #23 بدون diff مؤثر. هیچ‌کدام بازگشایی نشد — ADR-0044)
