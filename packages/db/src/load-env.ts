@@ -13,7 +13,12 @@ export function loadEnv(root = process.cwd()): void {
     if (existsSync(p)) {
       for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
         const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-        if (m && !(m[1] in process.env)) process.env[m[1]] = m[2];
+        if (!m) continue;
+        // noUncheckedIndexedAccess: the regex has exactly 2 capture groups, so
+        // both are present on a match; the guard/fallback are unreachable.
+        const [, key, value] = m;
+        if (key === undefined) continue;
+        if (!(key in process.env)) process.env[key] = value ?? "";
       }
       return;
     }
