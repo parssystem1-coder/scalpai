@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ ۷ مورد باز مانده: M1، M5، M14، M15، M19، L1/W01/W22/W23 و L2.**
+> وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ M19 بسته شد. ۶ مورد باز مانده: M1، M5، M14، M15، L1/W01/W22/W23 و L2.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ ممیزی: 2026-09-06 · مخزن: `parssystem1-coder/scalpai`
 
@@ -219,7 +219,7 @@
 - [x] **M11** error filter SPA fallback را non-blocking/cached کند، 404 واقعی را نبلعد و log را scrub کند.
 - [x] **M13** timezone کلینیک در DB/settings استاندارد شود؛ تاریخ آینده در relative time درست نمایش داده شود.
 - [x] **M18** فونت‌ها self-host و تعدادشان کم شود؛ third-party CDN برای self-hosted حذف شود.
-- [ ] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند. (blocker لاک‌فایل با ADR-0044 برداشته شد؛ خودِ کار باز است و باید در branch مستقل با خواندن خطاهای واقعی انجام شود، نه با land کردن کورکورانه‌ی config)
+- [x] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند. `noUncheckedIndexedAccess`، `noImplicitOverride`، `noImplicitReturns`، `noFallthroughCasesInSwitch` در `tooling/tsconfig/base.json` فعال شد؛ ESLint با `type-aware` rules، `react-hooks` و `jsx-a11y` پیکربندی شد؛ `typesafety.phase10-m19.spec.ts` نوشته شد؛ تمام خطاهای typecheck در `app-web` و `app-api` (بیش از ۱۰۰ خطا) بسته شد؛ تمام ۷۲ خطای lint (jsx-a11y، no-floating-promises، no-misused-promises، no-unsafe-*) در ۲۴ فایل اصلاح شد. ADR-0046 مستند شد.
 - [x] **M20** README، LICENSE، SECURITY.md، `.env.example`، CODEOWNERS، PR template و Dependabot اضافه شوند.
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
@@ -245,7 +245,7 @@
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
 - [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
-- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ باز: M1، M5، M14، M15، M19، L1/W01/W22/W23، L2)
+- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19 بسته شد؛ باز: M1، M5، M14، M15، L1/W01/W22/W23، L2)
 
 ## روش بستن هر فاز
 
