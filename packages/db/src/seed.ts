@@ -1,6 +1,6 @@
 import { loadEnv } from "./load-env.js";
 loadEnv();
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { hash } from "@node-rs/argon2";
 import { Pool } from "pg";
 
@@ -8,7 +8,24 @@ import { Pool } from "pg";
  * Dev/demo seed (phase 1): two clinics for cross-tenant negative tests,
  * one user per role for clinic A, starter+growth plans, entitlements.
  * Idempotent: skips when the marker clinic already exists.
+ *
+ * Clinic IDs are DETERMINISTIC (derived from the clinic name) so that tests
+ * and documentation can reference them reliably. This is safe for non-production
+ * only: production must never hash identifiers.
  */
+function deterministicUUID(input: string): string {
+  const h = createHash("md5").update(input).digest();
+  h[6] = (h[6] & 0x0f) | 0x50;
+  h[8] = (h[8] & 0x3f) | 0x80;
+  return [
+    h.toString("hex", 0, 4),
+    h.toString("hex", 4, 6),
+    h.toString("hex", 6, 8),
+    h.toString("hex", 8, 10),
+    h.toString("hex", 10, 16),
+  ].join("-");
+}
+
 export async function seed(config: string | import("pg").PoolConfig): Promise<{ skipped?: boolean; clinicA?: string; clinicB?: string }> {
   const poolConfig = typeof config === "string" ? { connectionString: config, max: 1 } : { ...config, max: 1 };
   const pool = new Pool(poolConfig);
@@ -19,13 +36,12 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<{ 
 
     const password = process.env.SEED_PASSWORD ?? "Dev12345!";
     const argon = await hash(password);
-    const clinicA = randomUUID();
-    const clinicB = randomUUID();
+    const clinicA = deterministicUUID("clinic-a.dev");
+    const clinicB = deterministicUUID("clinic-b.dev");
 
     try {
       await client.query("BEGIN");
 
-      // Plans catalog — new plan = INSERT only (§9.1)
       await client.query(
         `INSERT INTO plans (code, name, price, interval, limits) VALUES
          ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1,"monthly_sessions":5}'),
@@ -120,7 +136,7 @@ if (isCli) {
   
   seed(config)
     .then((r) => {
-      console.log(r.skipped ? "seed: already seeded" : "seed: done (2 clinics)");
+      console.log(r.skipped ? "seed: already seeded" : `seed: done (2 clinics: A=${r.clinicA}, B=${r.clinicB})`);
       process.exit(0);
     })
     .catch((e: Error) => {
