@@ -37,13 +37,18 @@ function useMockItems(): GalleryItem[] | null {
       "/trichoscopy/temporal.jpg",
       "/trichoscopy/occiput.jpg",
     ];
-    return Array.from({ length: n }, (_, i) => ({
-      id: `mock-${i}`,
-      createdAt: new Date().toISOString(),
-      quality: null,
-      thumbUrl: sampleUrls[i % sampleUrls.length],
-      viewUrl: sampleUrls[i % sampleUrls.length],
-    }));
+    return Array.from({ length: n }, (_, i) => {
+      // noUncheckedIndexedAccess: the modulo keeps this in range, so `?? null`
+      // is unreachable and only aligns the type with GalleryItem.
+      const url = sampleUrls[i % sampleUrls.length] ?? null;
+      return {
+        id: `mock-${i}`,
+        createdAt: new Date().toISOString(),
+        quality: null,
+        thumbUrl: url,
+        viewUrl: url,
+      };
+    });
   }, [mock]);
 }
 
