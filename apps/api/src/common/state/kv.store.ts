@@ -40,11 +40,41 @@ interface MemoryEntry {
   expiresAt: number;
 }
 
+/**
+ * The memory driver is a `Map`, so none of its work is actually asynchronous.
+ * M19: the methods used to be `async` with no `await` in the body (require-await)
+ * -- they now return resolved promises to satisfy the `KvStore` contract without
+ * claiming to wait for anything. Call sites are unchanged.
+ */
 export class MemoryKvStore implements KvStore {
   readonly driver = "memory" as const;
   private entries = new Map<string, MemoryEntry>();
 
-  async get(key: string): Promise<string | null> {
+  get(key: string): Promise<string | null> {
+    return Promise.resolve(this.read(key));
+  }
+
+  set(key: string, value: string, ttlMs: number): Promise<void> {
+    this.evict();
+    this.entries.set(key, { value, expiresAt: Date.now() + Math.max(1, ttlMs) });
+    return Promise.resolve();
+  }
+
+  del(key: string): Promise<void> {
+    this.entries.delete(key);
+    return Promise.resolve();
+  }
+
+  hit(key: string, windowMs: number): Promise<number> {
+    return Promise.resolve(this.bump(key, windowMs));
+  }
+
+  close(): Promise<void> {
+    this.entries.clear();
+    return Promise.resolve();
+  }
+
+  private read(key: string): string | null {
     const entry = this.entries.get(key);
     if (!entry) return null;
     if (entry.expiresAt <= Date.now()) {
@@ -54,16 +84,7 @@ export class MemoryKvStore implements KvStore {
     return entry.value;
   }
 
-  async set(key: string, value: string, ttlMs: number): Promise<void> {
-    this.evict();
-    this.entries.set(key, { value, expiresAt: Date.now() + Math.max(1, ttlMs) });
-  }
-
-  async del(key: string): Promise<void> {
-    this.entries.delete(key);
-  }
-
-  async hit(key: string, windowMs: number): Promise<number> {
+  private bump(key: string, windowMs: number): number {
     const now = Date.now();
     const entry = this.entries.get(key);
     if (!entry || entry.expiresAt <= now) {
@@ -75,10 +96,6 @@ export class MemoryKvStore implements KvStore {
     // the window keeps its original deadline — a fixed window, not a rolling one
     entry.value = String(next);
     return next;
-  }
-
-  async close(): Promise<void> {
-    this.entries.clear();
   }
 
   private evict(): void {
