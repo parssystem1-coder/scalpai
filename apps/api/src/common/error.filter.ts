@@ -98,7 +98,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const req = host.switchToHttp().getRequest<FastifyRequest>();
     const locale = resolveLocale(req.headers["accept-language"]);
 
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    // M19: annotated as `number`, not left to infer HttpStatus. Every branch
+    // below writes a bare 400/409 into it, and the two checks at the bottom
+    // (`>= 500`, `=== 404`) are numeric — comparing an enum-typed local against
+    // a literal is exactly what no-unsafe-enum-comparison refuses.
+    let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: { code: string; message: string; details?: unknown } = {
       code: "INTERNAL",
       message: ERROR_MESSAGES[locale].internal,
