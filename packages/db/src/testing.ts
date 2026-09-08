@@ -76,20 +76,37 @@ export async function resetAll(migrateUrl: string): Promise<void> {
   );
 }
 
+/**
+ * M19: `pool.query` without a row type hands back `any[]`, so every `r.rows[0].id`
+ * below was an unchecked member access on `any` — and it would also have
+ * stringified `undefined` into a clinic id when the seed had not run. Both
+ * helpers now name their row shape and fail loudly instead.
+ */
+interface ClinicIdRow {
+  id: string;
+}
+
+async function seededClinicId(migrateUrl: string, seedMarker: string): Promise<string> {
+  return withPool(migrateUrl, async (pool) => {
+    const r = await pool.query<ClinicIdRow>("SELECT id FROM clinics WHERE settings->>'seed' = $1 LIMIT 1", [
+      seedMarker,
+    ]);
+    const id = r.rows[0]?.id;
+    if (!id) {
+      throw new Error(`no clinic with settings->>'seed' = '${seedMarker}' — run the seed before this test`);
+    }
+    return id;
+  });
+}
+
 /** Id of the marker clinic created by seed() (used by integration tests). */
 export async function seedMarkerClinicId(migrateUrl: string): Promise<string> {
-  return withPool(migrateUrl, async (pool) => {
-    const r = await pool.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
-    return String(r.rows[0].id);
-  });
+  return seededClinicId(migrateUrl, "v1");
 }
 
 /** Id of the second seeded clinic — the cross-tenant counterparty. */
 export async function seedOtherClinicId(migrateUrl: string): Promise<string> {
-  return withPool(migrateUrl, async (pool) => {
-    const r = await pool.query("SELECT id FROM clinics WHERE settings->>'seed' = 'other' LIMIT 1");
-    return String(r.rows[0].id);
-  });
+  return seededClinicId(migrateUrl, "other");
 }
 
 /**
@@ -102,7 +119,7 @@ export async function migrateSql<T extends Record<string, unknown> = Record<stri
   params: unknown[] = [],
 ): Promise<T[]> {
   return withPool(migrateUrl, async (pool) => {
-    const res = await pool.query(text, params);
-    return res.rows as T[];
+    const res = await pool.query<T>(text, params);
+    return res.rows;
   });
 }
