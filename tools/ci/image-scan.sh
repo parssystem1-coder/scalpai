@@ -16,12 +16,39 @@ CACHE_DIR="${TRIVY_CACHE_DIR:-/tmp/trivy-cache}"
 BLOCKING_SEVERITY="${BLOCKING_SEVERITY:-CRITICAL}"
 services="${*:-api web}"
 
+compose() {
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+}
+
+# The scan runs straight after `compose build`, BEFORE anything is booted.
+# `compose images` only reports the images of CREATED containers, so at this
+# point it is empty for every service - which is why this gate used to claim
+# nothing had been built. `compose config --images` reports the tag compose
+# builds/uses for the service (api and web declare `build:` with no `image:`,
+# so that is the derived <project>-<service> tag), which is exactly what the
+# build step just produced. `compose images` stays as a fallback for callers
+# that scan an already-running stack.
+resolve_image() {
+  local service="$1" ref=""
+
+  ref=$(compose config --images "$service" 2>/dev/null | head -n 1)
+  if [ -z "$ref" ]; then
+    ref=$(compose images -q "$service" 2>/dev/null | head -n 1)
+  fi
+
+  [ -n "$ref" ] || return 1
+  # A resolved name is not proof: the image has to be present locally.
+  docker image inspect "$ref" >/dev/null 2>&1 || return 1
+
+  printf '%s\n' "$ref"
+}
+
 mkdir -p "$CACHE_DIR"
 docker pull -q "$TRIVY_IMAGE"
 
 fail=0
 for service in $services; do
-  ref=$(docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" images -q "$service" | head -n 1)
+  ref=$(resolve_image "$service")
   if [ -z "$ref" ]; then
     echo "::error::no image was built for compose service '$service'"
     fail=1
