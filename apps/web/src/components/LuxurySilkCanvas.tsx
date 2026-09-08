@@ -304,7 +304,10 @@ export default function LuxurySilkCanvas() {
       // Dynamic Re-computation of Strands (every 2 frames for smooth performance)
       if (frameCount % 2 === 0) {
         for (let i = 0; i < strandTubes.length; i++) {
+          // noUncheckedIndexedAccess: i is bounded by strandTubes.length, so the
+          // guard never fires at runtime.
           const item = strandTubes[i];
+          if (!item) continue;
           const newPts = generateStrandPoints(
             item.angleOffset,
             item.baseRadius,
