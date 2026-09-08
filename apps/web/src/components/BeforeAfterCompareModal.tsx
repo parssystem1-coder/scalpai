@@ -245,7 +245,7 @@ export default function BeforeAfterCompareModal({
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillText(
         densityDelta >= 0
-          ? "روند رشد فولیکولی مثبت و افزایش موهای ترمینال در پی دوره درمانی مشاهده شد."
+          ? "روند رشد فولیکولی مبت و افزایش موهای ترمینال در پی دوره درمانی مشاهده شد."
           : "کاهش یا عدم تغییر محسوس تراکم موضعی • نیازمند بررسی رژیم ماینوکسیدیل و تغذیه پاپیلاری.",
         1120,
         ribbonY + 105
@@ -279,6 +279,12 @@ export default function BeforeAfterCompareModal({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // M19: React drops the promise an async handler returns, so a rejection here
+  // would bypass the catch/finally above (which is what re-enables the button).
+  const exportComparisonCard = () => {
+    void handleExportComparisonCard();
   };
 
   useEffect(() => {
@@ -378,7 +384,7 @@ export default function BeforeAfterCompareModal({
             {/* Export Card Button */}
             <button
               type="button"
-              onClick={handleExportComparisonCard}
+              onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               title="صدور کارنامه تصویری قبل و بعد برای تحویل به بیمار یا چاپ"
@@ -685,7 +691,7 @@ export default function BeforeAfterCompareModal({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleExportComparisonCard}
+              onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               title="دانلود کارنامه مقایسه در ابعاد بزرگ برای واتساپ، پرینت یا پرونده بیمار"
