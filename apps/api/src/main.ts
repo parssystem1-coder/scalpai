@@ -90,7 +90,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: false }));
   app.setGlobalPrefix("/api/v1");
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors(buildCorsOptions());
+  app.enableCors(buildCorsOptions() as any);
   await registerSecurityHeaders(app);
   app.enableShutdownHooks();
   installShutdownHandlers(app);
