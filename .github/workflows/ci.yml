@@ -506,7 +506,11 @@ jobs:
 
       - name: Migration ran exactly once, as the owner role
         working-directory: ops
-        run: bash ../tools/ci/run-gate.sh migrate-once bash -c 'docker compose -f prod.yml --env-file ci.env logs migrate && docker compose -f prod.yml --env-file ci.env logs migrate | grep -q "migrate: applied="'
+        run: >
+          bash ../tools/ci/run-gate.sh migrate-once bash -c
+          'docker compose -f prod.yml --env-file ci.env logs migrate &&
+          docker compose -f prod.yml --env-file ci.env logs migrate |
+          grep -q "migrate: applied="'
 
       - name: API answers on its own health and readiness routes
         working-directory: ops
