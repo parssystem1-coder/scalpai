@@ -1,6 +1,6 @@
 import { Module, type OnModuleInit } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, HttpAdapterHost } from "@nestjs/core";
-import { JwtModule, type JwtModuleOptions } from "@nestjs/jwt";
+import { JwtModule } from "@nestjs/jwt";
 import type { FastifyInstance } from "fastify";
 import { DbService } from "@scalpai/db";
 import { AnalysesController } from "./analyses.controller.js";
@@ -37,8 +37,6 @@ const jwt = resolveJwtConfig();
 // The mock object store is a build-time opt-in: with STORAGE_DRIVER unset (or
 // in production, where 'mock' is refused outright) the route does not exist.
 const mockStorage = isMockStorageEnabled();
-
-type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expiresIn"]>;
 
 @Module({
   imports: [

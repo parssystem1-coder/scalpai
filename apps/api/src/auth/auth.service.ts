@@ -24,8 +24,6 @@ export interface AccessClaims {
   role: Role;
 }
 
-type ExpiresIn = NonNullable<JwtSignOptions["expiresIn"]>;
-
 function unauthorized(message: string, code = "UNAUTHORIZED"): UnauthorizedException {
   return new UnauthorizedException({ code, message });
 }

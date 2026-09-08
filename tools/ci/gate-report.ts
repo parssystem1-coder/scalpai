@@ -99,7 +99,9 @@ export function parseEvidence(file: string, text: string): GateEvidence {
 export function collectEvidence(dir: string): GateEvidence[] {
   const out: GateEvidence[] = [];
   const walk = (current: string): void => {
-    let entries: import("node:fs").Dirent[] = [];
+    // M19: the catch branch returns, so the `= []` initialiser this used to
+    // carry was never read (no-useless-assignment).
+    let entries: import("node:fs").Dirent[];
     try {
       entries = readdirSync(current, { withFileTypes: true });
     } catch {

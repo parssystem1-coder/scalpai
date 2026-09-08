@@ -128,8 +128,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status = 400;
       body = { code: "VALIDATION_ERROR", message: ERROR_MESSAGES[locale].validation, details: exception.issues };
     } else if (isPgError(exception)) {
-      const code = (exception as { code: string }).code;
-      if (code === "23505" || code === "23505".slice(0)) {
+      // M19: isPgError is a type predicate now, so `exception` is narrowed to
+      // { code: string } here — no cast, and no unsafe member access.
+      const code = exception.code;
+      if (code === "23505") {
         status = 409;
         body = { code: "CONFLICT", message: ERROR_MESSAGES[locale].conflict };
       } else if (code === "23503") {
@@ -154,7 +156,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
       code: body.code,
       // Scrubbed and truncated by the logger — driver messages quote values.
-      message: (exception as Error)?.message ?? "unknown",
+      message: exception instanceof Error ? exception.message : "unknown",
     });
 
     if (status === 404 && isSpaShellCandidate(req.method, req.url)) {
@@ -169,6 +171,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 }
 
-function isPgError(e: unknown): boolean {
-  return typeof e === "object" && e !== null && "code" in e && typeof (e).code === "string";
+function isPgError(e: unknown): e is { code: string } {
+  return typeof e === "object" && e !== null && "code" in e && typeof (e as { code?: unknown }).code === "string";
 }
