@@ -147,9 +147,9 @@ function rowsOf<T>(result: unknown): T[] {
 /** First day of the clinic-local month — the period every counter is keyed by. */
 export async function clinicPeriodStart(tx: Tx, clinicId: string): Promise<string> {
   const res = await tx.execute(sql`SELECT fn_clinic_period_start(${clinicId}::uuid)::text AS period_start`);
-  const period = rowsOf<{ period_start: string }>(res)[0]?.period_start;
-  if (!period) throw new QuotaError("quota period could not be resolved for this clinic");
-  return period;
+  const row = rowsOf<{ period_start: string }>(res)[0];
+  if (!row) throw new QuotaError("quota period could not be resolved for this clinic");
+  return row.period_start;
 }
 
 export interface QuotaVerdict {
