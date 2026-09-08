@@ -122,7 +122,7 @@ export class UploadService {
     private entitlements: EntitlementService,
   ) {}
 
-  /* ── open ──────────────────────────────────────────────────────────── */
+  /* ── open ────────────────────────────────────────────────── */
 
   async open(patientId: string, dto: UploadInitDto): Promise<OpenUploadResult> {
     const ctx = this.scope.requireCtx();
@@ -196,7 +196,7 @@ export class UploadService {
     }
   }
 
-  /* ── status / resume ──────────────────────────────────────────────── */
+  /* ── status / resume ────────────────────────────────────────── */
 
   async status(sessionId: string): Promise<UploadSessionView> {
     const ctx = this.scope.requireCtx();
@@ -228,7 +228,7 @@ export class UploadService {
     };
   }
 
-  /* ── complete ─────────────────────────────────────────────────────── */
+  /* ── complete ────────────────────────────────────────────── */
 
   /**
    * Finish a multipart upload. Every declared part is verified against the
@@ -273,7 +273,7 @@ export class UploadService {
     return this.runPipeline(galleryItemId, session);
   }
 
-  /* ── abort ────────────────────────────────────────────────────────── */
+  /* ── abort ───────────────────────────────────────────────── */
 
   /**
    * Give everything back: the multipart upload in the bucket, the pending row,
@@ -306,7 +306,7 @@ export class UploadService {
     return { aborted: true };
   }
 
-  /* ── internals ────────────────────────────────────────────────────── */
+  /* ── internals ───────────────────────────────────────────── */
 
   private async requireSession(sessionId: string): Promise<UploadSessionRow> {
     const session = await this.scope.tx((tx, c) => getUploadSession(tx, c.clinicId, sessionId));
@@ -382,8 +382,9 @@ export class UploadService {
       throw errors.validation({ sizeBytes: head.bytes });
     }
 
-    // 2) magic bytes from a 32 byte range read, not from a full download
-    let sniffed: string | null = null;
+    // 2) magic bytes from a 32 byte range read, not from a full download.
+    //    M19: no initialiser — both paths below assign, so `= null` was dead.
+    let sniffed: string | null;
     try {
       sniffed = sniffImageMime(await this.storage.getObjectRange(ctx.clinicId, item.storageKey));
     } catch {
