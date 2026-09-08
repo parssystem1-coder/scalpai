@@ -65,9 +65,11 @@ describe("@scalpai/education — Storyboards & Mapper (DESIGN-V2 §11)", () => {
     expect(results.length).toBeGreaterThanOrEqual(2);
 
     // Highest score should be first (hairLossScore 75)
-    expect(results[0].condition).toBe("androgenetic_alopecia");
-    expect(results[0].severity).toBe("severe");
-    expect(results[0].stateMachineInput).toBe(3);
+    const top = results[0];
+    expect(top).toBeDefined();
+    expect(top?.condition).toBe("androgenetic_alopecia");
+    expect(top?.severity).toBe("severe");
+    expect(top?.stateMachineInput).toBe(3);
 
     // Should detect erythema
     const erythema = results.find((r) => r.condition === "erythema");
@@ -82,6 +84,6 @@ describe("@scalpai/education — Storyboards & Mapper (DESIGN-V2 §11)", () => {
   it("provides baseline educational storyboard if analysis values are minimal", () => {
     const results = mapAnalysisToStoryboards({});
     expect(results.length).toBe(1);
-    expect(results[0].condition).toBe("androgenetic_alopecia");
+    expect(results[0]?.condition).toBe("androgenetic_alopecia");
   });
 });

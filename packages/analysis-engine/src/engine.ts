@@ -21,9 +21,11 @@ export const heuristicEngine: AnalysisEngine = {
     let excess = 0;
     const px = width * height;
     for (let i = 0; i < px; i++) {
-      const r = data[i * 4];
-      const g = data[i * 4 + 1];
-      const b = data[i * 4 + 2];
+      // noUncheckedIndexedAccess: buffer length is guaranteed by validate(),
+      // so the `?? 0` fallbacks are unreachable and behaviour is unchanged.
+      const r = data[i * 4] ?? 0;
+      const g = data[i * 4 + 1] ?? 0;
+      const b = data[i * 4 + 2] ?? 0;
       const e = r - (g + b) / 2;
       if (e > 12) excess += e; // ignore sensor noise floor
     }
