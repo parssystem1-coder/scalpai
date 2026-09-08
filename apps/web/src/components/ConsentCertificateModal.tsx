@@ -33,7 +33,7 @@ export default function ConsentCertificateModal({
     window.print();
   };
 
-  const handleDownloadImage = async () => {
+  const handleDownloadImage = () => {
     if (!certRef.current) return;
     try {
       const element = certRef.current;
