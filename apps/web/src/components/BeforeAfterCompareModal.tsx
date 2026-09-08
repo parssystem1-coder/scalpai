@@ -89,6 +89,10 @@ export default function BeforeAfterCompareModal({
     setSliderPosition(percentage);
   };
 
+  const nudgeSlider = (delta: number) => {
+    setSliderPosition((prev) => Math.max(0, Math.min(100, prev + delta)));
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
     handleMove(e.clientX);
@@ -158,7 +162,7 @@ export default function BeforeAfterCompareModal({
           const img = new Image();
           img.crossOrigin = "anonymous";
           img.onload = () => resolve(img);
-          img.onerror = () => reject();
+          img.onerror = () => reject(new Error(`Failed to load comparison image: ${url}`));
           img.src = url;
         });
       };
@@ -297,7 +301,17 @@ export default function BeforeAfterCompareModal({
     <div
       id="before-after-modal-backdrop"
       className="fixed inset-0 z-[85] flex items-center justify-center bg-black/90 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-y-auto"
+      role="button"
+      tabIndex={0}
+      aria-label="پایان جابجایی نشانگر مقایسه"
       onMouseUp={stopDragging}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          stopDragging();
+        }
+      }}
     >
       <div
         id="before-after-container"
@@ -485,6 +499,9 @@ export default function BeforeAfterCompareModal({
           {viewMode === "split" ? (
             <div
               ref={containerRef}
+              role="button"
+              tabIndex={0}
+              aria-label="نشانگر مقایسه قبل و بعد - با کلیدهای جهتنما جابجا کنید"
               className="relative w-full max-w-3xl aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-stone-800 bg-black cursor-ew-resize select-none"
               onMouseDown={(e) => {
                 setIsDragging(true);
@@ -497,6 +514,24 @@ export default function BeforeAfterCompareModal({
                 if (touch) handleMove(touch.clientX);
               }}
               onTouchMove={handleTouchMove}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  nudgeSlider(-5);
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  nudgeSlider(5);
+                } else if (e.key === "Home") {
+                  e.preventDefault();
+                  setSliderPosition(0);
+                } else if (e.key === "End") {
+                  e.preventDefault();
+                  setSliderPosition(100);
+                } else if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSliderPosition(50);
+                }
+              }}
             >
               <img
                 src={photoB?.url || photoA?.url}
