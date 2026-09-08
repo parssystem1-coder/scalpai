@@ -96,7 +96,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<FastifyReply>();
     const req = host.switchToHttp().getRequest<FastifyRequest>();
-    const locale = resolveLocale(req.headers["accept-language"] as string | undefined);
+    const locale = resolveLocale(req.headers["accept-language"]);
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: { code: string; message: string; details?: unknown } = {
@@ -170,5 +170,5 @@ export class AllExceptionsFilter implements ExceptionFilter {
 }
 
 function isPgError(e: unknown): boolean {
-  return typeof e === "object" && e !== null && "code" in e && typeof (e as { code: unknown }).code === "string";
+  return typeof e === "object" && e !== null && "code" in e && typeof (e).code === "string";
 }

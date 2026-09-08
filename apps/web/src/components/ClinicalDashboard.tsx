@@ -287,6 +287,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
       for (let i = SECTIONS.length - 1; i >= 0; i--) {
         const sec = SECTIONS[i];
+        if (!sec) continue;
         const el = document.getElementById(`section-${sec.id}`);
         if (el && el.offsetTop <= scrollPos) {
           setActiveSection(sec.id);
@@ -299,7 +300,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]!);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
@@ -486,10 +487,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   };
 
   const handleLightboxTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
     if (isCaliperActive) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.touches[0].clientX - rect.left;
-      const y = e.touches[0].clientY - rect.top;
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
       setCaliperStart({ x, y });
       setCaliperEnd({ x, y });
       setIsDrawingCaliper(true);
@@ -498,23 +501,25 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     if (e.touches.length === 1 && lightboxZoom > 1) {
       setIsLightboxPanning(true);
       lightboxTouchStart.current = {
-        x: e.touches[0].clientX - lightboxPan.x,
-        y: e.touches[0].clientY - lightboxPan.y,
+        x: touch.clientX - lightboxPan.x,
+        y: touch.clientY - lightboxPan.y,
       };
     }
   };
 
   const handleLightboxTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
     if (isCaliperActive && isDrawingCaliper) {
       const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.touches[0].clientX - rect.left;
-      const y = e.touches[0].clientY - rect.top;
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
       setCaliperEnd({ x, y });
       return;
     }
     if (!isLightboxPanning || lightboxZoom <= 1 || e.touches.length !== 1) return;
-    const newX = e.touches[0].clientX - lightboxTouchStart.current.x;
-    const newY = e.touches[0].clientY - lightboxTouchStart.current.y;
+    const newX = touch.clientX - lightboxTouchStart.current.x;
+    const newY = touch.clientY - lightboxTouchStart.current.y;
     const maxPan = (lightboxZoom - 1) * 450;
     setLightboxPan({
       x: Math.max(-maxPan, Math.min(maxPan, newX)),
@@ -631,7 +636,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           ...prev,
           [selectedPatient.id]: [...newImagesList, ...(prev[selectedPatient.id] || [])],
         }));
-        setActiveInspectedPhoto(newImagesList[0]);
+        setActiveInspectedPhoto(newImagesList[0] ?? null);
         setUploadFeedback(`${newImagesList.length} فریم تریکوسکوپی با وضوح بالا در گالری و هود هوش مصنوعی ذخیره گردید.`);
         setTimeout(() => setUploadFeedback(null), 6000);
       }
@@ -651,7 +656,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     if (activeInspectedPhoto?.id === photoId) {
       const currentList = localImages[selectedPatient.id] || [];
       const remaining = currentList.filter((img) => img.id !== photoId);
-      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] : null);
+      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] ?? null : null);
     }
 
     if (previewPhotoModal?.id === photoId) {

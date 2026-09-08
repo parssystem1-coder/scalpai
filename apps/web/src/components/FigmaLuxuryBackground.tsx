@@ -178,7 +178,7 @@ function HairCanvas() {
         [232, 218, 194],
         [250, 242, 228],
         [225, 205, 178],
-      ][Math.floor(Math.random() * 5)],
+      ][Math.floor(Math.random() * 5)]!,
     }));
 
     const draw = (t: number) => {
@@ -198,7 +198,7 @@ function HairCanvas() {
 
         /* Shimmer gradient along strand */
         const grad = ctx.createLinearGradient(x, 0, x, H());
-        const [r, g, b] = s.color;
+        const [r, g, b] = s.color as [number, number, number];
         grad.addColorStop(0, `rgba(${r},${g},${b},0)`);
         grad.addColorStop(0.2, `rgba(${r},${g},${b},${s.opacity})`);
         grad.addColorStop(0.5, `rgba(${r + 15},${g + 12},${b + 8},${s.opacity * 1.4})`);

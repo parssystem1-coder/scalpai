@@ -46,7 +46,7 @@ function AddPatientForm() {
     mutationFn: async (dto: PatientDto) => {
       if (!isOnline) {
         await enqueue("patients", "create", dto);
-        return { id: "pending", firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone } as PatientRow;
+        return { id: "pending", firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone };
       }
       return apiFetch<PatientRow>("/patients", { method: "POST", body: JSON.stringify(dto) });
     },

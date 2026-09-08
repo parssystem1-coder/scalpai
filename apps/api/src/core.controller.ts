@@ -196,7 +196,7 @@ export class CoreController {
         templateVersion: dto.templateVersion,
         signature,
         signedFromIp: req.ip ?? null,
-        userAgent: (req.headers["user-agent"] as string | undefined) ?? null,
+        userAgent: (req.headers["user-agent"]) ?? null,
         storeSignature: (key, body, mime) => this.storage.putBuffer(ctx.clinicId, key, body, mime),
       }),
     );

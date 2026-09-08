@@ -50,7 +50,7 @@ export const heuristicEngine: AnalysisEngine = {
 function validate(img: RgbaImage): Required<RgbaImage> & { data: Uint8ClampedArray | Uint8Array } {
   if (!img.data || img.width < 16 || img.height < 16) throw new Error("analysis input too small");
   if (img.data.length < img.width * img.height * 4) throw new Error("rgba buffer too small");
-  return img as Required<RgbaImage> & { data: Uint8ClampedArray | Uint8Array };
+  return img;
 }
 
 /** Factory — the single seam call sites use. */

@@ -45,7 +45,7 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions["signOptions"]>["expir
     JwtModule.register({
       secret: jwt.secret,
       signOptions: {
-        expiresIn: jwt.accessTtl as unknown as ExpiresIn,
+        expiresIn: jwt.accessTtl,
         issuer: jwt.issuer,
         audience: jwt.audience,
         keyid: jwt.kid,

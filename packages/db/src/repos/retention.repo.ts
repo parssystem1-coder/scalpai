@@ -59,7 +59,7 @@ export function assertPurgeScope(scope: readonly string[]): PurgeScope[] {
   if (scope.length === 0) throw new RetentionError("scope must name at least one entity");
   const unknown = scope.filter((s) => !(PURGE_SCOPES as readonly string[]).includes(s));
   if (unknown.length > 0) throw new RetentionError(`unknown purge scope: ${unknown.join(", ")}`);
-  if (scope.includes("audit_log" as PurgeScope)) {
+  if (scope.includes("audit_log")) {
     throw new RetentionError("audit_log is append-only and can never be purged");
   }
   // Destroying the patient row while its children survive would leave dangling
@@ -250,13 +250,13 @@ export async function executePurge(
   if (!request) throw new RetentionError("purge request not found");
   if (request.state !== "approved") throw new RetentionError(`purge request must be approved (is '${request.state}')`);
   if (!opts.ignoreGrace) {
-    const executableAt = request.executableAt as Date | null;
+    const executableAt = request.executableAt;
     if (executableAt && executableAt.getTime() > Date.now()) {
       throw new RetentionError(`grace window has not elapsed (executable at ${executableAt.toISOString()})`);
     }
   }
 
-  const scope = assertPurgeScope(request.scope as string[]);
+  const scope = assertPurgeScope(request.scope);
   const patientId = request.patientId;
   const deleted: Record<string, number> = {};
   let objectsQueued = 0;

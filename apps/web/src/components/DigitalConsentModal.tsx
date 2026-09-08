@@ -65,7 +65,7 @@ export default function DigitalConsentModal({
           templateVersion: payload.templateVersion,
           signaturePayload: payload.signaturePayload,
           signedAt: new Date().toISOString(),
-        } as ConsentRecord;
+        };
       }
       return apiFetch<ConsentRecord>(`/patients/${patientId}/consents`, {
         method: "POST",

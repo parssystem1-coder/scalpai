@@ -54,7 +54,7 @@ export class AuthService {
   private signAccess(claims: AccessClaims): string {
     const cfg = resolveJwtConfig();
     const signOpts: JwtSignOptions = {
-      expiresIn: cfg.accessTtl as unknown as ExpiresIn,
+      expiresIn: cfg.accessTtl,
       issuer: cfg.issuer,
       audience: cfg.audience,
       keyid: cfg.kid,
@@ -156,7 +156,7 @@ export class AuthService {
   }
 
   private tokenKid(token: string): string | null {
-    const decoded = this.jwt.decode(token, { complete: true }) as { header?: { kid?: string } } | null;
+    const decoded = this.jwt.decode(token, { complete: true });
     return decoded?.header?.kid ?? null;
   }
 

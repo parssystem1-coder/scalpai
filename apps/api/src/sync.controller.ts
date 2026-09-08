@@ -56,7 +56,7 @@ export class SyncController {
         : await this.scope.tx(async (tx, ctx) => {
             return processPushBatch(
               { tx, clinicId: ctx.clinicId, userId: ctx.userId },
-              accepted as unknown as Parameters<typeof processPushBatch>[1],
+              accepted,
             );
           });
 
