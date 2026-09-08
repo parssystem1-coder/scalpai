@@ -103,9 +103,10 @@ export async function markStorageOrphanFailed(
     .from(storageOrphans)
     .where(and(eq(storageOrphans.clinicId, clinicId), eq(storageOrphans.id, id)))
     .limit(1);
-  if (!current[0]) return "deleted";
+  const row = current[0];
+  if (!row) return "deleted";
 
-  const exhausted = current[0].attempts >= ORPHAN_MAX_ATTEMPTS;
+  const exhausted = row.attempts >= ORPHAN_MAX_ATTEMPTS;
   const state: OrphanState = exhausted ? "quarantined" : "pending";
   await tx
     .update(storageOrphans)
@@ -119,7 +120,7 @@ export async function markStorageOrphanFailed(
       action: "storage.orphan_quarantined",
       entity: "storage_orphan",
       entityId: id,
-      meta: { attempts: current[0].attempts, reason: "delete kept failing" },
+      meta: { attempts: row.attempts, reason: "delete kept failing" },
     });
   }
   return state;
