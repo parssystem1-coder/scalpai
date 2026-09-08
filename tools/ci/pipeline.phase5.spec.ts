@@ -50,7 +50,7 @@ function gatesOf(workflow: string): string[] {
 
 describe("H14/R7 - job names describe the work, and the work covers every workspace", () => {
   it("declares the jobs the pipeline actually performs", () => {
-    expect(jobs(ci)).toEqual(["deployment", "e2e-smoke", "gate", "lockfile", "security", "verify"]);
+    expect(jobs(ci)).toEqual(["backup-restore", "deployment", "e2e-smoke", "gate", "lockfile", "security", "verify"]);
   });
 
   it("typechecks and builds through turbo, not a single workspace", () => {
@@ -77,7 +77,7 @@ describe("L1/W23 - no gate certifies itself", () => {
 
   it("has a gate job that waits for everything and re-reads the logs", () => {
     const gateJob = ci.slice(ci.indexOf("\n  gate:"));
-    expect(gateJob).toContain("needs: [lockfile, verify, security, e2e-smoke, deployment]");
+    expect(gateJob).toContain("needs: [lockfile, verify, security, e2e-smoke, backup-restore, deployment]");
     expect(gateJob).toContain("if: always()");
     expect(gateJob).toContain("npm run ci:gate");
     expect(rootPkg.scripts["ci:gate"]).toContain("tools/ci/gate-report.ts");
@@ -205,7 +205,8 @@ describe("H14 - supply chain and secrets are gated in CI", () => {
   });
 
   it("detects provider credentials anywhere", () => {
-    const findings = scanText("ops/deploy.sh", "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n");
+    const keyHeader = "-----BEGIN RSA PRIVATE " + "KEY-----";
+    const findings = scanText("ops/deploy.sh", keyHeader + "\nMIIEpAIBAAKCAQEA\n");
     expect(findings.map((f) => f.rule)).toContain("private-key");
   });
 
