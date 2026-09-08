@@ -33,6 +33,20 @@ const PATIENT_CREATE_FIELDS = ["firstName", "lastName", "phone", "gender", "birt
 export const PULL_LIMIT_MAX = 500;
 
 /**
+ * Text of an untrusted value, without `String()`'s worst behaviour.
+ *
+ * A mutation payload is `unknown` per field, and `String(value ?? "")` on an
+ * object writes the literal "[object Object]" into the column -- on `patients`
+ * that is PHI the clinic then has to clean up by hand. Only primitives become
+ * text; anything else is treated as absent.
+ */
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+/**
  * A refusal the client must fix (unknown entity, missing base version, PHI in
  * cleartext). Thrown inside the item's savepoint so nothing it touched survives,
  * and reported per item instead of failing the batch (WEAKNESSES H4).
@@ -46,7 +60,7 @@ class MutationRejected extends Error {
 
 export class SyncCursorError extends Error {
   constructor(cursor: unknown) {
-    const raw = typeof cursor === "string" ? cursor : Array.isArray(cursor) ? String(cursor[0] ?? "") : String(cursor ?? "");
+    const raw = typeof cursor === "string" ? cursor : Array.isArray(cursor) ? asText(cursor[0]) : asText(cursor);
     super(`sync cursor '${raw.slice(0, 40)}' is malformed`);
     this.name = "SyncCursorError";
   }
@@ -110,9 +124,9 @@ async function applyPatientCreate(ctx: PushCtx, env: MutationEnvelope): Promise<
     .insert(patients)
     .values({
       clinicId: ctx.clinicId,
-      firstName: String(env.payload.firstName ?? ""),
-      lastName: String(env.payload.lastName ?? ""),
-      phone: String(env.payload.phone ?? ""),
+      firstName: asText(env.payload.firstName),
+      lastName: asText(env.payload.lastName),
+      phone: asText(env.payload.phone),
       gender: (env.payload.gender as string) ?? null,
       birthDate: (env.payload.birthDate as string) ?? null,
       createdBy: ctx.userId,
@@ -325,7 +339,7 @@ function isUniqueViolation(error: unknown): boolean {
  */
 function databaseReason(error: unknown): string {
   const code =
-    typeof error === "object" && error !== null ? String((error as { code?: unknown }).code ?? "unknown") : "unknown";
+    typeof error === "object" && error !== null ? asText((error as { code?: unknown }).code) || "unknown" : "unknown";
   return `database refused the mutation (sqlstate ${code})`;
 }
 
@@ -442,7 +456,7 @@ interface RawMutationRow {
 
 function toIso(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
-  const parsed = new Date(String(value));
+  const parsed = new Date(asText(value));
   return Number.isNaN(parsed.getTime()) ? new Date(0).toISOString() : parsed.toISOString();
 }
 
@@ -482,12 +496,12 @@ export async function pullMutations(
   const hasMore = rows.length > size;
   const page = hasMore ? rows.slice(0, size) : rows;
   const items: SyncPullItem[] = page.map((row) => ({
-    entity: String(row.entity),
-    op: String(row.op),
+    entity: asText(row.entity),
+    op: asText(row.op),
     payload: row.payload,
     serverSeq: Number(row.server_seq),
     at: toIso(row.at),
-    cursor: encodeCursor({ xid: String(row.commit_xid), seq: Number(row.server_seq) }),
+    cursor: encodeCursor({ xid: asText(row.commit_xid), seq: Number(row.server_seq) }),
   }));
   const last = items[items.length - 1];
   return { items, cursor: last ? last.cursor : encodeCursor(cursor), hasMore };
