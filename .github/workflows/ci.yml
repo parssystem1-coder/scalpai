@@ -317,6 +317,7 @@ jobs:
           --health-retries 10
 
     env:
+      CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
       MIGRATE_DATABASE_URL: postgresql://scalpai:scalpai_dev_only@localhost:5433/scalpai
       DATABASE_URL: postgresql://scalpai_app:scalpai_dev_only@localhost:5433/scalpai
       APP_ROLE_PASSWORD: scalpai_dev_only
