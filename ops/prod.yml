@@ -112,6 +112,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required (32+ chars)}
       - JWT_SECRET_PREVIOUS=${JWT_SECRET_PREVIOUS:-}
       - JWT_SECRET_PREVIOUS_UNTIL=${JWT_SECRET_PREVIOUS_UNTIL:-}
+      # PHI encryption key ring is mandatory; there is no plaintext fallback.
+      - PHI_KEY_RING=${PHI_KEY_RING:?PHI_KEY_RING is required}
       # Phase 9 (L3/ADR-0042): an install that cannot page anyone is not
       # operable, so the alert sink is a required decision, not a nice-to-have.
       - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:?ALERT_WEBHOOK_URL is required - a stack nobody can be paged about is not operable}

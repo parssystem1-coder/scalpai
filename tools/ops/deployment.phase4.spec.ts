@@ -81,6 +81,7 @@ describe("C8 - production secrets have no fallbacks", () => {
       "MINIO_ROOT_PASSWORD",
       "S3_BUCKET",
       "JWT_SECRET",
+      "PHI_KEY_RING",
       "SCALPAI_DOMAIN",
       "ACME_EMAIL",
       // Phase 9 (ADR-0042): the backup pipeline's own mandatory inputs.
