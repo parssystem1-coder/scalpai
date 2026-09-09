@@ -1,5 +1,7 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { SECTIONS, type SectionId } from "./dashboard-sections.js";
+import { faNum } from "../i18n.js";
 
 export interface DashboardTabsProps {
   /** Currently highlighted section (owned by ClinicalDashboard). */
@@ -16,17 +18,22 @@ export interface DashboardTabsProps {
 /**
  * Section switcher for the clinical dashboard.
  * Pure presentational: no local state, no data fetching.
+ *
+ * Phase 5: labels come from `dashboard.tabs.*` and the ordinal badge is
+ * rendered through `faNum()` so Persian shows ۱..۵ and English 1..5.
  */
 export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   activeSection,
   onSectionChange,
   variant = "desktop",
 }) => {
+  const { t } = useTranslation();
+
   if (variant === "mobile") {
     return (
       <div
         className="lg:hidden sticky top-[61px] sm:top-[65px] z-40 px-3 sm:px-4 py-2 bg-[oklch(98%_0.01_28/0.92)] backdrop-blur-2xl border-b border-white/70 shadow-xs flex items-center gap-2 overflow-x-auto no-scrollbar"
-        aria-label="بخش‌های داشبورد کلینیکی (موبایل)"
+        aria-label={t("dashboard.tabs.navLabelMobile")}
       >
         {SECTIONS.map((sec, idx) => {
           const Icon = sec.icon;
@@ -47,10 +54,10 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
                   isActive ? "bg-white/30 text-white" : "bg-stone-200 text-stone-600"
                 }`}
               >
-                {idx + 1}
+                {faNum(idx + 1)}
               </span>
               <Icon className="w-3.5 h-3.5" />
-              <span>{sec.label}</span>
+              <span>{t(sec.labelKey)}</span>
             </button>
           );
         })}
@@ -61,7 +68,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   return (
     <nav
       className="hidden lg:flex items-center gap-1.5 mr-6 p-1.5 bg-white/70 backdrop-blur-2xl rounded-2xl border border-white/80 shadow-[0_2px_12px_oklch(30%_0.04_15/0.05)]"
-      aria-label="بخش‌های داشبورد کلینیکی"
+      aria-label={t("dashboard.tabs.navLabel")}
     >
       {SECTIONS.map((sec, idx) => {
         const Icon = sec.icon;
@@ -82,10 +89,10 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
                 isActive ? "bg-white/30 text-white" : "bg-stone-200/70 text-stone-600"
               }`}
             >
-              {idx + 1}
+              {faNum(idx + 1)}
             </span>
             <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-[oklch(62%_0.09_16)]"}`} />
-            <span>{sec.label}</span>
+            <span>{t(sec.labelKey)}</span>
           </button>
         );
       })}
