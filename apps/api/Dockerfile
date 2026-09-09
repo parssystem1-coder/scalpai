@@ -1,7 +1,7 @@
 # ScalpAI v2 - API image (ADR-0036)
 #
 # Rules this file must keep obeying (WEAKNESSES C8/H16):
-#  - `npm ci` against the committed lockfile, never `npm install`
+#  - `npm ci` against the committed lockfile; npm itself is pinned explicitly
 #  - NO --ignore-scripts: sharp and @node-rs/argon2 are native and must build
 #  - build through turbo (`npm exec -- turbo run build`), never `npm run build --filter`
 #
@@ -12,11 +12,12 @@
 # either - it runs with --omit=dev, so it never described this image. The runtime
 # tree is therefore resolved from the SAME lockfile with --omit=dev, in its own
 # stage, and the builder's node_modules is copied nowhere.
-FROM node:22-alpine AS builder
+FROM node:22.23.2-alpine AS builder
 WORKDIR /app
 
 # Toolchain for the native modules (sharp -> libvips, argon2 -> cc).
 RUN apk add --no-cache python3 make g++ libc6-compat vips-dev
+RUN npm install --global npm@11.19.1 --no-fund --no-audit
 
 # The whole workspace is copied because `npm ci` validates the lockfile against
 # every workspace package.json. .dockerignore keeps the context small.
@@ -30,16 +31,14 @@ RUN npm exec -- turbo run build --filter=@scalpai/app-api...
 # the builder, so what the runtime receives is defined by the lockfile and not by
 # whatever the build happened to leave behind. Native modules still compile here,
 # which is why the toolchain is installed again.
-FROM node:22-alpine AS prod-deps
+FROM node:22.23.2-alpine AS prod-deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++ libc6-compat vips-dev
+RUN npm install --global npm@11.19.1 --no-fund --no-audit
 COPY . .
 RUN npm ci --omit=dev --legacy-peer-deps
-# Force-patch npm's bundled tar (CVE-2026-59873/73566) — overrides only
-# affect the project dep tree, not npm's own internal copy.
-RUN npm install tar@7.5.22 --no-save 2>/dev/null || true
 
-FROM node:22-alpine AS runner
+FROM node:22.23.2-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # The one-shot migrate container runs `npm run db:migrate:prod` as the
@@ -49,9 +48,10 @@ ENV npm_config_cache=/tmp/.npm
 ENV npm_config_update_notifier=false
 
 # M17: tools/ci/image-scan.sh blocks the build on any FIXABLE CRITICAL, so the
-# base package set is patched at build time. The node tag stays pinned - this
-# only pulls Alpine security updates for the layer it already ships.
+# base package set is patched at build time. The node tag stays pinned, and npm
+# is upgraded to a release whose bundled tar contains the security fix.
 RUN apk upgrade --no-cache
+RUN npm install --global npm@11.19.1 --no-fund --no-audit
 
 # Runtime libvips for sharp.
 RUN apk add --no-cache vips libc6-compat

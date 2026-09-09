@@ -150,10 +150,22 @@ describe("C8/H16 - images build from the lockfile with real native modules", () 
     it(`${name}: npm ci, no --ignore-scripts, turbo build`, () => {
       const directives = code(dockerfile);
       expect(directives).toContain("npm ci");
-      expect(directives).not.toContain("npm install");
       expect(directives).not.toContain("--ignore-scripts");
       expect(directives).not.toContain("npm run build --filter");
       expect(directives).toContain("npm exec -- turbo run build --filter");
+
+      const installLines = directives
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => /^RUN\s+npm install\b/.test(line));
+      const expectedNpmUpgrade =
+        "RUN npm install --global npm@11.19.1 --no-fund --no-audit";
+
+      if (name === "api") {
+        expect(installLines).toEqual([expectedNpmUpgrade, expectedNpmUpgrade, expectedNpmUpgrade]);
+      } else {
+        expect(installLines).toEqual([]);
+      }
     });
 
     it(`${name}: ships a container healthcheck`, () => {
