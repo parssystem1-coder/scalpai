@@ -40,6 +40,12 @@ export default defineConfig({
      * correctness are measured too. The API/web floors are a RATCHET - raise
      * them as suites grow, never lower them to make a red build green.
      *
+     * The web floor moved 15 -> 30 once the measured paths stopped being one
+     * suite: the transport (api/client.spec.ts), the identity boundary
+     * (context/auth-context.spec.tsx), the resumable upload
+     * (offline/chunked-upload.spec.ts) and the durable outbox
+     * (offline/outbox-store.spec.ts) are all covered directly now.
+     *
      * Excluded on purpose: the API bootstrap and Nest DI modules, whose real
      * proof is the deployment job booting the stack from an empty database, not
      * a unit test importing them.
@@ -69,7 +75,7 @@ export default defineConfig({
       thresholds: {
         "packages/{db,sync-client,licensing,analysis-core}/src/**": { lines: 70 },
         "apps/api/src/**": { lines: 40 },
-        "apps/web/src/{api,context,offline}/**": { lines: 15 },
+        "apps/web/src/{api,context,offline}/**": { lines: 30 },
       },
     },
   },
