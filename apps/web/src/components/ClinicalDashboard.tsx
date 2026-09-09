@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Camera,
   ArrowUp,
@@ -46,6 +47,7 @@ import PatientListSection from "./sections/PatientListSection.js";
 import ScalpMapSection from "./sections/ScalpMapSection.js";
 import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection.js";
 import { useDashboardModals } from "../hooks/useDashboardModals.js";
+import { faNum } from "../i18n.js";
 
 export { SECTIONS };
 export type { SectionId };
@@ -60,6 +62,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   onLogout,
 }) => {
   const { isOnline, pendingCount } = useSync();
+  const { t } = useTranslation();
+
+  /** Localised name of a trichoscopy area (`vertex`, `temple`, ...). */
+  const areaLabel = (area: string): string => t(`dashboard.galleryVision.areas.${area}`);
 
   const [activeSection, setActiveSection] = useState<SectionId>("patients");
   const isManualScrolling = useRef(false);
@@ -189,16 +195,16 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     // Optical scale factor: 50x => 2.0 um/px, 100x => 1.0 um/px, 200x => 0.5 um/px
     const scale = caliperMagnification === "50x" ? 2.0 : caliperMagnification === "100x" ? 1.0 : 0.5;
     const microns = +(opticalPixels * scale).toFixed(1);
-    let category = "ترمینال ضخیم";
+    let category = t("dashboard.caliper.terminalThick");
     let color = "text-emerald-400 border-emerald-500/40 bg-emerald-950/80";
     if (microns < 30) {
-      category = "ولوس / مینیاتوریزه شدید";
+      category = t("dashboard.caliper.vellus");
       color = "text-rose-400 border-rose-500/40 bg-rose-950/80";
     } else if (microns < 45) {
-      category = "مینیاتوریزه خفیف (Intermediate)";
+      category = t("dashboard.caliper.intermediate");
       color = "text-amber-400 border-amber-500/40 bg-amber-950/80";
     } else if (microns < 65) {
-      category = "ترمینال متوسط";
+      category = t("dashboard.caliper.terminalMedium");
       color = "text-cyan-400 border-cyan-500/40 bg-cyan-950/80";
     }
     return { microns, pixelDist: Math.round(pixelDist), category, color };
@@ -216,7 +222,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       return { ...prev, [selectedPatient.id]: updated };
     });
     setPreviewPhotoModal((prev) => (prev ? { ...prev, thickness: formatted } : null));
-    setNoteSavedFeedback(`کالیبر تار (${calc.microns} µm) به عنوان ضخامت فریم ثبت شد.`);
+    setNoteSavedFeedback(t("dashboard.toasts.caliperSaved", { microns: faNum(calc.microns) }));
     setTimeout(() => setNoteSavedFeedback(null), 4000);
   };
 
@@ -230,7 +236,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       return { ...prev, [selectedPatient.id]: updated };
     });
     setPreviewPhotoModal((prev) => (prev ? { ...prev, notes: lightboxNoteText } : null));
-    setNoteSavedFeedback("یادداشت و توصیه بالینی در پرونده بیمار ذخیره شد.");
+    setNoteSavedFeedback(t("dashboard.toasts.notesSaved"));
     setTimeout(() => setNoteSavedFeedback(null), 4000);
   };
 
@@ -361,7 +367,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
   const processUploadedImageFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
-      setUploadFeedback("خطا: فایل انتخابی باید از نوع تصویر (JPG, PNG, WebP) باشد.");
+      setUploadFeedback(t("dashboard.toasts.invalidImage"));
       return;
     }
 
@@ -375,7 +381,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         patientId: selectedPatient.id,
         url: dataUrl,
         area: selectedArea,
-        date: "امروز (بارگذاری مستقیم)",
+        date: t("dashboard.photoDates.uploaded"),
         density: Math.round(138 + Math.random() * 26),
         thickness: `${Math.round(64 + Math.random() * 14)} µm`,
         qualityScore: 99,
@@ -388,7 +394,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
       // Immediately set this real image as active in the Neural Segmentation HUD
       setActiveInspectedPhoto(newImg);
-      setUploadFeedback(`تصویر تریکوسکوپی «${file.name}» با موفقیت بارگذاری شد و در هود هوش مصنوعی فعال گردید.`);
+      setUploadFeedback(t("dashboard.toasts.uploaded", { name: file.name }));
       setTimeout(() => setUploadFeedback(null), 6000);
     };
     reader.readAsDataURL(file);
@@ -443,7 +449,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           patientId: selectedPatient.id,
           url: frameUrl,
           area: mappedArea,
-          date: "امروز (تریکوسکوپ زنده)",
+          date: t("dashboard.photoDates.captured"),
           density: mappedArea === "occiput" ? 205 : Math.round(135 + Math.random() * 30),
           thickness: `${Math.round(65 + Math.random() * 12)} µm`,
           qualityScore: 99,
@@ -457,7 +463,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           [selectedPatient.id]: [...newImagesList, ...(prev[selectedPatient.id] || [])],
         }));
         setActiveInspectedPhoto(newImagesList[0] ?? null);
-        setUploadFeedback(`${newImagesList.length} فریم تریکوسکوپی با وضوح بالا در گالری و هود هوش مصنوعی ذخیره گردید.`);
+        setUploadFeedback(
+          t("dashboard.toasts.captured", { frames: faNum(newImagesList.length) })
+        );
         setTimeout(() => setUploadFeedback(null), 6000);
       }
     }
@@ -483,7 +491,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       setPreviewPhotoModal(null);
     }
 
-    setUploadFeedback("تصویر با موفقیت از پرونده بیمار حذف شد.");
+    setUploadFeedback(t("dashboard.toasts.photoDeleted"));
     setTimeout(() => setUploadFeedback(null), 4000);
   };
 
@@ -493,9 +501,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     scores: { redness: 22, flakeTexture: 26, densityProxy: 88 },
     severity: 24,
     anagenRatio: 87,
-    hairCaliber: "76 µm (بافت ابریشمی سالم)",
-    recommendation:
-      "پروتکل پپتیدی بایواکتیو: تجویز لوسیون نانولیپوزومال Copper Tripeptide GHK-Cu، سرم آبرسان اسید هیالورونیک کراس‌لینک و ماساژ فوتوبیومدولاسیون با طول موج ۶۵۰ نانومتر.",
+    hairCaliber: t("dashboard.ai.caliberHealthy"),
+    recommendation: t("dashboard.ai.protocolPeptide"),
     matrixHydration: 92,
     tensorConfidence: 97.4,
     follicularUnits: { single: 24, double: 52, triple: 24 },
@@ -524,8 +531,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       firstName: newPatient.firstName,
       lastName: newPatient.lastName,
       phone: newPatient.phone || "09120000000",
-      lastVisit: "امروز",
-      scalpCondition: newPatient.condition || "پایش تریکولوژی و سلامت کوتیکول",
+      lastVisit: t("dashboard.addPatient.today"),
+      scalpCondition: newPatient.condition || t("dashboard.addPatient.defaultCondition"),
       hairDensity: 154,
       anagenRatio: 85,
       keratinHealth: 90,
@@ -560,7 +567,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         scores: out.scores,
         severity: out.severity,
         anagenRatio: Math.round(82 + Math.random() * 12),
-        hairCaliber: `${Math.round(68 + Math.random() * 12)} µm (کالیبر استاندارد)`,
+        hairCaliber: t("dashboard.ai.caliberStandard", {
+          microns: Math.round(68 + Math.random() * 12),
+        }),
         matrixHydration: Math.round(86 + Math.random() * 10),
         tensorConfidence: 98.2,
         follicularUnits: {
@@ -570,8 +579,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         },
         recommendation:
           out.scores.redness > 35
-            ? "پروتکل تسکین‌بخش فوری: ماسک کلاژن هیدرولیز شده، فیتواستروژن‌های طبیعی و نیاسینامید با تنظیم pH فیزیولوژیک ۵.۵ کف سر."
-            : "پروتکل مزوتراپی پپتیدی و بیوتین لیپوزومال: ۲ بار در ماه جهت تقویت سد بیولوژیک و تحریک سلول‌های پاپیلا درم.",
+            ? t("dashboard.ai.protocolSoothing")
+            : t("dashboard.ai.protocolMeso"),
       });
     } catch {
       // Fallback
@@ -581,7 +590,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   };
 
   const handleOpenAiEducation = () => {
-    // Map patient scalp condition or AI scores to 3D Education Storyboard & Severity
+    // Map patient scalp condition or AI scores to 3D Education Storyboard & Severity.
+    // NOTE: the Persian literals below are DATA matchers against the stored
+    // `scalpCondition` free-text field, not UI copy — they stay out of i18n on
+    // purpose, otherwise switching the UI language would change the diagnosis.
     const condText = (selectedPatient.scalpCondition || "").toLowerCase();
     let condKey: ConditionKey;
     if (condText.includes("سبورئیک") || condText.includes("seborrheic") || aiResult.scores.redness > 35) {
@@ -711,14 +723,16 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
-                    بخش ۲ از ۴
+                    {t("dashboard.galleryVision.badge")}
                   </span>
                   <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
-                    ویژن تریکوسکوپی بیمار: {selectedPatient.firstName} {selectedPatient.lastName}
+                    {t("dashboard.galleryVision.heading", {
+                      patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
+                    })}
                   </h2>
                 </div>
                 <p className="text-xs text-[oklch(45%_0.02_20)]">
-                  تصاویر میکروسکوپی و تفکیک اتوماتیک واحدهای ۱، ۲ و ۳ تاره با لیزر اسکنر
+                  {t("dashboard.galleryVision.subtitle")}
                 </p>
               </div>
 
@@ -734,30 +748,30 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     openBeforeAfter();
                   }}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 shadow-xs transition-all text-xs font-bold cursor-pointer"
-                  title="مقایسه اسلایدر دو تصویر قبل و بعد بالینی"
+                  title={t("dashboard.galleryVision.compareTitle")}
                 >
                   <Split className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>مقایسه رو در رو (قبل و بعد)</span>
+                  <span>{t("dashboard.galleryVision.compare")}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={openGuidedCapture}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white shadow-xs hover:brightness-110 transition-all text-xs font-bold cursor-pointer"
-                  title="تصویربرداری هدایت‌شده با دوربین و تریکوسکوپ"
+                  title={t("dashboard.galleryVision.captureTitle")}
                 >
                   <Camera className="w-3.5 h-3.5 text-amber-200" />
-                  <span>عکاسی تریکوسکوپ</span>
+                  <span>{t("dashboard.galleryVision.capture")}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => scrollToSection("patients")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold cursor-pointer"
-                  title="بازگشت به ابتدای پرونده"
+                  title={t("dashboard.galleryVision.backToTopTitle")}
                 >
                   <ArrowUp className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                  <span className="hidden sm:inline">ابتدای پرونده</span>
+                  <span className="hidden sm:inline">{t("dashboard.galleryVision.backToTop")}</span>
                 </button>
               </div>
             </div>
@@ -775,10 +789,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                           : "text-[oklch(40%_0.02_20)] hover:text-[oklch(20%_0.02_20)] hover:bg-white/50"
                       }`}
                     >
-                      {area === "vertex" && "تاج سر (Vertex)"}
-                      {area === "temple" && "شقیقه (Temple)"}
-                      {area === "frontal" && "خط رویش (Frontal)"}
-                      {area === "occiput" && "پس‌سر (Occiput)"}
+                      {areaLabel(area)}
                     </button>
                   ))}
                 </div>
@@ -788,23 +799,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               <div className="mb-8">
                 <NeuralSegmentationOverlay
                   imageUrl={activeInspectedPhoto?.url || patientPhotos[0]?.url || "/trichoscopy/vertex.jpg"}
-                  areaName={
-                    activeInspectedPhoto
-                      ? activeInspectedPhoto.area === "vertex"
-                        ? "تاج سر (Vertex)"
-                        : activeInspectedPhoto.area === "temple"
-                        ? "شقیقه (Temple)"
-                        : activeInspectedPhoto.area === "frontal"
-                        ? "خط رویش (Frontal)"
-                        : "پس‌سر (Occiput)"
-                      : selectedArea === "vertex"
-                      ? "تاج سر (Vertex)"
-                      : selectedArea === "temple"
-                      ? "شقیقه (Temple)"
-                      : selectedArea === "frontal"
-                      ? "خط رویش (Frontal)"
-                      : "پس‌سر (Occiput)"
-                  }
+                  areaName={areaLabel(activeInspectedPhoto ? activeInspectedPhoto.area : selectedArea)}
                   patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
                 />
               </div>
@@ -821,7 +816,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     onClick={() => setUploadFeedback(null)}
                     className="text-emerald-700 hover:text-emerald-950 text-xs cursor-pointer"
                   >
-                    بستن
+                    {t("dashboard.galleryVision.closeToast")}
                   </button>
                 </div>
               )}
@@ -855,26 +850,18 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 </div>
                 <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">
                   {isDraggingOver
-                    ? "فایل تصویر را همین‌جا رها کنید..."
-                    : "انتخاب و بارگذاری تصویر تریکوسکوپ واقعی از سیستم (کلیک یا Drag & Drop)"}
+                    ? t("dashboard.galleryVision.dropActive")
+                    : t("dashboard.galleryVision.dropIdle")}
                 </h4>
                 <p className="text-xs text-[oklch(45%_0.02_20)] mt-1">
-                  پشتیبانی از عکس‌های درماتوسکوپ و دوربین پوست با وضوح میکرومتری (JPG, PNG, WebP) • ذخیره برای ناحیه: {
-                    selectedArea === "vertex"
-                      ? "تاج سر (Vertex)"
-                      : selectedArea === "temple"
-                      ? "شقیقه (Temple)"
-                      : selectedArea === "frontal"
-                      ? "خط رویش (Frontal)"
-                      : "پس‌سر (Occiput)"
-                  }
+                  {t("dashboard.galleryVision.dropHint", { area: areaLabel(selectedArea) })}
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[oklch(62%_0.09_16)] font-bold">
                   <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-white/60 shadow-2xs">
-                    📁 مرورگر فایل‌های دستگاه
+                    {t("dashboard.galleryVision.dropChipBrowse")}
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-white/60 shadow-2xs">
-                    ⚡ بارگذاری لحظه‌ای در هود AI
+                    {t("dashboard.galleryVision.dropChipInstant")}
                   </span>
                 </div>
               </div>
@@ -887,10 +874,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                       <Camera className="w-6 h-6" />
                     </div>
                     <div className="text-sm font-bold text-[oklch(30%_0.02_20)]">
-                      هیچ تصویری در پرونده این بیمار ثبت نشده است
+                      {t("dashboard.galleryVision.emptyTitle")}
                     </div>
                     <p className="text-xs text-[oklch(50%_0.02_20)] max-w-md">
-                      می‌توانید با تریکوسکوپ/وب‌کم لپ‌تاپ عکس بگیرید یا عکس‌های باکیفیت را مستقیماً از سیستم بارگذاری کنید.
+                      {t("dashboard.galleryVision.emptyHint")}
                     </p>
                     <button
                       type="button"
@@ -898,7 +885,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                       className="mt-2 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-2"
                     >
                       <Camera className="w-4 h-4" />
-                      <span>شروع تصویربرداری هدایت‌شده</span>
+                      <span>{t("dashboard.galleryVision.startCapture")}</span>
                     </button>
                   </div>
                 ) : (
@@ -919,7 +906,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveInspectedPhoto(photo); }}
-                            title="کلیک برای بازرسی در هود هوش مصنوعی"
+                            title={t("dashboard.galleryVision.inspectCardTitle")}
                           >
                             <img
                               src={photo.url}
@@ -927,16 +914,18 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                             <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[oklch(20%_0.02_20)] text-[0.65rem] font-bold border border-white/80 shadow-xs">
-                              ناحیه: {photo.area}
+                              {t("dashboard.galleryVision.areaLabel", { area: photo.area })}
                             </div>
                             {isCurrentHUD && (
                               <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[oklch(62%_0.09_16)] text-white text-[0.62rem] font-bold shadow-xs">
-                                در حال بررسی
+                                {t("dashboard.galleryVision.inspecting")}
                               </div>
                             )}
                             <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 backdrop-blur-md text-emerald-800 text-[0.65rem] font-bold flex items-center gap-1 shadow-xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              وضوح کوانتومی {photo.qualityScore}%
+                              {t("dashboard.galleryVision.quantumClarity", {
+                                value: faNum(photo.qualityScore),
+                              })}
                             </div>
                           </div>
 
@@ -956,13 +945,19 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                             )}
 
                             <div className="flex items-center justify-between text-xs text-[oklch(45%_0.02_20)] mb-3 font-mono">
-                              <span>تاریخ: {photo.date}</span>
-                              <span>ضخامت: {photo.thickness}</span>
+                              <span>{t("dashboard.galleryVision.dateLabel", { value: photo.date })}</span>
+                              <span>
+                                {t("dashboard.galleryVision.thicknessLabel", {
+                                  value: faNum(photo.thickness),
+                                })}
+                              </span>
                             </div>
 
                             <div className="flex items-center justify-between pt-3 border-t border-black/5 gap-2">
                               <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                                تراکم: {photo.density} تار/cm²
+                                {t("dashboard.galleryVision.densityLabel", {
+                                  value: faNum(photo.density),
+                                })}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -972,7 +967,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                     handleDeletePhoto(photo.id);
                                   }}
                                   className="p-2 rounded-xl bg-white/80 hover:bg-rose-50 text-stone-400 hover:text-rose-600 border border-stone-200 hover:border-rose-200 shadow-xs transition-all cursor-pointer"
-                                  title="حذف این تصویر از پرونده بیمار"
+                                  title={t("dashboard.galleryVision.deletePhotoTitle")}
                                 >
                                   <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                                 </button>
@@ -986,7 +981,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                     openBeforeAfter();
                                   }}
                                   className="p-2 rounded-xl bg-white/80 hover:bg-cyan-50 text-stone-500 hover:text-cyan-700 border border-white shadow-xs transition-all cursor-pointer"
-                                  title="مقایسه قبل و بعد این تصویر (Before & After)"
+                                  title={t("dashboard.galleryVision.comparePhotoTitle")}
                                 >
                                   <Split className="w-3.5 h-3.5 text-cyan-600" />
                                 </button>
@@ -994,7 +989,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                   type="button"
                                   onClick={() => handleOpenLightbox(photo)}
                                   className="p-2 rounded-xl bg-white/80 hover:bg-white text-[oklch(40%_0.02_20)] border border-white shadow-xs transition-all cursor-pointer"
-                                  title="مشاهده تمام‌صفحه و زوم"
+                                  title={t("dashboard.galleryVision.fullscreenTitle")}
                                 >
                                   <Maximize2 className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
                                 </button>
@@ -1005,10 +1000,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                     scrollToSection("gallery");
                                   }}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer"
-                                  title="آنالیز هوش مصنوعی"
+                                  title={t("dashboard.galleryVision.inspectHudTitle")}
                                 >
                                   <Eye className="w-3.5 h-3.5 text-amber-200" />
-                                  <span>بازرسی HUD</span>
+                                  <span>{t("dashboard.galleryVision.inspectHud")}</span>
                                 </button>
                               </div>
                             </div>
@@ -1058,32 +1053,32 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
-                    بخش ۴ از ۴
+                    {t("dashboard.hologram.badge")}
                   </span>
                   <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
-                    شبیه‌ساز هولوگرافیک ۳ بعدی تار و فولیکول مو
+                    {t("dashboard.hologram.heading")}
                   </h2>
                 </div>
-                <p className="text-xs text-[oklch(45%_0.02_20)]">
-                  چرخش سه‌بعدی ۳۶۰ درجه و تفکیک لایه‌های کورتکس، مدولا و غلاف درونی ریشه
-                </p>
+                <p className="text-xs text-[oklch(45%_0.02_20)]">{t("dashboard.hologram.subtitle")}</p>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-xs bg-white/80 px-4 py-2 rounded-2xl border border-white/80 shadow-xs">
                   <HeartHandshake className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                   <span className="font-bold text-[oklch(20%_0.02_20)]">
-                    بیمار: {selectedPatient.firstName} {selectedPatient.lastName}
+                    {t("dashboard.hologram.patient", {
+                      patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
+                    })}
                   </span>
                 </div>
 
                 <button
                   onClick={() => scrollToSection("patients")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold"
-                  title="بازگشت به ابتدای پرونده"
+                  title={t("dashboard.hologram.backToTopTitle")}
                 >
                   <ArrowUp className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                  <span className="hidden sm:inline">ابتدای پرونده</span>
+                  <span className="hidden sm:inline">{t("dashboard.hologram.backToTop")}</span>
                 </button>
               </div>
             </div>
@@ -1093,7 +1088,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               <Suspense
                 fallback={
                   <div className="h-[450px] flex items-center justify-center text-xs font-bold text-stone-500">
-                    در حال بارگذاری شبیه‌ساز سه‌بعدی فولیکول...
+                    {t("dashboard.hologram.loading")}
                   </div>
                 }
               >
@@ -1110,10 +1105,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           <button
             onClick={() => scrollToSection("patients")}
             className="flex items-center gap-2 px-4 py-2.5 rounded-full rose-gold-gradient text-white text-xs font-bold shadow-xl shadow-[oklch(62%_0.09_16/0.3)] hover:brightness-110 active:scale-95 transition-all border border-white/80 backdrop-blur-md"
-            title="اسکرول سریع به ابتدای پرونده"
+            title={t("dashboard.backToTopPill.title")}
           >
             <ArrowUp className="w-4 h-4" />
-            <span>ابتدای پرونده</span>
+            <span>{t("dashboard.backToTopPill.label")}</span>
           </button>
         </div>
       )}
@@ -1123,59 +1118,65 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-md flex items-center justify-center p-4">
           <div className="rounded-[32px] p-6 md:p-8 max-w-md w-full bg-[oklch(98%_0.008_28/0.85)] border border-white/90 shadow-[0_24px_60px_oklch(30%_0.04_15/0.18)] backdrop-blur-2xl animate-fadeIn">
             <h3 className="text-xl font-serif font-bold text-[oklch(20%_0.02_20)] mb-1">
-              تشکیل پرونده بالینی اختصاصی
+              {t("dashboard.addPatient.title")}
             </h3>
-            <p className="text-xs text-[oklch(45%_0.02_20)] mb-6">
-              اطلاعات مراجع را جهت شروع پایش و پرونده تریکولوژی وارد نمایید
-            </p>
+            <p className="text-xs text-[oklch(45%_0.02_20)] mb-6">{t("dashboard.addPatient.subtitle")}</p>
 
             <form onSubmit={handleAddPatient} className="space-y-4">
               <div>
-                <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام</label>
+                <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+                  {t("dashboard.addPatient.firstName")}
+                </label>
                 <input
                   id="patient-firstName"
                   type="text"
                   required
                   value={newPatient.firstName}
                   onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
-                  placeholder="مثال: پروانه"
+                  placeholder={t("dashboard.addPatient.firstNamePh")}
                   className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
                 />
               </div>
 
               <div>
-                <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">نام خانوادگی</label>
+                <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+                  {t("dashboard.addPatient.lastName")}
+                </label>
                 <input
                   id="patient-lastName"
                   type="text"
                   required
                   value={newPatient.lastName}
                   onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
-                  placeholder="مثال: یزدانی"
+                  placeholder={t("dashboard.addPatient.lastNamePh")}
                   className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
                 />
               </div>
 
               <div>
-                <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">شماره تماس</label>
+                <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+                  {t("dashboard.addPatient.phone")}
+                </label>
                 <input
                   id="patient-phone"
                   type="tel"
                   value={newPatient.phone}
                   onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                  placeholder="مثال: 09123456789"
+                  placeholder={t("dashboard.addPatient.phonePh")}
                   className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
                 />
               </div>
 
               <div>
-                <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">عارضه یا وضعیت اولیه</label>
+                <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+                  {t("dashboard.addPatient.condition")}
+                </label>
                 <input
                   id="patient-condition"
                   type="text"
                   value={newPatient.condition}
                   onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
-                  placeholder="مثال: کنترل ریزش فصلی و افزایش تراکم"
+                  placeholder={t("dashboard.addPatient.conditionPh")}
                   className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
                 />
               </div>
@@ -1185,14 +1186,14 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   type="submit"
                   className="flex-1 h-12 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
                 >
-                  ثبت پرونده
+                  {t("dashboard.addPatient.submit")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsAddPatientOpen(false)}
                   className="px-5 h-12 rounded-2xl bg-white/80 hover:bg-white border border-stone-200 text-xs font-bold text-[oklch(40%_0.02_20)] transition-all"
                 >
-                  انصراف
+                  {t("dashboard.addPatient.cancel")}
                 </button>
               </div>
             </form>
@@ -1304,13 +1305,18 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>نمای میکروسکوپی تمام‌صفحه • ناحیه {previewPhotoModal.area}</span>
+                    <span>{t("dashboard.lightbox.title", { area: previewPhotoModal.area })}</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 border border-cyan-800 text-cyan-300">
-                      بزرگ‌نمایی: {Math.round(lightboxZoom * 100)}%
+                      {t("dashboard.lightbox.zoomBadge", {
+                        value: faNum(Math.round(lightboxZoom * 100)),
+                      })}
                     </span>
                   </h4>
                   <span className="text-[11px] text-stone-400 font-mono">
-                    بیمار: {selectedPatient.firstName} {selectedPatient.lastName} | تاریخ ثبت: {previewPhotoModal.date}
+                    {t("dashboard.lightbox.meta", {
+                      patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
+                      date: previewPhotoModal.date,
+                    })}
                   </span>
                 </div>
               </div>
@@ -1328,7 +1334,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   }}
                   disabled={lightboxZoom <= 1}
                   className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title="کاهش بزرگ‌نمایی (Zoom Out)"
+                  title={t("dashboard.lightbox.zoomOutTitle")}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
@@ -1340,7 +1346,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   }}
                   disabled={lightboxZoom >= 6}
                   className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title="افزایش بزرگ‌نمایی (Zoom In)"
+                  title={t("dashboard.lightbox.zoomInTitle")}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
@@ -1360,7 +1366,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                         : "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-300"
                     }`}
                   >
-                    {level}x
+                    {faNum(level)}x
                   </button>
                 ))}
 
@@ -1369,7 +1375,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   type="button"
                   onClick={() => setLightboxRotation((prev) => (prev + 90) % 360)}
                   className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title="چرخش ۹۰ درجه (Rotate)"
+                  title={t("dashboard.lightbox.rotateTitle")}
                 >
                   <RotateCw className="w-4 h-4 text-cyan-400" />
                 </button>
@@ -1380,9 +1386,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     type="button"
                     onClick={resetLightboxZoom}
                     className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
-                    title="بازنشانی زوم و جابجایی"
+                    title={t("dashboard.lightbox.resetTitle")}
                   >
-                    بازنشانی
+                    {t("dashboard.lightbox.reset")}
                   </button>
                 )}
 
@@ -1395,7 +1401,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     setPreviewPhotoModal(null);
                   }}
                   className="w-8 h-8 rounded-full border border-stone-700 flex items-center justify-center text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
-                  title="بستن پنجره"
+                  title={t("dashboard.lightbox.closeTitle")}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1444,21 +1450,27 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               {lightboxZoom > 1 && (
                 <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-950/80 backdrop-blur-md border border-stone-700 text-stone-300 text-xs font-mono animate-in fade-in pointer-events-none">
                   <Move className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>درگ برای جابجایی (Pan) • دوبار کلیک برای ریست</span>
+                  <span>{t("dashboard.lightbox.panHint")}</span>
                 </div>
               )}
 
               {/* Optical Scale and Telemetry Bar at Bottom */}
               <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 text-xs bg-stone-950/85 backdrop-blur-md border border-stone-800 px-4 py-2.5 rounded-2xl text-stone-300 font-mono pointer-events-none">
                 <div className="flex items-center gap-4 flex-wrap">
-                  <span className="text-emerald-400 font-bold">تراکم: {previewPhotoModal.density} تار/cm²</span>
-                  <span>ضخامت: {previewPhotoModal.thickness}</span>
-                  <span>امتیاز شفافیت: {previewPhotoModal.qualityScore}%</span>
+                  <span className="text-emerald-400 font-bold">
+                    {t("dashboard.lightbox.density", { value: faNum(previewPhotoModal.density) })}
+                  </span>
+                  <span>
+                    {t("dashboard.lightbox.thickness", { value: faNum(previewPhotoModal.thickness) })}
+                  </span>
+                  <span>
+                    {t("dashboard.lightbox.clarity", { value: faNum(previewPhotoModal.qualityScore) })}
+                  </span>
                   {previewPhotoModal.tags && previewPhotoModal.tags.length > 0 && (
                     <div className="flex items-center gap-1">
-                      {previewPhotoModal.tags.map((t) => (
-                        <span key={t} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">
-                          #{t}
+                      {previewPhotoModal.tags.map((tag) => (
+                        <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">
+                          #{tag}
                         </span>
                       ))}
                     </div>
@@ -1466,9 +1478,9 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-stone-400 text-[11px] hidden sm:inline">
-                    راهنما: اسکرول ماوس = زوم | کشیدن = جابجایی
+                    {t("dashboard.lightbox.mouseHint")}
                   </span>
-                  <div className="text-cyan-400 text-[11px]">OPTICAL CALIBRATION: 0.1mm GRID PASS</div>
+                  <div className="text-cyan-400 text-[11px]">{t("dashboard.lightbox.calibration")}</div>
                 </div>
               </div>
             </div>
@@ -1483,10 +1495,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   }
                 }}
                 className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-xs font-bold border border-rose-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                title="حذف این تصویر از پرونده بیمار"
+                title={t("dashboard.lightbox.deletePhotoTitle")}
               >
                 <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>حذف تصویر از پرونده</span>
+                <span>{t("dashboard.lightbox.deletePhoto")}</span>
               </button>
 
               <div className="flex items-center gap-3 flex-wrap">
@@ -1504,10 +1516,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     }
                   }}
                   className="px-3.5 py-2 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold border border-cyan-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                  title="مقایسه دو فریم با اسلایدر کشویی و رو در رو"
+                  title={t("dashboard.lightbox.compareTitle")}
                 >
                   <Split className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>مقایسه رو در رو (Before & After)</span>
+                  <span>{t("dashboard.lightbox.compare")}</span>
                 </button>
 
                 <button
@@ -1521,7 +1533,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   className="px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Eye className="w-3.5 h-3.5 text-amber-200" />
-                  <span>بررسی در هود هوش مصنوعی (Neural HUD)</span>
+                  <span>{t("dashboard.lightbox.neuralHud")}</span>
                 </button>
 
                 <button
@@ -1532,7 +1544,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
                 >
-                  بستن
+                  {t("dashboard.lightbox.close")}
                 </button>
               </div>
             </div>
