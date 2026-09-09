@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import ScalpMapSection from "../sections/ScalpMapSection.js";
 
 /**
  * The live scalp map itself is a heavy visual component with its own suite;
  * this spec only proves the Phase 3 wrapper contract and its Phase 5 label.
+ * `vi.mock` is hoisted above the import above, so the stub is what renders.
  */
 vi.mock("../ScalpMap.js", () => ({
   default: ({
@@ -28,8 +30,6 @@ vi.mock("../ScalpMap.js", () => ({
     </button>
   ),
 }));
-
-const { default: ScalpMapSection } = await import("../sections/ScalpMapSection.js");
 
 afterEach(cleanup);
 
