@@ -137,8 +137,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   } = useDashboardModals();
 
   // `null` until a record exists: SAMPLE_PATIENTS is DEV-gated, so a production
-  // build would resolve `SAMPLE_PATIENTS[0]!` to undefined and crash on the
-  // first property read.
+  // build would resolve the first element to undefined and crash on property read.
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
