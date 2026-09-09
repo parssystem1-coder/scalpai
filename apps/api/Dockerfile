@@ -35,6 +35,9 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ libc6-compat vips-dev
 COPY . .
 RUN npm ci --omit=dev --legacy-peer-deps
+# Force-patch npm's bundled tar (CVE-2026-59873/73566) — overrides only
+# affect the project dep tree, not npm's own internal copy.
+RUN npm install tar@7.5.22 --no-save 2>/dev/null || true
 
 FROM node:22-alpine AS runner
 WORKDIR /app
