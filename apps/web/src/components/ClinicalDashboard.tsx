@@ -45,6 +45,7 @@ import { SECTIONS, type SectionId } from "./dashboard-sections.js";
 import PatientListSection from "./sections/PatientListSection.js";
 import ScalpMapSection from "./sections/ScalpMapSection.js";
 import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection.js";
+import { useDashboardModals } from "../hooks/useDashboardModals.js";
 
 export { SECTIONS };
 export type { SectionId };
@@ -101,18 +102,37 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Phase 4: modal visibility is owned by a dedicated reducer-backed hook.
+  const {
+    isConsentOpen,
+    isLicenseOpen,
+    isSyncOpen,
+    isEducationOpen,
+    isGuidedCaptureOpen,
+    isPdfReportOpen,
+    isBeforeAfterOpen,
+    openConsent,
+    closeConsent,
+    openLicense,
+    closeLicense,
+    openSync,
+    closeSync,
+    openEducation,
+    closeEducation,
+    openGuidedCapture,
+    closeGuidedCapture,
+    openPdfReport,
+    closePdfReport,
+    openBeforeAfter,
+    closeBeforeAfter,
+  } = useDashboardModals();
+
   const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]!);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
-  const [isConsentOpen, setIsConsentOpen] = useState(false);
-  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
-  const [isEducationOpen, setIsEducationOpen] = useState(false);
+  // Modal payload/context state (not open/close state) stays local to the dashboard.
   const [educationCondition, setEducationCondition] = useState<ConditionKey>("androgenetic_alopecia");
   const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
-  const [isGuidedCaptureOpen, setIsGuidedCaptureOpen] = useState(false);
-  const [isPdfReportOpen, setIsPdfReportOpen] = useState(false);
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [compareDefaultA, setCompareDefaultA] = useState<string | undefined>(undefined);
   const [compareDefaultB, setCompareDefaultB] = useState<string | undefined>(undefined);
   const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
@@ -589,7 +609,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
     setEducationCondition(condKey);
     setEducationSeverity(sev);
-    setIsEducationOpen(true);
+    openEducation();
   };
 
   const allPatientPhotos = localImages[selectedPatient.id] || [
@@ -635,12 +655,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         pendingCount={pendingCount}
         activeSection={activeSection}
         onSectionChange={scrollToSection}
-        onOpenSyncInspector={() => setIsSyncModalOpen(true)}
-        onOpenLicenseDiagnostics={() => setIsLicenseModalOpen(true)}
-        onOpenEducation={() => setIsEducationOpen(true)}
-        onOpenGuidedCapture={() => setIsGuidedCaptureOpen(true)}
-        onOpenPdfReport={() => setIsPdfReportOpen(true)}
-        onOpenConsent={() => setIsConsentOpen(true)}
+        onOpenSyncInspector={openSync}
+        onOpenLicenseDiagnostics={openLicense}
+        onOpenEducation={openEducation}
+        onOpenGuidedCapture={openGuidedCapture}
+        onOpenPdfReport={openPdfReport}
+        onOpenConsent={openConsent}
         onLogout={() => { clearAccessToken(); onLogout(); }}
       />
       <DashboardTabs variant="mobile" activeSection={activeSection} onSectionChange={scrollToSection} />
@@ -671,7 +691,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           onZoneSelect={(zone: ZoneClinicalData) => {
             setEducationCondition(zone.primaryCondition);
             setEducationSeverity(zone.severity);
-            setIsEducationOpen(true);
+            openEducation();
           }}
         />
 
@@ -711,7 +731,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                       setCompareDefaultA(photos[photos.length - 1]?.id);
                       setCompareDefaultB(photos[0]?.id);
                     }
-                    setIsCompareModalOpen(true);
+                    openBeforeAfter();
                   }}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/60 shadow-xs transition-all text-xs font-bold cursor-pointer"
                   title="مقایسه اسلایدر دو تصویر قبل و بعد بالینی"
@@ -722,7 +742,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsGuidedCaptureOpen(true)}
+                  onClick={openGuidedCapture}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white shadow-xs hover:brightness-110 transition-all text-xs font-bold cursor-pointer"
                   title="تصویربرداری هدایت‌شده با دوربین و تریکوسکوپ"
                 >
@@ -874,7 +894,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     </p>
                     <button
                       type="button"
-                      onClick={() => setIsGuidedCaptureOpen(true)}
+                      onClick={openGuidedCapture}
                       className="mt-2 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-2"
                     >
                       <Camera className="w-4 h-4" />
@@ -963,7 +983,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                     const other = patientPhotos.find((p) => p.id !== photo.id) || photo;
                                     setCompareDefaultA(other.id);
                                     setCompareDefaultB(photo.id);
-                                    setIsCompareModalOpen(true);
+                                    openBeforeAfter();
                                   }}
                                   className="p-2 rounded-xl bg-white/80 hover:bg-cyan-50 text-stone-500 hover:text-cyan-700 border border-white shadow-xs transition-all cursor-pointer"
                                   title="مقایسه قبل و بعد این تصویر (Before & After)"
@@ -1018,7 +1038,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           isAnalyzing={isAnalyzing}
           onRunAnalysis={() => { void handleRunAiAnalysis(); }}
           onOpenEducation={handleOpenAiEducation}
-          onOpenPdfReport={() => setIsPdfReportOpen(true)}
+          onOpenPdfReport={openPdfReport}
           onNavigate={scrollToSection}
         />
 
@@ -1187,30 +1207,30 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
           patientPhone={selectedPatient.phone}
           isOpen={isConsentOpen}
-          onClose={() => setIsConsentOpen(false)}
+          onClose={closeConsent}
         />
       )}
 
       {/* Modal: License Diagnostics & Clock Anti-Tamper */}
-      {isLicenseModalOpen && (
+      {isLicenseOpen && (
         <LicenseDiagnosticsModal
-          isOpen={isLicenseModalOpen}
-          onClose={() => setIsLicenseModalOpen(false)}
+          isOpen={isLicenseOpen}
+          onClose={closeLicense}
         />
       )}
 
       {/* Modal: Sync & Conflict Inspector */}
-      {isSyncModalOpen && (
+      {isSyncOpen && (
         <SyncInspectorModal
-          isOpen={isSyncModalOpen}
-          onClose={() => setIsSyncModalOpen(false)}
+          isOpen={isSyncOpen}
+          onClose={closeSync}
         />
       )}
 
       {/* Modal: Education E1 3D Layer (DESIGN-V2 §11) */}
       <EducationModal
         isOpen={isEducationOpen}
-        onClose={() => setIsEducationOpen(false)}
+        onClose={closeEducation}
         initialCondition={educationCondition}
         initialSeverity={educationSeverity}
         patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
@@ -1219,15 +1239,15 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       {/* Modal: Guided Capture & Quality Gate */}
       <GuidedCaptureModal
         isOpen={isGuidedCaptureOpen}
-        onClose={() => setIsGuidedCaptureOpen(false)}
+        onClose={closeGuidedCapture}
         patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
         onCompleteCapture={handleCompleteGuidedCapture}
       />
 
       {/* Modal: Longitudinal Before/After Trichoscopy Comparison */}
       <BeforeAfterCompareModal
-        isOpen={isCompareModalOpen}
-        onClose={() => setIsCompareModalOpen(false)}
+        isOpen={isBeforeAfterOpen}
+        onClose={closeBeforeAfter}
         patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
         photos={(localImages[selectedPatient.id] || []).map((img) => ({
           id: img.id,
@@ -1248,7 +1268,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       {/* Modal: Clinical PDF Report */}
       <ClinicalPdfReportModal
         isOpen={isPdfReportOpen}
-        onClose={() => setIsPdfReportOpen(false)}
+        onClose={closePdfReport}
         patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
         patientPhone={selectedPatient.phone}
         patientId={selectedPatient.id}
@@ -1480,7 +1500,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                       setCompareDefaultB(previewPhotoModal.id);
                       resetLightboxZoom();
                       setPreviewPhotoModal(null);
-                      setIsCompareModalOpen(true);
+                      openBeforeAfter();
                     }
                   }}
                   className="px-3.5 py-2 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold border border-cyan-800 transition-colors cursor-pointer flex items-center gap-1.5"
