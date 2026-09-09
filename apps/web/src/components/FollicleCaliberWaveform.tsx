@@ -1,5 +1,7 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
+import { faNum } from "../i18n.js";
 
 interface WaveformPoint {
   visitDate: string;
@@ -14,18 +16,34 @@ interface FollicleCaliberWaveformProps {
   densityTrend?: string;
 }
 
-const DEFAULT_TIMELINE: WaveformPoint[] = [
-  { visitDate: "۳ ماه قبل", density: 128, caliber: 58, anagenPct: 72 },
-  { visitDate: "۲ ماه قبل", density: 136, caliber: 64, anagenPct: 78 },
-  { visitDate: "۱ ماه قبل", density: 142, caliber: 68, anagenPct: 83 },
-  { visitDate: "امروز (ویزیت جاری)", density: 154, caliber: 74, anagenPct: 88 },
-];
+/** M5: visit labels come from the catalogue, so the default timeline is built
+ *  per render instead of living in a module-level Persian constant. */
+const DEFAULT_MEASUREMENTS = [
+  { visitKey: "m3", density: 128, caliber: 58, anagenPct: 72 },
+  { visitKey: "m2", density: 136, caliber: 64, anagenPct: 78 },
+  { visitKey: "m1", density: 142, caliber: 68, anagenPct: 83 },
+  { visitKey: "now", density: 154, caliber: 74, anagenPct: 88 },
+] as const;
 
 export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = ({
-  data = DEFAULT_TIMELINE,
-  currentCaliber = "74 µm",
-  densityTrend = "+۲۰.۳٪ بهبود",
+  data,
+  currentCaliber,
+  densityTrend,
 }) => {
+  const { t } = useTranslation();
+
+  const series: WaveformPoint[] =
+    data ??
+    DEFAULT_MEASUREMENTS.map((m) => ({
+      visitDate: t(`waveform.visits.${m.visitKey}`),
+      density: m.density,
+      caliber: m.caliber,
+      anagenPct: m.anagenPct,
+    }));
+
+  const shownCaliber = currentCaliber ?? t("waveform.caliberValue", { value: faNum(74) });
+  const shownTrend = densityTrend ?? t("waveform.trendDefault");
+
   const width = 500;
   const height = 180;
   const padding = 35;
@@ -34,8 +52,8 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
   const maxDensity = 170;
   const minDensity = 110;
 
-  const points = data.map((d, index) => {
-    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+  const points = series.map((d, index) => {
+    const x = padding + (index / (series.length - 1)) * (width - padding * 2);
     const y =
       height -
       padding -
@@ -47,8 +65,8 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
     return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
   }, "");
 
-  // noUncheckedIndexedAccess: data is never empty (defaults to DEFAULT_TIMELINE),
-  // so the empty-string fallback is unreachable.
+  // noUncheckedIndexedAccess: series is never empty (defaults to the built-in
+  // measurements), so the empty-string fallback is unreachable.
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
   const areaD =
@@ -65,20 +83,18 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600" />
-            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">روند پویای تراکم و کالیبر ساقه</h4>
+            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">{t("waveform.title")}</h4>
           </div>
-          <p className="text-[0.68rem] text-[oklch(45%_0.02_20)] mt-0.5">
-            روند افزایشی تراکم فولیکولی در ۴ نوبت ویزیت تریکوسکوپی اخیر
-          </p>
+          <p className="text-[0.68rem] text-[oklch(45%_0.02_20)] mt-0.5">{t("waveform.subtitle")}</p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-left">
-            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">ضخامت میانگین:</span>
-            <span className="text-xs font-mono font-black text-[oklch(20%_0.02_20)]">{currentCaliber}</span>
+            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">{t("waveform.meanCaliber")}</span>
+            <span className="text-xs font-mono font-black text-[oklch(20%_0.02_20)]">{shownCaliber}</span>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold shadow-xs">
-            {densityTrend}
+            {shownTrend}
           </span>
         </div>
       </div>
@@ -125,7 +141,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                   fill="#785963"
                   className="text-[0.6rem] font-mono opacity-80"
                 >
-                  {val}
+                  {faNum(val)}
                 </text>
               </g>
             );
@@ -173,7 +189,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
                 fill="#9f2d48"
                 className="text-[0.68rem] font-mono font-bold"
               >
-                {p.density}
+                {faNum(p.density)}
               </text>
             </g>
           ))}

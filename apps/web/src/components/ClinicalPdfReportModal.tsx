@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { formatToJalali } from "@scalpai/shared";
+import { faNum } from "../i18n.js";
 
 interface ClinicalPdfReportModalProps {
   isOpen: boolean;
@@ -31,22 +32,29 @@ interface ClinicalPdfReportModalProps {
 export default function ClinicalPdfReportModal({
   isOpen,
   onClose,
-  patientName = "مریم رضایی",
+  patientName,
   patientPhone = "09129876543",
   patientId = "PAT-2026-9811",
-  doctorName = "دکتر آرش رحمانی — بورد تخصصی پوست، مو و زیبایی",
-  clinicName = "مرکز تخصصی تریکولوژی و کلینیک پوست و مو ScalpAI",
+  doctorName,
+  clinicName,
   density = 112,
   miniaturization = 32,
   erythema = 45,
   sebum = 68,
-  diagnosis = "آلوپسی آندروژنتیک زنانه گرید ۲ (FPHL Ludwig Grade II) همراه با احتقان مویرگی خفیف",
+  diagnosis,
 }: ClinicalPdfReportModalProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFa = i18n.language === "fa";
   const reportRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
+
+  // M5: the sample header/footer copy used to be hard-coded Persian in the
+  // default parameters; it now falls back to the active catalogue instead.
+  const shownPatientName = patientName ?? t("pdf.demo.patientName");
+  const shownDoctorName = doctorName ?? t("pdf.demo.doctorName");
+  const shownClinicName = clinicName ?? t("pdf.demo.clinicName");
+  const shownDiagnosis = diagnosis ?? t("pdf.demo.diagnosis");
 
   const now = new Date();
   const jalaliDate = formatToJalali(now);
@@ -77,9 +85,7 @@ export default function ClinicalPdfReportModal({
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200 print:hidden shrink-0">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-[oklch(62%_0.09_16)]" />
-            <h3 className="font-bold text-sm text-stone-800">
-              {isFa ? "پیش‌نمایش سند رسمی گزارش بالینی تریکوسکوپی (PDF)" : "Clinical Trichoscopy PDF Report"}
-            </h3>
+            <h3 className="font-bold text-sm text-stone-800">{t("pdf.previewTitle")}</h3>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
               RTL READY
             </span>
@@ -92,7 +98,7 @@ export default function ClinicalPdfReportModal({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-stone-300 text-stone-700 hover:bg-stone-100 shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>{isFa ? "چاپ گزارش" : "Print"}</span>
+              <span>{t("pdf.print")}</span>
             </button>
 
             <button
@@ -101,12 +107,13 @@ export default function ClinicalPdfReportModal({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[oklch(62%_0.09_16)] text-white hover:brightness-110 shadow-xs transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isFa ? "دانلود PDF" : "Download PDF"}</span>
+              <span>{t("pdf.download")}</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
+              aria-label={t("pdf.closeAria")}
               className="w-8 h-8 rounded-full border border-stone-300 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -127,17 +134,15 @@ export default function ClinicalPdfReportModal({
                   S
                 </div>
                 <h1 className="text-xl font-bold tracking-tight text-stone-950">
-                  {clinicName}
+                  {shownClinicName}
                 </h1>
               </div>
-              <p className="text-xs text-stone-600 font-medium">
-                سیستم جامع آنالیز تریکوسکوپی دیجیتال و هوش مصنوعی بالینی ScalpAI v2
-              </p>
+              <p className="text-xs text-stone-600 font-medium">{t("pdf.systemLine")}</p>
             </div>
 
             <div className="text-left sm:text-left text-xs font-mono space-y-0.5 bg-stone-50 p-3 rounded-xl border border-stone-200">
-              <div><strong className="text-stone-700">شماره پرونده:</strong> {patientId}</div>
-              <div><strong className="text-stone-700">شناسه گزارش:</strong> {reportId}</div>
+              <div><strong className="text-stone-700">{t("pdf.fileNo")}</strong> {patientId}</div>
+              <div><strong className="text-stone-700">{t("pdf.reportNo")}</strong> {reportId}</div>
               <div className="flex items-center gap-1 mt-1 text-emerald-700 font-bold">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>{jalaliDate} ({gregorianDate})</span>
@@ -148,14 +153,14 @@ export default function ClinicalPdfReportModal({
           {/* Patient Demographics & Doctor Info Banner */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-stone-50 border border-stone-200 text-xs">
             <div className="space-y-1.5">
-              <div><span className="text-stone-500">نام و نام خانوادگی بیمار:</span> <strong className="text-stone-900 text-sm">{patientName}</strong></div>
-              <div><span className="text-stone-500">شماره تماس / پرونده:</span> <span className="font-mono text-stone-800">{patientPhone}</span></div>
-              <div><span className="text-stone-500">پزشک معالج / ناظر:</span> <strong className="text-stone-800">{doctorName}</strong></div>
+              <div><span className="text-stone-500">{t("pdf.patientNameLabel")}</span> <strong className="text-stone-900 text-sm">{shownPatientName}</strong></div>
+              <div><span className="text-stone-500">{t("pdf.patientPhoneLabel")}</span> <span className="font-mono text-stone-800">{patientPhone}</span></div>
+              <div><span className="text-stone-500">{t("pdf.doctorLabel")}</span> <strong className="text-stone-800">{shownDoctorName}</strong></div>
             </div>
             <div className="space-y-1.5 sm:text-left">
-              <div><span className="text-stone-500">نواحی مورد سنجش:</span> <span className="text-stone-800 font-medium">Frontal, Mid-scalp, Vertex, Temporal, Occiput</span></div>
-              <div><span className="text-stone-500">بزرگ‌نمایی لنز:</span> <span className="text-stone-800 font-mono">20x / 50x Polarized Epiluminescence</span></div>
-              <div><span className="text-stone-500">شماره نظام پزشکی:</span> <span className="font-mono text-stone-800">IR-148920-TRICH</span></div>
+              <div><span className="text-stone-500">{t("pdf.areasLabel")}</span> <span className="text-stone-800 font-medium">{t("pdf.areasValue")}</span></div>
+              <div><span className="text-stone-500">{t("pdf.magLabel")}</span> <span className="text-stone-800 font-mono">{t("pdf.magValue")}</span></div>
+              <div><span className="text-stone-500">{t("pdf.licenseLabel")}</span> <span className="font-mono text-stone-800">{t("pdf.licenseValue")}</span></div>
             </div>
           </div>
 
@@ -163,89 +168,79 @@ export default function ClinicalPdfReportModal({
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-stone-900 flex items-center gap-1.5">
               <Award className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-              <span>متریک‌ها و اندازه‌گیری‌های بیومتریک تریکومتری</span>
+              <span>{t("pdf.metricsTitle")}</span>
             </h3>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="p-3.5 rounded-xl border border-stone-200 bg-stone-50">
-                <div className="text-stone-500 font-medium">تراکم میانگین (Density)</div>
+                <div className="text-stone-500 font-medium">{t("pdf.densityLabel")}</div>
                 <div className="text-xl font-black text-stone-900 mt-1">
-                  {density} <span className="text-xs font-normal text-stone-500">مو/cm²</span>
+                  {faNum(density)} <span className="text-xs font-normal text-stone-500">{t("pdf.densityUnit")}</span>
                 </div>
-                <div className="text-[10px] text-amber-700 font-medium mt-1">کاهش ۳۵٪ نسبت به بانک مو</div>
+                <div className="text-[10px] text-amber-700 font-medium mt-1">{t("pdf.densityNote")}</div>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-stone-50">
-                <div className="text-stone-500 font-medium">نازک‌شدگی (Anisotrichosis)</div>
+                <div className="text-stone-500 font-medium">{t("pdf.miniLabel")}</div>
                 <div className="text-xl font-black text-amber-600 mt-1">
-                  {miniaturization}% <span className="text-xs font-normal text-stone-500">تنوع قطر</span>
+                  {faNum(miniaturization)}% <span className="text-xs font-normal text-stone-500">{t("pdf.miniUnit")}</span>
                 </div>
-                <div className="text-[10px] text-amber-700 font-medium mt-1">&gt;۲۰٪ نمایانگر مینیاتوریزه</div>
+                <div className="text-[10px] text-amber-700 font-medium mt-1">{t("pdf.miniNote")}</div>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-stone-50">
-                <div className="text-stone-500 font-medium">شاخص التهاب عروق (Erythema)</div>
+                <div className="text-stone-500 font-medium">{t("pdf.erythemaLabel")}</div>
                 <div className="text-xl font-black text-red-600 mt-1">
-                  {erythema} <span className="text-xs font-normal text-stone-500">از ۱۰۰</span>
+                  {faNum(erythema)} <span className="text-xs font-normal text-stone-500">{t("pdf.outOf100")}</span>
                 </div>
-                <div className="text-[10px] text-stone-500 mt-1">اتساع مویرگ‌های اینترفولیکولار</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("pdf.erythemaNote")}</div>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-stone-50">
-                <div className="text-stone-500 font-medium">چربی سبوم (Sebum Index)</div>
+                <div className="text-stone-500 font-medium">{t("pdf.sebumLabel")}</div>
                 <div className="text-xl font-black text-stone-900 mt-1">
-                  {sebum} <span className="text-xs font-normal text-stone-500">از ۱۰۰</span>
+                  {faNum(sebum)} <span className="text-xs font-normal text-stone-500">{t("pdf.outOf100")}</span>
                 </div>
-                <div className="text-[10px] text-stone-500 mt-1">فعالیت غدد سباسه بالا</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("pdf.sebumNote")}</div>
               </div>
             </div>
           </div>
 
           {/* Clinical Findings & Formal Diagnosis */}
           <div className="p-4 rounded-2xl border-2 border-stone-300 bg-stone-50/60 space-y-2">
-            <h4 className="text-xs font-bold text-stone-900 uppercase">تشخیص بالینی و استیجینگ تریکوسکوپی:</h4>
+            <h4 className="text-xs font-bold text-stone-900 uppercase">{t("pdf.diagnosisTitle")}</h4>
             <p className="text-sm font-bold text-stone-950 leading-relaxed">
-              {diagnosis}
+              {shownDiagnosis}
             </p>
-            <p className="text-xs text-stone-600 leading-relaxed">
-              یافته‌های تصویری میکروسکوپیک حاکی از وجود هاله‌های پری‌فولیکولار قهوه‌ای (Peripilar sign) و نقاط زرد رنگ (Yellow dots) ناشی از ترشح سبوم در ناحیه ورتکس است که شاخص آلوپسی آندروژنتیک فعال را تایید می‌کند.
-            </p>
+            <p className="text-xs text-stone-600 leading-relaxed">{t("pdf.findings")}</p>
           </div>
 
           {/* Actionable Treatment Plan */}
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-stone-900 flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>پروتکل درمانی و توصیه‌های مراقبتی تجویز شده</span>
+              <span>{t("pdf.planTitle")}</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div className="p-3.5 rounded-xl border border-stone-200 bg-white space-y-1">
-                <strong className="block text-stone-800">۱. محلول موضعی و مکمل تغذیه‌ای</strong>
-                <p className="text-stone-600 text-[11px] leading-relaxed">
-                  ماینوکسیدیل ۵٪ فوم (روزی ۱ نوبت) به همراه کپسول مکمل حاوی زینک، بیوتین و اسیدهای آمینه گوگرددار.
-                </p>
+                <strong className="block text-stone-800">{t("pdf.plan1Title")}</strong>
+                <p className="text-stone-600 text-[11px] leading-relaxed">{t("pdf.plan1Body")}</p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-white space-y-1">
-                <strong className="block text-stone-800">۲. مزوتراپی و پی‌آرپی (PRP) بالینی</strong>
-                <p className="text-stone-600 text-[11px] leading-relaxed">
-                  ۳ جلسه مزوتراپی فاکتور رشد به فاصله هر ۳ هفته جهت تحریک پاپیلا و طولانی کردن فاز آناژن.
-                </p>
+                <strong className="block text-stone-800">{t("pdf.plan2Title")}</strong>
+                <p className="text-stone-600 text-[11px] leading-relaxed">{t("pdf.plan2Body")}</p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-white space-y-1">
-                <strong className="block text-stone-800">۳. کنترل سبوم و شستشوی کف سر</strong>
-                <p className="text-stone-600 text-[11px] leading-relaxed">
-                  شامپوی تنظیم‌کننده چربی حاوی سالیسیلیک اسید و کتوکونازول ۲ بار در هفته.
-                </p>
+                <strong className="block text-stone-800">{t("pdf.plan3Title")}</strong>
+                <p className="text-stone-600 text-[11px] leading-relaxed">{t("pdf.plan3Body")}</p>
               </div>
 
               <div className="p-3.5 rounded-xl border border-stone-200 bg-white space-y-1">
-                <strong className="block text-stone-800">۴. جلسه بازبینی و تریکوسکوپی مجدد</strong>
-                <p className="text-stone-600 text-[11px] leading-relaxed">
-                  مراجعه بعدی پس از ۱۲ هفته (۳ ماه آینده) جهت پایش سرعت رشد و توقف ریزش در فاز پیگیری.
-                </p>
+                <strong className="block text-stone-800">{t("pdf.plan4Title")}</strong>
+                <p className="text-stone-600 text-[11px] leading-relaxed">{t("pdf.plan4Body")}</p>
               </div>
             </div>
           </div>
@@ -255,14 +250,12 @@ export default function ClinicalPdfReportModal({
             <div className="md:col-span-8 text-[10px] text-stone-500 leading-relaxed space-y-1">
               <div className="flex items-center gap-1.5 font-bold text-stone-700">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>گواهی امنیتی اصالت سند و عدم دستکاری بالینی</span>
+                <span>{t("pdf.authTitle")}</span>
               </div>
-              <p>
-                این سند با امضای دیجیتال رمزنگاری‌شده صادر گردیده و نسخه تغییرناپذیر آن در پرونده ابری امن کلینیک بایگانی شده است. این گزارش صرفاً جنبه تخصصی داشته و هرگونه تغییر در دوز دارو باید تحت نظارت پزشک معالج انجام پذیرد.
-              </p>
+              <p>{t("pdf.authBody")}</p>
               <div className="flex items-center gap-2 text-stone-400 font-mono text-[9px] pt-1">
                 <QrCode className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                <span className="truncate">Portal: {portalUrl}</span>
+                <span className="truncate">{t("pdf.portalLabel")} {portalUrl}</span>
               </div>
               <div className="text-stone-400 font-mono text-[9px]">
                 SHA256: 7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069
@@ -271,9 +264,9 @@ export default function ClinicalPdfReportModal({
 
             {/* Doctor Seal & Stamp */}
             <div className="md:col-span-4 p-3 rounded-2xl border border-dashed border-stone-300 text-center space-y-1 bg-stone-50">
-              <div className="text-[10px] text-stone-500 font-medium">محل امضا و مهر دیجیتال پزشک</div>
-              <div className="text-xs font-bold text-stone-900 mt-1">{doctorName}</div>
-              <div className="text-[10px] text-emerald-700 font-semibold">تایید و امضا شد (VERIFIED)</div>
+              <div className="text-[10px] text-stone-500 font-medium">{t("pdf.sealTitle")}</div>
+              <div className="text-xs font-bold text-stone-900 mt-1">{shownDoctorName}</div>
+              <div className="text-[10px] text-emerald-700 font-semibold">{t("pdf.sealVerified")}</div>
             </div>
           </div>
         </div>
