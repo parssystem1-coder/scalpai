@@ -36,6 +36,12 @@ RUN apk add --no-cache python3 make g++ libc6-compat vips-dev
 COPY . .
 RUN npm ci --omit=dev --legacy-peer-deps
 
+# npm bundles its own tar copy outside the project dependency graph. Install the
+# patched project tar in the production tree so image scanning sees the exact
+# patched package; package-lock.json remains the source-of-truth for npm ci.
+# Do not hide failures: a failed patch must fail the image build.
+RUN npm install --no-save --package-lock=false --legacy-peer-deps tar@7.5.22
+
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
