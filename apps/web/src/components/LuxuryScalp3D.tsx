@@ -1,28 +1,35 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 
 export type VisualMode = "silk" | "follicle" | "scan";
 
+type MarkerId = "density" | "diameter" | "sebum" | "anagen";
+
 interface DiagnosticMarker {
-  id: string;
-  title: string;
-  value: string;
+  id: MarkerId;
   status: "optimal" | "good" | "analyzing";
   position: [number, number, number];
 }
 
+/** M5: the chip copy moved to the catalogue (luxury3d.markers.*); only the
+ *  clinical ids and their 3D anchors stay in code. */
 const MARKERS: DiagnosticMarker[] = [
-  { id: "density", title: "تراکم موضعی", value: "۱۴۸ تار/cm²", status: "optimal", position: [-1.4, 0.8, 0.4] },
-  { id: "diameter", title: "قطر میانگین تار", value: "۸۴ میکرون (عالی)", status: "optimal", position: [1.2, 0.4, 0.6] },
-  { id: "sebum", title: "تراز چربی اپیدرم", value: "متعادل (۲۱٪)", status: "good", position: [-0.9, -0.9, 0.5] },
-  { id: "anagen", title: "فاز رشد فعال (Anagen)", value: "۸۹٪ فولیکول‌ها", status: "optimal", position: [1.3, -0.7, 0.3] },
+  { id: "density", status: "optimal", position: [-1.4, 0.8, 0.4] },
+  { id: "diameter", status: "optimal", position: [1.2, 0.4, 0.6] },
+  { id: "sebum", status: "good", position: [-0.9, -0.9, 0.5] },
+  { id: "anagen", status: "optimal", position: [1.3, -0.7, 0.3] },
 ];
 
 export default function LuxuryScalp3D() {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<VisualMode>("silk");
   const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0] ?? null);
   const [_isHovered, setIsHovered] = useState(false);
+
+  const markerTitle = (m: DiagnosticMarker) => t(`luxury3d.markers.${m.id}.title`);
+  const markerValue = (m: DiagnosticMarker) => t(`luxury3d.markers.${m.id}.value`);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -278,7 +285,7 @@ export default function LuxuryScalp3D() {
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
-              aria-label={`${m.title}: ${m.value}`}
+              aria-label={`${markerTitle(m)}: ${markerValue(m)}`}
               onClick={() => setSelectedMarker(m)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -325,8 +332,8 @@ export default function LuxuryScalp3D() {
                   }}
                 />
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "0.72rem", color: "#78716c", fontWeight: 500 }}>{m.title}</div>
-                  <div style={{ fontSize: "0.82rem", color: "#1c1917", fontWeight: 700 }}>{m.value}</div>
+                  <div style={{ fontSize: "0.72rem", color: "#78716c", fontWeight: 500 }}>{markerTitle(m)}</div>
+                  <div style={{ fontSize: "0.82rem", color: "#1c1917", fontWeight: 700 }}>{markerValue(m)}</div>
                 </div>
               </div>
             </div>
@@ -365,7 +372,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "silk" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          ✨ نمای ابریشمی موج‌دار
+          {t("luxury3d.modes.silk")}
         </button>
         <button
           type="button"
@@ -383,7 +390,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "follicle" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          🔬 کریستال فولیکول
+          {t("luxury3d.modes.follicle")}
         </button>
         <button
           type="button"
@@ -401,7 +408,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "scan" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          🌐 اسکن رادیال AI
+          {t("luxury3d.modes.scan")}
         </button>
       </div>
       <div
@@ -418,7 +425,7 @@ export default function LuxuryScalp3D() {
           pointerEvents: "none",
         }}
       >
-        ماوس را حرکت دهید یا روی نودها کلیک کنید
+        {t("luxury3d.hint")}
       </div>
     </div>
   );
