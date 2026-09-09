@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import ScalpMap, { type ZoneClinicalData } from "../ScalpMap.js";
 
 export interface ScalpMapSectionProps {
@@ -16,13 +17,22 @@ export interface ScalpMapSectionProps {
  *
  * Zone clinical data and heatmap metric toggles stay inside `ScalpMap`
  * itself, so this wrapper only owns layout and the zone-select bridge.
+ *
+ * Phase 5: the wrapper carries no copy of its own, so i18n here is the
+ * accessible name of the landmark (`dashboard.scalpMap.title`).
  */
 export const ScalpMapSection: React.FC<ScalpMapSectionProps> = ({
   patientName,
   onZoneSelect,
 }) => {
+  const { t } = useTranslation();
+
   return (
-    <section id="section-scalp-map" className="scroll-mt-28 space-y-6">
+    <section
+      id="section-scalp-map"
+      className="scroll-mt-28 space-y-6"
+      aria-label={t("dashboard.scalpMap.title")}
+    >
       <ScalpMap
         patientName={patientName}
         onDiveUnderSkin={(zone: ZoneClinicalData) => onZoneSelect?.(zone)}
