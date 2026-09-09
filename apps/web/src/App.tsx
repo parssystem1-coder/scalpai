@@ -172,7 +172,7 @@ function AppRoutes() {
       )}
     </>
   );
-};
+}
 
 export const App: React.FC = () => {
   return (
