@@ -130,6 +130,18 @@ const fa = {
       navLabel: "بخش‌های داشبورد کلینیکی",
       navLabelMobile: "بخش‌های داشبورد کلینیکی (موبایل)",
     },
+    dividers: {
+      scalpMap: "بخش ۰۲ • نقشه پوست سر و کاوش زیرپوستی",
+      trichoscopy: "بخش ۰۳ • تصویربرداری تریکوسکوپی",
+      aiEngine: "بخش ۰۳ • موتور عصبی هوش مصنوعی و فرمولاسیون",
+      hologram: "بخش ۰۴ • فولیکول هولوگرافیک سه‌بعدی",
+    },
+    emptyState: {
+      badge: "پرونده‌ای انتخاب نشده",
+      title: "هنوز پرونده بالینی ثبت نشده است",
+      hint: "برای شروع پایش تریکولوژی، اولین پرونده بیمار را ثبت کنید. پس از ثبت، همه بخش‌های داشبورد فعال می‌شوند.",
+      addPatient: "ثبت اولین پرونده",
+    },
     patientList: {
       badge: "بخش ۱ از ۴",
       title: "پرونده‌های تریکولوژی",
@@ -143,6 +155,7 @@ const fa = {
       today: "امروز",
       density: "تراکم:",
       densityUnit: "تار/cm²",
+      titlePrefixes: "دکتر|مهندس|خانم|آقای",
       openGalleryTitle: "مشاهده در ویژن تریکوسکوپ 4K",
       aiScanTitle: "اسکن هوشمند AI",
       radar: {
@@ -235,6 +248,8 @@ const fa = {
       dateLabel: "تاریخ: {{value}}",
       thicknessLabel: "ضخامت: {{value}}",
       densityLabel: "تراکم: {{value}} تار/cm²",
+      thumbAlt: "تصویر تریکوسکوپی",
+      tagChip: "#{{tag}}",
       inspectCardTitle: "کلیک برای بازرسی در هود هوش مصنوعی",
       deletePhotoTitle: "حذف این تصویر از پرونده بیمار",
       comparePhotoTitle: "مقایسه قبل و بعد این تصویر (Before & After)",
@@ -286,6 +301,8 @@ const fa = {
       density: "تراکم: {{value}} تار/cm²",
       thickness: "ضخامت: {{value}}",
       clarity: "امتیاز شفافیت: {{value}}%",
+      imageAlt: "نمای کامل تصویر تریکوسکوپی",
+      tagChip: "#{{tag}}",
       mouseHint: "راهنما: اسکرول ماوس = زوم | کشیدن = جابجایی",
       calibration: "OPTICAL CALIBRATION: 0.1mm GRID PASS",
       deletePhoto: "حذف تصویر از پرونده",
@@ -452,6 +469,18 @@ const en = {
       navLabel: "Clinical dashboard sections",
       navLabelMobile: "Clinical dashboard sections (mobile)",
     },
+    dividers: {
+      scalpMap: "SECTION 02 • SCALP MAP & SUB-CUTANEOUS DIVE",
+      trichoscopy: "SECTION 03 • TRICHOSCOPY IMAGING",
+      aiEngine: "SECTION 03 • NEURAL AI ENGINE & FORMULATION",
+      hologram: "SECTION 04 • 3D HOLOGRAPHIC FOLLICLE",
+    },
+    emptyState: {
+      badge: "No record selected",
+      title: "No clinical record has been created yet",
+      hint: "Create the first patient record to start trichology monitoring. Every dashboard section unlocks once a record exists.",
+      addPatient: "Create the first record",
+    },
     patientList: {
       badge: "Section 1 of 4",
       title: "Trichology Records",
@@ -465,6 +494,7 @@ const en = {
       today: "Today",
       density: "Density:",
       densityUnit: "hairs/cm²",
+      titlePrefixes: "Dr.|Dr|Prof.|Prof|Mr.|Mrs.|Ms.",
       openGalleryTitle: "Open in 4K trichoscopy vision",
       aiScanTitle: "AI smart scan",
       radar: {
@@ -557,6 +587,8 @@ const en = {
       dateLabel: "Date: {{value}}",
       thicknessLabel: "Thickness: {{value}}",
       densityLabel: "Density: {{value}} hairs/cm²",
+      thumbAlt: "Trichoscopy image",
+      tagChip: "#{{tag}}",
       inspectCardTitle: "Click to inspect in the AI HUD",
       deletePhotoTitle: "Delete this image from the patient record",
       comparePhotoTitle: "Compare this image before & after",
@@ -608,6 +640,8 @@ const en = {
       density: "Density: {{value}} hairs/cm²",
       thickness: "Thickness: {{value}}",
       clarity: "Clarity score: {{value}}%",
+      imageAlt: "Full trichoscopy view",
+      tagChip: "#{{tag}}",
       mouseHint: "Tip: mouse wheel = zoom | drag = pan",
       calibration: "OPTICAL CALIBRATION: 0.1mm GRID PASS",
       deletePhoto: "Delete image from record",
@@ -667,6 +701,38 @@ export function faNum(value: number | string | null | undefined): string {
   // noUncheckedIndexedAccess: the /\d/ match guarantees an index of 0-9, so the
   // `?? d` fallback is unreachable; it only satisfies replace()'s string return.
   return String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)] ?? d);
+}
+
+/**
+ * Renders a stored ISO date (`YYYY-MM-DD`) for the active locale: the Jalali
+ * calendar for `fa`, ISO for every other locale. Digits stay ASCII on purpose
+ * so `faNum()` remains the single place that shapes numerals (rules §9).
+ *
+ * Values that are not ISO dates (already-localised labels such as the "today"
+ * capture badge) are returned untouched.
+ */
+export function formatDate(
+  value: string | null | undefined,
+  locale: string = i18n.language
+): string {
+  if (value === null || value === undefined || value === "") return "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  const calendar = locale.startsWith("fa") ? "fa-IR-u-ca-persian-nu-latn" : "en-CA";
+  try {
+    return new Intl.DateTimeFormat(calendar, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "UTC",
+    }).format(parsed);
+  } catch {
+    // Environments without the Persian calendar keep the ISO value readable.
+    return value;
+  }
 }
 
 export function toggleLang(): void {
