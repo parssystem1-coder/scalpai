@@ -425,6 +425,7 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '\n')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
           ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
           BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-secrets/recipients.txt
           BACKUP_OFFSITE_ENDPOINT=http://127.0.0.1:9000
