@@ -31,12 +31,11 @@ describe("M5 blocker 1.1 — production build must not dereference DEV-only samp
   });
 
   it("ships an empty-state translation in both locales", () => {
-    expect(i18n.getFixedT("fa")("dashboard.emptyState.title")).not.toBe(
-      "dashboard.emptyState.title"
-    );
-    expect(i18n.getFixedT("en")("dashboard.emptyState.title")).not.toBe(
-      "dashboard.emptyState.title"
-    );
+    // Use the i18n instance directly; it will resolve keys based on the current language
+    const faTitle = i18n.t("dashboard.emptyState.title", { lng: "fa" });
+    const enTitle = i18n.t("dashboard.emptyState.title", { lng: "en" });
+    expect(faTitle).not.toBe("dashboard.emptyState.title");
+    expect(enTitle).not.toBe("dashboard.emptyState.title");
   });
 });
 
@@ -72,7 +71,8 @@ describe("M5 blocker 1.3 — no hardcoded copy left in the dashboard", () => {
   it("derives the patient initial from translation data, not a Persian literal", () => {
     expect(patientListSource).not.toContain('replace("\u062f\u06a9\u062a\u0631 "');
     expect(patientListSource).toContain("dashboard.patientList.titlePrefixes");
-    expect(i18n.getFixedT("en")("dashboard.patientList.titlePrefixes")).toContain("Dr.");
+    const enPrefixes = i18n.t("dashboard.patientList.titlePrefixes", { lng: "en" });
+    expect(enPrefixes).toContain("Dr.");
   });
 
   it("has no Persian-digit date literal left in the dashboard", () => {
@@ -104,7 +104,7 @@ describe("M5 blocker 1.4 — stored data stays ASCII, the render layer localises
   });
 
   it("passes through already-localised labels and empty values untouched", () => {
-    const captured = i18n.getFixedT("fa")("dashboard.photoDates.captured");
+    const captured = i18n.t("dashboard.photoDates.captured", { lng: "fa" });
     expect(formatDate(captured, "fa")).toBe(captured);
     expect(formatDate(undefined, "fa")).toBe("");
     expect(formatDate("not-a-date", "en")).toBe("not-a-date");
