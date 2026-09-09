@@ -1,4 +1,8 @@
 // Patient sample data and trichoscopy images for ClinicalDashboard
+//
+// Dates are stored as ASCII ISO `YYYY-MM-DD` (rules §9): the render layer is
+// the only place allowed to localise them (see `formatDate` in `../i18n.ts`,
+// which renders the Jalali calendar for `fa` and ISO for `en`).
 
 export interface Patient {
   id: string;
@@ -6,6 +10,7 @@ export interface Patient {
   lastName: string;
   phone: string;
   createdAt?: string;
+  /** ISO `YYYY-MM-DD`. Localise with `formatDate()` before display. */
   lastVisit?: string;
   scalpCondition?: string;
   hairDensity?: number;
@@ -21,6 +26,7 @@ export interface TrichoscopyImage {
   patientId: string;
   url: string;
   area: "vertex" | "temple" | "frontal" | "occiput";
+  /** ISO `YYYY-MM-DD` for stored frames; freshly captured frames carry a label. */
   date: string;
   density: number;
   thickness: string;
@@ -36,7 +42,7 @@ export const SAMPLE_PATIENTS: Patient[] = import.meta.env.DEV ? [
     firstName: "دکتر سارا",
     lastName: "رادمنش",
     phone: "09123456789",
-    lastVisit: "۱۴۰۳/۰۶/۱۰",
+    lastVisit: "2024-08-31",
     scalpCondition: "آلوپسی آندروژنتیک (Grade II)",
     hairDensity: 148,
     anagenRatio: 86,
@@ -50,7 +56,7 @@ export const SAMPLE_PATIENTS: Patient[] = import.meta.env.DEV ? [
     firstName: "مهسا",
     lastName: "کریمی",
     phone: "09129998877",
-    lastVisit: "۱۴۰۳/۰۶/۰۸",
+    lastVisit: "2024-08-29",
     scalpCondition: "تلوژن افلوویوم (استرس بیوشیمیایی)",
     hairDensity: 165,
     anagenRatio: 74,
@@ -64,7 +70,7 @@ export const SAMPLE_PATIENTS: Patient[] = import.meta.env.DEV ? [
     firstName: "نگین",
     lastName: "فرهمند",
     phone: "09351112233",
-    lastVisit: "۱۴۰۳/۰۵/۲۸",
+    lastVisit: "2024-08-18",
     scalpCondition: "درماتیت سبورئیک و میکروالتهاب فولیکولی",
     hairDensity: 122,
     anagenRatio: 79,
@@ -82,7 +88,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-101",
       url: "/trichoscopy/vertex.jpg",
       area: "vertex",
-      date: "۱۴۰۳/۰۶/۱۰",
+      date: "2024-08-31",
       density: 148,
       thickness: "72 µm",
       qualityScore: 98,
@@ -92,7 +98,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-101",
       url: "/trichoscopy/frontal.jpg",
       area: "frontal",
-      date: "۱۴۰۳/۰۶/۱۰",
+      date: "2024-08-31",
       density: 142,
       thickness: "66 µm",
       qualityScore: 97,
@@ -102,7 +108,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-101",
       url: "/trichoscopy/temporal.jpg",
       area: "temple",
-      date: "۱۴۰۳/۰۵/۱۰",
+      date: "2024-07-31",
       density: 134,
       thickness: "64 µm",
       qualityScore: 95,
@@ -112,7 +118,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-101",
       url: "/trichoscopy/occiput.jpg",
       area: "occiput",
-      date: "۱۴۰۳/۰۴/۱۵",
+      date: "2024-07-05",
       density: 195,
       thickness: "85 µm",
       qualityScore: 99,
@@ -124,7 +130,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-102",
       url: "/trichoscopy/vertex.jpg",
       area: "vertex",
-      date: "۱۴۰۳/۰۶/۰۸",
+      date: "2024-08-29",
       density: 165,
       thickness: "78 µm",
       qualityScore: 97,
@@ -134,7 +140,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-102",
       url: "/trichoscopy/temporal.jpg",
       area: "temple",
-      date: "۱۴۰۳/۰۵/۲۰",
+      date: "2024-08-10",
       density: 158,
       thickness: "74 µm",
       qualityScore: 94,
@@ -144,7 +150,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-102",
       url: "/trichoscopy/occiput.jpg",
       area: "occiput",
-      date: "۱۴۰۳/۰۴/۱۰",
+      date: "2024-06-30",
       density: 210,
       thickness: "88 µm",
       qualityScore: 99,
@@ -156,7 +162,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-103",
       url: "/trichoscopy/temporal.jpg",
       area: "temple",
-      date: "۱۴۰۳/۰۶/۰۱",
+      date: "2024-08-22",
       density: 122,
       thickness: "58 µm",
       qualityScore: 92,
@@ -166,7 +172,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-103",
       url: "/trichoscopy/frontal.jpg",
       area: "frontal",
-      date: "۱۴۰۳/۰۵/۱۵",
+      date: "2024-08-05",
       density: 118,
       thickness: "55 µm",
       qualityScore: 91,
@@ -176,7 +182,7 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env
       patientId: "pat-103",
       url: "/trichoscopy/vertex.jpg",
       area: "vertex",
-      date: "۱۴۰۳/۰۴/۲۰",
+      date: "2024-07-10",
       density: 130,
       thickness: "62 µm",
       qualityScore: 94,
