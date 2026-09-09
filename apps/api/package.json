@@ -39,6 +39,6 @@
     "@scalpai/licensing": "*",
     "@types/node": "^26.3.0",
     "supertest": "^7.1.4",
-    "typescript": "~5.9.3"
+    "typescript": "~7.0.2"
   }
 }
