@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# M17 - the images CI just built are scanned, never assumed clean.
-#
-#   bash tools/ci/image-scan.sh <compose-service> [more services...]
-#
-# Resolves the image compose actually built for each service (so the scan can
-# never target a stale or unrelated tag), prints the full HIGH+CRITICAL report
-# for the reviewer, and FAILS the gate on any fixable CRITICAL finding.
-# Raising the blocking severity to HIGH is the documented ratchet (ADR-0037).
+# Scan local Compose images without weakening the vulnerability gate.
+# Usage: bash tools/ci/image-scan.sh [compose-service ...]
 set -uo pipefail
 
 TRIVY_IMAGE="${TRIVY_IMAGE:-aquasec/trivy:0.58.1}"
@@ -14,108 +8,128 @@ COMPOSE_FILE="${COMPOSE_FILE:-prod.yml}"
 ENV_FILE="${ENV_FILE:-ci.env}"
 CACHE_DIR="${TRIVY_CACHE_DIR:-/tmp/trivy-cache}"
 BLOCKING_SEVERITY="${BLOCKING_SEVERITY:-CRITICAL}"
-services="${*:-api web}"
+services=("$@")
+if [ "${#services[@]}" -eq 0 ]; then services=(api web); fi
 
-compose() {
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
-}
+log() { printf '[image-scan] %s\n' "$*" >&2; }
+compose() { docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"; }
+image_exists() { [ -n "${1:-}" ] && docker image inspect "$1" >/dev/null 2>&1; }
 
-image_exists() {
-  [ -n "${1:-}" ] && docker image inspect "$1" >/dev/null 2>&1
-}
-
-# The project name compose derives build-only image tags from: prod.yml pins
-# name: scalpai, and compose config prints the resolved value.
 compose_project() {
   local name=""
-  # Two tries: first as if compose can render config (normal case), second as
-  # a fallback for when env file has missing secrets (CI sometimes generates
-  # placeholders that don't resolve). A safe fallback is the COMPOSE_PROJECT_NAME
-  # env var, which docker compose itself checks.
-  name=$(compose config 2>/dev/null | sed -n 's/^name:[[:space:]]*//p' | head -n 1)
-  [ -n "$name" ] && printf '%s\n' "$name" && return 0
-  name="${COMPOSE_PROJECT_NAME:-}"
-  [ -n "$name" ] && printf '%s\n' "$name" && return 0
-  return 1
+  # Never print rendered configuration: it contains interpolated secrets.
+  name=$(compose config 2>/dev/null | sed -n 's/^name:[[:space:]]*//p')
+  if [ -z "$name" ]; then
+    name="${COMPOSE_PROJECT_NAME:-}"
+    log "Compose project lookup unavailable; trying COMPOSE_PROJECT_NAME."
+  fi
+  [ -n "$name" ] || return 1
+  printf '%s\n' "$name"
 }
 
-# Resolution order: try compose's derived tag, then what compose reports,
-# then any image matching the service name, then compose images as last resort.
-# The grep patterns all use -- to stop option parsing, so a pattern can start
-# with - without being swallowed as an option.
+# Accept only one distinct local image ID. Never select an arbitrary first
+# match or a similarly named image from another Compose project.
+unique_image() {
+  local candidates="$1" source="$2" ref id ids="" count
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    id=$(docker image inspect --format '{{.Id}}' "$ref" 2>/dev/null) || continue
+    [ -n "$id" ] || continue
+    ids="${ids}${id}"$'\n'
+  done <<< "$candidates"
+  ids=$(printf '%s' "$ids" | sed '/^$/d' | sort -u)
+  count=$(printf '%s\n' "$ids" | sed '/^$/d' | wc -l)
+  if [ "$count" -gt 1 ]; then
+    log "$source: ambiguous image IDs; refusing to guess."
+    return 2
+  fi
+  [ "$count" -eq 1 ] || return 1
+  log "$source: resolved $ids"
+  printf '%s\n' "$ids"
+}
+
 resolve_image() {
-  local service="$1" project ref=""
-  project=$(compose_project) || true
+  local service="$1" project="" candidates="" rc ref
+  # Explicit image declarations take precedence over derived default tags.
+  candidates=$(compose config --images "$service" 2>/dev/null) || candidates=""
+  unique_image "$candidates" "$service: Compose config"
+  rc=$?
+  [ "$rc" -eq 1 ] || return "$rc"
+  log "$service: no local image from Compose config; trying fallbacks."
 
-  # 1. The default tag for a service with build: and no image: key.
+  project=$(compose_project) || project=""
   if [ -n "$project" ]; then
-    for ref in "${project}-${service}:latest" "${project}-${service}" "${project}_${service}:latest"; do
-      if image_exists "$ref"; then
-        printf '%s\n' "$ref"
-        return 0
-      fi
+    candidates=""
+    for ref in "${project}-${service}:latest" "${project}_${service}:latest"; do
+      if image_exists "$ref"; then candidates="${candidates}${ref}"$'\n'; fi
     done
+    unique_image "$candidates" "$service: project tags"
+    rc=$?
+    [ "$rc" -eq 1 ] || return "$rc"
+
+    candidates=$(docker image ls -q \
+      --filter "label=com.docker.compose.project=$project" \
+      --filter "label=com.docker.compose.service=$service" 2>/dev/null) || candidates=""
+    unique_image "$candidates" "$service: Compose project/service labels"
+    rc=$?
+    [ "$rc" -eq 1 ] || return "$rc"
   fi
 
-  # 2. What compose itself reports for this service.
-  ref=$(compose config --images "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
-  if [ -n "$ref" ] && image_exists "$ref"; then
-    printf '%s\n' "$ref"
-    return 0
-  fi
-
-  # 3. Any image in docker images whose name ends in -<service> or _<service>.
-  # Filter out <none> tags (dangling layers).
-  ref=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-    | grep -E -- "[-_]${service}:[a-z0-9]" \
-    | head -n 1)
-  if [ -n "$ref" ] && image_exists "$ref"; then
-    printf '%s\n' "$ref"
-    return 0
-  fi
-
-  # 4. Last resort: an already-running stack.
-  ref=$(compose images -q "$service" 2>/dev/null | grep -v -- '^[[:space:]]*$' | head -n 1)
-  if [ -n "$ref" ] && image_exists "$ref"; then
-    printf '%s\n' "$ref"
-    return 0
-  fi
-
-  return 1
+  candidates=$(compose images -q "$service" 2>/dev/null) || candidates=""
+  unique_image "$candidates" "$service: Compose containers"
 }
 
-mkdir -p "$CACHE_DIR"
-docker pull -q "$TRIVY_IMAGE"
-
-fail=0
-for service in $services; do
-  ref=$(resolve_image "$service")
-  if [ -z "$ref" ]; then
-    echo "::error::no image was built for compose service '$service'"
-    # A resolution failure has to be debuggable from the log alone.
-    echo "--- debug: compose project: '$(compose_project || echo 'unresolvable')' ---"
-    echo "--- debug: docker images on this runner ---"
-    docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}' || true
-    fail=1
-    continue
+log "Compose file=$COMPOSE_FILE; services=${services[*]}; scanner=$TRIVY_IMAGE; blocking=$BLOCKING_SEVERITY"
+if ! docker info >/dev/null 2>&1; then
+  log "ERROR: Docker daemon unavailable."
+  exit 1
+fi
+if ! mkdir -p "$CACHE_DIR"; then
+  log "ERROR: cannot create scanner cache directory."
+  exit 1
+fi
+if ! docker pull -q "$TRIVY_IMAGE"; then
+  if image_exists "$TRIVY_IMAGE"; then
+    log "WARNING: scanner pull failed; using the locally cached $TRIVY_IMAGE."
+  else
+    log "ERROR: scanner pull failed and no local scanner image exists."
+    exit 1
   fi
+fi
 
-  echo "=== $service ($ref): HIGH + CRITICAL report ==="
+scan() {
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$CACHE_DIR":/root/.cache/ \
-    "$TRIVY_IMAGE" image --scanners vuln --ignore-unfixed \
-    --severity HIGH,CRITICAL --format table "$ref" || true
+    "$TRIVY_IMAGE" image --image-src docker --scanners vuln --ignore-unfixed "$@"
+}
 
-  echo "=== $service ($ref): blocking gate on $BLOCKING_SEVERITY ==="
-  if ! docker run --rm \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v "$CACHE_DIR":/root/.cache/ \
-    "$TRIVY_IMAGE" image --scanners vuln --ignore-unfixed \
-    --severity "$BLOCKING_SEVERITY" --exit-code 1 --format table "$ref"; then
-    echo "::error::$service image has fixable $BLOCKING_SEVERITY vulnerabilities"
+fail=0
+for service in "${services[@]}"; do
+  if ! ref=$(resolve_image "$service"); then
+    log "ERROR: cannot uniquely resolve a local image for '$service'."
+    log "Available local image names and IDs (no environment values):"
+    docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}' >&2 || true
+    fail=1
+    continue
+  fi
+  log "$service ($ref): HIGH + CRITICAL report"
+  scan --severity HIGH,CRITICAL --format table "$ref"
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "ERROR: $service report failed (scanner exit=$rc)."
     fail=1
   fi
+
+  log "$service ($ref): blocking gate on $BLOCKING_SEVERITY"
+  # A dedicated findings code distinguishes vulnerabilities from tool errors.
+  scan --severity "$BLOCKING_SEVERITY" --exit-code 10 --format table "$ref"
+  rc=$?
+  case "$rc" in
+    0) log "$service: blocking scan passed." ;;
+    10) log "ERROR: $service has fixable $BLOCKING_SEVERITY vulnerabilities."; fail=1 ;;
+    *) log "ERROR: $service scanner failed (exit=$rc); vulnerability status unknown."; fail=1 ;;
+  esac
 done
 
 if [ "$fail" -ne 0 ]; then
