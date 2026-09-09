@@ -10,6 +10,9 @@ afterEach(cleanup);
 describe("login page (T1)", () => {
   it("renders labels with email and password fields", async () => {
     await i18n;
+    // M5: the page copy now comes from i18n, so the English assertions below
+    // need the English catalogue selected explicitly (default lng is "fa").
+    await i18n.changeLanguage("en");
     render(
       <AuthProvider>
         <LoginPage onLoggedIn={() => undefined} />
@@ -23,6 +26,7 @@ describe("login page (T1)", () => {
 
   it("shows a validation alert for bad email on submit", async () => {
     await i18n;
+    await i18n.changeLanguage("en");
     render(
       <AuthProvider>
         <LoginPage onLoggedIn={() => undefined} />

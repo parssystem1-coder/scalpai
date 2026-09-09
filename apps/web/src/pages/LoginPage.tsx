@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest, type LoginRequest as LoginDto } from "@scalpai/shared";
 import { apiFetch } from "../api/client.js";
@@ -14,6 +15,7 @@ import {
   Crown,
   Stethoscope,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import LuxuryFeminineBackground from "../components/LuxuryFeminineBackground.js";
 import LuxuryTiltCard from "../components/LuxuryTiltCard.js";
@@ -22,12 +24,33 @@ type TokenPair = { accessToken: string; user: { id: string; clinicId: string; ro
 
 const isDev = import.meta.env.DEV;
 
+/** M5: the page used to fire five browser alert() dialogs. They are now
+ *  announced through this in-page toast (role=status, auto-dismissed), so the
+ *  copy goes through i18n and nothing blocks the main thread. */
+const NOTICE_TTL_MS = 4500;
+
 export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const { t } = useTranslation();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [activeRole, setActiveRole] = useState<"owner" | "tricho">("owner");
   const [rememberMe, setRememberMe] = useState(false);
   const { login } = useAuth();
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+    },
+    [],
+  );
+
+  const showNotice = (message: string) => {
+    setNotice(message);
+    if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), NOTICE_TTL_MS);
+  };
 
   const {
     register,
@@ -59,7 +82,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       );
       onLoggedIn();
     } catch (e) {
-      setServerError(e instanceof Error ? e.message : "Authentication failed. Please check credentials.");
+      setServerError(e instanceof Error ? e.message : t("login.authFailed"));
     }
   });
 
@@ -92,6 +115,39 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     >
       {/* 3D Dynamic Microscopic Follicle Background */}
       <LuxuryFeminineBackground />
+
+      {/* M5: toast replaces the old alert() dialogs */}
+      {notice && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="login-toast"
+          style={{
+            position: "absolute",
+            top: "1.5rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 40,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            maxWidth: "min(90vw, 460px)",
+            padding: "0.75rem 1.1rem",
+            borderRadius: "16px",
+            background: "rgba(255, 255, 255, 0.9)",
+            backdropFilter: "blur(18px)",
+            border: "1px solid rgba(196, 125, 136, 0.35)",
+            boxShadow: "0 14px 34px -10px rgba(164, 95, 108, 0.35)",
+            color: "#3F2A2F",
+            fontSize: "0.84rem",
+            fontWeight: 500,
+            textAlign: "center",
+          }}
+        >
+          <CheckCircle2 size={16} color="#A25C68" />
+          <span>{notice}</span>
+        </div>
+      )}
 
       {/* LEFT: Frosted Glass Login Card (Exact Replica of the Design) */}
       <div
@@ -153,6 +209,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             </div>
 
             <div>
+              {/* Wordmark & ritual line: brand marks, intentionally not translated */}
               <div
                 style={{
                   fontSize: "0.95rem",
@@ -191,7 +248,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 letterSpacing: "-0.01em",
               }}
             >
-              Welcome Back
+              {t("login.welcomeBack")}
             </h1>
             <p
               style={{
@@ -201,7 +258,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 fontWeight: 400,
               }}
             >
-              Sign in to continue your scalp care journey
+              {t("login.welcomeSub")}
             </p>
           </div>
 
@@ -237,7 +294,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 }}
               >
                 <Crown size={13} />
-                Clinic Director
+                {t("login.roleOwnerShort")}
               </button>
               <button
                 type="button"
@@ -261,7 +318,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 }}
               >
                 <Stethoscope size={13} />
-                Trichologist
+                {t("login.roleTrichoShort")}
               </button>
             </div>
           )}
@@ -300,7 +357,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 type="text"
                 {...register("email")}
                 autoComplete="username"
-                placeholder="Username or Email"
+                placeholder={t("login.emailPh")}
                 style={{
                   width: "100%",
                   height: "52px",
@@ -351,7 +408,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 type={showPassword ? "text" : "password"}
                 {...register("password")}
                 autoComplete="current-password"
-                placeholder="Password"
+                placeholder={t("login.passwordPh")}
                 style={{
                   width: "100%",
                   height: "52px",
@@ -376,6 +433,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               <button
                 type="button"
                 data-testid="login-toggle-password"
+                aria-label={t("login.togglePassword")}
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: "absolute",
@@ -433,12 +491,12 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                     cursor: "pointer",
                   }}
                 />
-                <span>Remember me</span>
+                <span>{t("login.rememberMe")}</span>
               </label>
 
               <button
                 type="button"
-                onClick={() => alert("Password reset link sent to registered clinic email.")}
+                onClick={() => showNotice(t("login.notice.resetSent"))}
                 style={{
                   background: "none",
                   border: "none",
@@ -449,7 +507,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                   padding: 0,
                 }}
               >
-                Forgot password?
+                {t("login.forgotPass")}
               </button>
             </div>
 
@@ -501,7 +559,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 transition: "all 0.25s ease",
               }}
             >
-              {isSubmitting ? "Authenticating..." : "Sign In"}
+              {isSubmitting ? t("login.submitting") : t("login.submit")}
             </button>
 
             {/* Social Logins Divider */}
@@ -514,7 +572,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               }}
             >
               <div style={{ flex: 1, height: "1px", background: "rgba(196, 125, 136, 0.25)" }} />
-              <span style={{ fontSize: "0.76rem", color: "#8C6F76" }}>or continue with</span>
+              <span style={{ fontSize: "0.76rem", color: "#8C6F76" }}>{t("login.orContinue")}</span>
               <div style={{ flex: 1, height: "1px", background: "rgba(196, 125, 136, 0.25)" }} />
             </div>
 
@@ -529,7 +587,8 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               {/* Google */}
               <button
                 type="button"
-                onClick={() => alert("Google Sign-In ready")}
+                aria-label={t("login.googleAria")}
+                onClick={() => showNotice(t("login.notice.googleReady"))}
                 style={{
                   width: "48px",
                   height: "48px",
@@ -568,7 +627,8 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               {/* Apple */}
               <button
                 type="button"
-                onClick={() => alert("Apple Sign-In ready")}
+                aria-label={t("login.appleAria")}
+                onClick={() => showNotice(t("login.notice.appleReady"))}
                 style={{
                   width: "48px",
                   height: "48px",
@@ -593,7 +653,8 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               {/* Biometric / Touch ID */}
               <button
                 type="button"
-                onClick={() => alert("Biometric authentication initialized")}
+                aria-label={t("login.biometricAria")}
+                onClick={() => showNotice(t("login.notice.biometricReady"))}
                 style={{
                   width: "48px",
                   height: "48px",
@@ -623,10 +684,10 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                 color: "#6F555C",
               }}
             >
-              New here?{" "}
+              {t("login.newHere")}{" "}
               <button
                 type="button"
-                onClick={() => alert("Clinic Registration & Consultation portal available.")}
+                onClick={() => showNotice(t("login.notice.registerPortal"))}
                 style={{
                   background: "none",
                   border: "none",
@@ -638,7 +699,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
                   fontSize: "0.84rem",
                 }}
               >
-                Create an account
+                {t("login.createAccount")}
               </button>
             </div>
           </form>
@@ -672,9 +733,9 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               lineHeight: 1.4,
             }}
           >
-            HEALTHY SCALP.
+            {t("login.heroLine1")}
             <br />
-            BEAUTIFUL YOU.
+            {t("login.heroLine2")}
           </h2>
 
           <p
@@ -686,7 +747,7 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               maxWidth: "32ch",
             }}
           >
-            Advanced scalp exfoliation for a cleaner, healthier foundation for your hair.
+            {t("login.heroBody")}
           </p>
 
           {/* Water Droplet Badge */}
@@ -735,9 +796,9 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               lineHeight: 1.35,
             }}
           >
-            SCALP CARE
+            {t("login.taglineLine1")}
             <br />
-            IS SELF CARE
+            {t("login.taglineLine2")}
           </div>
         </div>
       </div>
