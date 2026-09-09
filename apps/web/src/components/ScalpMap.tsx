@@ -11,6 +11,7 @@ import {
   Info,
 } from "lucide-react";
 import type { ConditionKey, SeverityLevel } from "@scalpai/education";
+import { faNum } from "../i18n.js";
 
 export type ScalpZoneKey = "frontal" | "vertex" | "temporal_left" | "temporal_right" | "occiput";
 export type HeatmapMetric = "density" | "erythema" | "sebum";
@@ -86,12 +87,13 @@ const DEFAULT_ZONE_DATA: Record<ScalpZoneKey, ZoneClinicalData> = {
 };
 
 export default function ScalpMap({
-  patientName = "بیمار",
+  patientName,
   onDiveUnderSkin,
   customData,
 }: ScalpMapProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isFa = i18n.language === "fa";
+  const shownPatientName = patientName ?? t("scalpMap.defaultPatient");
 
   const [activeMetric, setActiveMetric] = useState<HeatmapMetric>("density");
   const [selectedZoneKey, setSelectedZoneKey] = useState<ScalpZoneKey>("vertex");
@@ -173,8 +175,8 @@ export default function ScalpMap({
           </div>
           <p className="text-xs text-stone-400 mt-0.5">
             {isFa
-              ? `توزیع هیت‌مپ نواحی ۵ گانه تریکوسکوپی برای پرونده: ${patientName}`
-              : `5-zone trichoscopy heatmap distribution for: ${patientName}`}
+              ? `توزیع هیت‌مپ نواحی ۵ گانه تریکوسکوپی برای پرونده: ${shownPatientName}`
+              : `5-zone trichoscopy heatmap distribution for: ${shownPatientName}`}
           </p>
         </div>
 
@@ -227,7 +229,7 @@ export default function ScalpMap({
         <div className="lg:col-span-6 flex flex-col items-center justify-center relative p-4 rounded-2xl bg-stone-950/60 border border-stone-800/80">
           <div className="text-[11px] font-mono text-stone-400 absolute top-3 left-4 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-stone-500" />
-            <span>ANTERIOR (جلو)</span>
+            <span>{t("scalpMap.anterior")}</span>
           </div>
 
           <svg
@@ -263,7 +265,7 @@ export default function ScalpMap({
                 strokeWidth={selectedZoneKey === "frontal" ? "2.5" : "1"}
               />
               <text x="200" y="115" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-                Frontal (قدامی)
+                {t("scalpMap.zoneFrontal")}
               </text>
             </g>
 
@@ -283,7 +285,7 @@ export default function ScalpMap({
                 strokeWidth={selectedZoneKey === "vertex" ? "3" : "1"}
               />
               <text x="200" y="214" textAnchor="middle" fill="#ffffff" fontSize="12" fontWeight="bold">
-                Vertex (فرق سر)
+                {t("scalpMap.zoneVertex")}
               </text>
             </g>
 
@@ -300,7 +302,7 @@ export default function ScalpMap({
                 strokeWidth={selectedZoneKey === "temporal_left" ? "2.5" : "1"}
               />
               <text x="100" y="185" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="bold">
-                گیجگاهی چپ
+                {t("scalpMap.zoneTempLeft")}
               </text>
             </g>
 
@@ -317,7 +319,7 @@ export default function ScalpMap({
                 strokeWidth={selectedZoneKey === "temporal_right" ? "2.5" : "1"}
               />
               <text x="300" y="185" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="bold">
-                گیجگاهی راست
+                {t("scalpMap.zoneTempRight")}
               </text>
             </g>
 
@@ -334,13 +336,13 @@ export default function ScalpMap({
                 strokeWidth={selectedZoneKey === "occiput" ? "2.5" : "1"}
               />
               <text x="200" y="335" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-                Occiput (بانک مو)
+                {t("scalpMap.zoneOcciput")}
               </text>
             </g>
           </svg>
 
           <div className="text-[11px] font-mono text-stone-400 absolute bottom-3 left-4 flex items-center gap-1.5">
-            <span>POSTERIOR (پشت سر)</span>
+            <span>{t("scalpMap.posterior")}</span>
           </div>
         </div>
 
@@ -350,7 +352,7 @@ export default function ScalpMap({
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-mono uppercase text-[oklch(75%_0.14_25)] font-bold">
-                  ACTIVE REGION ANALYSIS
+                  {t("scalpMap.activeRegion")}
                 </span>
                 <h4 className="text-base font-bold text-white mt-0.5">
                   {isFa ? selectedZone.name.fa : selectedZone.name.en}
@@ -375,31 +377,31 @@ export default function ScalpMap({
               <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
                 <div className="text-[11px] text-stone-400 font-medium">{isFa ? "تراکم مو:" : "Density:"}</div>
                 <div className="text-lg font-bold text-white mt-0.5 flex items-baseline gap-1">
-                  <span>{selectedZone.density}</span>
+                  <span>{faNum(selectedZone.density)}</span>
                   <span className="text-[10px] text-stone-500 font-normal">hairs/cm²</span>
                 </div>
-                <div className="text-[10px] text-stone-500 mt-1">نرمال: ۱۸۰-۲۲۰</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("scalpMap.densityNormal")}</div>
               </div>
 
               <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
                 <div className="text-[11px] text-stone-400 font-medium">{isFa ? "تنوع قطر مو:" : "Anisotrichosis:"}</div>
                 <div className="text-lg font-bold text-white mt-0.5 flex items-baseline gap-1">
-                  <span>{selectedZone.diameterDiversity}%</span>
+                  <span>{faNum(selectedZone.diameterDiversity)}%</span>
                   <span className="text-[10px] text-stone-500 font-normal">diversity</span>
                 </div>
-                <div className="text-[10px] text-stone-500 mt-1">&gt;۲۰٪ = نشانه مینیاتوریزه</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("scalpMap.diversityNote")}</div>
               </div>
 
               <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
                 <div className="text-[11px] text-stone-400 font-medium">{isFa ? "شاخص قرمزی/التهاب:" : "Erythema:"}</div>
-                <div className="text-lg font-bold text-red-400 mt-0.5">{selectedZone.erythemaScore}/100</div>
-                <div className="text-[10px] text-stone-500 mt-1">احتقان عروق مویرگی</div>
+                <div className="text-lg font-bold text-red-400 mt-0.5">{faNum(selectedZone.erythemaScore)}/{faNum(100)}</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("scalpMap.erythemaNote")}</div>
               </div>
 
               <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
                 <div className="text-[11px] text-stone-400 font-medium">{isFa ? "ترشح سبوم سطحی:" : "Sebum:"}</div>
-                <div className="text-lg font-bold text-amber-400 mt-0.5">{selectedZone.sebumScore}/100</div>
-                <div className="text-[10px] text-stone-500 mt-1">وضعیت لیپید و غدد</div>
+                <div className="text-lg font-bold text-amber-400 mt-0.5">{faNum(selectedZone.sebumScore)}/{faNum(100)}</div>
+                <div className="text-[10px] text-stone-500 mt-1">{t("scalpMap.sebumNote")}</div>
               </div>
             </div>
 

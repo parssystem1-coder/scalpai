@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Layers,
   Crosshair,
   Eye,
   CheckCircle,
 } from "lucide-react";
+import { faNum } from "../i18n.js";
 
 interface FollicleDetection {
   id: string;
@@ -33,23 +35,23 @@ const SAMPLE_DETECTIONS: FollicleDetection[] = [
   { id: "f8", x: 18, y: 55, type: "single", caliber: 58, confidence: 92 },
 ];
 
-/** Persian label for the follicular-unit type — also what the marker announces. */
-const TYPE_LABEL_FA: Record<FollicleDetection["type"], string> = {
-  single: "واحد تک‌تاری",
-  double: "واحد دوتاری",
-  triple: "واحد سه‌تاری",
-  empty: "واحد خالی",
-};
+const MEAN_CALIBER = "71.4";
+const LOCAL_DENSITY = 154;
 
 export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps> = ({
   imageUrl,
   areaName,
   patientName,
 }) => {
+  const { t } = useTranslation();
   const [showAiBoxes, setShowAiBoxes] = useState(true);
   const [showLaser, setShowLaser] = useState(true);
   const [selectedFollicle, setSelectedFollicle] = useState<FollicleDetection | null>(null);
   const [heatmapMode, setHeatmapMode] = useState(false);
+
+  /** M5: the follicular-unit label now comes from the catalogue — it is also
+   *  what the marker announces to assistive tech. */
+  const typeLabel = (type: FollicleDetection["type"]) => t(`neural.types.${type}`);
 
   return (
     <div className="relative rounded-3xl overflow-hidden bg-white/55 border border-white/80 backdrop-blur-xl shadow-md p-4 select-none">
@@ -58,10 +60,10 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-[oklch(62%_0.09_16)] animate-pulse" />
           <span className="font-mono text-[oklch(20%_0.02_20)] font-bold tracking-wider">
-            AI TRICHO-VISION HUD • 4K
+            {t("neural.hud")}
           </span>
           <span className="px-2.5 py-0.5 rounded-full bg-white/80 border border-black/5 text-[0.65rem] text-[oklch(40%_0.02_20)] font-medium shadow-xs">
-            ناحیه: {areaName}
+            {t("neural.areaLabel", { area: areaName })}
           </span>
         </div>
 
@@ -76,7 +78,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
             }`}
           >
             <Eye className="w-3 h-3" />
-            <span>واحد‌های فولیکولی</span>
+            <span>{t("neural.toggleUnits")}</span>
           </button>
 
           <button
@@ -88,7 +90,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
             }`}
           >
             <Layers className="w-3 h-3" />
-            <span>نقشه حرارتی تراکم</span>
+            <span>{t("neural.toggleHeatmap")}</span>
           </button>
 
           <button
@@ -100,7 +102,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
             }`}
           >
             <Crosshair className="w-3 h-3" />
-            <span>لیزر اسکنر</span>
+            <span>{t("neural.toggleLaser")}</span>
           </button>
         </div>
       </div>
@@ -109,7 +111,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
       <div className="relative aspect-16/10 rounded-2xl overflow-hidden bg-stone-900 border border-white/30 shadow-lg">
         <img
           src={imageUrl}
-          alt="Trichoscopy Microscopic View"
+          alt={t("neural.imageAlt")}
           className={`w-full h-full object-cover transition-all duration-700 ${
             heatmapMode ? "brightness-75 contrast-125 saturate-200 hue-rotate-30" : ""
           }`}
@@ -166,7 +168,11 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
                 role="button"
                 tabIndex={0}
                 aria-pressed={isHovered}
-                aria-label={`${TYPE_LABEL_FA[f.type]} — کالیبر ${f.caliber} میکرومتر، اطمینان مدل ${f.confidence} درصد`}
+                aria-label={t("neural.markerAria", {
+                  type: typeLabel(f.type),
+                  caliber: faNum(f.caliber),
+                  confidence: faNum(f.confidence),
+                })}
                 onClick={select}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -191,8 +197,10 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
                 {/* Floating Tag */}
                 {isHovered && (
                   <div className="absolute top-10 right-1/2 translate-x-1/2 px-2.5 py-1 rounded-lg bg-black/90 border border-white/30 text-[0.62rem] text-rose-100 whitespace-nowrap shadow-xl">
-                    <div>کالیبر: {f.caliber} µm</div>
-                    <div className="text-emerald-400 font-bold">اطمینان مدل: {f.confidence}%</div>
+                    <div>{t("neural.caliberTag", { value: faNum(f.caliber) })}</div>
+                    <div className="text-emerald-400 font-bold">
+                      {t("neural.confidenceTag", { value: faNum(f.confidence) })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -204,10 +212,10 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1 text-emerald-300 font-bold">
               <CheckCircle className="w-3.5 h-3.5" />
-              ۸ واحد فولیکولی تفکیک شد
+              {t("neural.unitsSegmented", { count: faNum(SAMPLE_DETECTIONS.length) })}
             </span>
-            <span className="text-stone-300">میانگین ضخامت: 71.4 µm</span>
-            <span className="text-stone-300">تراکم محلی: 154 تار/cm²</span>
+            <span className="text-stone-300">{t("neural.meanCaliber", { value: faNum(MEAN_CALIBER) })}</span>
+            <span className="text-stone-300">{t("neural.localDensity", { value: faNum(LOCAL_DENSITY) })}</span>
           </div>
 
           <span className="text-[0.65rem] font-mono text-rose-300/90">
