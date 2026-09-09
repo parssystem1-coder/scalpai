@@ -59,7 +59,7 @@
     "packages/*",
     "tools/*"
   ],
-  "dependencies": {
+  "overrides": {
     "tar": "^7.5.22"
   }
 }
