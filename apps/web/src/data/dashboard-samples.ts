@@ -29,7 +29,8 @@ export interface TrichoscopyImage {
   notes?: string;
 }
 
-export const SAMPLE_PATIENTS: Patient[] = [
+// Gated behind DEV to satisfy production-mocks conformance (ADR-21)
+export const SAMPLE_PATIENTS: Patient[] = import.meta.env.DEV ? [
   {
     id: "pat-101",
     firstName: "دکتر سارا",
@@ -72,9 +73,9 @@ export const SAMPLE_PATIENTS: Patient[] = [
     microcirculation: 68,
     stemCellVitality: 73,
   },
-];
+] : [];
 
-export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
+export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = import.meta.env.DEV ? {
   "pat-101": [
     {
       id: "img-01",
@@ -181,4 +182,4 @@ export const SAMPLE_IMAGES: Record<string, TrichoscopyImage[]> = {
       qualityScore: 94,
     },
   ],
-};
+} : {};
