@@ -6,7 +6,7 @@ import TrichologyRadarChart, { RadarMetric } from "../TrichologyRadarChart.js";
 import FollicleCaliberWaveform from "../FollicleCaliberWaveform.js";
 import type { Patient } from "../../data/dashboard-samples.js";
 import type { SectionId } from "../dashboard-sections.js";
-import { faNum } from "../../i18n.js";
+import { faNum, formatDate } from "../../i18n.js";
 
 export interface PatientListSectionProps {
   /** Full patient roster (API-backed when online, local sample fallback otherwise). */
@@ -48,6 +48,25 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
       p.lastName.includes(searchQuery) ||
       p.phone.includes(searchQuery)
   );
+
+  /**
+   * Avatar initial with any localised honorific removed ("دکتر سارا" → "س").
+   * The prefix list is translation data, never a hardcoded literal, so the
+   * English UI strips "Dr." the same way Persian strips "دکتر".
+   */
+  const patientInitial = (firstName: string): string => {
+    const prefixes = t("dashboard.patientList.titlePrefixes")
+      .split("|")
+      .filter((prefix) => prefix.length > 0);
+    let bare = firstName.trim();
+    for (const prefix of prefixes) {
+      if (bare.startsWith(`${prefix} `)) {
+        bare = bare.slice(prefix.length + 1).trim();
+        break;
+      }
+    }
+    return bare.charAt(0);
+  };
 
   // Dynamic Radar Metrics for Selected Patient
   const radarMetrics: RadarMetric[] = [
@@ -150,7 +169,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                               : "bg-white/85 text-[oklch(48%_0.095_12)] ring-white/60 border border-[oklch(62%_0.09_16/0.3)]"
                           }`}
                         >
-                          {patient.firstName.replace("دکتر ", "")[0]}
+                          {patientInitial(patient.firstName)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -166,7 +185,9 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                             <span>•</span>
                             <span>
                               {t("dashboard.patientList.lastVisit")}{" "}
-                              {patient.lastVisit || t("dashboard.patientList.today")}
+                              {patient.lastVisit
+                                ? faNum(formatDate(patient.lastVisit))
+                                : t("dashboard.patientList.today")}
                             </span>
                             <span>•</span>
                             <span className="text-emerald-700 font-bold font-mono">
