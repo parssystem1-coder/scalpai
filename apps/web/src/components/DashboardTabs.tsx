@@ -1,5 +1,5 @@
 import React from "react";
-import { SECTIONS, type SectionId, type SectionIcon } from "./dashboard-sections.js";
+import { SECTIONS, type SectionId } from "./dashboard-sections.js";
 
 export interface DashboardTabsProps {
   /** Currently highlighted section (owned by ClinicalDashboard). */
@@ -29,7 +29,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
         aria-label="بخش‌های داشبورد کلینیکی (موبایل)"
       >
         {SECTIONS.map((sec, idx) => {
-          const Icon = sec.icon as SectionIcon;
+          const Icon = sec.icon;
           const isActive = activeSection === sec.id;
           return (
             <button
@@ -64,7 +64,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
       aria-label="بخش‌های داشبورد کلینیکی"
     >
       {SECTIONS.map((sec, idx) => {
-        const Icon = sec.icon as SectionIcon;
+        const Icon = sec.icon;
         const isActive = activeSection === sec.id;
         return (
           <button
