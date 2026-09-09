@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // @vitest-environment jsdom
 //
 // M5 blocker regression guard (docs/WEAKNESSES-V2-10-PHASES.md).
