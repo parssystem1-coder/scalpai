@@ -47,10 +47,13 @@ import PatientListSection from "./sections/PatientListSection.js";
 import ScalpMapSection from "./sections/ScalpMapSection.js";
 import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection.js";
 import { useDashboardModals } from "../hooks/useDashboardModals.js";
-import { faNum } from "../i18n.js";
+import { faNum, formatDate } from "../i18n.js";
 
 export { SECTIONS };
 export type { SectionId };
+
+/** ISO date of the placeholder frame shown before a record has any capture. */
+const FALLBACK_PHOTO_DATE = "2024-08-31";
 
 interface ClinicalDashboardProps {
   userEmail?: string;
@@ -133,7 +136,10 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     closeBeforeAfter,
   } = useDashboardModals();
 
-  const [selectedPatient, setSelectedPatient] = useState<Patient>(SAMPLE_PATIENTS[0]!);
+  // `null` until a record exists: SAMPLE_PATIENTS is DEV-gated, so a production
+  // build would resolve `SAMPLE_PATIENTS[0]!` to undefined and crash on the
+  // first property read.
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
   // Modal payload/context state (not open/close state) stays local to the dashboard.
@@ -147,6 +153,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [selectedTagFilter, _setSelectedTagFilter] = useState<string>("all");
   const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);
   const [previewPhotoModal, setPreviewPhotoModal] = useState<TrichoscopyImage | null>(null);
+
+  const openAddPatient = () => setIsAddPatientOpen(true);
 
   // Lightbox Zoom & Pan Interactive State
   const [lightboxZoom, setLightboxZoom] = useState<number>(1);
@@ -212,7 +220,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
   const _handleSaveCaliperToPhoto = () => {
     const calc = calculateCaliperDistance();
-    if (!calc || !previewPhotoModal) return;
+    if (!calc || !previewPhotoModal || !selectedPatient) return;
     const formatted = `${calc.microns} µm (${calc.category})`;
     setLocalImages((prev) => {
       const list = prev[selectedPatient.id] || [];
@@ -227,7 +235,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   };
 
   const _handleSavePhotoNotes = () => {
-    if (!previewPhotoModal) return;
+    if (!previewPhotoModal || !selectedPatient) return;
     setLocalImages((prev) => {
       const list = prev[selectedPatient.id] || [];
       const updated = list.map((p) =>
@@ -366,6 +374,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const processUploadedImageFile = (file: File) => {
+    if (!selectedPatient) return;
     if (!file.type.startsWith("image/")) {
       setUploadFeedback(t("dashboard.toasts.invalidImage"));
       return;
@@ -432,6 +441,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     frames?: Record<string, string>,
     stepTags?: Record<string, string[]>
   ) => {
+    if (!selectedPatient) return;
     if (frames && Object.keys(frames).length > 0) {
       const newImagesList: TrichoscopyImage[] = [];
       const zoneMapping: Record<string, "vertex" | "temple" | "frontal" | "occiput"> = {
@@ -472,6 +482,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   };
 
   const handleDeletePhoto = (photoId: string) => {
+    if (!selectedPatient) return;
     setLocalImages((prev) => {
       const currentList = prev[selectedPatient.id] || [];
       const updated = currentList.filter((img) => img.id !== photoId);
@@ -516,6 +527,14 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   });
 
   const patientList = apiPatients && apiPatients.length > 0 ? apiPatients : localPatients;
+
+  // Latch onto the first available record once the roster is known. In dev this
+  // is the first sample; in production it is the first API record.
+  useEffect(() => {
+    if (selectedPatient) return;
+    const first = patientList[0];
+    if (first) setSelectedPatient(first);
+  }, [patientList, selectedPatient]);
 
   const handleSelectPatientById = (id: string) => {
     const found = patientList.find((p) => p.id === id);
@@ -594,7 +613,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     // NOTE: the Persian literals below are DATA matchers against the stored
     // `scalpCondition` free-text field, not UI copy — they stay out of i18n on
     // purpose, otherwise switching the UI language would change the diagnosis.
-    const condText = (selectedPatient.scalpCondition || "").toLowerCase();
+    const condText = (selectedPatient?.scalpCondition || "").toLowerCase();
     let condKey: ConditionKey;
     if (condText.includes("سبورئیک") || condText.includes("seborrheic") || aiResult.scores.redness > 35) {
       condKey = "seborrheic_dermatitis";
@@ -624,18 +643,20 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     openEducation();
   };
 
-  const allPatientPhotos = localImages[selectedPatient.id] || [
-    {
-      id: "img-default",
-      patientId: selectedPatient.id,
-      url: "/trichoscopy/vertex.jpg",
-      area: "vertex",
-      date: "۱۴۰۳/۰۶/۱۰",
-      density: selectedPatient.hairDensity || 148,
-      thickness: "72 µm",
-      qualityScore: 98,
-    },
-  ];
+  const allPatientPhotos: TrichoscopyImage[] = selectedPatient
+    ? localImages[selectedPatient.id] ?? [
+        {
+          id: "img-default",
+          patientId: selectedPatient.id,
+          url: "/trichoscopy/vertex.jpg",
+          area: "vertex",
+          date: FALLBACK_PHOTO_DATE,
+          density: selectedPatient.hairDensity || 148,
+          thickness: "72 µm",
+          qualityScore: 98,
+        },
+      ]
+    : [];
 
   const patientPhotos = allPatientPhotos.filter((p) => {
     if (selectedTagFilter === "all") return true;
@@ -643,11 +664,157 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     return Boolean(p.tags && p.tags.includes(selectedTagFilter));
   });
 
+  /* Modal: Add Patient — shared by the empty state and the full dashboard. */
+  const addPatientModal = isAddPatientOpen ? (
+    <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="rounded-[32px] p-6 md:p-8 max-w-md w-full bg-[oklch(98%_0.008_28/0.85)] border border-white/90 shadow-[0_24px_60px_oklch(30%_0.04_15/0.18)] backdrop-blur-2xl animate-fadeIn">
+        <h3 className="text-xl font-serif font-bold text-[oklch(20%_0.02_20)] mb-1">
+          {t("dashboard.addPatient.title")}
+        </h3>
+        <p className="text-xs text-[oklch(45%_0.02_20)] mb-6">{t("dashboard.addPatient.subtitle")}</p>
+
+        <form onSubmit={handleAddPatient} className="space-y-4">
+          <div>
+            <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+              {t("dashboard.addPatient.firstName")}
+            </label>
+            <input
+              id="patient-firstName"
+              type="text"
+              required
+              value={newPatient.firstName}
+              onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
+              placeholder={t("dashboard.addPatient.firstNamePh")}
+              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+              {t("dashboard.addPatient.lastName")}
+            </label>
+            <input
+              id="patient-lastName"
+              type="text"
+              required
+              value={newPatient.lastName}
+              onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
+              placeholder={t("dashboard.addPatient.lastNamePh")}
+              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+              {t("dashboard.addPatient.phone")}
+            </label>
+            <input
+              id="patient-phone"
+              type="tel"
+              value={newPatient.phone}
+              onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
+              placeholder={t("dashboard.addPatient.phonePh")}
+              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
+              {t("dashboard.addPatient.condition")}
+            </label>
+            <input
+              id="patient-condition"
+              type="text"
+              value={newPatient.condition}
+              onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
+              placeholder={t("dashboard.addPatient.conditionPh")}
+              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="submit"
+              className="flex-1 h-12 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
+            >
+              {t("dashboard.addPatient.submit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAddPatientOpen(false)}
+              className="px-5 h-12 rounded-2xl bg-white/80 hover:bg-white border border-stone-200 text-xs font-bold text-[oklch(40%_0.02_20)] transition-all"
+            >
+              {t("dashboard.addPatient.cancel")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  ) : null;
+
+  // Empty roster: mount the shell and offer record creation instead of reading
+  // properties off a record that does not exist.
+  if (!selectedPatient) {
+    return (
+      <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
+        <div
+          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
+          style={{ backgroundImage: `url('/images/scalp-bg.jpg')` }}
+        />
+        <AmberOrbs />
+        <HairCanvas />
+
+        <DashboardHeader
+          userEmail={userEmail}
+          isOnline={isOnline}
+          pendingCount={pendingCount}
+          activeSection={activeSection}
+          onSectionChange={scrollToSection}
+          onOpenSyncInspector={openSync}
+          onOpenLicenseDiagnostics={openLicense}
+          onOpenEducation={openAddPatient}
+          onOpenGuidedCapture={openAddPatient}
+          onOpenPdfReport={openAddPatient}
+          onOpenConsent={openAddPatient}
+          onLogout={() => { clearAccessToken(); onLogout(); }}
+        />
+        <DashboardTabs variant="mobile" activeSection={activeSection} onSectionChange={scrollToSection} />
+
+        <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 relative z-10">
+          <section id="section-patients" className="scroll-mt-28">
+            <div className="rounded-[32px] p-8 md:p-12 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)] flex flex-col items-center text-center gap-4">
+              <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
+                {t("dashboard.emptyState.badge")}
+              </span>
+              <div className="w-14 h-14 rounded-2xl bg-white/80 border border-white text-[oklch(62%_0.09_16)] grid place-items-center shadow-xs">
+                <HeartHandshake className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
+                {t("dashboard.emptyState.title")}
+              </h2>
+              <p className="text-xs text-[oklch(45%_0.02_20)] max-w-md">{t("dashboard.emptyState.hint")}</p>
+              <button
+                type="button"
+                onClick={openAddPatient}
+                className="mt-2 px-5 py-3 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              >
+                {t("dashboard.emptyState.addPatient")}
+              </button>
+            </div>
+          </section>
+        </main>
+
+        {addPatientModal}
+
+        {/* Record-independent diagnostics stay reachable on an empty roster. */}
+        {isLicenseOpen && <LicenseDiagnosticsModal isOpen={isLicenseOpen} onClose={closeLicense} />}
+        {isSyncOpen && <SyncInspectorModal isOpen={isSyncOpen} onClose={closeSync} />}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none"
-      dir="rtl"
-    >
+    <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
       {/* 1. Global Scalp Aesthetic Background Image (Matches Login Page) */}
       <div
         className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
@@ -684,7 +851,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           patients={patientList}
           selectedPatient={selectedPatient}
           onSelectPatient={handleSelectPatientById}
-          onAddPatient={() => setIsAddPatientOpen(true)}
+          onAddPatient={openAddPatient}
           onNavigate={scrollToSection}
         />
 
@@ -692,7 +859,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <div className="flex items-center gap-4 py-2 opacity-70">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
           <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            SECTION 02 • SCALP MAP & SUB-CUTANEOUS DIVE
+            {t("dashboard.dividers.scalpMap")}
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
@@ -711,7 +878,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <div className="flex items-center gap-4 py-2 opacity-70">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
           <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            SECTION 03 • TRICHOSCOPY IMAGING
+            {t("dashboard.dividers.trichoscopy")}
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
@@ -910,7 +1077,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                           >
                             <img
                               src={photo.url}
-                              alt="Trichoscopy"
+                              alt={t("dashboard.galleryVision.thumbAlt")}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                             <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[oklch(20%_0.02_20)] text-[0.65rem] font-bold border border-white/80 shadow-xs">
@@ -938,14 +1105,18 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                                     key={tag}
                                     className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80"
                                   >
-                                    #{tag}
+                                    {t("dashboard.galleryVision.tagChip", { tag })}
                                   </span>
                                 ))}
                               </div>
                             )}
 
                             <div className="flex items-center justify-between text-xs text-[oklch(45%_0.02_20)] mb-3 font-mono">
-                              <span>{t("dashboard.galleryVision.dateLabel", { value: photo.date })}</span>
+                              <span>
+                                {t("dashboard.galleryVision.dateLabel", {
+                                  value: faNum(formatDate(photo.date)),
+                                })}
+                              </span>
                               <span>
                                 {t("dashboard.galleryVision.thicknessLabel", {
                                   value: faNum(photo.thickness),
@@ -1021,7 +1192,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <div className="flex items-center gap-4 py-2 opacity-70">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
           <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            SECTION 03 • NEURAL AI ENGINE & FORMULATION
+            {t("dashboard.dividers.aiEngine")}
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
@@ -1041,7 +1212,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <div className="flex items-center gap-4 py-2 opacity-70">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
           <span className="text-[0.65rem] font-mono font-bold uppercase tracking-widest text-[oklch(45%_0.02_20)] bg-white/75 px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            SECTION 04 • 3D HOLOGRAPHIC FOLLICLE
+            {t("dashboard.dividers.hologram")}
           </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
@@ -1113,93 +1284,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         </div>
       )}
 
-      {/* Modal: Add Patient */}
-      {isAddPatientOpen && (
-        <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="rounded-[32px] p-6 md:p-8 max-w-md w-full bg-[oklch(98%_0.008_28/0.85)] border border-white/90 shadow-[0_24px_60px_oklch(30%_0.04_15/0.18)] backdrop-blur-2xl animate-fadeIn">
-            <h3 className="text-xl font-serif font-bold text-[oklch(20%_0.02_20)] mb-1">
-              {t("dashboard.addPatient.title")}
-            </h3>
-            <p className="text-xs text-[oklch(45%_0.02_20)] mb-6">{t("dashboard.addPatient.subtitle")}</p>
-
-            <form onSubmit={handleAddPatient} className="space-y-4">
-              <div>
-                <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-                  {t("dashboard.addPatient.firstName")}
-                </label>
-                <input
-                  id="patient-firstName"
-                  type="text"
-                  required
-                  value={newPatient.firstName}
-                  onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
-                  placeholder={t("dashboard.addPatient.firstNamePh")}
-                  className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-                  {t("dashboard.addPatient.lastName")}
-                </label>
-                <input
-                  id="patient-lastName"
-                  type="text"
-                  required
-                  value={newPatient.lastName}
-                  onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
-                  placeholder={t("dashboard.addPatient.lastNamePh")}
-                  className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-                  {t("dashboard.addPatient.phone")}
-                </label>
-                <input
-                  id="patient-phone"
-                  type="tel"
-                  value={newPatient.phone}
-                  onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                  placeholder={t("dashboard.addPatient.phonePh")}
-                  className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-                  {t("dashboard.addPatient.condition")}
-                </label>
-                <input
-                  id="patient-condition"
-                  type="text"
-                  value={newPatient.condition}
-                  onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
-                  placeholder={t("dashboard.addPatient.conditionPh")}
-                  className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 pt-3">
-                <button
-                  type="submit"
-                  className="flex-1 h-12 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
-                >
-                  {t("dashboard.addPatient.submit")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddPatientOpen(false)}
-                  className="px-5 h-12 rounded-2xl bg-white/80 hover:bg-white border border-stone-200 text-xs font-bold text-[oklch(40%_0.02_20)] transition-all"
-                >
-                  {t("dashboard.addPatient.cancel")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {addPatientModal}
 
       {/* Modal: Digital Consent Form */}
       {isConsentOpen && (
@@ -1255,7 +1340,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
           patientId: img.patientId,
           url: img.url,
           area: img.area,
-          date: img.date,
+          date: formatDate(img.date),
           density: img.density,
           thickness: img.thickness,
           qualityScore: img.qualityScore,
@@ -1295,7 +1380,6 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
-            dir="rtl"
           >
             {/* Header with Title & Quick Zoom Controls */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 bg-stone-900 border-b border-stone-800 text-stone-100 flex-wrap gap-2">
@@ -1315,7 +1399,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                   <span className="text-[11px] text-stone-400 font-mono">
                     {t("dashboard.lightbox.meta", {
                       patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-                      date: previewPhotoModal.date,
+                      date: faNum(formatDate(previewPhotoModal.date)),
                     })}
                   </span>
                 </div>
@@ -1440,7 +1524,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
               >
                 <img
                   src={previewPhotoModal.url}
-                  alt="Full Trichoscopy View"
+                  alt={t("dashboard.lightbox.imageAlt")}
                   className="max-w-full max-h-full object-contain pointer-events-none select-none"
                   draggable={false}
                 />
@@ -1470,7 +1554,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
                     <div className="flex items-center gap-1">
                       {previewPhotoModal.tags.map((tag) => (
                         <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">
-                          #{tag}
+                          {t("dashboard.lightbox.tagChip", { tag })}
                         </span>
                       ))}
                     </div>
