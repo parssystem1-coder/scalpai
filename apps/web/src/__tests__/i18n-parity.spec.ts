@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import i18n from "../i18n.js";
 
@@ -46,7 +45,7 @@ const placeholdersOf = (value: unknown): string[] =>
     ? [...value.matchAll(/\{\{\s*([\w.]+)[^}]*\}\}/g)].map((m) => m[1] ?? "").sort()
     : [];
 
-const WEB_SRC = fileURLToPath(new URL("../", import.meta.url));
+const WEB_SRC = resolve(__dirname, "..");
 
 /**
  * The M5 surface phase A migrated. Kept in step with the
