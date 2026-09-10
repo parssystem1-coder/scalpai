@@ -14,8 +14,9 @@ import i18n from "../i18n.js";
  */
 type Node = Record<string, unknown>;
 
-const LANGUAGES = ["fa", "en"] as const;
-type Lang = (typeof LANGUAGES)[number];
+type Lang = "fa" | "en";
+
+const LANGUAGES: Lang[] = ["fa", "en"];
 
 const bundleOf = (lng: Lang): Node => {
   const raw: unknown = i18n.getResourceBundle(lng, "translation");
