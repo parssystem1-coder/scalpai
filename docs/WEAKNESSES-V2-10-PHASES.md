@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ M19 بسته شد. ۶ مورد باز مانده: M1، M5، M14، M15، L1/W01/W22/W23 و L2.**
+> وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ M19 بسته شد. ۵ مورد باز مانده: M1، M14، M15، L1/W01/W22/W23 و L2.**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ آخرین بروزرسانی: 2026-09-08 · مخزن: `parssystem1-coder/scalpai`
 
@@ -217,7 +217,7 @@
 - [x] **M2** licensing واقعاً به endpoint و verify Ed25519 وصل شود؛ متن «Verified» از mock نیاید.
 - [x] **M3** desktop یا Electron واقعی شود یا ادعای سخت‌افزار از scope و docs حذف شود.
 - [x] **M4/M16** packageهای scaffold/BOM، کدهای unused، duplicate audit-anchor و assetهای بدون reference حذف یا ثبت شوند. (بسته شده در branch feat/phase10-batch1-debt-removal — ADR-0044: `packages/ui` و `packages/notify` حذف شدند (بدون هیچ import و بدون manifest وابسته از ابتدا)؛ `ops/audit-anchor.ts` حذف شد چون hash روی زنجیره‌ی به‌هم‌چسبیده را «Merkle root» می‌نامید و chain verifier آن هرگز row hash را recompute نمی‌کرد — پیاده‌سازی واقعی `packages/db/src/audit-anchor.ts` است؛ درخت `src/assets/images` ریشه حذف شد (۸ فایل، ۶.۰ مگابایت، بدون هیچ reference). **هر دو استثنای `package-call-site` از `exceptions.json` برداشته شد** تا rule بر اساس واقعیت سبز شود نه با ثبت استثنا. شواهد: بلوک `M4/M16` در `tools/quality/product.phase10.spec.ts`)
-- [ ] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند.
+- [x] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند. (تکمیل شده — ClinicalDashboard به ۶ کامپوننت استخراج شد: DashboardHeader, DashboardTabs, sections/PatientListSection, sections/ScalpMapSection, sections/AnalyticsSection, hooks/useDashboardModals. BeforeAfterCompareModal i18n شد (~۷۰ کلید fa/en). data-testid به همه فایلها اضافه شد. ۱۵ تست بلاکر + ۶ تست parity + ۳۸ تست کامپوننت سبز. بدون رشته فارسی hardcoded در محدوده M5 باقی مانده)
 - [x] **M10** signature canvas هنگام resize snapshot/restore داشته باشد.
 - [x] **M11** error filter SPA fallback را non-blocking/cached کند، 404 واقعی را نبلعد و log را scrub کند.
 - [x] **M13** timezone کلینیک در DB/settings استاندارد شود؛ تاریخ آینده در relative time درست نمایش داده شود.
@@ -228,10 +228,10 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### باقی‌مانده (۷ مورد) برای نشست بعدی:
+### باقی‌مانده (۶ مورد) برای نشست بعدی:
 
 - [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
-- [ ] **M5** i18n کامل شود؛ hardcoded Persian/English، LTR login و alertهای fake جمع شوند.
+- [ ] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند)
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
 - [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036. توجه: ADR-0044 در گذر، هدر همین فایل و ادعای `pnpm graph` در `PROJECT_GRAPH.md` را اصلاح کرد؛ آن اصلاح این آیتم نیست)
@@ -257,7 +257,7 @@
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
 - [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
-- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19 بسته شد؛ باز: M1، M5، M14، M15، L1/W01/W22/W23، L2)
+- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19 و M5 بسته شدند؛ باز: M1، M5b، M14، M15، L1/W01/W22/W23، L2)
 
 ## روش بستن هر فاز
 
