@@ -16,8 +16,6 @@ type Node = Record<string, unknown>;
 
 type Lang = "fa" | "en";
 
-const LANGUAGES: Lang[] = ["fa", "en"];
-
 const bundleOf = (lng: Lang): Node => {
   const raw: unknown = i18n.getResourceBundle(lng, "translation");
   if (raw === null || typeof raw !== "object") {
