@@ -34,24 +34,6 @@ const TONE_BY_STATE: Record<LicenseStatusDto["state"], PanelTone> = {
   unlicensed: "neutral",
 };
 
-const STATE_TITLE_FA: Record<LicenseStatusDto["state"], string> = {
-  active: "لایسنس معتبر است و امضای Ed25519 توسط سرور تأیید شد",
-  grace_period: "لایسنس منقضی شده و سیستم در دوره فرجه است",
-  expired: "لایسنس و دوره فرجه منقضی شده است",
-  tampered: "هشدار: دستکاری ساعت سیستم شناسایی شد",
-  invalid_signature: "امضای توکن لایسنس تأیید نشد",
-  unlicensed: "برای این نصب لایسنسی تنطیم نشده است",
-};
-
-const STATE_TITLE_EN: Record<LicenseStatusDto["state"], string> = {
-  active: "Licence valid - Ed25519 signature verified by the server",
-  grace_period: "Licence expired - grace period active",
-  expired: "Licence and grace period expired",
-  tampered: "Warning: system clock rollback detected",
-  invalid_signature: "Licence token signature did not verify",
-  unlicensed: "No licence is configured for this installation",
-};
-
 const TONE_CLASSES: Record<PanelTone, string> = {
   ok: "bg-emerald-50/80 border-emerald-200 text-emerald-950",
   warn: "bg-amber-50/80 border-amber-200 text-amber-950",
@@ -82,6 +64,23 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
       setLoading(false);
     }
   }, [t]);
+
+  const getStateTitle = (state: LicenseStatusDto["state"]) => {
+    switch (state) {
+      case "active":
+        return t("dashboard.licenseDiagnostics.statusActive");
+      case "grace_period":
+        return t("dashboard.licenseDiagnostics.statusGrace");
+      case "expired":
+        return t("dashboard.licenseDiagnostics.statusExpired");
+      case "tampered":
+        return t("dashboard.licenseDiagnostics.statusTampered");
+      case "invalid_signature":
+        return t("dashboard.licenseDiagnostics.statusInvalidSig");
+      case "unlicensed":
+        return t("dashboard.licenseDiagnostics.statusUnlicensed");
+    }
+  };
 
   useEffect(() => {
     if (isOpen) void refresh();
@@ -155,7 +154,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
               )}
               <div className="space-y-1 text-xs">
                 <strong className="block font-bold">
-                  {i18n.language === "fa" ? STATE_TITLE_FA[status.state] : STATE_TITLE_EN[status.state]}
+                  {getStateTitle(status.state)}
                 </strong>
                 {status.reason && <p className="leading-relaxed opacity-90">{status.reason}</p>}
                 {typeof status.daysRemaining === "number" && (
