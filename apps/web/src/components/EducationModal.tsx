@@ -38,6 +38,7 @@ export default function EducationModal({
   patientName = "بیمار",
 }: EducationModalProps) {
   const { t, i18n } = useTranslation();
+  const isFa = i18n.language === "fa";
 
   const [selectedCondition, setSelectedCondition] = useState<ConditionKey>(initialCondition);
   const [severity, setSeverity] = useState<SeverityLevel>(initialSeverity);
