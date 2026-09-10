@@ -256,7 +256,7 @@ export default function GuidedCaptureModal({
         setIsLiveCamera(false);
       }
     },
-    []
+    [i18n.language]
   );
 
   // Sync stream to video element whenever isLiveCamera turns true or videoRef mounts
