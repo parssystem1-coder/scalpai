@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runRules } from "./run.js";
 import { RULES } from "./rules/index.js";
-import { packageCallSite, packageManager, productionMocks } from "./rules/v2.js";
+import { packageCallSite, packageManager, persianLiteralsInTsx, productionMocks } from "./rules/v2.js";
 
 /**
  * ADR-21: a rule without a self-test is a suggestion. Every phase 5 rule proves
@@ -139,11 +139,83 @@ describe("package-manager", () => {
   });
 });
 
+describe("no-persian-literals-in-tsx", () => {
+  it("flags a Persian literal rendered by an enforced component", async () => {
+    const root = emptyRepo();
+    writeFile(
+      root,
+      "apps/web/src/components/sections/BadSection.tsx",
+      "export const Bad = () => <p>سلام دنیا</p>;\n",
+    );
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations.map((v) => v.file)).toEqual([
+      "apps/web/src/components/sections/BadSection.tsx:1",
+    ]);
+  });
+
+  it("flags shaped digits and the Arabic percent sign, which never belong in a component", async () => {
+    const root = emptyRepo();
+    writeFile(
+      root,
+      "apps/web/src/components/DashboardHeader.tsx",
+      "export const Bad = () => <span>۹۲٪</span>;\n",
+    );
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations.map((v) => v.file)).toEqual(["apps/web/src/components/DashboardHeader.tsx:1"]);
+  });
+
+  it("accepts a component whose copy goes through i18n", async () => {
+    const root = emptyRepo();
+    writeFile(
+      root,
+      "apps/web/src/components/DashboardTabs.tsx",
+      'export const Ok = () => <span>{t("dashboard.tabs.patients")}</span>;\n',
+    );
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations).toEqual([]);
+  });
+
+  it("does not report Persian inside line or block comments", async () => {
+    const root = emptyRepo();
+    writeFile(
+      root,
+      "apps/web/src/components/sections/Documented.tsx",
+      "/**\n * namoone: 'دکتر سارا' -> 'س'\n */\n// tozih: متن\nexport const Ok = () => <span>{faNum(9)}</span>;\n",
+    );
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations).toEqual([]);
+  });
+
+  it("ignores specs, __tests__ and data fixtures", async () => {
+    const root = emptyRepo();
+    writeFile(root, "apps/web/src/components/sections/Bad.spec.tsx", "const a = 'سلام';\n");
+    writeFile(root, "apps/web/src/components/sections/__tests__/Bad.tsx", "const a = 'سلام';\n");
+    writeFile(root, "apps/web/src/data/Fixture.tsx", "const a = 'سلام';\n");
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations).toEqual([]);
+  });
+
+  it("stays inside the ratchet: a not-yet-migrated module is not reported", async () => {
+    const root = emptyRepo();
+    writeFile(root, "apps/web/src/components/EducationModal.tsx", "const a = 'سلام';\n");
+    writeFile(root, "apps/web/src/pages/LandingPage.tsx", "const a = 'سلام';\n");
+
+    const res = await runRules([persianLiteralsInTsx], { root });
+    expect(res.violations).toEqual([]);
+  });
+});
+
 describe("registration", () => {
   it("every phase 5 rule is registered in the harness", () => {
     const names = RULES.map((r) => r.name);
     expect(names).toContain("package-call-site");
     expect(names).toContain("production-mocks");
     expect(names).toContain("package-manager");
+    expect(names).toContain("no-persian-literals-in-tsx");
   });
 });
