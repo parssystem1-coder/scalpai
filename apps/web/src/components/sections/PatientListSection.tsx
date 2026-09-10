@@ -22,15 +22,22 @@ export interface PatientListSectionProps {
 }
 
 /**
- * SECTION 1 — Patient directory, 3D tilt cards, holographic radar matrix
+ * SECTION 1 - Patient directory, 3D tilt cards, holographic radar matrix
  * and the telemetry/quick-action panel.
  *
  * Search state is local to this section (see Phase 3 of
- * docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md — no cross-section state coupling).
+ * docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md - no cross-section state coupling).
  * Radar metrics are derived from `selectedPatient` rather than passed in.
  *
  * Phase 5: all copy resolves through `dashboard.patientList.*` and every
  * biometric number is shaped with `faNum()`.
+ *
+ * Phase B (M5 quality gates): `patient-list` is the directory panel this section
+ * OWNS (badge, title, search, roster) - the radar chart and the caliber waveform
+ * are separate legacy components that still carry hardcoded Persian defaults, so
+ * they are deliberately outside that hook until their own M5 slice lands.
+ * Percentages render with an ASCII `%`: the Arabic percent sign used to be
+ * hardcoded here, which put a Persian codepoint in the English UI.
  */
 export const PatientListSection: React.FC<PatientListSectionProps> = ({
   patients,
@@ -50,9 +57,9 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
   );
 
   /**
-   * Avatar initial with any localised honorific removed ("دکتر سارا" → "س").
+   * Avatar initial with any localised honorific removed ("Dr. Sara" -> "S").
    * The prefix list is translation data, never a hardcoded literal, so the
-   * English UI strips "Dr." the same way Persian strips "دکتر".
+   * English UI strips "Dr." the same way the Persian UI strips its own prefix.
    */
   const patientInitial = (firstName: string): string => {
     const prefixes = t("dashboard.patientList.titlePrefixes")
@@ -95,25 +102,37 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
   };
 
   return (
-    <section id="section-patients" className="scroll-mt-28 space-y-6">
+    <section id="section-patients" data-testid="patient-list-section" className="scroll-mt-28 space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Patient Directory with 3D Tilt Cards */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-[32px] p-6 md:p-8 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]">
+          <div
+            data-testid="patient-list"
+            className="rounded-[32px] p-6 md:p-8 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]"
+          >
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
+                  <span
+                    data-testid="patient-list-badge"
+                    className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]"
+                  >
                     {t("dashboard.patientList.badge")}
                   </span>
-                  <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
+                  <h2
+                    data-testid="patient-list-title"
+                    className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]"
+                  >
                     {t("dashboard.patientList.title")}
                   </h2>
                 </div>
-                <p className="text-xs text-[oklch(45%_0.02_20)]">{t("dashboard.patientList.subtitle")}</p>
+                <p data-testid="patient-list-subtitle" className="text-xs text-[oklch(45%_0.02_20)]">
+                  {t("dashboard.patientList.subtitle")}
+                </p>
               </div>
 
               <button
+                data-testid="patient-add-btn"
                 onClick={() => onAddPatient?.()}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
               >
@@ -126,6 +145,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
             <div className="relative mb-6">
               <input
                 type="text"
+                data-testid="patient-search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t("dashboard.patientList.search")}
@@ -137,7 +157,10 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
             {/* Patient Cards (3D Tilt) */}
             <div className="space-y-3.5">
               {filteredPatients.length === 0 && (
-                <div className="p-6 rounded-2xl bg-white/50 border border-dashed border-stone-300 text-center text-xs font-bold text-[oklch(40%_0.02_20)]">
+                <div
+                  data-testid="patient-list-empty"
+                  className="p-6 rounded-2xl bg-white/50 border border-dashed border-stone-300 text-center text-xs font-bold text-[oklch(40%_0.02_20)]"
+                >
                   {t("dashboard.patientList.noPatients")}
                 </div>
               )}
@@ -151,6 +174,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                     className="rounded-2xl cursor-pointer"
                   >
                     <div
+                      data-testid={`patient-card-${patient.id}`}
                       onClick={() => selectPatient(patient.id)}
                       role="button"
                       tabIndex={0}
@@ -163,6 +187,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                     >
                       <div className="flex items-center gap-4">
                         <div
+                          data-testid={`patient-card-initial-${patient.id}`}
                           className={`w-12 h-12 rounded-2xl grid place-items-center font-bold text-sm shadow-sm ring-1 ${
                             isSelected
                               ? "rose-gold-gradient text-white ring-white/80"
@@ -173,10 +198,16 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-[oklch(20%_0.02_20)]">
+                            <h3
+                              data-testid={`patient-card-name-${patient.id}`}
+                              className="text-sm font-bold text-[oklch(20%_0.02_20)]"
+                            >
                               {patient.firstName} {patient.lastName}
                             </h3>
-                            <span className="text-[0.65rem] px-2.5 py-0.5 rounded-full bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] font-extrabold border border-[oklch(62%_0.09_16/0.25)]">
+                            <span
+                              data-testid={`patient-card-condition-${patient.id}`}
+                              className="text-[0.65rem] px-2.5 py-0.5 rounded-full bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] font-extrabold border border-[oklch(62%_0.09_16/0.25)]"
+                            >
                               {patient.scalpCondition || t("dashboard.patientList.conditionFallback")}
                             </span>
                           </div>
@@ -200,6 +231,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
 
                       <div className="flex items-center gap-2">
                         <button
+                          data-testid={`patient-card-gallery-${patient.id}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             selectPatient(patient.id);
@@ -211,6 +243,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                           <Camera className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                         </button>
                         <button
+                          data-testid={`patient-card-ai-${patient.id}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             selectPatient(patient.id);
@@ -251,12 +284,21 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
           />
 
           <LuxuryTiltCard maxTilt={5} className="rounded-[32px]">
-            <div className="rounded-[32px] p-6 space-y-4 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]">
+            <div
+              data-testid="patient-telemetry-panel"
+              className="rounded-[32px] p-6 space-y-4 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]"
+            >
               <div className="flex items-center justify-between border-b border-black/5 pb-3">
-                <span className="text-[0.7rem] font-mono font-bold tracking-widest uppercase text-[oklch(45%_0.02_20)]">
+                <span
+                  data-testid="patient-telemetry"
+                  className="text-[0.7rem] font-mono font-bold tracking-widest uppercase text-[oklch(45%_0.02_20)]"
+                >
                   {t("dashboard.patientList.telemetry.matrix")}
                 </span>
-                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-white/80 text-[oklch(35%_0.02_20)] border border-black/5 shadow-xs">
+                <span
+                  data-testid="patient-telemetry-id"
+                  className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-white/80 text-[oklch(35%_0.02_20)] border border-black/5 shadow-xs"
+                >
                   {t("dashboard.patientList.telemetry.id")} {selectedPatient.id}
                 </span>
               </div>
@@ -267,7 +309,10 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                   <div className="text-[0.68rem] text-[oklch(45%_0.02_20)] font-medium">
                     {t("dashboard.patientList.telemetry.density")}
                   </div>
-                  <div className="text-sm font-mono font-black text-[oklch(20%_0.02_20)] mt-0.5">
+                  <div
+                    data-testid="patient-telemetry-density"
+                    className="text-sm font-mono font-black text-[oklch(20%_0.02_20)] mt-0.5"
+                  >
                     {faNum(selectedPatient.hairDensity || 148)}
                   </div>
                   <div className="text-[0.6rem] text-stone-500">
@@ -278,8 +323,11 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                   <div className="text-[0.68rem] text-[oklch(45%_0.02_20)] font-medium">
                     {t("dashboard.patientList.telemetry.anagen")}
                   </div>
-                  <div className="text-sm font-mono font-black text-emerald-700 mt-0.5">
-                    {faNum(selectedPatient.anagenRatio || 86)}٪
+                  <div
+                    data-testid="patient-telemetry-anagen"
+                    className="text-sm font-mono font-black text-emerald-700 mt-0.5"
+                  >
+                    {faNum(selectedPatient.anagenRatio || 86)}%
                   </div>
                   <div className="text-[0.6rem] text-emerald-600">
                     {t("dashboard.patientList.telemetry.anagenHint")}
@@ -289,8 +337,11 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                   <div className="text-[0.68rem] text-[oklch(45%_0.02_20)] font-medium">
                     {t("dashboard.patientList.telemetry.keratin")}
                   </div>
-                  <div className="text-sm font-mono font-black text-[oklch(48%_0.095_12)] mt-0.5">
-                    {faNum(selectedPatient.keratinHealth || 92)}٪
+                  <div
+                    data-testid="patient-telemetry-keratin"
+                    className="text-sm font-mono font-black text-[oklch(48%_0.095_12)] mt-0.5"
+                  >
+                    {faNum(selectedPatient.keratinHealth || 92)}%
                   </div>
                   <div className="text-[0.6rem] text-stone-500">
                     {t("dashboard.patientList.telemetry.keratinHint")}
@@ -301,6 +352,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
               {/* Quick Action Buttons */}
               <div className="pt-2 space-y-2.5">
                 <button
+                  data-testid="patient-goto-gallery"
                   onClick={() => onNavigate?.("gallery")}
                   className="w-full h-11 rounded-2xl bg-white/70 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-xs font-bold text-[oklch(48%_0.095_12)] flex items-center justify-center gap-2 transition-all shadow-xs"
                 >
@@ -309,6 +361,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                 </button>
 
                 <button
+                  data-testid="patient-goto-ai-studio"
                   onClick={() => onNavigate?.("ai-studio")}
                   className="w-full h-11 rounded-2xl rose-gold-gradient text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
                 >
@@ -317,6 +370,7 @@ export const PatientListSection: React.FC<PatientListSectionProps> = ({
                 </button>
 
                 <button
+                  data-testid="patient-goto-3d-model"
                   onClick={() => onNavigate?.("3d-model")}
                   className="w-full h-11 rounded-2xl bg-white/70 hover:bg-white border border-white/90 text-xs font-bold text-[oklch(35%_0.02_20)] flex items-center justify-center gap-2 transition-all shadow-xs"
                 >

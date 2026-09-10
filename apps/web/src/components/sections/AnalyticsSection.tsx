@@ -47,7 +47,7 @@ export interface AnalyticsSectionProps {
 }
 
 /**
- * SECTION 3 — AI trichology studio: holographic metric dials and the
+ * SECTION 3 - AI trichology studio: holographic metric dials and the
  * AI-synthesised treatment protocol card.
  *
  * Pure presentational: every metric arrives through `data`, all mutations
@@ -55,6 +55,11 @@ export interface AnalyticsSectionProps {
  *
  * Phase 5: copy resolves through `dashboard.analytics.*`; the percentages are
  * shaped with `faNum()` while the CSS bar widths keep the raw ASCII numbers.
+ *
+ * Phase B (M5 quality gates): every dial and action carries a `data-testid`, and
+ * all four dials now print the same ASCII `%`. The hydration dial used to print
+ * the Arabic percent sign, which is a Persian codepoint rendered even in the
+ * English UI - and it disagreed with the other three dials in the Persian one.
  */
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   data,
@@ -70,6 +75,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   return (
     <section
       id="section-ai-studio"
+      data-testid="analytics-section"
       className="scroll-mt-28 space-y-6"
       aria-label={t("dashboard.analytics.title")}
     >
@@ -77,20 +83,29 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
+              <span
+                data-testid="analytics-badge"
+                className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]"
+              >
                 {t("dashboard.analytics.badge")}
               </span>
-              <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
+              <h2
+                data-testid="analytics-heading"
+                className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]"
+              >
                 {t("dashboard.analytics.heading")}
               </h2>
             </div>
-            <p className="text-xs text-[oklch(45%_0.02_20)]">
+            <p data-testid="analytics-subtitle" className="text-xs text-[oklch(45%_0.02_20)]">
               {t("dashboard.analytics.subtitle", { patient: patientName })}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="px-3 py-1.5 rounded-xl bg-white/80 border border-black/5 text-[0.7rem] font-mono text-[oklch(30%_0.02_20)] flex items-center gap-2 shadow-xs">
+            <div
+              data-testid="analytics-tensor-confidence"
+              className="px-3 py-1.5 rounded-xl bg-white/80 border border-black/5 text-[0.7rem] font-mono text-[oklch(30%_0.02_20)] flex items-center gap-2 shadow-xs"
+            >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               <span>
                 {t("dashboard.analytics.tensorConfidence", { value: faNum(data.tensorConfidence) })}
@@ -98,6 +113,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             </div>
 
             <button
+              data-testid="analytics-rerun-btn"
               onClick={() => onRunAnalysis?.()}
               disabled={isAnalyzing}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-md shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 disabled:opacity-60 transition-all active:scale-95"
@@ -109,6 +125,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             </button>
 
             <button
+              data-testid="analytics-back-btn"
               onClick={() => onNavigate?.("patients")}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold"
               title={t("dashboard.analytics.backToTopTitle")}
@@ -123,12 +140,18 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             {/* Metric 1 */}
             <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full">
+              <div
+                data-testid="analytics-metric-redness"
+                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
                     {t("dashboard.analytics.metrics.redness")}
                   </span>
-                  <span className="text-xs font-mono font-black text-rose-700 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200">
+                  <span
+                    data-testid="analytics-metric-value-redness"
+                    className="text-xs font-mono font-black text-rose-700 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
+                  >
                     {faNum(data.scores.redness)}%
                   </span>
                 </div>
@@ -147,12 +170,18 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
 
             {/* Metric 2 */}
             <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full">
+              <div
+                data-testid="analytics-metric-flake"
+                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
                     {t("dashboard.analytics.metrics.flake")}
                   </span>
-                  <span className="text-xs font-mono font-black text-amber-800 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
+                  <span
+                    data-testid="analytics-metric-value-flake"
+                    className="text-xs font-mono font-black text-amber-800 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200"
+                  >
                     {faNum(data.scores.flakeTexture)}%
                   </span>
                 </div>
@@ -171,12 +200,18 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
 
             {/* Metric 3 */}
             <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full">
+              <div
+                data-testid="analytics-metric-anagen"
+                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
                     {t("dashboard.analytics.metrics.anagen")}
                   </span>
-                  <span className="text-xs font-mono font-black text-emerald-800 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+                  <span
+                    data-testid="analytics-metric-value-anagen"
+                    className="text-xs font-mono font-black text-emerald-800 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200"
+                  >
                     {faNum(data.anagenRatio)}%
                   </span>
                 </div>
@@ -195,13 +230,19 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
 
             {/* Metric 4 */}
             <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full">
+              <div
+                data-testid="analytics-metric-hydration"
+                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
                     {t("dashboard.analytics.metrics.hydration")}
                   </span>
-                  <span className="text-xs font-mono font-black text-[oklch(48%_0.095_12)] px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200">
-                    {faNum(data.matrixHydration)}٪
+                  <span
+                    data-testid="analytics-metric-value-hydration"
+                    className="text-xs font-mono font-black text-[oklch(48%_0.095_12)] px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
+                  >
+                    {faNum(data.matrixHydration)}%
                   </span>
                 </div>
                 <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
@@ -226,7 +267,10 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">
+                  <h4
+                    data-testid="analytics-protocol-title"
+                    className="text-sm font-bold text-[oklch(20%_0.02_20)]"
+                  >
                     {t("dashboard.analytics.protocol.title")}
                   </h4>
                   <span className="text-[0.68rem] text-[oklch(45%_0.02_20)]">
@@ -238,6 +282,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <div className="flex items-center flex-wrap gap-2">
                 <button
                   type="button"
+                  data-testid="analytics-education-btn"
                   onClick={() => onOpenEducation?.()}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                   title={t("dashboard.analytics.protocol.educationTitle")}
@@ -248,6 +293,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
 
                 <button
                   type="button"
+                  data-testid="analytics-pdf-btn"
                   onClick={() => onOpenPdfReport?.()}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-xs text-[oklch(48%_0.095_12)] transition-all shadow-xs cursor-pointer"
                   title={t("dashboard.analytics.protocol.pdfTitle")}
@@ -258,7 +304,10 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               </div>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-xl p-5 rounded-2xl border border-[oklch(62%_0.09_16/0.2)] leading-relaxed text-xs text-[oklch(20%_0.02_20)] shadow-inner">
+            <div
+              data-testid="analytics-recommendation"
+              className="bg-white/80 backdrop-blur-xl p-5 rounded-2xl border border-[oklch(62%_0.09_16/0.2)] leading-relaxed text-xs text-[oklch(20%_0.02_20)] shadow-inner"
+            >
               {data.recommendation}
             </div>
           </div>
