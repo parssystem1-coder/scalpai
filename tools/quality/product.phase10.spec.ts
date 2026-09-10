@@ -448,7 +448,7 @@ describe("phase 10 bookkeeping is honest", () => {
     const adr = read("docs/adr/ADR-0044-phase10-debt-removal.md");
     expect(adr).toContain("Weaknesses addressed:");
     // It must name what it did NOT close, same rule as ADR-0043.
-    for (const open of ["M1", "M5b", "M14", "M15", "L1", "L2"]) {
+    for (const open of ["M1", "M5b", "M5c", "M14", "M15", "L1", "L2"]) {
       expect(adr, `ADR-0044 must still name ${open} as open`).toContain(open);
     }
     // The lockfile gate is the reason this batch exists - it must say so.
@@ -462,8 +462,8 @@ describe("phase 10 bookkeeping is honest", () => {
     expect(start, "phase 10 heading not found").toBeGreaterThan(-1);
     expect(end, "phase summary must follow the phase 10 section").toBeGreaterThan(start);
     const openCount = (phase.slice(start, end).match(/^- \[ \] /gm) ?? []).length;
-    // M1, M5b, M14, M15, L2, L1/W01/W22/W23.
-    expect(openCount, "an item was ticked or added without updating this gate").toBe(6);
+    // M1, M5b, M5c, M14, M15, L2, L1/W01/W22/W23.
+    expect(openCount, "an item was ticked or added without updating this gate").toBe(7);
   });
 
   it("keeps the phase-level box open while any item is open", () => {

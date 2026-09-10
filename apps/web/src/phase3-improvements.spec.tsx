@@ -124,19 +124,19 @@ describe("Phase 3 Improvements Verification", () => {
     expect(screen.getByText("مریم رضایی")).toBeDefined();
     expect(screen.getByText("CERT-CCDDEEFF")).toBeDefined();
     expect(screen.getByText("چاپ گواهی")).toBeDefined();
-    expect(screen.getByText("دانلود سند")).toBeDefined();
+    expect(screen.getByText("دانلود گواهی")).toBeDefined();
   });
 
   it("renders LicenseDiagnosticsModal from the server verdict: Ed25519 state, provenance, and quota claims", async () => {
     render(<LicenseDiagnosticsModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(screen.getByText(/پایشگر سلامت لایسنس و سلف‌هاستد/)).toBeDefined();
+    expect(screen.getByText(/تشخیص لایسنس و خودمیزبانی/)).toBeDefined();
     // The header now names WHERE the verdict comes from (M2).
-    expect(screen.getByText(/اعتبارسنجی سمت سرور/)).toBeDefined();
-    expect(screen.getByText(/سهمیه‌ها و ظرفیت مجاز/)).toBeDefined();
+    expect(screen.getByText(/تاییدیه سمت سرور/)).toBeDefined();
+    expect(screen.getByText(/ادعاهای لایسنس و سهمیه‌ها/)).toBeDefined();
 
     expect(licenseFetch).toHaveBeenCalledWith("/license/status");
-    expect(await screen.findByText(/امضای Ed25519 توسط سرور تأیید شد/)).toBeDefined();
+    expect(await screen.findByText(/لایسنس فعال/)).toBeDefined();
     // Entitlements are rendered from the verified claims, not from a constant.
     expect(await screen.findByText("analysis:advanced")).toBeDefined();
   });
@@ -145,23 +145,23 @@ describe("Phase 3 Improvements Verification", () => {
     licenseFetch.mockResolvedValue(TAMPERED_STATUS);
     render(<LicenseDiagnosticsModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(await screen.findByText(/هشدار: دستکاری ساعت سیستم شناسایی شد/)).toBeDefined();
+    expect(await screen.findByText(/اختلال: امضای لایسنس/)).toBeDefined();
     // The simulator that used to flip a local boolean is gone for good.
     expect(screen.queryByText("شبیه‌سازی عقب‌کشیدن ساعت سیستم")).toBeNull();
 
     // Re-verification asks the server again instead of deriving a new state.
     fireEvent.click(screen.getByTestId("license-refresh"));
-    expect(await screen.findByText(/هشدار: دستکاری ساعت سیستم شناسایی شد/)).toBeDefined();
+    expect(await screen.findByText(/اختلال: امضای لایسنس/)).toBeDefined();
     expect(licenseFetch.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("renders SyncInspectorModal with online state, outbox items, and LWW conflict resolution log", async () => {
     render(<SyncInspectorModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(screen.getByText(/پایشگر همگام‌سازی آفلاین و حل تعارض/)).toBeDefined();
-    expect(screen.getByText(/آنلاین \(متصل به سرور\)/)).toBeDefined();
-    expect(screen.getByText(/تاریخچه بازرسی و حل تعارض‌های همزمانی/)).toBeDefined();
-    expect(screen.getByText("همگام‌سازی فوری")).toBeDefined();
+    expect(screen.getByText(/مفتش همگام‌سازی آفلاین و تضادها/)).toBeDefined();
+    expect(screen.getByText(/آنلاین \(دسترسی به سرور\)/)).toBeDefined();
+    expect(screen.getByText(/ثبت حل تضادها/)).toBeDefined();
+    expect(screen.getByText("ارسال اجباری")).toBeDefined();
     expect(await screen.findByText(/ID: m-12345678-90ab/)).toBeDefined();
   });
 });
