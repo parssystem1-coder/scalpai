@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 
 export type VisualMode = "silk" | "follicle" | "scan";
@@ -11,15 +12,17 @@ interface DiagnosticMarker {
   position: [number, number, number];
 }
 
-const MARKERS: DiagnosticMarker[] = [
-  { id: "density", title: "تراکم موضعی", value: "۱۴۸ تار/cm²", status: "optimal", position: [-1.4, 0.8, 0.4] },
-  { id: "diameter", title: "قطر میانگین تار", value: "۸۴ میکرون (عالی)", status: "optimal", position: [1.2, 0.4, 0.6] },
-  { id: "sebum", title: "تراز چربی اپیدرم", value: "متعادل (۲۱٪)", status: "good", position: [-0.9, -0.9, 0.5] },
-  { id: "anagen", title: "فاز رشد فعال (Anagen)", value: "۸۹٪ فولیکول‌ها", status: "optimal", position: [1.3, -0.7, 0.3] },
-];
-
 export default function LuxuryScalp3D() {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const MARKERS: DiagnosticMarker[] = [
+    { id: "density", title: t("dashboard.luxury3d.density"), value: t("dashboard.luxury3d.densityValue"), status: "optimal", position: [-1.4, 0.8, 0.4] },
+    { id: "diameter", title: t("dashboard.luxury3d.diameter"), value: t("dashboard.luxury3d.diameterValue"), status: "optimal", position: [1.2, 0.4, 0.6] },
+    { id: "sebum", title: t("dashboard.luxury3d.sebum"), value: t("dashboard.luxury3d.sebumValue"), status: "good", position: [-0.9, -0.9, 0.5] },
+    { id: "anagen", title: t("dashboard.luxury3d.anagen"), value: t("dashboard.luxury3d.anagenValue"), status: "optimal", position: [1.3, -0.7, 0.3] },
+  ];
+
   const [activeMode, setActiveMode] = useState<VisualMode>("silk");
   const [selectedMarker, setSelectedMarker] = useState<DiagnosticMarker | null>(MARKERS[0] ?? null);
   const [_isHovered, setIsHovered] = useState(false);
@@ -365,7 +368,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "silk" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          ✨ نمای ابریشمی موج‌دار
+          {t("dashboard.luxury3d.silkMode")}
         </button>
         <button
           type="button"
@@ -383,7 +386,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "follicle" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          🔬 کریستال فولیکول
+          {t("dashboard.luxury3d.follicleMode")}
         </button>
         <button
           type="button"
@@ -401,7 +404,7 @@ export default function LuxuryScalp3D() {
             boxShadow: activeMode === "scan" ? "0 4px 12px rgba(212, 175, 55, 0.3)" : "none",
           }}
         >
-          🌐 اسکن رادیال AI
+          {t("dashboard.luxury3d.scanMode")}
         </button>
       </div>
       <div
@@ -418,7 +421,7 @@ export default function LuxuryScalp3D() {
           pointerEvents: "none",
         }}
       >
-        ماوس را حرکت دهید یا روی نودها کلیک کنید
+        {t("dashboard.luxury3d.mouseHint")}
       </div>
     </div>
   );

@@ -37,8 +37,7 @@ export default function EducationModal({
   initialSeverity = "moderate",
   patientName = "بیمار",
 }: EducationModalProps) {
-  const { i18n } = useTranslation();
-  const isFa = i18n.language === "fa";
+  const { t, i18n } = useTranslation();
 
   const [selectedCondition, setSelectedCondition] = useState<ConditionKey>(initialCondition);
   const [severity, setSeverity] = useState<SeverityLevel>(initialSeverity);
@@ -101,7 +100,7 @@ export default function EducationModal({
       <div
         id="education-modal-container"
         className="relative my-auto w-full max-w-5xl rounded-3xl bg-[#0d1217] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[92vh]"
-        dir={isFa ? "rtl" : "ltr"}
+        dir={i18n.language === "fa" ? "rtl" : "ltr"}
       >
         {/* Top Clinical Header & §11 Always Skippable Controls */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-900/80 border-b border-stone-800 shrink-0">
@@ -112,16 +111,14 @@ export default function EducationModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm md:text-base font-bold text-white">
-                  {isFa ? "لایه آموزش تعاملی سه بعدی (Education E1)" : "Clinical 3D Education Layer (E1)"}
+                  {t("dashboard.education.title")}
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/60 border border-emerald-500/40 text-emerald-400">
                   DESIGN-V2 §11
                 </span>
               </div>
               <p className="text-xs text-stone-400">
-                {isFa
-                  ? `انیمیشن میکروسکوپیک آسیب‌شناسی پوست سر برای: ${patientName}`
-                  : `Pathophysiological trichoscopy simulation for: ${patientName}`}
+                {t("dashboard.education.subtitle", { patient: patientName })}
               </p>
             </div>
           </div>
@@ -136,11 +133,11 @@ export default function EducationModal({
                   ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                   : "bg-stone-800/60 text-stone-400 border-stone-700 hover:text-stone-200"
               }`}
-              title={isFa ? "تغییر به حالت بدون حرکت (ایستا)" : "Toggle Reduced Motion mode"}
+              title={t("dashboard.education.reducedMotionTitle")}
             >
               <Sliders className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
-                {reducedMotion ? (isFa ? "حالت ایستا فعال" : "Reduced Motion: ON") : (isFa ? "حالت متحرک" : "Motion: ON")}
+                {reducedMotion ? t("dashboard.education.reducedMotionOn") : t("dashboard.education.motionOn")}
               </span>
             </button>
 
@@ -150,7 +147,7 @@ export default function EducationModal({
               onClick={onClose}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition-colors shadow-xs cursor-pointer"
             >
-              <span>{isFa ? "رد کردن (Skip)" : "Skip"}</span>
+              <span>{t("dashboard.education.skip")}</span>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -159,7 +156,7 @@ export default function EducationModal({
         {/* Condition Selector Tabs (All 8 Conditions) */}
         <div className="flex items-center gap-1.5 px-6 py-2 bg-stone-900/40 border-b border-stone-800/80 overflow-x-auto scrollbar-none shrink-0">
           <span className="text-[11px] text-stone-400 font-bold whitespace-nowrap pl-2">
-            {isFa ? "عارضه‌های ۸ گانه بالینی:" : "Conditions:"}
+            {t("dashboard.education.conditionsLabel")}
           </span>
           {conditionList.map((cond) => {
             const isSelected = selectedCondition === cond;
@@ -429,7 +426,7 @@ export default function EducationModal({
                   type="button"
                   onClick={() => setProgress(0)}
                   className="w-7 h-7 rounded-lg bg-stone-800 flex items-center justify-center text-stone-400 hover:text-white hover:bg-stone-700 transition-colors cursor-pointer"
-                  title={isFa ? "بازنشانی انیمیشن" : "Reset"}
+                  title={t("dashboard.education.resetTitle")}
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
@@ -448,16 +445,16 @@ export default function EducationModal({
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                 <span className="text-xs font-bold text-stone-300">
-                  {isFa ? "ورودی استیت‌ماشین شدت (State Machine Input):" : "Severity State Machine:"}
+                  {t("dashboard.education.severityTitle")}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 bg-stone-950 p-1 rounded-xl border border-stone-800">
                 {(["mild", "moderate", "severe"] as SeverityLevel[]).map((lvl) => {
                   const isActive = severity === lvl;
                   const label =
-                    lvl === "mild" ? (isFa ? "خفیف (۱)" : "Mild (1)") :
-                    lvl === "moderate" ? (isFa ? "متوسط (۲)" : "Moderate (2)") :
-                    (isFa ? "شدید (۳)" : "Severe (3)");
+                    lvl === "mild" ? t("dashboard.education.mild") :
+                    lvl === "moderate" ? t("dashboard.education.moderate") :
+                    t("dashboard.education.severe");
 
                   return (
                     <button
@@ -512,7 +509,7 @@ export default function EducationModal({
               <div className="p-4 rounded-xl bg-stone-950/80 border border-stone-800 text-xs leading-relaxed text-stone-300 space-y-2">
                 <div className="flex items-center gap-1.5 text-stone-400 font-semibold text-[11px]">
                   <Eye className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                  <span>{isFa ? "شرح آسیب‌شناسی بیومتریک:" : "Biometric Pathological Narration:"}</span>
+                  <span>{t("dashboard.education.narrationTitle")}</span>
                 </div>
                 <p>{isFa ? currentStoryboard.currentNarration.fa : currentStoryboard.currentNarration.en}</p>
               </div>
@@ -531,7 +528,7 @@ export default function EducationModal({
               <Award className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs">
                 <strong className="block font-bold text-stone-200">
-                  {isFa ? "تأیید علمی و نظارت بالینی (Reviewed By):" : "Clinical Peer Review:"}
+                  {t("dashboard.education.peerReview")}
                 </strong>
                 <p className="text-stone-400 font-mono text-[11px] leading-relaxed">{def.reviewedBy}</p>
               </div>
@@ -549,15 +546,15 @@ export default function EducationModal({
         <div className="flex items-center justify-between px-6 py-4 bg-stone-900/80 border-t border-stone-800 shrink-0">
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>{isFa ? "سازگار با موتور Rive و پورتال اختصاصی بیمار" : "Rive State Machine & Patient Portal Ready"}</span>
+            <span>{t("dashboard.education.compatible")}</span>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="flex items-center gap-1 px-5 py-2 rounded-xl text-xs font-bold rose-gold-gradient text-white hover:brightness-110 shadow-xs transition-all cursor-pointer"
           >
-            <span>{isFa ? "متوجه شدم و بستن" : "Got it"}</span>
-            <ChevronRight className={`w-3.5 h-3.5 ${isFa ? "rotate-180" : ""}`} />
+            <span>{t("dashboard.education.gotIt")}</span>
+            <ChevronRight className={`w-3.5 h-3.5 ${i18n.language === "fa" ? "rotate-180" : ""}`} />
           </button>
         </div>
       </div>

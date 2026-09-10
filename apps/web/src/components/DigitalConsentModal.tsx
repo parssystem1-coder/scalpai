@@ -73,7 +73,7 @@ export default function DigitalConsentModal({
       });
     },
     onSuccess: () => {
-      setSuccessMsg("فرم رضایت‌نامه با موفقیت ثبت و به پرونده بیمار ضمیمه گردید.");
+      setSuccessMsg(t("dashboard.consent.successMsg"));
       setErrorMsg(null);
       signatureRef.current?.clear();
       setAgreedPhotography(false);
@@ -99,13 +99,13 @@ export default function DigitalConsentModal({
     setErrorMsg(null);
 
     if (!agreedPhotography || !agreedAiAnalysis || !agreedDataPrivacy) {
-      setErrorMsg("لطفاً تمامی بندهای رضایت‌نامه بالینی را تایید فرمایید.");
+      setErrorMsg(t("dashboard.consent.errorAgree"));
       return;
     }
 
     const sigData = signatureRef.current?.toDataURL();
     if (!sigData || signatureRef.current?.isEmpty()) {
-      setErrorMsg("ثبت امضای دیجیتال بیمار الزامی است.");
+      setErrorMsg(t("dashboard.consent.errorSignature"));
       return;
     }
 
@@ -123,7 +123,7 @@ export default function DigitalConsentModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-md animate-in fade-in duration-200"
       role="button"
       tabIndex={0}
-      aria-label="بستن پنجره رضایت‌نامه"
+      aria-label={t("dashboard.consent.backdropLabel")}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -142,10 +142,10 @@ export default function DigitalConsentModal({
         <div className="flex items-center justify-between border-b border-black/5 bg-white/60 px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-[oklch(20%_0.02_20)]">
-              فرم رضایت دیجیتال بیمار (Digital Consent)
+              {t("dashboard.consent.title")}
             </h2>
             <p className="text-xs text-[oklch(45%_0.02_20)]">
-              پرونده: <span className="font-semibold text-[oklch(20%_0.02_20)]">{patientName}</span> ({patientPhone})
+              {t("dashboard.consent.recordLabel")} <span className="font-semibold text-[oklch(20%_0.02_20)]">{patientName}</span> ({patientPhone})
             </p>
           </div>
           <button
@@ -168,7 +168,7 @@ export default function DigitalConsentModal({
                 : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
-            ثبت رضایت‌نامه جدید
+            {t("dashboard.consent.newTab")}
           </button>
           <button
             id="tab-history-consent"
@@ -180,7 +180,7 @@ export default function DigitalConsentModal({
                 : "border-transparent text-stone-500 hover:text-stone-800"
             }`}
           >
-            تاریخچه رضایت‌نامه‌ها ({historyList.length})
+            {t("dashboard.consent.historyTab", { count: historyList.length })}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
@@ -188,17 +188,17 @@ export default function DigitalConsentModal({
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="rounded-2xl border border-[oklch(62%_0.09_16/0.2)] bg-rose-50/40 p-4 text-sm leading-relaxed text-[oklch(25%_0.02_20)]">
                 <div className="mb-2 font-bold text-[oklch(20%_0.02_20)]">
-                  مفاد رضایت‌آگاهانه خدمات تریکولوژی و تصویربرداری درماتوسکوپی:
+                  {t("dashboard.consent.termsTitle")}
                 </div>
                 <ul className="list-inside list-disc space-y-1.5 text-xs text-[oklch(40%_0.02_20)]">
                   <li>
-                    اینجانب رضایت خود را جهت انجام تصویربرداری ماکرو و درماتوسکوپی دیجیتال از پوست سر و ساقه مو اعلام می‌دارم.
+                    {t("dashboard.consent.terms1")}
                   </li>
                   <li>
-                    موافقت می‌نمایم داده‌های تصویربرداری جهت پایش روند درمان و آنالیز شدت علائم بالینی (تراکم، قرمزی و پوسته‌ریزی) با حفط کامل حریم خصوصی پردازش گردند.
+                    {t("dashboard.consent.terms2")}
                   </li>
                   <li>
-                    از برنامه‌های مراقبتی، توصیه‌های بهداشتی و پروتکل‌های پیگیری کلینیک مطلع شده‌ام.
+                    {t("dashboard.consent.terms3")}
                   </li>
                 </ul>
               </div>
@@ -211,7 +211,7 @@ export default function DigitalConsentModal({
                     onChange={(e) => setAgreedPhotography(e.target.checked)}
                     className="h-4 w-4 rounded-sm border-stone-300 text-[oklch(62%_0.09_16)] focus:ring-[oklch(62%_0.09_16)]"
                   />
-                  <span>تایید رضایت تصویربرداری تشخیصی تریکوسکوپی و ثبت در پرونده</span>
+                  <span>{t("dashboard.consent.checkboxPhoto")}</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-ai">
                   <input
@@ -221,7 +221,7 @@ export default function DigitalConsentModal({
                     onChange={(e) => setAgreedAiAnalysis(e.target.checked)}
                     className="h-4 w-4 rounded-sm border-stone-300 text-[oklch(62%_0.09_16)] focus:ring-[oklch(62%_0.09_16)]"
                   />
-                  <span>موافقت با تحلیل کمکی الگوهای پوست سر و پردازش شاخص‌های تریکولوژی</span>
+                  <span>{t("dashboard.consent.checkboxAi")}</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2.5" htmlFor="consent-check-privacy">
                   <input
@@ -231,13 +231,13 @@ export default function DigitalConsentModal({
                     onChange={(e) => setAgreedDataPrivacy(e.target.checked)}
                     className="h-4 w-4 rounded-sm border-stone-300 text-[oklch(62%_0.09_16)] focus:ring-[oklch(62%_0.09_16)]"
                   />
-                  <span>تایید صحت اطلاعات شناسنامه‌ای و آگاهی از شرایط محرمانگی داده‌ها</span>
+                  <span>{t("dashboard.consent.checkboxPrivacy")}</span>
                 </label>
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                    امضای الکترونیکی بیمار (Touch / Pen):
+                    {t("dashboard.consent.signatureLabel")}
                   </span>
                   <button
                     id="clear-signature-btn"
@@ -245,7 +245,7 @@ export default function DigitalConsentModal({
                     onClick={() => signatureRef.current?.clear()}
                     className="text-xs font-semibold text-[oklch(62%_0.09_16)] hover:underline"
                   >
-                    پاک کردن امضا
+                    {t("dashboard.consent.clearSignature")}
                   </button>
                 </div>
                 <div className="rounded-xl overflow-hidden border border-stone-200 shadow-sm">
@@ -268,7 +268,7 @@ export default function DigitalConsentModal({
                   onClick={onClose}
                   className="rounded-xl border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 transition-colors"
                 >
-                  انصراف
+                  {t("dashboard.consent.cancel")}
                 </button>
                 <button
                   id="submit-consent-btn"
@@ -276,7 +276,7 @@ export default function DigitalConsentModal({
                   disabled={submitConsentMutation.isPending}
                   className="rounded-xl rose-gold-gradient px-5 py-2 text-xs font-bold text-white shadow-md hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all"
                 >
-                  {submitConsentMutation.isPending ? "در حال ثبت..." : "تایید و ثبت نهایی رضایت‌نامه"}
+                  {submitConsentMutation.isPending ? t("dashboard.consent.submitting") : t("dashboard.consent.submit")}
                 </button>
               </div>
             </form>
@@ -286,7 +286,7 @@ export default function DigitalConsentModal({
                 <p className="text-center text-xs text-stone-500">{t("common.loading")}</p>
               ) : historyList.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-xs text-stone-500">
-                  هیچ رضایت‌نامه‌ای برای این بیمار ثبت نشده است.
+                  {t("dashboard.consent.emptyHistory")}
                 </div>
               ) : (
                 historyList.map((c) => (
@@ -297,23 +297,23 @@ export default function DigitalConsentModal({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-300">
-                          معتبر
+                          {t("dashboard.consent.valid")}
                         </span>
                         <span className="text-xs font-semibold text-[oklch(20%_0.02_20)]">
-                          قالب: {c.templateVersion}
+                          {t("dashboard.consent.templateLabel")} {c.templateVersion}
                         </span>
                       </div>
                       <p className="mt-1 text-[11px] text-stone-500">
-                        زمان ثبت: {new Date(c.signedAt).toLocaleString("fa-IR")}
+                        {t("dashboard.consent.registeredAt")} {new Date(c.signedAt).toLocaleString("fa-IR")}
                       </p>
                     </div>
                     {c.signaturePayload ? (
                       <div className="flex flex-col sm:flex-row items-center gap-3">
                         <div className="flex flex-col items-center">
-                          <span className="text-[10px] text-stone-500 mb-1">امضای ثبت شده</span>
+                          <span className="text-[10px] text-stone-500 mb-1">{t("dashboard.consent.recordedSignature")}</span>
                           <img
                             src={c.signaturePayload}
-                            alt="امضای بیمار"
+                            alt={t("dashboard.consent.signatureImage")}
                             className="h-14 max-w-[140px] rounded border border-stone-200 bg-stone-50 object-contain p-1"
                           />
                         </div>
@@ -323,7 +323,7 @@ export default function DigitalConsentModal({
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 transition-colors shadow-2xs"
                         >
                           <Award className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                          <span>مشاهده و چاپ گواهی</span>
+                          <span>{t("dashboard.consent.viewCert")}</span>
                         </button>
                       </div>
                     ) : null}
