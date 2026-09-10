@@ -13,6 +13,9 @@ import { listFiles, readRoot } from "../lib/walk.js";
  *   3. package-manager    - a foreign package-manager invocation in an npm
  *                           repository (H15).
  *
+ * Phase B adds a fourth (M5): no-persian-literals-in-tsx, at the bottom of this
+ * file.
+ *
  * Prose lives in docs/: this file only covers EXECUTABLE surfaces, because the
  * leftover non-npm snippets in docs/playbooks are explicitly phase 10 doc-drift
  * work (ADR-0036).
@@ -232,6 +235,136 @@ export const packageManager: Rule = {
           });
         }
       });
+    }
+    return out;
+  },
+};
+
+/**
+ * M5 (phase B) - Persian copy must reach the DOM through i18n, never as a
+ * literal inside a `.tsx`. A hardcoded string cannot be translated, cannot be
+ * proven by the en suite, and is exactly what M5 is still open for.
+ *
+ * The whole U+0600-U+06FF block is rejected, including the Arabic-Indic digits
+ * and the Arabic percent sign: numerals are shaped at RENDER time by `faNum()`
+ * and units belong in the bundle, so a literal one of those in a component is a
+ * Persian codepoint that survives into the English UI.
+ *
+ * SCOPE IS A RATCHET, not a glob. It currently covers the components phase A
+ * migrated; the rest of `apps/web/src` (the legacy modals, the pages, the
+ * dashboard shell) is the open half of M5 per ADR-0045, so enforcing every
+ * `.tsx` today would fail the build on known debt instead of preventing a
+ * regression. Add a path here as each component migrates - never remove one.
+ */
+const PERSIAN_LITERAL = /[\u0600-\u06FF]/;
+
+const I18N_ENFORCED_TSX: string[] = [
+  "apps/web/src/components/DashboardHeader.tsx",
+  "apps/web/src/components/DashboardTabs.tsx",
+  "apps/web/src/components/sections/",
+];
+
+/** Fixtures and specs legitimately carry Persian: they assert it, they don't ship it. */
+const I18N_EXEMPT_TSX: RegExp[] = [
+  /\.spec\.tsx?$/,
+  /\.test\.tsx?$/,
+  /(^|\/)__tests__\//,
+  /(^|\/)(test|tests|testing)\//,
+  /(^|\/)data\//,
+  /(^|\/)fixtures\//,
+];
+
+/**
+ * Blanks out line and block comments while preserving line numbers and column
+ * count, so a JSDoc that EXPLAINS the Persian handling is never reported. String
+ * and template literals are kept: a literal is precisely what this rule hunts.
+ * Quote tracking exists only so a `//` inside a string does not swallow the rest
+ * of the line.
+ */
+export function maskComments(src: string): string[] {
+  const masked: string[] = [];
+  let inBlock = false;
+
+  for (const line of src.split("\n")) {
+    let out = "";
+    let quote: string | null = null;
+    let i = 0;
+
+    while (i < line.length) {
+      const ch = line[i]!;
+      const next = line[i + 1];
+
+      if (inBlock) {
+        if (ch === "*" && next === "/") {
+          inBlock = false;
+          out += "  ";
+          i += 2;
+          continue;
+        }
+        out += " ";
+        i += 1;
+        continue;
+      }
+
+      if (quote !== null) {
+        if (ch === "\\" && next !== undefined) {
+          out += ch + next;
+          i += 2;
+          continue;
+        }
+        if (ch === quote) quote = null;
+        out += ch;
+        i += 1;
+        continue;
+      }
+
+      if (ch === "/" && next === "/") {
+        out += " ".repeat(line.length - i);
+        break;
+      }
+      if (ch === "/" && next === "*") {
+        inBlock = true;
+        out += "  ";
+        i += 2;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        quote = ch;
+        out += ch;
+        i += 1;
+        continue;
+      }
+
+      out += ch;
+      i += 1;
+    }
+
+    masked.push(out);
+  }
+
+  return masked;
+}
+
+export const persianLiteralsInTsx: Rule = {
+  name: "no-persian-literals-in-tsx",
+  source: "9 (M5/i18n)",
+  check(ctx: RuleContext): Violation[] {
+    const out: Violation[] = [];
+    for (const f of listFiles(ctx.root, "apps/web/src", [".tsx"])) {
+      if (I18N_EXEMPT_TSX.some((re) => re.test(f))) continue;
+      const enforced = I18N_ENFORCED_TSX.some((p) => (p.endsWith("/") ? f.startsWith(p) : f === p));
+      if (!enforced) continue;
+
+      const lines = maskComments(readRoot(ctx.root, f));
+      for (let i = 0; i < lines.length; i += 1) {
+        if (!PERSIAN_LITERAL.test(lines[i]!)) continue;
+        out.push({
+          rule: this.name,
+          file: `${f}:${i + 1}`,
+          message: "Persian literal dar TSX: copy bayad az i18n biad, na az khode component",
+          fix: "move the string into apps/web/src/i18n.ts (fa AND en) and render it with t(); shape numerals with faNum()",
+        });
+      }
     }
     return out;
   },
