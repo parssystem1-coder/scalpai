@@ -60,8 +60,7 @@ const TONE_CLASSES: Record<PanelTone, string> = {
 };
 
 export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiagnosticsModalProps) {
-  const { i18n } = useTranslation();
-  const isFa = i18n.language === "fa";
+  const { t, i18n } = useTranslation();
 
   const [status, setStatus] = useState<LicenseStatusDto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,14 +76,12 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
       setError(
         e instanceof ApiError
           ? `[${e.code}] ${e.message}`
-          : isFa
-            ? "دریافت وضعیت لایسنس از سرور ناموفق بود"
-            : "Could not read the licence status from the server",
+          : t("dashboard.licenseDiagnostics.error.fetchFailed"),
       );
     } finally {
       setLoading(false);
     }
-  }, [isFa]);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) void refresh();
@@ -101,11 +98,11 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
       id="license-modal-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div
-        id="license-modal-container"
-        className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
-        dir={isFa ? "rtl" : "ltr"}
-      >
+<div
+          id="license-modal-container"
+          className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+          dir={i18n.language === "fa" ? "rtl" : "ltr"}
+        >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200">
           <div className="flex items-center gap-3">
@@ -114,17 +111,17 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
             </div>
             <div>
               <h2 className="text-sm font-bold text-stone-900">
-                {isFa ? "پایشگر سلامت لایسنس و سلف‌هاستد" : "License & Self-Hosted Diagnostics"}
+                {t("dashboard.licenseDiagnostics.title")}
               </h2>
               <span className="text-[11px] font-mono text-stone-500">
-                {isFa ? "اعتبارسنجی سمت سرور · ADR-0043" : "Server-side verification · ADR-0043"}
+                {t("dashboard.licenseDiagnostics.subtitle")}
               </span>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={isFa ? "بستن" : "Close"}
+            aria-label={t("dashboard.licenseDiagnostics.close")}
             className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition-colors"
           >
             <X className="w-4 h-4" />
@@ -135,7 +132,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
         <div className="p-6 space-y-6 overflow-y-auto max-h-[80vh]">
           {loading && !status && (
             <p className="text-xs text-stone-500" data-testid="license-loading">
-              {isFa ? "در حال دریافت وضعیت از سرور…" : "Reading the status from the server…"}
+              {t("dashboard.licenseDiagnostics.loading")}
             </p>
           )}
 
@@ -158,14 +155,12 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
               )}
               <div className="space-y-1 text-xs">
                 <strong className="block font-bold">
-                  {isFa ? STATE_TITLE_FA[status.state] : STATE_TITLE_EN[status.state]}
+                  {i18n.language === "fa" ? STATE_TITLE_FA[status.state] : STATE_TITLE_EN[status.state]}
                 </strong>
                 {status.reason && <p className="leading-relaxed opacity-90">{status.reason}</p>}
                 {typeof status.daysRemaining === "number" && (
                   <p className="leading-relaxed opacity-90">
-                    {isFa
-                      ? `اعتبار باقی‌مانده: ${status.daysRemaining} روز`
-                      : `${status.daysRemaining} days remaining`}
+                    {t("dashboard.licenseDiagnostics.daysRemaining", { count: status.daysRemaining })}
                   </p>
                 )}
               </div>
@@ -177,15 +172,15 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
                 <Clock className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-                <span>{isFa ? "اعتبارسنجی انجام‌شده" : "Verification performed"}</span>
+                <span>{t("dashboard.licenseDiagnostics.verificationPerformed")}</span>
               </div>
               <div className="space-y-2 text-xs text-stone-600 font-mono">
                 <div className="flex justify-between items-center py-1 border-b border-stone-200">
-                  <span className="text-[11px] text-stone-500 font-sans">{isFa ? "زمان بررسی سرور:" : "Checked at:"}</span>
+                  <span className="text-[11px] text-stone-500 font-sans">{t("dashboard.licenseDiagnostics.checkedAt")}</span>
                   <span className="font-bold text-stone-900 font-sans">
                     {status
                       ? formatRelativeTime(status.checkedAt, {
-                          locale: isFa ? "fa" : "en",
+                          locale: i18n.language === "fa" ? "fa" : "en",
                           timeZone: CLINIC_DEFAULT_TIMEZONE,
                         })
                       : "—"}
@@ -193,16 +188,16 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
                 </div>
                 <div className="flex justify-between items-center py-1 border-b border-stone-200">
                   <span className="text-[11px] text-stone-500 font-sans">
-                    {isFa ? "امضا بررسی شد؟" : "Signature checked?"}
+                    {t("dashboard.licenseDiagnostics.signatureChecked")}
                   </span>
                   <span className="text-stone-800 font-sans">
-                    {status?.verified ? (isFa ? "بله" : "Yes") : isFa ? "خیر" : "No"}
+                    {status?.verified ? t("dashboard.licenseDiagnostics.yes") : t("dashboard.licenseDiagnostics.no")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-1">
-                  <span className="text-[11px] text-stone-500 font-sans">{isFa ? "اثر انگشت کلید:" : "Key fingerprint:"}</span>
+                  <span className="text-[11px] text-stone-500 font-sans">{t("dashboard.licenseDiagnostics.keyFingerprint")}</span>
                   <span className="px-2 py-0.5 rounded-md bg-stone-200 text-stone-800 text-[10px] font-bold" data-testid="license-key">
-                    {status?.keyFingerprint ?? (isFa ? "کلیدی تنطیم نشده" : "no key configured")}
+                    {status?.keyFingerprint ?? t("dashboard.licenseDiagnostics.noKeyConfigured")}
                   </span>
                 </div>
               </div>
@@ -211,32 +206,32 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
                 <Key className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-                <span>{isFa ? "سهمیه‌ها و ظرفیت مجاز" : "License Claims & Quotas"}</span>
+                <span>{t("dashboard.licenseDiagnostics.claimsQuotas")}</span>
               </div>
               {claims ? (
                 <div className="space-y-2 text-xs text-stone-600 font-mono">
                   <div className="flex justify-between items-center py-1 border-b border-stone-200">
                     <span className="text-[11px] text-stone-500 font-sans flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-stone-400" />
-                      {isFa ? "حداکثر صندلی همزمان:" : "Max Concurrent Seats:"}
+                      {t("dashboard.licenseDiagnostics.maxSeats")}
                     </span>
                     <span className="font-bold text-stone-900">{claims.maxSeats}</span>
                   </div>
                   <div className="flex justify-between items-center py-1 border-b border-stone-200">
                     <span className="text-[11px] text-stone-500 font-sans flex items-center gap-1.5">
                       <Database className="w-3.5 h-3.5 text-stone-400" />
-                      {isFa ? "سقف بیماران آفلاین:" : "Max Offline Patients:"}
+                      {t("dashboard.licenseDiagnostics.maxPatients")}
                     </span>
                     <span className="font-bold text-stone-900">{claims.maxPatients}</span>
                   </div>
                   <div className="flex justify-between items-center py-1">
                     <span className="text-[11px] text-stone-500 font-sans flex items-center gap-1.5">
                       <Laptop className="w-3.5 h-3.5 text-stone-400" />
-                      {isFa ? "تاریخ انقضای لایسنس:" : "License Expiry:"}
+                      {t("dashboard.licenseDiagnostics.licenseExpiry")}
                     </span>
                     <span className="text-stone-800 font-sans font-semibold">
                       {formatDate(new Date(claims.expiresAt * 1000).toISOString(), {
-                        locale: isFa ? "fa" : "en",
+                        locale: i18n.language === "fa" ? "fa" : "en",
                         format: "short",
                         timeZone: CLINIC_DEFAULT_TIMEZONE,
                       })}
@@ -245,9 +240,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
                 </div>
               ) : (
                 <p className="text-xs text-stone-500">
-                  {isFa
-                    ? "تا وقتی امضای یک توکن معتبر تأیید نشود، هیچ ادعایی نمایش داده نمی‌شود."
-                    : "No claims are shown until a real token signature verifies."}
+                  {t("dashboard.licenseDiagnostics.noClaims")}
                 </p>
               )}
             </div>
@@ -257,7 +250,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
           {claims && claims.features.length > 0 && (
             <div>
               <span className="block text-xs font-bold text-stone-800 mb-2">
-                {isFa ? "ماژول‌ها و دسترسی‌های فعال بالینی:" : "Active Feature Entitlements:"}
+                {t("dashboard.licenseDiagnostics.activeEntitlements")}
               </span>
               <div className="flex flex-wrap gap-2">
                 {claims.features.map((feat) => (
@@ -282,12 +275,10 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-all cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-              <span>{isFa ? "صحت‌سنجی مجدد لایسنس" : "Re-verify licence"}</span>
+              <span>{t("dashboard.licenseDiagnostics.reverify")}</span>
             </button>
             <span className="text-[11px] text-stone-500">
-              {isFa
-                ? "این پنل فقط خروجی اعتبارسنجی سرور را نشان می‌دهد و هیچ وضعیتی را خودش نمی‌سازد."
-                : "This panel only displays the server's verdict; it never derives one locally."}
+              {t("dashboard.licenseDiagnostics.disclaimer")}
             </span>
           </div>
         </div>
@@ -299,7 +290,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-xs font-bold bg-stone-800 text-white hover:bg-stone-900 transition-colors"
           >
-            {isFa ? "بستن" : "Close"}
+            {t("dashboard.licenseDiagnostics.close")}
           </button>
         </div>
       </div>

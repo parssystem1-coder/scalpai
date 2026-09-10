@@ -146,8 +146,7 @@ export default function GuidedCaptureModal({
   patientName = "بیمار",
   onCompleteCapture,
 }: GuidedCaptureModalProps) {
-  const { i18n } = useTranslation();
-  const isFa = i18n.language === "fa";
+  const { t, i18n } = useTranslation();
 
   const [steps, setSteps] = useState<CaptureAngleStep[]>(INITIAL_STEPS);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -250,14 +249,14 @@ export default function GuidedCaptureModal({
       } catch (err: unknown) {
         console.warn("Camera init error:", err);
         setCameraError(
-          isFa
+          i18n.language === "fa"
             ? "دسترسی به دوربین/تریکوسکوپ برقرار نشد. لطفاً دسترسی دوربین را در مرورگر تأیید کنید."
             : "Camera/Trichoscope access failed. Please allow camera permissions in your browser."
         );
         setIsLiveCamera(false);
       }
     },
-    [isFa]
+    []
   );
 
   // Sync stream to video element whenever isLiveCamera turns true or videoRef mounts
@@ -516,11 +515,11 @@ export default function GuidedCaptureModal({
       {/* Hidden canvas for capturing video frames */}
       <canvas ref={canvasRef} className="hidden" />
 
-      <div
-        id="guided-capture-container"
-        className="relative my-auto w-full max-w-4xl rounded-3xl bg-[#0e1318] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[94vh]"
-        dir={isFa ? "rtl" : "ltr"}
-      >
+<div
+          id="guided-capture-container"
+          className="relative my-auto w-full max-w-4xl rounded-3xl bg-[#0e1318] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[94vh]"
+          dir={i18n.language === "fa" ? "rtl" : "ltr"}
+        >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-900/80 border-b border-stone-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -530,7 +529,7 @@ export default function GuidedCaptureModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm md:text-base font-bold text-white">
-                  {isFa ? "تصویربرداری هدایت‌شده و گیت کنترل کیفیت" : "Guided Trichoscopy Capture & Quality-Gate"}
+                  {t("dashboard.guidedCapture.title")}
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
                   PROTOCOL 4-ZONE
@@ -547,7 +546,7 @@ export default function GuidedCaptureModal({
                 )}
               </div>
               <p className="text-xs text-stone-400">
-                {isFa
+                {i18n.language === "fa"
                   ? `پروتکل استاندارد عکاسی درماتوسکوپی جلسه بالینی: ${patientName}`
                   : `Standardized dermoscopy angle protocol for: ${patientName}`}
               </p>
@@ -560,10 +559,10 @@ export default function GuidedCaptureModal({
                 type="button"
                 onClick={handleClearAllFrames}
                 className="px-2.5 py-1.5 rounded-xl bg-stone-800/80 hover:bg-rose-950 text-stone-400 hover:text-rose-300 border border-stone-700 hover:border-rose-800 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                title={isFa ? "پاک کردن تمام فریم‌های ثبت‌شده و شروع از نو" : "Clear all captured frames"}
+                title={t("dashboard.guidedCapture.clearAllTitle")}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{isFa ? "شروع مجدد همه" : "Restart All"}</span>
+                <span className="hidden sm:inline">{t("dashboard.guidedCapture.restartAll")}</span>
               </button>
             )}
             <button
@@ -606,7 +605,7 @@ export default function GuidedCaptureModal({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold">فریم {idx + 1}</span>
+                  <span className="text-[10px] font-mono font-bold">{t("dashboard.guidedCapture.zoneNamePrefix")} {idx + 1}</span>
                   {step.isCaptured ? (
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -617,7 +616,7 @@ export default function GuidedCaptureModal({
                           handleDeleteStepFrame(step.id);
                         }}
                         className="p-1 rounded-md hover:bg-rose-950 text-stone-400 hover:text-rose-300 border border-transparent hover:border-rose-800 transition-colors cursor-pointer"
-                        title={isFa ? "حذف این فریم و عکاسی مجدد" : "Delete & retake"}
+                        title={t("dashboard.guidedCapture.deleteRetakeTitle")}
                       >
                         <Trash2 className="w-3 h-3 text-rose-400" />
                       </button>
@@ -627,7 +626,7 @@ export default function GuidedCaptureModal({
                   )}
                 </div>
                 <div className="text-xs font-bold truncate mt-0.5">
-                  {isFa ? step.zoneName.fa.split(" ")[0] : step.zoneName.en.split(" ")[0]}
+                  {i18n.language === "fa" ? step.zoneName.fa.split(" ")[0] : step.zoneName.en.split(" ")[0]}
                 </div>
               </div>
             );
@@ -638,7 +637,7 @@ export default function GuidedCaptureModal({
         <div className="px-6 py-2.5 bg-stone-900/50 border-b border-stone-800 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-stone-400 font-medium">
-              {isFa ? "منبع تصویربرداری:" : "Input Source:"}
+              {t("dashboard.guidedCapture.inputSource")}
             </span>
             <button
               type="button"
@@ -658,12 +657,12 @@ export default function GuidedCaptureModal({
               {isLiveCamera ? (
                 <>
                   <Video className="w-3.5 h-3.5" />
-                  <span>{isFa ? "دوربین زنده فعال (اتصال UVC)" : "Live UVC Camera Active"}</span>
+                  <span>{t("dashboard.guidedCapture.liveCameraActive")}</span>
                 </>
               ) : (
                 <>
                   <VideoOff className="w-3.5 h-3.5" />
-                  <span>{isFa ? "اتصال تریکوسکوپ USB / دوربین زنده" : "Connect USB Trichoscope / Camera"}</span>
+                  <span>{t("dashboard.guidedCapture.connectDevice")}</span>
                 </>
               )}
             </button>
@@ -672,7 +671,7 @@ export default function GuidedCaptureModal({
           {/* Device Selection dropdown when multiple cameras are found */}
           {videoDevices.length > 1 && (
             <div className="flex items-center gap-2">
-              <span className="text-stone-400 text-[11px]">{isFa ? "انتخاب دستگاه:" : "Select Device:"}</span>
+              <span className="text-stone-400 text-[11px]">{t("dashboard.guidedCapture.selectDevice")}</span>
               <select
                 value={selectedDeviceId}
                 onChange={(e) => {
@@ -780,7 +779,7 @@ export default function GuidedCaptureModal({
                     ZOOM: {zoomLevel}x
                   </span>
                   <span>MAG: {currentStep.magnification}</span>
-                  <span className="hidden sm:inline">| POLAR: {isFa ? currentStep.polarization.fa.split(" ")[0] : "Cross"}</span>
+                  <span className="hidden sm:inline">| {t("dashboard.guidedCapture.polarLabel")} {i18n.language === "fa" ? currentStep.polarization.fa.split(" ")[0] : "Cross"}</span>
                 </div>
               </div>
 
@@ -789,7 +788,7 @@ export default function GuidedCaptureModal({
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center justify-between text-[9px] font-mono text-stone-300 gap-2">
-                    <span>{isFa ? "شارپنس عدسی:" : "Sharpness:"}</span>
+                    <span>{t("dashboard.guidedCapture.sharpness")}</span>
                     <span
                       className={`font-bold ${
                         liveSharpness >= 75
@@ -821,7 +820,7 @@ export default function GuidedCaptureModal({
               {capturedFrames[currentStep.id] && (
                 <div className="absolute top-12 right-3 px-2.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-600 text-emerald-300 text-[10px] font-bold backdrop-blur-md flex items-center gap-1.5 z-20 shadow-sm">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{isFa ? "فریم ثبت‌شده" : "Frame captured"}</span>
+                  <span>{t("dashboard.guidedCapture.frameCaptured")}</span>
                 </div>
               )}
 
@@ -833,10 +832,10 @@ export default function GuidedCaptureModal({
                   </div>
                   <div className="text-center">
                     <p className="text-xs font-bold text-cyan-200">
-                      {isFa ? "لرزش‌گیر فعال - لنز را روی سر ثابت نگه دارید" : "Steady the trichoscope on scalp..."}
+                      {t("dashboard.guidedCapture.steadyHint")}
                     </p>
                     <p className="text-[10px] text-stone-400 mt-0.5">
-                      {isFa ? "ثبت خودکار تصویر پس از پایان معکوس" : "Auto-capture when timer reaches zero"}
+                      {t("dashboard.guidedCapture.autoCaptureHint")}
                     </p>
                   </div>
                   <button
@@ -844,7 +843,7 @@ export default function GuidedCaptureModal({
                     onClick={cancelCountdown}
                     className="mt-1 px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium border border-stone-700 cursor-pointer"
                   >
-                    {isFa ? "لغو شمارش" : "Cancel"}
+                    {t("dashboard.guidedCapture.cancel")}
                   </button>
                 </div>
               )}
@@ -861,7 +860,7 @@ export default function GuidedCaptureModal({
               <div className="flex items-center gap-1.5">
                 <span className="text-stone-400 text-[11px] flex items-center gap-1 font-medium">
                   <ZoomIn className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{isFa ? "بزرگ‌نمایی:" : "Zoom:"}</span>
+                  <span>{t("dashboard.guidedCapture.zoomLabel")}</span>
                 </span>
                 {([1, 1.5, 2, 3] as const).map((z) => (
                   <button
@@ -883,12 +882,12 @@ export default function GuidedCaptureModal({
               <div className="flex items-center gap-1.5">
                 <span className="text-stone-400 text-[11px] flex items-center gap-1 font-medium">
                   <Timer className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{isFa ? "تایمر:" : "Timer:"}</span>
+                  <span>{t("dashboard.guidedCapture.timerLabel")}</span>
                 </span>
                 {([
-                  { sec: 0, label: isFa ? "فوری" : "0s" },
-                  { sec: 3, label: isFa ? "۳ث" : "3s" },
-                  { sec: 5, label: isFa ? "۵ث" : "5s" },
+                  { sec: 0, label: t("dashboard.guidedCapture.timer0s") },
+                  { sec: 3, label: t("dashboard.guidedCapture.timer3s") },
+                  { sec: 5, label: t("dashboard.guidedCapture.timer5s") },
                 ] as const).map((t) => (
                   <button
                     key={t.sec}
@@ -908,10 +907,10 @@ export default function GuidedCaptureModal({
               {/* Hands-free Pedal/Space hotkey indicator */}
               <div
                 className="hidden sm:flex items-center gap-1 text-[10px] text-cyan-300/80 bg-cyan-950/40 px-2 py-1 rounded-lg border border-cyan-800/40"
-                title={isFa ? "برای ثبت تصویر، کلید Space کیبورد یا پدال پا را فشار دهید" : "Press Spacebar or foot pedal to capture"}
+                title={t("dashboard.guidedCapture.captureHint")}
               >
                 <Keyboard className="w-3 h-3 text-cyan-400" />
-                <span>Space: {isFa ? "شاتر دست‌آزاد" : "Shutter"}</span>
+                <span>Space: {t("dashboard.guidedCapture.shutterLabel")}</span>
               </div>
             </div>
 
@@ -930,16 +929,11 @@ export default function GuidedCaptureModal({
                 <Camera className="w-4 h-4" />
                 <span>
                   {capturedFrames[currentStep.id]
-                    ? isFa
-                      ? `ثبت مجدد تصویر (جایگزینی فریم ${activeStepIndex + 1})`
-                      : `Retake Frame ${activeStepIndex + 1}`
-                    : isFa
-                    ? `ثبت تصویر زاویه: ${currentStep.zoneName.fa.split(" ")[0]} ${
-                        timerSeconds > 0 ? `(تایمر ${timerSeconds} ثانیه)` : ""
-                      }`
-                    : `Capture Angle: ${currentStep.zoneName.en} ${
-                        timerSeconds > 0 ? `(${timerSeconds}s timer)` : ""
-                      }`}
+                    ? t("dashboard.guidedCapture.retakeFrame", { frame: activeStepIndex + 1 })
+                    : t("dashboard.guidedCapture.captureAngle", {
+                        zone: i18n.language === "fa" ? currentStep.zoneName.fa.split(" ")[0] : currentStep.zoneName.en,
+                        timer: timerSeconds > 0 ? ` (${timerSeconds}s ${t("dashboard.guidedCapture.timerLabel")})` : "",
+                      })}
                 </span>
               </button>
 
@@ -948,10 +942,10 @@ export default function GuidedCaptureModal({
                   type="button"
                   onClick={() => handleDeleteStepFrame(currentStep.id)}
                   className="px-3.5 py-3 rounded-2xl bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                  title={isFa ? "حذف عکس این زاویه و ثبت دوباره" : "Delete captured frame and retake"}
+                  title={t("dashboard.guidedCapture.deleteFrameTitle")}
                 >
                   <Trash2 className="w-4 h-4 text-rose-400" />
-                  <span className="hidden sm:inline">{isFa ? "حذف فریم" : "Delete"}</span>
+                  <span className="hidden sm:inline">{t("dashboard.guidedCapture.deleteButton")}</span>
                 </button>
               )}
 
@@ -961,7 +955,7 @@ export default function GuidedCaptureModal({
                   setFocusQuality(focusQuality === "pass" ? "warn" : "pass");
                 }}
                 className="p-3 rounded-2xl bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                title={isFa ? "شبیه‌سازی بازتنطیم فوکوس" : "Calibrate Focus"}
+                title={t("dashboard.guidedCapture.calibrateTitle")}
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
@@ -975,7 +969,7 @@ export default function GuidedCaptureModal({
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <h4 className="text-sm font-bold text-white">
-                    {isFa ? "گیت کنترل کیفیت خودکار (Quality-Gate)" : "Automated Quality-Gate"}
+                    {t("dashboard.guidedCapture.qualityGateTitle")}
                   </h4>
                 </div>
                 {capturedFrames[currentStep.id] && (
@@ -990,9 +984,9 @@ export default function GuidedCaptureModal({
                 {/* 1. Focus & Sharpness */}
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between">
                   <div className="text-xs">
-                    <strong className="block text-stone-200">{isFa ? "۱. وضوح و شارپنس عدسی" : "1. Focus & Sharpness"}</strong>
+                    <strong className="block text-stone-200">{t("dashboard.guidedCapture.focusStep")}</strong>
                     <span className="text-[10px] text-stone-500">
-                      {isFa ? `شارپنس زنده سنسور: ${liveSharpness}%` : `Live sharpness: ${liveSharpness}%`}
+                      {t("dashboard.guidedCapture.liveSharpness", { value: liveSharpness })}
                     </span>
                   </div>
                   <span
@@ -1009,7 +1003,7 @@ export default function GuidedCaptureModal({
                 {/* 2. Glare & Lighting */}
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between">
                   <div className="text-xs">
-                    <strong className="block text-stone-200">{isFa ? "۲. عدم بازتاب نور کورکننده" : "2. Anti-Glare & Lux"}</strong>
+                    <strong className="block text-stone-200">{t("dashboard.guidedCapture.glareStep")}</strong>
                     <span className="text-[10px] text-stone-500">یکنواختی نور LED رینگی</span>
                   </div>
                   <span
@@ -1026,7 +1020,7 @@ export default function GuidedCaptureModal({
                 {/* 3. Scalp Contact */}
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between">
                   <div className="text-xs">
-                    <strong className="block text-stone-200">{isFa ? "۳. تماس و فشار مناسب سر مته" : "3. Proper Contact"}</strong>
+                    <strong className="block text-stone-200">{t("dashboard.guidedCapture.contactStep")}</strong>
                     <span className="text-[10px] text-stone-500">عدم انسداد عروقی با فشار زیاد</span>
                   </div>
                   <span
@@ -1046,7 +1040,7 @@ export default function GuidedCaptureModal({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-stone-200">
                     <Tag className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isFa ? "ثبت نشانه‌های تریکوسکوپی این زاویه:" : "Clinical Dermoscopy Signs:"}</span>
+                    <span>{t("dashboard.guidedCapture.clinicalSigns")}</span>
                   </div>
                   {(stepTags[currentStep.id]?.length ?? 0) > 0 && (
                     <span className="text-[10px] text-cyan-400 font-mono">
@@ -1068,10 +1062,10 @@ export default function GuidedCaptureModal({
                             ? `${sign.badgeColor} border-opacity-100 font-bold shadow-xs`
                             : "bg-stone-950/60 border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300"
                         }`}
-                        title={isFa ? sign.desc.fa : sign.desc.en}
+                        title={i18n.language === "fa" ? sign.desc.fa : sign.desc.en}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-amber-400" : "bg-stone-600"}`} />
-                        <span>{isFa ? sign.name.fa : sign.name.en}</span>
+                        <span>{i18n.language === "fa" ? sign.name.fa : sign.name.en}</span>
                       </button>
                     );
                   })}
@@ -1082,8 +1076,8 @@ export default function GuidedCaptureModal({
               <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-800/40 text-xs text-cyan-200/90 leading-relaxed">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <span className="font-bold block mb-0.5">{isFa ? "هدف بالینی این زاویه:" : "Target Objective:"}</span>
-                    <p className="text-[11px] text-stone-300">{isFa ? currentStep.objective.fa : currentStep.objective.en}</p>
+                    <span className="font-bold block mb-0.5">{t("dashboard.guidedCapture.targetObjective")}</span>
+                    <p className="text-[11px] text-stone-300">{i18n.language === "fa" ? currentStep.objective.fa : currentStep.objective.en}</p>
                   </div>
                   {capturedFrames[currentStep.id] && (
                     <div className="flex flex-col items-center gap-1.5 shrink-0">
@@ -1098,10 +1092,10 @@ export default function GuidedCaptureModal({
                         type="button"
                         onClick={() => handleDeleteStepFrame(currentStep.id)}
                         className="px-2 py-0.5 rounded-md bg-rose-950 hover:bg-rose-900 border border-rose-800 text-[10px] text-rose-300 font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                        title={isFa ? "حذف فریم این زاویه و ثبت مجدد" : "Delete this frame and retake"}
+                        title={t("dashboard.guidedCapture.deleteCurrentFrame")}
                       >
                         <Trash2 className="w-3 h-3 text-rose-400" />
-                        <span>{isFa ? "حذف" : "Delete"}</span>
+                        <span>{t("dashboard.guidedCapture.deleteBtn")}</span>
                       </button>
                     </div>
                   )}
@@ -1112,7 +1106,7 @@ export default function GuidedCaptureModal({
             {/* Protocol Progress Status */}
             <div className="p-4 rounded-2xl bg-stone-900/40 border border-stone-800 flex items-center justify-between text-xs">
               <div>
-                <span className="text-stone-400">{isFa ? "مجموع فریم‌های ثبت‌شده:" : "Captured Frames:"}</span>
+                <span className="text-stone-400">{t("dashboard.guidedCapture.capturedFrames")}</span>
                 <div className="text-sm font-bold text-white mt-0.5">
                   {capturedCount} از {steps.length} زاویه استاندارد
                 </div>
@@ -1125,13 +1119,9 @@ export default function GuidedCaptureModal({
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-200" />
                 <span>
-                  {isFa
-                    ? isAllCaptured
-                      ? "تکمیل تمام زوایا و بازگشت به پرونده"
-                      : "تکمیل فریم‌ها و بازگشت"
-                    : isAllCaptured
-                    ? "All Angles Captured & Return"
-                    : "Complete & Return"}
+                  {isAllCaptured
+                    ? t("dashboard.guidedCapture.allZonesDone")
+                    : t("dashboard.guidedCapture.zonesRemaining")}
                 </span>
               </button>
             </div>

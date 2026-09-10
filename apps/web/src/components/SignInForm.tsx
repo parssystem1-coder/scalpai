@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
 import { signInSchema, SignInFormData } from "../types.js";
+import { useTranslation } from "react-i18next";
 
 interface SignInFormProps {
   onSubmit: (data: SignInFormData) => void;
@@ -16,6 +17,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({
   onForgotPassword,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const { t } = useTranslation();
 
   const {
     register,
@@ -36,9 +38,9 @@ export const SignInForm: React.FC<SignInFormProps> = ({
 
   return (
     <div className="animate-fadeIn">
-      <h1 className="font-serif text-3xl font-normal mb-1">Welcome Back</h1>
+      <h1 className="font-serif text-3xl font-normal mb-1">{t("dashboard.signInForm.welcomeBack")}</h1>
       <p className="text-xs font-light text-[oklch(42%_0.02_20)] mb-5">
-        Sign in to your active professional scalp suite
+        {t("dashboard.signInForm.signInDesc")}
       </p>
 
       <form
@@ -99,12 +101,12 @@ export const SignInForm: React.FC<SignInFormProps> = ({
             <span>Remember me</span>
           </label>
           <button
-            type="button"
-            onClick={onForgotPassword}
-            className="text-[oklch(62%_0.09_16)] font-medium hover:underline bg-transparent border-0 p-0 cursor-pointer"
-          >
-            Forgot password?
-          </button>
+          type="button"
+          onClick={onForgotPassword}
+          className="text-[oklch(62%_0.09_16)] font-medium hover:underline bg-transparent border-0 p-0 cursor-pointer"
+        >
+          {t("dashboard.signInForm.forgotPassword")}
+        </button>
         </div>
 
         <button
@@ -119,7 +121,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({
       <div className="relative flex items-center justify-center my-4">
         <div className="border-t border-black/10 w-full" />
         <span className="bg-transparent px-3 text-[0.65rem] tracking-wider uppercase text-[oklch(60%_0.015_20)]">
-          or explore instant demo with
+          {t("dashboard.signInForm.orExploreDemo")}
         </span>
         <div className="border-t border-black/10 w-full" />
       </div>
@@ -159,11 +161,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({
           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
             <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-2.13 4.48-3.74 4.25z" />
           </svg>
-          <span>Apple Demo</span>
+          <span>{t("dashboard.signInForm.appleDemo")}</span>
         </button>
       </div>
       <p className="text-center text-[0.68rem] text-[oklch(50%_0.015_20)]">
-        💡 ورود با گوگل/اپل شما را مستقیماً وارد محیط پیش‌نمایش (Demo Mode) می‌کند.
+        {t("dashboard.signInForm.demoNotice")}
       </p>
     </div>
   );

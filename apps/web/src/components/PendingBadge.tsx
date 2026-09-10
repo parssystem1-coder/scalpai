@@ -1,4 +1,5 @@
 import { useSync } from "../offline/SyncProvider.js";
+import { useTranslation } from "react-i18next";
 
 /**
  * Shows the count of pending offline mutations. Hidden when zero.
@@ -6,11 +7,12 @@ import { useSync } from "../offline/SyncProvider.js";
  */
 export default function PendingBadge() {
   const { isOnline, pendingCount } = useSync();
+  const { t } = useTranslation();
   if (pendingCount === 0) return null;
   return (
     <span
       data-testid="pending-badge"
-      title={isOnline ? "در حال همگام‌سازی..." : "آفلاین — منتظر اتصال"}
+      title={isOnline ? t("dashboard.pendingBadge.onlineTooltip") : t("dashboard.pendingBadge.offlineTooltip")}
       style={{
         display: "inline-flex",
         alignItems: "center",

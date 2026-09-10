@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 export interface RadarMetric {
   label: string;
@@ -16,11 +17,21 @@ interface TrichologyRadarChartProps {
 
 export const TrichologyRadarChart: React.FC<TrichologyRadarChartProps> = ({
   metrics,
-  title = "ماتریس ۶ محوره تریکولوژی هوشمند",
-  subtitle = "محاسبه بردار سلامت فولیکولی توسط شبکه عصبی عمیق",
+  title,
+  subtitle,
   aiScore = 94,
 }) => {
+  const { t } = useTranslation();
   const size = 320;
+
+  const defaultTitle = t("dashboard.trichologyRadar.title");
+  const defaultSubtitle = t("dashboard.trichologyRadar.subtitle");
+  const aiLabel = t("dashboard.trichologyRadar.aiIndex");
+  const patientProfileLabel = t("dashboard.trichologyRadar.patientProfile");
+  const goldenStandardLabel = t("dashboard.trichologyRadar.goldenStandard");
+
+  const resolvedTitle = title ?? defaultTitle;
+  const resolvedSubtitle = subtitle ?? defaultSubtitle;
   const center = size / 2;
   const radius = size * 0.38;
   const total = metrics.length;
@@ -60,13 +71,13 @@ export const TrichologyRadarChart: React.FC<TrichologyRadarChartProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[oklch(62%_0.09_16)] animate-ping" />
-            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">{title}</h4>
+            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">{resolvedTitle}</h4>
           </div>
-          <p className="text-[0.7rem] text-[oklch(45%_0.02_20)] mt-0.5">{subtitle}</p>
+          <p className="text-[0.7rem] text-[oklch(45%_0.02_20)] mt-0.5">{resolvedSubtitle}</p>
         </div>
 
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-black/5 text-xs shadow-xs">
-          <span className="text-[0.68rem] text-[oklch(50%_0.015_20)]">شاخص AI:</span>
+          <span className="text-[0.68rem] text-[oklch(50%_0.015_20)]">{aiLabel}</span>
           <span className="font-mono font-black text-[oklch(20%_0.02_20)]">{aiScore}٪</span>
         </div>
       </div>
@@ -194,11 +205,11 @@ export const TrichologyRadarChart: React.FC<TrichologyRadarChartProps> = ({
         <div className="flex items-center gap-6 mt-3 text-[0.7rem]">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-sm bg-[oklch(62%_0.09_16)] border border-[oklch(62%_0.09_16)]" />
-            <span className="text-[oklch(30%_0.02_20)] font-medium">پروفایل بالینی بیمار</span>
+            <span className="text-[oklch(30%_0.02_20)] font-medium">{patientProfileLabel}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-0.5 bg-amber-500 border-b border-dashed border-amber-600" />
-            <span className="text-amber-700 font-medium">استاندارد نرمال طلایی</span>
+            <span className="text-amber-700 font-medium">{goldenStandardLabel}</span>
           </div>
         </div>
       </div>

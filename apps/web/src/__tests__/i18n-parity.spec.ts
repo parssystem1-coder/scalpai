@@ -58,6 +58,22 @@ const M5_SOURCES: string[] = [
   join(WEB_SRC, "components", "DashboardTabs.tsx"),
   join(WEB_SRC, "components", "dashboard-sections.ts"),
   join(WEB_SRC, "components", "sections"),
+  // M5c components
+  join(WEB_SRC, "components", "ConsentCertificateModal.tsx"),
+  join(WEB_SRC, "components", "GuidedCaptureModal.tsx"),
+  join(WEB_SRC, "components", "LicenseDiagnosticsModal.tsx"),
+  join(WEB_SRC, "components", "ScalpMap.tsx"),
+  join(WEB_SRC, "components", "SyncInspectorModal.tsx"),
+  join(WEB_SRC, "components", "NeuralSegmentationOverlay.tsx"),
+  join(WEB_SRC, "components", "FollicleCaliberWaveform.tsx"),
+  join(WEB_SRC, "components", "TrichologyRadarChart.tsx"),
+  join(WEB_SRC, "components", "DemoBanner.tsx"),
+  join(WEB_SRC, "components", "ProPlansView.tsx"),
+  join(WEB_SRC, "components", "RegisterForm.tsx"),
+  join(WEB_SRC, "components", "SignInForm.tsx"),
+  join(WEB_SRC, "components", "SignatureCanvas.tsx"),
+  join(WEB_SRC, "components", "HairCanvas.tsx"),
+  join(WEB_SRC, "components", "PendingBadge.tsx"),
 ];
 
 const M5_NAMESPACES = [
@@ -66,6 +82,22 @@ const M5_NAMESPACES = [
   "dashboard.patientList.",
   "dashboard.scalpMap.",
   "dashboard.analytics.",
+  // M5c namespaces
+  "dashboard.consentCertificate.",
+  "dashboard.guidedCapture.",
+  "dashboard.licenseDiagnostics.",
+  "dashboard.scalpMap.",
+  "dashboard.syncInspector.",
+  "dashboard.neuralSegmentation.",
+  "dashboard.follicleCaliber.",
+  "dashboard.trichologyRadar.",
+  "dashboard.demoBanner.",
+  "dashboard.proPlans.",
+  "dashboard.registerForm.",
+  "dashboard.signInForm.",
+  "dashboard.signatureCanvas.",
+  "dashboard.hairCanvas.",
+  "dashboard.pendingBadge.",
 ];
 
 const SOURCE_EXTS = [".ts", ".tsx"];

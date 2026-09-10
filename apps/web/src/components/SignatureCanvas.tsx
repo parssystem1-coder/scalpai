@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface SignatureCanvasRef {
   clear: () => void;
@@ -62,6 +63,7 @@ export function planCanvasResize(input: {
 
 export const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasProps>(
   ({ id = "signature-canvas", strokeColor = "#1e293b", lineWidth = 2.5, onBegin, onEnd }, ref) => {
+    const { t } = useTranslation();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [hasDrawing, setHasDrawing] = useState(false);
     // A ref as well as state: the resize handler runs outside React's render
@@ -259,7 +261,7 @@ export const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasPro
         />
         {!hasDrawing && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-medium text-stone-400 select-none">
-            محل لمس / امضای بیمار با انگشت یا قلم نوری
+            {t("dashboard.signatureCanvas.placeholder")}
           </div>
         )}
       </div>

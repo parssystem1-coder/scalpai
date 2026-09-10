@@ -232,6 +232,7 @@
 
 - [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
 - [ ] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند)
+- [ ] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded.
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
 - [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036. توجه: ADR-0044 در گذر، هدر همین فایل و ادعای `pnpm graph` در `PROJECT_GRAPH.md` را اصلاح کرد؛ آن اصلاح این آیتم نیست)

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export const HairCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -233,7 +235,7 @@ export const HairCanvas: React.FC = () => {
       buildHairCortexPath(ctx);
       ctx.clip();
 
-      // 1. Ascending Bio-Photonic Light Wave Pulses (امواج نوری کورتکس)
+      // 1. Ascending Bio-Photonic Light Wave Pulses ({t("dashboard.hairCanvas.aiHudLabel")})
       const drawLightPulse = (progress: number, intensity: number) => {
         const wavePt = getHairPoint(progress);
         ctx.save();

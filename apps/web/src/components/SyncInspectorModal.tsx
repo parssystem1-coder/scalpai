@@ -12,8 +12,7 @@ interface SyncInspectorModalProps {
 }
 
 export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorModalProps) {
-  const { i18n } = useTranslation();
-  const isFa = i18n.language === "fa";
+  const { t, i18n } = useTranslation();
   const { isOnline, pendingCount, flush } = useSync();
 
   const [outboxItems, setOutboxItems] = useState<OutboxRecord[]>([]);
@@ -63,9 +62,9 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
     try {
       const count = await flush();
       await loadOutbox();
-      setFlushResult(isFa ? `${count} جهش با موفقیت به سرور ارسال و تایید شد.` : `${count} mutations successfully pushed.`);
+      setFlushResult(t("dashboard.syncInspector.syncSuccess", { count }));
     } catch {
-      setFlushResult(isFa ? "خطا در برقراری ارتباط با سرور. جهش‌ها در صف امن محلی باقی ماندند." : "Sync error. Mutations remain safe in IndexedDB.");
+      setFlushResult(t("dashboard.syncInspector.syncError"));
     } finally {
       setIsFlushing(false);
     }
@@ -79,7 +78,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
       <div
         id="sync-inspector-container"
         className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
-        dir={isFa ? "rtl" : "ltr"}
+        dir={i18n.language === "fa" ? "rtl" : "ltr"}
       >
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200">
           <div className="flex items-center gap-3">
@@ -88,7 +87,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
             </div>
             <div>
               <h2 className="text-sm font-bold text-stone-900">
-                {isFa ? "پایشگر همگام‌سازی آفلاین و حل تعارض (Sync Inspector)" : "Offline Sync & Conflict Inspector"}
+                {t("dashboard.syncInspector.title")}
               </h2>
               <span className="text-[11px] font-mono text-stone-500">
                 Dexie IndexedDB • Field-level LWW Engine • ADR-0027
@@ -106,20 +105,20 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
         <div className="p-6 space-y-6 overflow-y-auto max-h-[80vh]">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
-              <span className="block text-[11px] text-stone-500 mb-1">{isFa ? "وضعیت اتصال شبکه:" : "Network State:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-1">{t("dashboard.syncInspector.networkState")}</span>
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                 <strong className="text-xs text-stone-900 font-bold">
-                  {isOnline ? (isFa ? "آنلاین (متصل به سرور)" : "Online") : (isFa ? "آفلاین (ذخیره محلی)" : "Offline")}
+                  {isOnline ? t("dashboard.syncInspector.online") : t("dashboard.syncInspector.offline")}
                 </strong>
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
-              <span className="block text-[11px] text-stone-500 mb-1">{isFa ? "جهش‌های در صف انتظار:" : "Pending Outbox Queue:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-1">{t("dashboard.syncInspector.pendingOutboxQueue")}</span>
               <div className="flex items-center gap-2">
                 <Database className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                 <strong className="text-xs text-stone-900 font-bold font-mono">
-                  {pendingCount} {isFa ? "عملیات" : "items"}
+                  {pendingCount} {t("dashboard.syncInspector.items")}
                 </strong>
               </div>
             </div>
@@ -133,7 +132,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold rose-gold-gradient text-white shadow-xs hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isFlushing ? "animate-spin" : ""}`} />
-                <span>{isFlushing ? (isFa ? "در حال ارسال..." : "Syncing...") : (isFa ? "همگام‌سازی فوری" : "Force Sync")}</span>
+                <span>{isFlushing ? t("dashboard.syncInspector.syncing") : t("dashboard.syncInspector.forceSync")}</span>
               </button>
             </div>
           </div>
@@ -147,13 +146,13 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
                 <Layers className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-                <span>{isFa ? "صف محلی تغییرات (IndexedDB Outbox):" : "Local IndexedDB Outbox:"}</span>
+                <span>{t("dashboard.syncInspector.localOutbox")}</span>
               </div>
-              <span className="text-[11px] font-mono text-stone-500">{outboxItems.length} {isFa ? "رکورد پایدار" : "records"}</span>
+              <span className="text-[11px] font-mono text-stone-500">{outboxItems.length} {t("dashboard.syncInspector.records")}</span>
             </div>
             {outboxItems.length === 0 ? (
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-center text-xs text-stone-500">
-                {isFa ? "صف محلی خالی است. تمام تغییرات با سرور همگام هستند." : "Outbox is clean. All local data is fully synced."}
+                {t("dashboard.syncInspector.outboxEmpty")}
               </div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -179,7 +178,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
               <GitCompare className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-              <span>{isFa ? "تاریخچه بازرسی و حل تعارض‌های همزمانی (Field-level LWW):" : "Conflict Resolution Log (Field-level LWW):"}</span>
+              <span>{t("dashboard.syncInspector.conflictResolutionLog")}</span>
             </div>
             <div className="space-y-2">
               {conflictResolutions.map((c) => (
@@ -190,11 +189,11 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2 rounded-xl border border-stone-200">
                     <div>
-                      <span className="block text-stone-400 text-[10px]">{isFa ? "مقدار کلاینت محلی:" : "Client Value:"}</span>
+                      <span className="block text-stone-400 text-[10px]">{t("dashboard.syncInspector.clientValue")}</span>
                       <span className="text-stone-700 font-mono">{c.clientVal}</span>
                     </div>
                     <div>
-                      <span className="block text-stone-400 text-[10px]">{isFa ? "مقدار دریافت شده از سرور:" : "Server Value:"}</span>
+                      <span className="block text-stone-400 text-[10px]">{t("dashboard.syncInspector.serverValue")}</span>
                       <span className="text-stone-700 font-mono">{c.serverVal}</span>
                     </div>
                   </div>
@@ -210,14 +209,14 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-t border-stone-200">
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
             <AlertCircle className="w-3.5 h-3.5" />
-            <span>{isFa ? "معماری آفلاین منطبق با الزامات RLS و ایزولاسیون کلینیک" : "Offline Architecture adheres to multi-tenant RLS"}</span>
+            <span>{t("dashboard.syncInspector.offlineArchitecture")}</span>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-xs font-bold bg-stone-800 text-white hover:bg-stone-900 transition-colors"
           >
-            {isFa ? "بستن" : "Close"}
+            {t("dashboard.syncInspector.close")}
           </button>
         </div>
       </div>

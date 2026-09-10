@@ -2,6 +2,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { User, Mail, Lock, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { registerSchema, RegisterFormData } from "../types.js";
 
 interface RegisterFormProps {
@@ -9,6 +10,7 @@ interface RegisterFormProps {
 }
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -26,15 +28,15 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
     <div className="animate-fadeIn">
       <h1 className="font-serif text-3xl font-normal mb-1">Open Registration</h1>
       <p className="text-xs font-light text-[oklch(42%_0.02_20)] mb-4">
-        ثبت‌نام مستقیم و آزاد برای تمامی آرایشگران، تریکولوژیست‌ها و سالون‌های زیبایی
+        {t("dashboard.registerForm.description")}
       </p>
 
       {/* Subscription Callout */}
       <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[oklch(85%_0.1_50/0.15)] border border-[oklch(85%_0.12_55/0.4)] mb-4 text-xs">
         <Sparkles className="w-4 h-4 text-[oklch(62%_0.09_16)] shrink-0" />
-        <p className="text-[0.72rem] text-right font-sans leading-relaxed" dir="rtl">
-          <strong>شفاف‌سازی:</strong> ثبت‌نام اولیه کاملاً رایگان است. جهت دسترسی و فعال‌سازی ابزارهای درمانی، اشتراک تخصصی مورد نیاز خواهد بود.
-        </p>
+<p className="text-[0.72rem] text-right font-sans leading-relaxed" dir="rtl">
+           <strong>{t("dashboard.registerForm.transparencyTitle")}</strong> {t("dashboard.registerForm.transparencyText")}
+         </p>
       </div>
 
       <form
@@ -100,7 +102,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
           disabled={isSubmitting}
           className="w-full h-12 rounded-2xl bg-gradient-to-r from-[oklch(76%_0.085_24)] via-[oklch(62%_0.09_16)] to-[oklch(48%_0.095_12)] text-white font-semibold text-xs tracking-wider uppercase shadow-xl hover:brightness-110 active:scale-[0.98] transition-all"
         >
-          {isSubmitting ? "Creating Account..." : "Create Account & Choose Plan"}
+          {isSubmitting ? t("dashboard.registerForm.creatingAccount") : t("dashboard.registerForm.createAccount")}
         </button>
       </form>
     </div>

@@ -19,9 +19,8 @@ export default function ConsentCertificateModal({
   isOpen,
   onClose,
 }: ConsentCertificateModalProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const certRef = useRef<HTMLDivElement>(null);
-  const isFa = i18n.language === "fa";
 
   if (!isOpen) return null;
 
@@ -53,7 +52,7 @@ export default function ConsentCertificateModal({
       const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
         `<svg xmlns="http://www.w3.org/2000/svg" width="${element.offsetWidth}" height="${element.offsetHeight}">
           <foreignObject width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="direction: ${isFa ? "rtl" : "ltr"}; font-family: sans-serif; background: #ffffff; padding: 24px; color: #1c1917;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="direction: ${i18n.language === "fa" ? "rtl" : "ltr"}; font-family: sans-serif; background: #ffffff; padding: 24px; color: #1c1917;">
               ${element.innerHTML}
             </div>
           </foreignObject>
@@ -78,18 +77,19 @@ export default function ConsentCertificateModal({
     <div
       id="consent-cert-backdrop"
       className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+      aria-label={t("dashboard.consentCertificate.backdropLabel")}
     >
-      <div
-        id="consent-cert-container"
-        className="relative my-8 w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
-        dir={isFa ? "rtl" : "ltr"}
-      >
+<div
+            id="consent-cert-container"
+            className="relative my-8 w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+            dir={i18n.language === "fa" ? "rtl" : "ltr"}
+          >
         {/* Modal Action Bar (Hidden on Print) */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200 print:hidden">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-[oklch(62%_0.09_16)]" />
             <span className="font-bold text-sm text-stone-800">
-              {isFa ? "گواهی رسمی رضایت آگاهانه بالینی" : "Official Clinical Informed Consent Certificate"}
+              {t("dashboard.consentCertificate.headerTitle")}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export default function ConsentCertificateModal({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-stone-200 text-stone-700 hover:bg-stone-100 shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>{isFa ? "چاپ گواهی" : "Print"}</span>
+              <span>{t("dashboard.consentCertificate.print")}</span>
             </button>
             <button
               type="button"
@@ -107,7 +107,7 @@ export default function ConsentCertificateModal({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[oklch(62%_0.09_16)] text-white hover:brightness-110 shadow-xs transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isFa ? "دانلود سند" : "Download"}</span>
+              <span>{t("dashboard.consentCertificate.download")}</span>
             </button>
             <button
               type="button"
@@ -135,10 +135,10 @@ export default function ConsentCertificateModal({
                 Scalp Scrub Trichology Center
               </span>
               <h1 className="text-xl md:text-2xl font-serif font-bold text-stone-900">
-                {isFa ? "گواهی رضایت آگاهانه تریکوسکوپی" : "Informed Trichoscopy Consent Certificate"}
+                {t("dashboard.consentCertificate.headerTitle")}
               </h1>
               <p className="text-xs text-stone-500">
-                {isFa ? "سند حقوقی و بالینی پرونده الکترونیک سلامت" : "Electronic Health Record Legal & Clinical Dossier"}
+                {t("dashboard.consentCertificate.subHeader")}
               </p>
             </div>
             <div className="text-left font-mono">
@@ -153,19 +153,19 @@ export default function ConsentCertificateModal({
           {/* Patient Details Grid */}
           <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-stone-50 border border-stone-200 mb-6 text-xs">
             <div>
-              <span className="block text-[11px] text-stone-500 mb-0.5">{isFa ? "نام بیمار:" : "Patient Name:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-0.5">{t("dashboard.consentCertificate.patientName")}</span>
               <strong className="text-stone-900 font-bold">{patientName}</strong>
             </div>
             <div>
-              <span className="block text-[11px] text-stone-500 mb-0.5">{isFa ? "شماره تماس:" : "Contact Phone:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-0.5">{t("dashboard.consentCertificate.contactPhone")}</span>
               <span className="font-mono text-stone-800">{patientPhone || "—"}</span>
             </div>
             <div>
-              <span className="block text-[11px] text-stone-500 mb-0.5">{isFa ? "شناسه پرونده:" : "Patient ID:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-0.5">{t("dashboard.consentCertificate.patientId")}</span>
               <span className="font-mono text-stone-800">{consent.patientId.slice(0, 10)}</span>
             </div>
             <div>
-              <span className="block text-[11px] text-stone-500 mb-0.5">{isFa ? "نسخه قالب:" : "Template Ver:"}</span>
+              <span className="block text-[11px] text-stone-500 mb-0.5">{t("dashboard.consentCertificate.templateVer")}</span>
               <span className="font-mono text-stone-800">{consent.templateVersion}</span>
             </div>
           </div>
@@ -173,11 +173,11 @@ export default function ConsentCertificateModal({
           {/* Timestamp details */}
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-[11px] text-stone-600 mb-6 px-1">
             <div>
-              <span className="font-semibold">{isFa ? "زمان دقیق ثبت (شمسی):" : "Signed Timestamp (Jalali):"}</span>{" "}
+              <span className="font-semibold">{t("dashboard.consentCertificate.signedTimestamp")}</span>{" "}
               <span className="font-mono text-stone-900">{signedDateFa}</span>
             </div>
             <div>
-              <span className="font-semibold">{isFa ? "زمان سرور (UTC):" : "UTC Reference:"}</span>{" "}
+              <span className="font-semibold">{t("dashboard.consentCertificate.utcReference")}</span>{" "}
               <span className="font-mono text-stone-900">{signedDateEn}</span>
             </div>
           </div>
@@ -187,28 +187,22 @@ export default function ConsentCertificateModal({
             <div className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <p>
-                <strong>{isFa ? "۱. تصویربرداری میکروسکوپی:" : "1. Trichoscopic Imaging:"}</strong>{" "}
-                {isFa
-                  ? "بدین‌وسیله رضایت خود را برای انجام تصویربرداری تشخیصی تریکوسکوپی پلاریزه از پوست سر و فولیکول‌های مو جهت پایش روند درمان اعلام می‌دارم."
-                  : "I grant informed consent for polarized dermoscopic scalp and follicular imaging for trichological assessment."}
+                <strong>{t("dashboard.consentCertificate.section1Title")}</strong>{" "}
+                {t("dashboard.consentCertificate.section1Text")}
               </p>
             </div>
             <div className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <p>
-                <strong>{isFa ? "۲. تحلیل کمکی الگوها:" : "2. Algorithmic Pattern Analysis:"}</strong>{" "}
-                {isFa
-                  ? "آگاهی دارم که داده‌های تریکومتری و سنجش‌های بیومتریک به عنوان ابزار کمکی در اختیار تریکولوژیست معالج قرار می‌گیرد."
-                  : "I understand that computerized trichometry serves as an adjunctive decision-support aid for the clinician."}
+                <strong>{t("dashboard.consentCertificate.section2Title")}</strong>{" "}
+                {t("dashboard.consentCertificate.section2Text")}
               </p>
             </div>
             <div className="flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <p>
-                <strong>{isFa ? "۳. محرمانگی و حقوق داده‌ها:" : "3. Privacy & Compliance:"}</strong>{" "}
-                {isFa
-                  ? "تمامی سوابق طبق اصول رازداری پزشکی ثبت شده و خارج از کلینیک بدون اجازه کتبی منتشر نخواهد شد."
-                  : "All clinical records are encrypted and protected under healthcare data confidentiality standards."}
+                <strong>{t("dashboard.consentCertificate.section3Title")}</strong>{" "}
+                {t("dashboard.consentCertificate.section3Text")}
               </p>
             </div>
           </div>
@@ -218,7 +212,7 @@ export default function ConsentCertificateModal({
             {/* Signature Preview */}
             <div className="text-center sm:text-right">
               <span className="block text-[11px] font-bold text-stone-600 mb-2">
-                {isFa ? "امضای ثبت شده بیمار (دیجیتال):" : "Patient Electronic Signature:"}
+                {t("dashboard.consentCertificate.patientSignature")}
               </span>
               {consent.signaturePayload ? (
                 <div className="inline-block p-2 rounded-xl bg-stone-50 border border-stone-200 shadow-inner">
@@ -239,7 +233,7 @@ export default function ConsentCertificateModal({
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
-                {isFa ? "تاییدیه الکترونیک کلینیک" : "Clinic Digital Seal"}
+                {t("dashboard.consentCertificate.clinicSeal")}
               </span>
               <span className="text-[9px] font-mono text-emerald-700">Ed25519 Verified Token</span>
             </div>

@@ -1,5 +1,6 @@
 import React from "react";
 import { TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface WaveformPoint {
   visitDate: string;
@@ -24,8 +25,10 @@ const DEFAULT_TIMELINE: WaveformPoint[] = [
 export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = ({
   data = DEFAULT_TIMELINE,
   currentCaliber = "74 µm",
-  densityTrend = "+۲۰.۳٪ بهبود",
+  densityTrend,
 }) => {
+  const { t } = useTranslation();
+  const trendLabel = densityTrend ?? t("dashboard.follicleCaliber.densityTrendDefault");
   const width = 500;
   const height = 180;
   const padding = 35;
@@ -65,20 +68,20 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-600" />
-            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">روند پویای تراکم و کالیبر ساقه</h4>
+            <h4 className="text-sm font-bold text-[oklch(20%_0.02_20)]">{t("dashboard.follicleCaliber.chartTitle")}</h4>
           </div>
           <p className="text-[0.68rem] text-[oklch(45%_0.02_20)] mt-0.5">
-            روند افزایشی تراکم فولیکولی در ۴ نوبت ویزیت تریکوسکوپی اخیر
+            {t("dashboard.follicleCaliber.chartSubtitle")}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-left">
-            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">ضخامت میانگین:</span>
+            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">{t("dashboard.follicleCaliber.averageThickness")}</span>
             <span className="text-xs font-mono font-black text-[oklch(20%_0.02_20)]">{currentCaliber}</span>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold shadow-xs">
-            {densityTrend}
+            {trendLabel}
           </span>
         </div>
       </div>
