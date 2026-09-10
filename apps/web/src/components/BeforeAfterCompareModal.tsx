@@ -9,6 +9,7 @@ import {
   Download,
   CheckCircle2,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface ComparePhotoItem {
   id: string;
@@ -32,13 +33,6 @@ interface BeforeAfterCompareModalProps {
   defaultPhotoIdB?: string;
 }
 
-const AREA_LABELS: Record<string, string> = {
-  vertex: "تاج و فرق سر (Vertex)",
-  frontal: "خط رویش قدامی (Frontal)",
-  temple: "شقیقه و گیجگاهی (Temple)",
-  occiput: "پس‌سر و بانک مو (Occiput)",
-};
-
 export default function BeforeAfterCompareModal({
   isOpen,
   onClose,
@@ -47,6 +41,7 @@ export default function BeforeAfterCompareModal({
   defaultPhotoIdA,
   defaultPhotoIdB,
 }: BeforeAfterCompareModalProps) {
+  const { t } = useTranslation();
   const [photoAId, setPhotoAId] = useState<string>("");
   const [photoBId, setPhotoBId] = useState<string>("");
   const [sliderPosition, setSliderPosition] = useState<number>(50);
@@ -113,7 +108,7 @@ export default function BeforeAfterCompareModal({
   const handleExportComparisonCard = async () => {
     if (!photoA || !photoB) return;
     setIsExporting(true);
-    setExportFeedback("در حال آماده‌سازی و رندر کارنامه مقایسه...");
+    setExportFeedback(t("dashboard.compareModal.exportPreparing"));
 
     try {
       const canvas = document.createElement("canvas");
@@ -139,12 +134,16 @@ export default function BeforeAfterCompareModal({
       ctx.fillStyle = "#f59e0b";
       ctx.font = "bold 22px system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText("ScalpAI Trichology • کارنامه بالینی مقایسه تریکوسکوپی", 1140, 60);
+      ctx.fillText(t("dashboard.compareModal.canvasTitle"), 1140, 60);
 
       ctx.fillStyle = "#a8a29e";
       ctx.font = "14px system-ui, sans-serif";
       ctx.fillText(
-        `بیمار: ${patientName}  |  ناحیه: ${AREA_LABELS[photoA.area] || photoA.area}  |  تاریخ صدور: ${new Date().toLocaleDateString("fa-IR")}`,
+        t("dashboard.compareModal.canvasPatient", {
+          patient: patientName,
+          area: t(`dashboard.compareModal.areaLabels.${photoA.area}`),
+          date: new Date().toLocaleDateString("fa-IR"),
+        }),
         1140,
         90
       );
@@ -191,11 +190,11 @@ export default function BeforeAfterCompareModal({
       ctx.fillStyle = "#fde68a";
       ctx.font = "bold 15px system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText(`فریم پایه (قبل / Baseline) • ${photoA.date}`, boxAX + boxWidth - 15, boxY + 27);
+      ctx.fillText(t("dashboard.compareModal.canvasBaselineFrame", { date: photoA.date }), boxAX + boxWidth - 15, boxY + 27);
       ctx.textAlign = "left";
       ctx.fillStyle = "#34d399";
       ctx.font = "bold 13px monospace";
-      ctx.fillText(`تراکم: ${photoA.density} تار/cm²`, boxAX + 15, boxY + 27);
+      ctx.fillText(t("dashboard.compareModal.canvasDensity", { value: photoA.density }), boxAX + 15, boxY + 27);
 
       const boxBX = 620;
       ctx.fillStyle = "#171717";
@@ -212,11 +211,11 @@ export default function BeforeAfterCompareModal({
       ctx.fillStyle = "#a7f3d0";
       ctx.font = "bold 15px system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText(`فریم پیگیری (بعد / Follow-up) • ${photoB.date}`, boxBX + boxWidth - 15, boxY + 27);
+      ctx.fillText(t("dashboard.compareModal.canvasFollowUpFrame", { date: photoB.date }), boxBX + boxWidth - 15, boxY + 27);
       ctx.textAlign = "left";
       ctx.fillStyle = "#34d399";
       ctx.font = "bold 13px monospace";
-      ctx.fillText(`تراکم: ${photoB.density} تار/cm²`, boxBX + 15, boxY + 27);
+      ctx.fillText(t("dashboard.compareModal.canvasDensity", { value: photoB.density }), boxBX + 15, boxY + 27);
 
       const ribbonY = 575;
       ctx.fillStyle = "#1c1917";
@@ -227,9 +226,9 @@ export default function BeforeAfterCompareModal({
       ctx.textAlign = "right";
       ctx.fillStyle = "#e7e5e4";
       ctx.font = "bold 15px system-ui, sans-serif";
-      ctx.fillText("تحلیل کمی تغییرات بالینی در طول دوره درمان:", 1120, ribbonY + 35);
+      ctx.fillText(t("dashboard.compareModal.canvasAnalysis"), 1120, ribbonY + 35);
 
-      const deltaText = `${densityDelta >= 0 ? `+${densityDelta}` : densityDelta} تار/cm²  (${densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}٪)`;
+      const deltaText = `${densityDelta >= 0 ? `+${densityDelta}` : densityDelta} ${t("dashboard.compareModal.densityUnit")}  (${densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)`;
       ctx.fillStyle = densityDelta >= 0 ? "#10b981" : "#f43f5e";
       ctx.font = "bold 24px monospace";
       ctx.fillText(deltaText, 1120, ribbonY + 75);
@@ -238,8 +237,8 @@ export default function BeforeAfterCompareModal({
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillText(
         densityDelta >= 0
-          ? "روند رشد فولیکولی مبت و افزایش موهای ترمینال در پی دوره درمانی مشاهده شد."
-          : "کاهش یا عدم تغییر محسوس تراکم موضعی • نیازمند بررسی رژیم ماینوکسیدیل و تغذیه پاپیلاری.",
+          ? t("dashboard.compareModal.canvasPositiveTrend")
+          : t("dashboard.compareModal.canvasNegativeTrend"),
         1120,
         ribbonY + 105
       );
@@ -261,11 +260,11 @@ export default function BeforeAfterCompareModal({
       link.href = dataUrl;
       link.click();
 
-      setExportFeedback("کارت مقایسه بالینی با موفقیت صادر و دانلود شد.");
+      setExportFeedback(t("dashboard.compareModal.exportSuccess"));
       setTimeout(() => setExportFeedback(null), 5000);
     } catch (err) {
       console.error(err);
-      setExportFeedback("خطا در صدور کارت مقایسه.");
+      setExportFeedback(t("dashboard.compareModal.exportError"));
       setTimeout(() => setExportFeedback(null), 4000);
     } finally {
       setIsExporting(false);
@@ -303,7 +302,7 @@ export default function BeforeAfterCompareModal({
       className="fixed inset-0 z-[85] flex items-center justify-center bg-black/90 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-y-auto"
       role="button"
       tabIndex={0}
-      aria-label="پایان جابجایی نشانگر مقایسه"
+      aria-label={t("dashboard.compareModal.backdropLabel")}
       onMouseUp={stopDragging}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
@@ -326,14 +325,14 @@ export default function BeforeAfterCompareModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white">
-                  مقایسه تریکوسکوپی رو در رو (قبل و بعد بالینی)
+                  {t("dashboard.compareModal.title")}
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
                   LONGITUDINAL TRACKING
                 </span>
               </div>
               <p className="text-xs text-stone-400">
-                بیمار: <strong className="text-stone-200">{patientName}</strong> • مقایسه تغییرات میکروکالیبر و تراکم فولیکولی
+                {t("dashboard.compareModal.subtitle", { patient: patientName })}
               </p>
             </div>
           </div>
@@ -349,7 +348,7 @@ export default function BeforeAfterCompareModal({
                 }`}
               >
                 <Split className="w-3.5 h-3.5" />
-                <span>اسلایدر کشویی</span>
+                <span>{t("dashboard.compareModal.sliderMode")}</span>
               </button>
               <button
                 type="button"
@@ -361,7 +360,7 @@ export default function BeforeAfterCompareModal({
                 }`}
               >
                 <Columns className="w-3.5 h-3.5" />
-                <span>موازی (Side-by-Side)</span>
+                <span>{t("dashboard.compareModal.sideBySideMode")}</span>
               </button>
             </div>
             <div className="flex items-center gap-1 bg-stone-800/80 p-1 rounded-xl border border-stone-700 text-xs">
@@ -369,7 +368,7 @@ export default function BeforeAfterCompareModal({
                 type="button"
                 onClick={() => setZoomLevel(zoomLevel === 1 ? 1.5 : zoomLevel === 1.5 ? 2 : 1)}
                 className="px-2.5 py-1 rounded-lg text-stone-300 hover:text-white font-mono font-bold hover:bg-stone-700 transition-colors cursor-pointer"
-                title="بزرگ‌نمایی میکروسکوپی"
+                title={t("dashboard.compareModal.zoomTitle")}
               >
                 {zoomLevel}x
               </button>
@@ -379,10 +378,10 @@ export default function BeforeAfterCompareModal({
               onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              title="صدور کارنامه تصویری قبل و بعد برای تحویل به بیمار یا چاپ"
+              title={t("dashboard.compareModal.closeTitle")}
             >
               <Download className="w-3.5 h-3.5 text-amber-200" />
-              <span>{isExporting ? "در حال صدور..." : "صدور کارت مقایسه"}</span>
+              <span>{isExporting ? t("dashboard.compareModal.exportPreparingBtn") : t("dashboard.compareModal.exportBtn")}</span>
             </button>
             <button
               type="button"
@@ -412,7 +411,7 @@ export default function BeforeAfterCompareModal({
           <div className="flex flex-wrap items-center gap-4 flex-1">
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-stone-800 text-amber-300 border border-amber-500/30 font-bold text-[11px]">
-                فریم اول (قبل / Baseline):
+                {t("dashboard.compareModal.baselineLabel")}
               </span>
               <select
                 value={photoAId}
@@ -421,7 +420,7 @@ export default function BeforeAfterCompareModal({
               >
                 {filteredPhotos.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {AREA_LABELS[p.area] || p.area} — تاریخ {p.date} ({p.density} تار/cm²)
+                    {t(`dashboard.compareModal.areaLabels.${p.area}`)} — {t("dashboard.compareModal.datePrefix")}{p.date} ({p.density} {t("dashboard.compareModal.densityUnit")})
                   </option>
                 ))}
               </select>
@@ -429,7 +428,7 @@ export default function BeforeAfterCompareModal({
             <ArrowRight className="w-4 h-4 text-stone-500 hidden md:block" />
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 rounded-md bg-stone-800 text-emerald-300 border border-emerald-500/30 font-bold text-[11px]">
-                فریم دوم (بعد / Follow-up):
+                {t("dashboard.compareModal.followUpLabel")}
               </span>
               <select
                 value={photoBId}
@@ -438,24 +437,24 @@ export default function BeforeAfterCompareModal({
               >
                 {filteredPhotos.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {AREA_LABELS[p.area] || p.area} — تاریخ {p.date} ({p.density} تار/cm²)
+                    {t(`dashboard.compareModal.areaLabels.${p.area}`)} — {t("dashboard.compareModal.datePrefix")}{p.date} ({p.density} {t("dashboard.compareModal.densityUnit")})
                   </option>
                 ))}
               </select>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-stone-400">
-            <span>فیلتر ناحیه:</span>
+            <span>{t("dashboard.compareModal.filterArea")}</span>
             <select
               value={filterArea}
               onChange={(e) => setFilterArea(e.target.value)}
               className="bg-stone-900 border border-stone-700 rounded-xl px-2 py-1 text-stone-300 text-xs focus:outline-none cursor-pointer"
             >
-              <option value="all">همه نواحی</option>
-              <option value="vertex">فرق سر (Vertex)</option>
-              <option value="frontal">خط رویش (Frontal)</option>
-              <option value="temple">شقیقه (Temple)</option>
-              <option value="occiput">پس‌سر (Occiput)</option>
+              <option value="all">{t("dashboard.compareModal.filterAll")}</option>
+              <option value="vertex">{t("dashboard.compareModal.filterVertex")}</option>
+              <option value="frontal">{t("dashboard.compareModal.filterFrontal")}</option>
+              <option value="temple">{t("dashboard.compareModal.filterTemple")}</option>
+              <option value="occiput">{t("dashboard.compareModal.filterOcciput")}</option>
             </select>
           </div>
         </div>
@@ -467,25 +466,25 @@ export default function BeforeAfterCompareModal({
                   densityDelta >= 0 ? "text-emerald-400" : "text-amber-400"
                 }`}
               />
-              <span className="text-stone-300 font-medium">تغییرات تراکم فولیکولی:</span>
+              <span className="text-stone-300 font-medium">{t("dashboard.compareModal.densityChange")}</span>
               <span
                 className={`font-bold font-mono text-sm ${
                   densityDelta >= 0 ? "text-emerald-300" : "text-amber-300"
                 }`}
               >
-                {densityDelta >= 0 ? `+${densityDelta}` : densityDelta} تار/cm²
+                {densityDelta >= 0 ? `+${densityDelta}` : densityDelta} {t("dashboard.compareModal.densityUnit")}
                 {" "}
-                ({densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}٪)
+                ({densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)
               </span>
             </div>
             <div className="flex items-center gap-2 text-stone-400">
-              <span>ضخامت کالیبر:</span>
+              <span>{t("dashboard.compareModal.caliperThickness")}</span>
               <span className="font-mono text-stone-200">
                 {photoA?.thickness} ← {photoB?.thickness}
               </span>
             </div>
             <div className="flex items-center gap-2 text-stone-400 hidden sm:flex">
-              <span>فاصله پایش:</span>
+              <span>{t("dashboard.compareModal.monitoringInterval")}</span>
               <span className="text-stone-200 font-mono">
                 {photoA?.date} تا {photoB?.date}
               </span>
@@ -501,7 +500,7 @@ export default function BeforeAfterCompareModal({
               ref={containerRef}
               role="button"
               tabIndex={0}
-              aria-label="نشانگر مقایسه قبل و بعد - با کلیدهای جهتنما جابجا کنید"
+              aria-label={t("dashboard.compareModal.sliderLabel")}
               className="relative w-full max-w-3xl aspect-16/10 rounded-2xl overflow-hidden shadow-2xl border border-stone-800 bg-black cursor-ew-resize select-none"
               onMouseDown={(e) => {
                 setIsDragging(true);
@@ -565,23 +564,23 @@ export default function BeforeAfterCompareModal({
               <div className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-stone-950/85 backdrop-blur-md border border-amber-500/40 text-xs font-bold text-amber-300 z-10 flex flex-col gap-0.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
-                  <span>قبل (Baseline) • {photoA?.date}</span>
+                  <span>{t("dashboard.compareModal.beforeLabel")} • {photoA?.date}</span>
                 </span>
                 <span className="text-[10px] text-stone-400 font-mono">
-                  تراکم: {photoA?.density} • ضخامت: {photoA?.thickness}
+                  {t("dashboard.compareModal.canvasDensity", { value: photoA?.density })} • {t("dashboard.compareModal.caliperLabel", { value: photoA?.thickness })}
                 </span>
               </div>
               <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-stone-950/85 backdrop-blur-md border border-emerald-500/40 text-xs font-bold text-emerald-300 z-10 flex flex-col gap-0.5">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>بعد (Follow-up) • {photoB?.date}</span>
+                  <span>{t("dashboard.compareModal.afterLabel")} • {photoB?.date}</span>
                 </span>
                 <span className="text-[10px] text-stone-400 font-mono">
-                  تراکم: {photoB?.density} • ضخامت: {photoB?.thickness}
+                  {t("dashboard.compareModal.canvasDensity", { value: photoB?.density })} • {t("dashboard.compareModal.caliperLabel", { value: photoB?.thickness })}
                 </span>
               </div>
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-stone-900/80 backdrop-blur-md text-stone-400 text-[11px] border border-stone-800 pointer-events-none z-10">
-                نشانگر را به چپ و راست بکشید تا تغییرات مو مقایسه شود
+                {t("dashboard.compareModal.sliderHint")}
               </div>
             </div>
           ) : (
@@ -590,10 +589,10 @@ export default function BeforeAfterCompareModal({
                 <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-900/40 flex items-center justify-between text-xs">
                   <span className="font-bold text-amber-300 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400" />
-                    فریم مبنا (قبل) • {photoA?.date}
+                    {t("dashboard.compareModal.baselineFrame")} • {photoA?.date}
                   </span>
                   <span className="text-stone-400 text-[11px] font-mono">
-                    تراکم: {photoA?.density} تار/cm²
+                    {t("dashboard.compareModal.canvasDensity", { value: photoA?.density })}
                   </span>
                 </div>
                 <div className="relative aspect-4/3 overflow-hidden bg-black flex items-center justify-center">
@@ -617,18 +616,18 @@ export default function BeforeAfterCompareModal({
                   )}
                 </div>
                 <div className="p-3 bg-stone-950 text-xs flex items-center justify-between text-stone-400 font-mono">
-                  <span>ناحیه: {photoA ? AREA_LABELS[photoA.area] || photoA.area : "-"}</span>
-                  <span>کالیبر: {photoA?.thickness}</span>
+                  <span>{t("dashboard.compareModal.areaLabel", { area: photoA ? t(`dashboard.compareModal.areaLabels.${photoA.area}`) : "-" })}</span>
+                  <span>{t("dashboard.compareModal.caliperLabel", { value: photoA?.thickness })}</span>
                 </div>
               </div>
               <div className="rounded-2xl bg-stone-900/70 border border-stone-800 overflow-hidden flex flex-col">
                 <div className="px-4 py-2 bg-emerald-950/30 border-b border-emerald-900/40 flex items-center justify-between text-xs">
                   <span className="font-bold text-emerald-300 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    فریم پایش (بعد) • {photoB?.date}
+                    {t("dashboard.compareModal.followUpFrame")} • {photoB?.date}
                   </span>
                   <span className="text-stone-400 text-[11px] font-mono">
-                    تراکم: {photoB?.density} تار/cm²
+                    {t("dashboard.compareModal.canvasDensity", { value: photoB?.density })}
                   </span>
                 </div>
                 <div className="relative aspect-4/3 overflow-hidden bg-black flex items-center justify-center">
@@ -652,8 +651,8 @@ export default function BeforeAfterCompareModal({
                   )}
                 </div>
                 <div className="p-3 bg-stone-950 text-xs flex items-center justify-between text-stone-400 font-mono">
-                  <span>ناحیه: {photoB ? AREA_LABELS[photoB.area] || photoB.area : "-"}</span>
-                  <span>کالیبر: {photoB?.thickness}</span>
+                  <span>{t("dashboard.compareModal.areaLabel", { area: photoB ? t(`dashboard.compareModal.areaLabels.${photoB.area}`) : "-" })}</span>
+                  <span>{t("dashboard.compareModal.caliperLabel", { value: photoB?.thickness })}</span>
                 </div>
               </div>
             </div>
@@ -662,7 +661,7 @@ export default function BeforeAfterCompareModal({
         <div className="flex items-center justify-between px-6 py-3.5 bg-stone-900/90 border-t border-stone-800 shrink-0">
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <Layers className="w-4 h-4 text-cyan-400" />
-            <span>نرم‌افزار مقایسه طولی تراکم مو و قطر تارها بر پایه پردازش تصویر ScalpAI</span>
+            <span>{t("dashboard.compareModal.footerText")}</span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -670,17 +669,17 @@ export default function BeforeAfterCompareModal({
               onClick={exportComparisonCard}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              title="دانلود کارنامه مقایسه در ابعاد بزرگ برای واتساپ، پرینت یا پرونده بیمار"
+              title={t("dashboard.compareModal.closeTitle")}
             >
               <Download className="w-4 h-4 text-amber-200" />
-              <span>{isExporting ? "در حال صدور کارنامه..." : "صدور کارنامه تصویری (PNG)"}</span>
+              <span>{isExporting ? t("dashboard.compareModal.exportPreparingCard") : t("dashboard.compareModal.exportCardBtn")}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="px-5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
             >
-              بستن
+              {t("common.close")}
             </button>
           </div>
         </div>
