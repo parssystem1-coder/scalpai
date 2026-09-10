@@ -2,55 +2,79 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import AnalyticsSection, { type AnalyticsData } from "../sections/AnalyticsSection.js";
-import { faNum } from "../../i18n.js";
+import i18n, { faNum } from "../../i18n.js";
 
 afterEach(cleanup);
 
+const tr = (key: string, options: Record<string, unknown> = {}): string =>
+  String(i18n.t(key, options));
+
+const PATIENT = "Maryam Rezaei";
+
+/** Engine output, not copy: an ASCII fixture keeps the spec language-neutral. */
 const DATA: AnalyticsData = {
   scores: { redness: 22, flakeTexture: 26, densityProxy: 88 },
   severity: 24,
   anagenRatio: 87,
   hairCaliber: "76 µm",
-  recommendation: "پروتکل آزمونی پپتیدی",
+  recommendation: "AI-synthesised peptide protocol (fixture)",
   matrixHydration: 92,
   tensorConfidence: 97.4,
   follicularUnits: { single: 24, double: 52, triple: 24 },
 };
 
-describe("AnalyticsSection (Phase 5 i18n)", () => {
+describe("AnalyticsSection (Phase 5 i18n, Phase B testids)", () => {
   it("renders the translated badge, heading and patient-aware subtitle", () => {
-    render(<AnalyticsSection data={DATA} patientName="مریم رضایی" />);
+    render(<AnalyticsSection data={DATA} patientName={PATIENT} />);
 
-    expect(screen.getByText("بخش ۳ از ۴")).toBeDefined();
-    expect(screen.getByText(/استودیوی آنالیز عمیق تریکولوژی/)).toBeDefined();
-    expect(screen.getByText(/مریم رضایی/)).toBeDefined();
-    expect(screen.getByLabelText("گزارشات و تحلیل‌ها")).toBeDefined();
+    const section = screen.getByTestId("analytics-section");
+    expect(section.getAttribute("aria-label")).toBe(tr("dashboard.analytics.title"));
+    expect(screen.getByTestId("analytics-badge").textContent).toBe(tr("dashboard.analytics.badge"));
+    expect(screen.getByTestId("analytics-heading").textContent).toBe(
+      tr("dashboard.analytics.heading")
+    );
+    expect(screen.getByTestId("analytics-subtitle").textContent).toBe(
+      tr("dashboard.analytics.subtitle", { patient: PATIENT })
+    );
+    expect(screen.getByTestId("analytics-subtitle").textContent).toContain(PATIENT);
   });
 
-  it("renders the four metric dials with digit-shaped percentages", () => {
-    render(<AnalyticsSection data={DATA} patientName="مریم رضایی" />);
+  it("renders the four metric dials with locale-shaped percentages", () => {
+    render(<AnalyticsSection data={DATA} patientName={PATIENT} />);
 
-    expect(screen.getByText("اریتم و التهاب پوست سر")).toBeDefined();
-    expect(screen.getByText("تجمع سبوم و پوسته لایه شاخی")).toBeDefined();
-    expect(screen.getByText("فاز رشد فعال (آناژن)")).toBeDefined();
-    expect(screen.getByText("هیدراتاسیون ماتریکس مو")).toBeDefined();
+    for (const metric of ["redness", "flake", "anagen", "hydration"]) {
+      expect(screen.getByTestId(`analytics-metric-${metric}`)).toBeDefined();
+    }
 
-    expect(screen.getByText(`${faNum(22)}%`)).toBeDefined();
-    expect(screen.getByText(`${faNum(87)}%`)).toBeDefined();
-    expect(screen.getByText(`${faNum(92)}٪`)).toBeDefined();
-    expect(screen.getByText(`Tensor Confidence: ${faNum(97.4)}%`)).toBeDefined();
+    expect(screen.getByTestId("analytics-metric-value-redness").textContent).toBe(`${faNum(22)}%`);
+    expect(screen.getByTestId("analytics-metric-value-flake").textContent).toBe(`${faNum(26)}%`);
+    expect(screen.getByTestId("analytics-metric-value-anagen").textContent).toBe(`${faNum(87)}%`);
+    expect(screen.getByTestId("analytics-metric-value-hydration").textContent).toBe(
+      `${faNum(92)}%`
+    );
+    expect(screen.getByTestId("analytics-tensor-confidence").textContent).toContain(
+      tr("dashboard.analytics.tensorConfidence", { value: faNum(97.4) })
+    );
   });
 
   it("swaps the scan button copy while the engine is running", () => {
     const { unmount } = render(
-      <AnalyticsSection data={DATA} patientName="مریم رضایی" isAnalyzing={false} />
+      <AnalyticsSection data={DATA} patientName={PATIENT} isAnalyzing={false} />
     );
-    expect(screen.getByText("اجرای مجدد اسکن AI")).toBeDefined();
+    expect(screen.getByTestId("analytics-rerun-btn").textContent).toContain(
+      tr("dashboard.analytics.rerun")
+    );
+    expect(screen.getByTestId("analytics-rerun-btn").hasAttribute("disabled")).toBe(false);
     unmount();
 
-    render(<AnalyticsSection data={DATA} patientName="مریم رضایی" isAnalyzing={true} />);
-    expect(screen.getByText("پردازش ماتریس...")).toBeDefined();
-    expect(screen.queryByText("اجرای مجدد اسکن AI")).toBeNull();
+    render(<AnalyticsSection data={DATA} patientName={PATIENT} isAnalyzing={true} />);
+    expect(screen.getByTestId("analytics-rerun-btn").textContent).toContain(
+      tr("dashboard.analytics.processing")
+    );
+    expect(screen.getByTestId("analytics-rerun-btn").textContent).not.toContain(
+      tr("dashboard.analytics.rerun")
+    );
+    expect(screen.getByTestId("analytics-rerun-btn").hasAttribute("disabled")).toBe(true);
   });
 
   it("renders the AI protocol text and delegates all actions", () => {
@@ -62,7 +86,7 @@ describe("AnalyticsSection (Phase 5 i18n)", () => {
     render(
       <AnalyticsSection
         data={DATA}
-        patientName="مریم رضایی"
+        patientName={PATIENT}
         onRunAnalysis={onRunAnalysis}
         onOpenEducation={onOpenEducation}
         onOpenPdfReport={onOpenPdfReport}
@@ -70,12 +94,15 @@ describe("AnalyticsSection (Phase 5 i18n)", () => {
       />
     );
 
-    expect(screen.getByText("پروتکل آزمونی پپتیدی")).toBeDefined();
+    expect(screen.getByTestId("analytics-protocol-title").textContent).toBe(
+      tr("dashboard.analytics.protocol.title")
+    );
+    expect(screen.getByTestId("analytics-recommendation").textContent).toBe(DATA.recommendation);
 
-    fireEvent.click(screen.getByText("اجرای مجدد اسکن AI"));
-    fireEvent.click(screen.getByText("شبیه‌ساز ۳ بعدی و توجیه بیمار"));
-    fireEvent.click(screen.getByText("صدور نسخه و گزارش PDF"));
-    fireEvent.click(screen.getByTitle("بازگشت به ابتدای پرونده"));
+    fireEvent.click(screen.getByTestId("analytics-rerun-btn"));
+    fireEvent.click(screen.getByTestId("analytics-education-btn"));
+    fireEvent.click(screen.getByTestId("analytics-pdf-btn"));
+    fireEvent.click(screen.getByTestId("analytics-back-btn"));
 
     expect(onRunAnalysis).toHaveBeenCalledTimes(1);
     expect(onOpenEducation).toHaveBeenCalledTimes(1);

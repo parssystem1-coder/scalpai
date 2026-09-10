@@ -1,30 +1,31 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import DashboardTabs from "../DashboardTabs.js";
 import { SECTIONS } from "../dashboard-sections.js";
 import i18n, { faNum } from "../../i18n.js";
 
 afterEach(cleanup);
 
-// The language is process-wide; hand it back so no later suite inherits "en".
-afterAll(async () => {
-  await i18n.changeLanguage("fa");
-});
+/**
+ * Phase B: a tab is addressed by its SECTION ID, never by its label, so this file
+ * no longer changes when a translation changes. The English render proof moved to
+ * DashboardTabs.en.spec.tsx - keeping a `changeLanguage("en")` in the middle of
+ * this suite meant one failing assertion could leak "en" into every later file.
+ */
+const tr = (key: string): string => String(i18n.t(key));
 
-describe("DashboardTabs (Phase 5 i18n)", () => {
-  it("renders one translated tab per section with Persian ordinals", () => {
+describe("DashboardTabs (Phase 5 i18n, Phase B testids)", () => {
+  it("renders one translated tab per section with shaped ordinals", () => {
     render(<DashboardTabs activeSection="patients" onSectionChange={vi.fn()} />);
 
-    expect(screen.getByText("پرونده و مراجعین")).toBeDefined();
-    expect(screen.getByText("نقشه زنده سر")).toBeDefined();
-    expect(screen.getByText("ویژن تریکوسکوپی 4K")).toBeDefined();
-    expect(screen.getByText("استودیوی محاسباتی AI")).toBeDefined();
-    expect(screen.getByText("هولوگرام ۳ بعدی ساقه مو")).toBeDefined();
+    expect(screen.getByTestId("dashboard-tabs")).toBeDefined();
 
-    // Ordinals are digit-shaped, so 1..5 render as ۱..۵ in the fa UI.
-    expect(screen.getByText(faNum(1))).toBeDefined();
-    expect(screen.getByText(faNum(5))).toBeDefined();
+    SECTIONS.forEach((sec, idx) => {
+      expect(screen.getByTestId(`dashboard-tab-${sec.id}`)).toBeDefined();
+      expect(screen.getByTestId(`dashboard-tab-label-${sec.id}`).textContent).toBe(tr(sec.labelKey));
+      expect(screen.getByTestId(`dashboard-tab-ordinal-${sec.id}`).textContent).toBe(faNum(idx + 1));
+    });
 
     expect(screen.getAllByRole("button").length).toBe(SECTIONS.length);
   });
@@ -37,14 +38,14 @@ describe("DashboardTabs (Phase 5 i18n)", () => {
       .filter((b) => b.getAttribute("aria-current") === "true");
 
     expect(current.length).toBe(1);
-    expect(current[0]?.textContent).toContain("ویژن تریکوسکوپی 4K");
+    expect(current[0]).toBe(screen.getByTestId("dashboard-tab-gallery"));
   });
 
   it("reports the clicked section id to the parent", () => {
     const onSectionChange = vi.fn();
     render(<DashboardTabs activeSection="patients" onSectionChange={onSectionChange} />);
 
-    fireEvent.click(screen.getByText("استودیوی محاسباتی AI"));
+    fireEvent.click(screen.getByTestId("dashboard-tab-ai-studio"));
 
     expect(onSectionChange).toHaveBeenCalledWith("ai-studio");
   });
@@ -53,29 +54,16 @@ describe("DashboardTabs (Phase 5 i18n)", () => {
     const { unmount } = render(
       <DashboardTabs activeSection="patients" onSectionChange={vi.fn()} variant="desktop" />
     );
-    expect(screen.getByLabelText("بخش‌های داشبورد کلینیکی")).toBeDefined();
+    expect(screen.getByTestId("dashboard-tabs").getAttribute("aria-label")).toBe(
+      tr("dashboard.tabs.navLabel")
+    );
     unmount();
 
     render(<DashboardTabs activeSection="patients" onSectionChange={vi.fn()} variant="mobile" />);
-    expect(screen.getByLabelText("بخش‌های داشبورد کلینیکی (موبایل)")).toBeDefined();
-  });
-
-  it("follows the active language: no Persian copy leaks into the English UI", async () => {
-    await act(async () => {
-      await i18n.changeLanguage("en");
-    });
-
-    render(<DashboardTabs activeSection="patients" onSectionChange={vi.fn()} />);
-
-    expect(screen.getByText("Patient Records")).toBeDefined();
-    expect(screen.getByText("Live Scalp Map")).toBeDefined();
-    expect(screen.getByText("3D Hair Shaft Hologram")).toBeDefined();
-    expect(screen.queryByText("پرونده و مراجعین")).toBeNull();
-    // Digits stop being shaped once the UI is not Persian.
-    expect(screen.getByText("1")).toBeDefined();
-
-    await act(async () => {
-      await i18n.changeLanguage("fa");
-    });
+    expect(screen.getByTestId("dashboard-tabs").getAttribute("aria-label")).toBe(
+      tr("dashboard.tabs.navLabelMobile")
+    );
+    // Both variants expose the same hooks, so a spec never depends on the layout.
+    expect(screen.getByTestId("dashboard-tab-patients")).toBeDefined();
   });
 });
