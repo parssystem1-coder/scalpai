@@ -37,6 +37,11 @@ export interface DashboardHeaderProps {
  *
  * Phase 5: every string resolves through `dashboard.header.*` and the outbox
  * counter is rendered with `faNum()` (Persian digits in the fa UI).
+ *
+ * Phase B (M5 quality gates): every node a test needs to reach carries a
+ * `data-testid`. They are anchored to STRUCTURE (the header, the sync badge, an
+ * action button), never to copy, so the suite keeps working in fa and in en and
+ * a translation change is no longer a test failure.
  */
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   userEmail,
@@ -55,7 +60,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const { t } = useTranslation();
 
   return (
-    <header className="sticky top-0 z-50 w-full px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between border-b border-white/60 bg-[oklch(98%_0.01_28/0.75)] backdrop-blur-2xl shadow-[0_4px_24px_oklch(30%_0.04_15/0.08)]">
+    <header
+      data-testid="dashboard-header"
+      className="sticky top-0 z-50 w-full px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between border-b border-white/60 bg-[oklch(98%_0.01_28/0.75)] backdrop-blur-2xl shadow-[0_4px_24px_oklch(30%_0.04_15/0.08)]"
+    >
       <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl rose-gold-gradient grid place-items-center text-white shadow-md shadow-[oklch(62%_0.09_16/0.25)] ring-1 ring-white/60 shrink-0">
@@ -66,25 +74,40 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-serif text-base sm:text-lg font-bold tracking-tight text-[oklch(20%_0.02_20)] drop-shadow-xs">
+              <h1
+                data-testid="dashboard-clinic-name"
+                className="font-serif text-base sm:text-lg font-bold tracking-tight text-[oklch(20%_0.02_20)] drop-shadow-xs"
+              >
                 {t("dashboard.header.clinicName")}
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[0.6rem] sm:text-[0.62rem] font-mono font-extrabold bg-white/80 text-[oklch(40%_0.02_20)] border border-black/5 flex items-center gap-1 shadow-xs">
+              <span
+                data-testid="dashboard-version"
+                className="px-2 py-0.5 rounded-full text-[0.6rem] sm:text-[0.62rem] font-mono font-extrabold bg-white/80 text-[oklch(40%_0.02_20)] border border-black/5 flex items-center gap-1 shadow-xs"
+              >
                 <Cpu className="w-3 h-3 text-[oklch(62%_0.09_16)]" />
                 {t("dashboard.header.version")}
               </span>
             </div>
             <div className="flex items-center gap-2 text-[0.68rem] sm:text-[0.72rem] text-[oklch(45%_0.02_20)] flex-wrap">
-              <span className="font-medium text-[oklch(30%_0.02_20)]">
+              <span
+                data-testid="dashboard-trichologist"
+                className="font-medium text-[oklch(30%_0.02_20)]"
+              >
                 {t("dashboard.header.trichologist")} {userEmail.split("@")[0]}
               </span>
               <span className="w-1 h-1 rounded-full bg-[oklch(62%_0.09_16/0.4)]" />
-              <span className="text-emerald-700 font-semibold flex items-center gap-1">
+              <span
+                data-testid="dashboard-connection"
+                className="text-emerald-700 font-semibold flex items-center gap-1"
+              >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {isOnline ? t("dashboard.header.online") : t("dashboard.header.offline")}
               </span>
               {pendingCount > 0 && (
-                <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[0.65rem] px-2 py-0.5 rounded-full font-bold shadow-xs">
+                <span
+                  data-testid="dashboard-pending-badge"
+                  className="bg-amber-100 text-amber-800 border border-amber-300 text-[0.65rem] px-2 py-0.5 rounded-full font-bold shadow-xs"
+                >
                   {faNum(pendingCount)} {t("dashboard.header.syncPending")}
                 </span>
               )}
@@ -101,6 +124,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Sync & Offline Inspector Trigger */}
         <button
           type="button"
+          data-testid="dashboard-sync-badge"
           onClick={onOpenSyncInspector}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs ${
             isOnline
@@ -114,7 +138,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             {isOnline ? t("dashboard.header.sync") : t("dashboard.header.offlineMode")}
           </span>
           {pendingCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-mono">
+            <span
+              data-testid="dashboard-sync-pending-count"
+              className="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-mono"
+            >
               {faNum(pendingCount)}
             </span>
           )}
@@ -123,6 +150,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* License & Anti-Tamper Diagnostics Trigger */}
         <button
           type="button"
+          data-testid="dashboard-license-btn"
           onClick={onOpenLicenseDiagnostics}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
           title={t("dashboard.header.licenseTitle")}
@@ -134,6 +162,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Education E1 3D Layer Trigger */}
         <button
           type="button"
+          data-testid="dashboard-education-btn"
           onClick={onOpenEducation}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[oklch(62%_0.09_16/0.15)] hover:bg-[oklch(62%_0.09_16/0.25)] border border-[oklch(62%_0.09_16/0.4)] text-[oklch(48%_0.095_12)] shadow-2xs transition-all"
           title={t("dashboard.header.education3DTitle")}
@@ -145,6 +174,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* Guided Capture Trigger */}
         <button
           type="button"
+          data-testid="dashboard-capture-btn"
           onClick={onOpenGuidedCapture}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
           title={t("dashboard.header.guidedCaptureTitle")}
@@ -156,6 +186,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         {/* PDF Report Trigger */}
         <button
           type="button"
+          data-testid="dashboard-pdf-btn"
           onClick={onOpenPdfReport}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-stone-200 text-stone-700 shadow-2xs transition-all"
           title={t("dashboard.header.pdfReportTitle")}
@@ -165,6 +196,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </button>
 
         <button
+          data-testid="dashboard-consent-btn"
           onClick={onOpenConsent}
           className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold bg-white/80 hover:bg-white border border-[oklch(62%_0.09_16/0.4)] text-[oklch(48%_0.095_12)] shadow-xs backdrop-blur-sm transition-all"
         >
@@ -173,6 +205,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </button>
 
         <button
+          data-testid="dashboard-logout-btn"
           onClick={onLogout}
           className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold bg-white/70 text-stone-600 hover:text-red-700 hover:bg-white border border-white/80 transition-all shadow-xs"
           title={t("dashboard.header.logoutTitle")}

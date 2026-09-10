@@ -20,7 +20,11 @@ export interface DashboardTabsProps {
  * Pure presentational: no local state, no data fetching.
  *
  * Phase 5: labels come from `dashboard.tabs.*` and the ordinal badge is
- * rendered through `faNum()` so Persian shows ۱..۵ and English 1..5.
+ * rendered through `faNum()` so Persian shows 1..5 shaped and English 1..5.
+ *
+ * Phase B (M5 quality gates): both variants expose the same structural test
+ * hooks - `dashboard-tabs` for the nav landmark and `dashboard-tab-{id}` per
+ * tab - so a spec addresses a tab by SECTION ID instead of by its label.
  */
 export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   activeSection,
@@ -32,6 +36,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   if (variant === "mobile") {
     return (
       <div
+        data-testid="dashboard-tabs"
         className="lg:hidden sticky top-[61px] sm:top-[65px] z-40 px-3 sm:px-4 py-2 bg-[oklch(98%_0.01_28/0.92)] backdrop-blur-2xl border-b border-white/70 shadow-xs flex items-center gap-2 overflow-x-auto no-scrollbar"
         aria-label={t("dashboard.tabs.navLabelMobile")}
       >
@@ -41,6 +46,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
           return (
             <button
               key={sec.id}
+              data-testid={`dashboard-tab-${sec.id}`}
               onClick={() => onSectionChange(sec.id)}
               aria-current={isActive ? "true" : undefined}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-300 shrink-0 ${
@@ -50,6 +56,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
               }`}
             >
               <span
+                data-testid={`dashboard-tab-ordinal-${sec.id}`}
                 className={`flex h-4 w-4 items-center justify-center rounded-full text-[0.6rem] font-mono font-black ${
                   isActive ? "bg-white/30 text-white" : "bg-stone-200 text-stone-600"
                 }`}
@@ -57,7 +64,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
                 {faNum(idx + 1)}
               </span>
               <Icon className="w-3.5 h-3.5" />
-              <span>{t(sec.labelKey)}</span>
+              <span data-testid={`dashboard-tab-label-${sec.id}`}>{t(sec.labelKey)}</span>
             </button>
           );
         })}
@@ -67,6 +74,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
 
   return (
     <nav
+      data-testid="dashboard-tabs"
       className="hidden lg:flex items-center gap-1.5 mr-6 p-1.5 bg-white/70 backdrop-blur-2xl rounded-2xl border border-white/80 shadow-[0_2px_12px_oklch(30%_0.04_15/0.05)]"
       aria-label={t("dashboard.tabs.navLabel")}
     >
@@ -76,6 +84,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
         return (
           <button
             key={sec.id}
+            data-testid={`dashboard-tab-${sec.id}`}
             onClick={() => onSectionChange(sec.id)}
             aria-current={isActive ? "true" : undefined}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${
@@ -85,6 +94,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
             }`}
           >
             <span
+              data-testid={`dashboard-tab-ordinal-${sec.id}`}
               className={`flex h-4 w-4 items-center justify-center rounded-full text-[0.65rem] font-mono font-black transition-colors ${
                 isActive ? "bg-white/30 text-white" : "bg-stone-200/70 text-stone-600"
               }`}
@@ -92,7 +102,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
               {faNum(idx + 1)}
             </span>
             <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-[oklch(62%_0.09_16)]"}`} />
-            <span>{t(sec.labelKey)}</span>
+            <span data-testid={`dashboard-tab-label-${sec.id}`}>{t(sec.labelKey)}</span>
           </button>
         );
       })}
