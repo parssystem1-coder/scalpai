@@ -205,7 +205,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
                 <Key className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-                <span>{t("dashboard.licenseDiagnostics.claimsQuotas")}</span>
+                <span>{t("dashboard.licenseDiagnostics.claimsTitle")}</span>
               </div>
               {claims ? (
                 <div className="space-y-2 text-xs text-stone-600 font-mono">
@@ -219,7 +219,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
                   <div className="flex justify-between items-center py-1 border-b border-stone-200">
                     <span className="text-[11px] text-stone-500 font-sans flex items-center gap-1.5">
                       <Database className="w-3.5 h-3.5 text-stone-400" />
-                      {t("dashboard.licenseDiagnostics.maxPatients")}
+                      {t("dashboard.licenseDiagnostics.maxOfflinePatients")}
                     </span>
                     <span className="font-bold text-stone-900">{claims.maxPatients}</span>
                   </div>
@@ -249,7 +249,7 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
           {claims && claims.features.length > 0 && (
             <div>
               <span className="block text-xs font-bold text-stone-800 mb-2">
-                {t("dashboard.licenseDiagnostics.activeEntitlements")}
+                {t("dashboard.licenseDiagnostics.entitlementsTitle")}
               </span>
               <div className="flex flex-wrap gap-2">
                 {claims.features.map((feat) => (

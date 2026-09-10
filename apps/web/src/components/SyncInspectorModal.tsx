@@ -62,9 +62,9 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
     try {
       const count = await flush();
       await loadOutbox();
-      setFlushResult(t("dashboard.syncInspector.syncSuccess", { count }));
+      setFlushResult(t("dashboard.syncInspector.flushSuccess", { count }));
     } catch {
-      setFlushResult(t("dashboard.syncInspector.syncError"));
+      setFlushResult(t("dashboard.syncInspector.flushError"));
     } finally {
       setIsFlushing(false);
     }
@@ -114,11 +114,12 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
               </div>
             </div>
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
-              <span className="block text-[11px] text-stone-500 mb-1">{t("dashboard.syncInspector.pendingOutboxQueue")}</span>
+              <span className="block text-[11px] text-stone-500 mb-1">{t("dashboard.syncInspector.pendingQueue")}</span>
               <div className="flex items-center gap-2">
                 <Database className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                 <strong className="text-xs text-stone-900 font-bold font-mono">
-                  {pendingCount} {t("dashboard.syncInspector.items")}
+{pendingCount} 
+{t("dashboard.syncInspector.itemsCount")}
                 </strong>
               </div>
             </div>
@@ -148,11 +149,11 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
                 <Layers className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
                 <span>{t("dashboard.syncInspector.localOutbox")}</span>
               </div>
-              <span className="text-[11px] font-mono text-stone-500">{outboxItems.length} {t("dashboard.syncInspector.records")}</span>
+              <span className="text-[11px] font-mono text-stone-500">{outboxItems.length} {t("dashboard.syncInspector.recordsCount")}</span>
             </div>
             {outboxItems.length === 0 ? (
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-center text-xs text-stone-500">
-                {t("dashboard.syncInspector.outboxEmpty")}
+                {t("dashboard.syncInspector.outboxClean")}
               </div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -178,7 +179,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
               <GitCompare className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-              <span>{t("dashboard.syncInspector.conflictResolutionLog")}</span>
+              <span>{t("dashboard.syncInspector.conflictLog")}</span>
             </div>
             <div className="space-y-2">
               {conflictResolutions.map((c) => (
@@ -209,7 +210,7 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-t border-stone-200">
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
             <AlertCircle className="w-3.5 h-3.5" />
-            <span>{t("dashboard.syncInspector.offlineArchitecture")}</span>
+            <span>{t("dashboard.syncInspector.architectureNote")}</span>
           </div>
           <button
             type="button"

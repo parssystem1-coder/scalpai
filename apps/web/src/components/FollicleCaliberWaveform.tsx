@@ -28,7 +28,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
   densityTrend,
 }) => {
   const { t } = useTranslation();
-  const trendLabel = densityTrend ?? t("dashboard.follicleCaliber.densityTrendDefault");
+  const trendLabel = densityTrend ?? t("dashboard.follicleCaliber.densityTrend");
   const width = 500;
   const height = 180;
   const padding = 35;
@@ -77,7 +77,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
 
         <div className="flex items-center gap-3">
           <div className="text-left">
-            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">{t("dashboard.follicleCaliber.averageThickness")}</span>
+            <span className="text-[0.65rem] text-[oklch(50%_0.015_20)] block">{t("dashboard.follicleCaliber.caliberLabel")}</span>
             <span className="text-xs font-mono font-black text-[oklch(20%_0.02_20)]">{currentCaliber}</span>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold shadow-xs">

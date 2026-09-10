@@ -546,9 +546,7 @@ export default function GuidedCaptureModal({
                 )}
               </div>
               <p className="text-xs text-stone-400">
-                {i18n.language === "fa"
-                  ? `پروتکل استاندارد عکاسی درماتوسکوپی جلسه بالینی: ${patientName}`
-                  : `Standardized dermoscopy angle protocol for: ${patientName}`}
+                {t("dashboard.guidedCapture.stepTitlePrefix", { patientName })}
               </p>
             </div>
           </div>
@@ -996,7 +994,7 @@ export default function GuidedCaptureModal({
                         : "bg-amber-950 text-amber-300 border border-amber-800"
                     }`}
                   >
-                    {liveSharpness >= 65 || focusQuality === "pass" ? "تایید (PASS)" : "هشدار تاری"}
+                    {liveSharpness >= 65 || focusQuality === "pass" ? t("dashboard.guidedCapture.focusPass") : t("dashboard.guidedCapture.focusFail")}
                   </span>
                 </div>
 
@@ -1004,7 +1002,7 @@ export default function GuidedCaptureModal({
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between">
                   <div className="text-xs">
                     <strong className="block text-stone-200">{t("dashboard.guidedCapture.glareStep")}</strong>
-                    <span className="text-[10px] text-stone-500">یکنواختی نور LED رینگی</span>
+                    <span className="text-[10px] text-stone-500">{t("dashboard.guidedCapture.glareLedHint")}</span>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1013,7 +1011,7 @@ export default function GuidedCaptureModal({
                         : "bg-amber-950 text-amber-300 border border-amber-800"
                     }`}
                   >
-                    {glareQuality === "pass" ? "تایید (PASS)" : "بازتاب نور"}
+                    {glareQuality === "pass" ? t("dashboard.guidedCapture.glarePass") : t("dashboard.guidedCapture.glareFail")}
                   </span>
                 </div>
 
@@ -1021,7 +1019,7 @@ export default function GuidedCaptureModal({
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between">
                   <div className="text-xs">
                     <strong className="block text-stone-200">{t("dashboard.guidedCapture.contactStep")}</strong>
-                    <span className="text-[10px] text-stone-500">عدم انسداد عروقی با فشار زیاد</span>
+                    <span className="text-[10px] text-stone-500">{t("dashboard.guidedCapture.contactHint")}</span>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1030,7 +1028,7 @@ export default function GuidedCaptureModal({
                         : "bg-amber-950 text-amber-300 border border-amber-800"
                     }`}
                   >
-                    {contactQuality === "pass" ? "تایید (PASS)" : "فشار نامتعادل"}
+                    {contactQuality === "pass" ? t("dashboard.guidedCapture.contactPass") : t("dashboard.guidedCapture.contactFail")}
                   </span>
                 </div>
               </div>
@@ -1044,7 +1042,7 @@ export default function GuidedCaptureModal({
                   </div>
                   {(stepTags[currentStep.id]?.length ?? 0) > 0 && (
                     <span className="text-[10px] text-cyan-400 font-mono">
-                      {stepTags[currentStep.id]?.length} نشانه انتخاب‌شده
+                      {t("dashboard.guidedCapture.detectedSignsCount", { count: stepTags[currentStep.id]?.length ?? 0 })}
                     </span>
                   )}
                 </div>
@@ -1108,7 +1106,7 @@ export default function GuidedCaptureModal({
               <div>
                 <span className="text-stone-400">{t("dashboard.guidedCapture.capturedFrames")}</span>
                 <div className="text-sm font-bold text-white mt-0.5">
-                  {capturedCount} از {steps.length} زاویه استاندارد
+                  {t("dashboard.guidedCapture.framesProgress", { captured: capturedCount, total: steps.length })}
                 </div>
               </div>
 

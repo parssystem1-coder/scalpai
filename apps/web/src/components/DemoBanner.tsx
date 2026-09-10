@@ -16,7 +16,7 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({ onUpgrade, onExit }) => 
     >
       <div className="flex items-center gap-3.5 text-right font-sans mb-2 md:mb-0" dir="rtl">
         <span className="bg-[oklch(82%_0.14_58)] text-[oklch(20%_0.02_20)] text-[0.7rem] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">
-          {t("dashboard.demoBanner.modeLabel")}
+          {t("dashboard.demoBanner.proLabel")}
         </span>
         <p className="text-sm font-normal text-[oklch(95%_0.01_30)]">
           {t("dashboard.demoBanner.description")}
@@ -34,7 +34,7 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({ onUpgrade, onExit }) => 
           className="text-xs text-[oklch(80%_0.02_30)] border border-white/20 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1"
         >
           <X className="w-3.5 h-3.5" />
-          {t("dashboard.demoBanner.exitButton")}
+          {t("dashboard.demoBanner.dismiss")}
         </button>
       </div>
     </aside>
