@@ -486,7 +486,7 @@ export default function BeforeAfterCompareModal({
             <div className="flex items-center gap-2 text-stone-400 hidden sm:flex">
               <span>{t("dashboard.compareModal.monitoringInterval")}</span>
               <span className="text-stone-200 font-mono">
-                {photoA?.date} تا {photoB?.date}
+                {photoA?.date}{t("dashboard.compareModal.dateSeparator")}{photoB?.date}
               </span>
             </div>
           </div>
