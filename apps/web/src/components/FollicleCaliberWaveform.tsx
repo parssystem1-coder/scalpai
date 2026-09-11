@@ -15,19 +15,31 @@ interface FollicleCaliberWaveformProps {
   densityTrend?: string;
 }
 
-const DEFAULT_TIMELINE: WaveformPoint[] = [
-  { visitDate: "۳ ماه قبل", density: 128, caliber: 58, anagenPct: 72 },
-  { visitDate: "۲ ماه قبل", density: 136, caliber: 64, anagenPct: 78 },
-  { visitDate: "۱ ماه قبل", density: 142, caliber: 68, anagenPct: 83 },
-  { visitDate: "امروز (ویزیت جاری)", density: 154, caliber: 74, anagenPct: 88 },
-];
+const createDefaultTimeline = (t: (key: string) => string): WaveformPoint[] => {
+  const today = new Date();
+  const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+  const twoMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, today.getDate());
+  const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+
+  const formatDate = (date: Date, locale: string) =>
+    date.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+
+  return [
+    { visitDate: formatDate(threeMonthsAgo, "fa-IR"), density: 128, caliber: 58, anagenPct: 72 },
+    { visitDate: formatDate(twoMonthsAgo, "fa-IR"), density: 136, caliber: 64, anagenPct: 78 },
+    { visitDate: formatDate(oneMonthAgo, "fa-IR"), density: 142, caliber: 68, anagenPct: 83 },
+    { visitDate: t("dashboard.follicleCaliber.todayVisit"), density: 154, caliber: 74, anagenPct: 88 },
+  ];
+};
 
 export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = ({
-  data = DEFAULT_TIMELINE,
+  data,
   currentCaliber = "74 µm",
   densityTrend,
 }) => {
   const { t } = useTranslation();
+  const defaultData = React.useMemo(() => createDefaultTimeline(t), [t]);
+  const finalData = data ?? defaultData;
   const trendLabel = densityTrend ?? t("dashboard.follicleCaliber.densityTrend");
   const width = 500;
   const height = 180;
@@ -37,8 +49,8 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
   const maxDensity = 170;
   const minDensity = 110;
 
-  const points = data.map((d, index) => {
-    const x = padding + (index / (data.length - 1)) * (width - padding * 2);
+  const points = finalData.map((d, index) => {
+    const x = padding + (index / (finalData.length - 1)) * (width - padding * 2);
     const y =
       height -
       padding -
@@ -50,7 +62,7 @@ export const FollicleCaliberWaveform: React.FC<FollicleCaliberWaveformProps> = (
     return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
   }, "");
 
-  // noUncheckedIndexedAccess: data is never empty (defaults to DEFAULT_TIMELINE),
+  // noUncheckedIndexedAccess: finalData is never empty (defaults to createDefaultTimeline),
   // so the empty-string fallback is unreachable.
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];

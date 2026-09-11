@@ -607,26 +607,35 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     }
   };
 
-  const handleOpenAiEducation = () => {
-    // Map patient scalp condition or AI scores to 3D Education Storyboard & Severity.
-    // NOTE: the Persian literals below are DATA matchers against the stored
-    // `scalpCondition` free-text field, not UI copy — they stay out of i18n on
-    // purpose, otherwise switching the UI language would change the diagnosis.
-    const condText = (selectedPatient?.scalpCondition || "").toLowerCase();
-    let condKey: ConditionKey;
-    if (condText.includes("سبورئیک") || condText.includes("seborrheic") || aiResult.scores.redness > 35) {
-      condKey = "seborrheic_dermatitis";
-    } else if (condText.includes("تلوژن") || condText.includes("telogen")) {
-      condKey = "telogen_effluvium";
-    } else if (condText.includes("فولیکولیت") || condText.includes("folliculitis")) {
-      condKey = "folliculitis";
-    } else if (condText.includes("چرب") || condText.includes("sebum")) {
-      condKey = "hyperseborrhea";
-    } else if (condText.includes("خشک") || condText.includes("dry")) {
-      condKey = "scalp_dryness";
-    } else {
-      condKey = "androgenetic_alopecia";
+  const CONDITION_MATCHERS: Record<ConditionKey, string[]> = {
+  seborrheic_dermatitis: ["سبورئیک", "seborrheic"],
+  telogen_effluvium: ["تلوژن", "telogen"],
+  folliculitis: ["فولیکولیت", "folliculitis"],
+  hyperseborrhea: ["چرب", "sebum"],
+  scalp_dryness: ["خشک", "dry"],
+  androgenetic_alopecia: [],
+  erythema: [],
+  follicular_plugging: [],
+};
+
+const handleOpenAiEducation = () => {
+  // Map patient scalp condition or AI scores to 3D Education Storyboard & Severity.
+  // NOTE: the matchers below are DATA matchers against the stored `scalpCondition`
+  // free-text field, not UI copy — they stay out of i18n on purpose, otherwise
+  // switching the UI language would change the diagnosis.
+  // TODO: Migrate DB to store ConditionKey instead of free-text Persian strings.
+  const condText = (selectedPatient?.scalpCondition || "").toLowerCase();
+  let condKey: ConditionKey = "androgenetic_alopecia";
+
+  for (const [key, matchers] of Object.entries(CONDITION_MATCHERS)) {
+    if (matchers.some((m) => condText.includes(m.toLowerCase()))) {
+      condKey = key as ConditionKey;
+      break;
     }
+  }
+  if (condKey === "androgenetic_alopecia" && aiResult.scores.redness > 35) {
+    condKey = "seborrheic_dermatitis";
+  }
 
     let sev: SeverityLevel;
     if (aiResult.severity < 20) {

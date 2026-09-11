@@ -628,11 +628,12 @@ const fa = {
       laserScanner: "لیزر اسکنر",
       detectedCount: "{{count}} واحد فولیکولی تفکیک شد",
     },
-    follicleCaliber: {
-      chartTitle: "شکل موج ضخامت فولیکول در طول دوره درمان",
-      chartSubtitle: "روند بیومتریک تراکم، ضخامت و فاز آناژن",
-      densityTrend: "روند تراکم: {{value}}٪",
-      caliberLabel: "ضخامت فولیکول:",
+follicleCaliber: {
+      chartTitle: "موج‌کش کالبیر فولیکول در طول دوره درمان",
+      chartSubtitle: "روند بیومتریک چگالی، کالبیر و فاز اناژن",
+      densityTrend: "روند چگالی: {{value}}%",
+      caliberLabel: "کالبیر فولیکول:",
+      todayVisit: "امروز (ویزیت جاری)",
     },
     trichologyRadar: {
       title: "نمای رادار شاخص‌های تریکولوژی",
@@ -1340,6 +1341,7 @@ const en = {
       chartSubtitle: "Biometric trend of density, caliber & anagen phase",
       densityTrend: "Density trend: {{value}}%",
       caliberLabel: "Follicle Caliber:",
+      todayVisit: "Today (Current Visit)",
     },
     trichologyRadar: {
       title: "Trichology Radar Chart",
