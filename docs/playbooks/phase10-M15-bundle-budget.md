@@ -126,32 +126,21 @@ npm run budget:bundle
 
 #### ۳. اتصال به CI
 
-فلگ جدید `--policy` به `tools/bundle-budget.ts` اضافه می‌شود تا مسیر فایل policy را بگیرد:
+فلگ جدید `--policy` به `tools/bundle-budget.ts` اضافه می‌شود تا مسیر فایل policy را بگیرد. اجرای CI از طریق `run-gate.sh` دار این دستور عمل می‌کند (ADR-0037):
 
 ```yaml
 # در .github/workflows/ci.yml
-- name: Enforce bundle budget
-  run: |
-    npm run budget:bundle -- --policy tools/bundle-budget.policy.json
-    echo "budget:bundle" >> ci-evidence/gates.log
-```
-
-توضیح:
-
-- `--policy` مسیر policy را می‌گیرد؛ بدون آن، رفتار فعلی (env) فقط برای اجرای محلی معتبر است.
-- خروجی باید در `ci-evidence` ذخیره شود تا قابل ممیزی باشد.
-- job نهایی `gate` همین شواهد را می‌خواند؛ لاگ نباشد = قرمز.
-
-**هشدار هم‌خوانی با ADR-0037:** قرارداد فعلی مخزن این است که هر گیت از درون `tools/ci/run-gate.sh` اجرا شود و همان اسکریپت خودش command، خروجی کامل و exit code را در `ci-evidence/<gate>.log` می‌نویسد. `echo` دستی در `gates.log` یک پاس self-certified است: فقط می‌گوید گیت اجرا شد، نمی‌گوید با چه خروجی و چه exit code. فرم منطبق بر ADR-0037:
-
-```yaml
 - name: Enforce bundle budget from the committed policy (M15b)
   run: >
     bash tools/ci/run-gate.sh bundle-budget
     npm run budget:bundle -- --policy tools/bundle-budget.policy.json
 ```
 
-توصیه: فرم `run-gate.sh` ملاک باشد و فرم `echo` فقط به‌عنوان طرح اولیه‌ی مورد نظر مالک ثبت می‌ماند؛ تصمیم نهایی قبل از شروع M15b گرفته شود.
+توضیح:
+
+- `--policy` مسیر policy را می‌گیرد؛ بدون آن، رفتار فعلی (env) فقط برای اجرای محلی معتبر است.
+- `run-gate.sh` خودش command، خروجی کامل و exit code را در `ci-evidence/bundle-budget.log` می‌نویسد.
+- job نهایی `gate` همین شواهد را می‌خواند؛ لاگ نباشد = قرمز.
 
 #### ۴. Regression test
 
