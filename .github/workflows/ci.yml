@@ -144,8 +144,13 @@ jobs:
       - name: Build every workspace (turbo)
         run: bash tools/ci/run-gate.sh build npm run build
 
-      - name: Bundle budget from the real Vite manifest (M15)
-        run: bash tools/ci/run-gate.sh bundle-budget npm run budget:bundle
+      # M15b: the ceiling comes from the COMMITTED policy, not from an
+      # environment variable a step could raise. run-gate.sh records the command,
+      # the full output and the exit code, and the final `gate` job re-reads it.
+      - name: Enforce bundle budget from the committed policy (M15b)
+        run: >
+          bash tools/ci/run-gate.sh bundle-budget
+          npm run budget:bundle -- --policy tools/bundle-budget.policy.json
 
       - name: Conformance harness (ADR-21)
         run: bash tools/ci/run-gate.sh conformance npm run conformance
@@ -159,6 +164,19 @@ jobs:
         with:
           name: coverage
           path: coverage
+          retention-days: 14
+
+      # The measured report is an artifact (dist/ is gitignored); the policy it
+      # was judged against is committed. Keeping both together makes the verdict
+      # reproducible from the artifact alone.
+      - name: Upload the bundle budget report and the policy it was judged against
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-budget
+          path: |
+            apps/web/dist/bundle-budget.report.json
+            tools/bundle-budget.policy.json
           retention-days: 14
 
       - name: Upload gate evidence
@@ -426,7 +444,8 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
-          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '\n')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '
+')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
           ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
           BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-secrets/recipients.txt
           BACKUP_OFFSITE_ENDPOINT=http://127.0.0.1:9000
@@ -478,7 +497,8 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
-          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '\n')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '
+')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
           ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
           BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-recipients.txt
           BACKUP_OFFSITE_ENDPOINT=https://s3.provider.example
@@ -486,7 +506,8 @@ jobs:
           BACKUP_OFFSITE_ACCESS_KEY=$(openssl rand -hex 12)
           BACKUP_OFFSITE_SECRET_KEY=$(openssl rand -hex 16)
           ENV
-          printf 'age1ci0000000000000000000000000000000000000000000000000000000\n' > /tmp/scalpai-recipients.txt
+          printf 'age1ci0000000000000000000000000000000000000000000000000000000
+' > /tmp/scalpai-recipients.txt
 
       - name: prod.yml and dev.yml render with a full secret set
         working-directory: ops
