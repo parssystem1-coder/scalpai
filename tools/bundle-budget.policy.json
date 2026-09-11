@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "budget": {
+    "initialGzipBytes": 307200,
+    "warningThreshold": 0.9
+  },
+  "exceptions": []
+}

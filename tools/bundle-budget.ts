@@ -23,6 +23,17 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
  * relative to the dist directory - so two runs against the same build are
  * byte-identical. It is written inside the build output (`dist/` is gitignored)
  * because it is an artifact, not a committed file.
+ *
+ * M15b turns that measurement into ENFORCEMENT. The hard limit no longer comes
+ * from an environment variable any CI step could raise; it lives in
+ * `tools/bundle-budget.policy.json`, which IS committed, so every change to the
+ * ceiling shows up in a reviewable diff. Run with `--policy <file>` and the
+ * policy is the only source of the limit: `BUNDLE_BUDGET_BYTES` is ignored, a
+ * missing or malformed policy is fatal, a missing or unreadable report is fatal,
+ * a report written against another `schemaVersion` is fatal, and an over-budget
+ * payload exits 1 with the limit, the actual value and the delta.
+ * `--report <file>` judges an existing report without measuring, which is how
+ * the regression suite proves the failure path without running a real build.
  */
 
 export interface ManifestChunk {
@@ -37,6 +48,11 @@ export interface ManifestChunk {
 
 export type ViteManifest = Record<string, ManifestChunk>;
 
+/**
+ * Fallback limit for a run WITHOUT `--policy`: local exploration and the local
+ * failure-path experiments the playbook allows. Deliberately no longer the CI
+ * contract - see `--policy`.
+ */
 export const LIMIT_BYTES = Number(process.env.BUNDLE_BUDGET_BYTES ?? 300 * 1024);
 
 /**
@@ -48,6 +64,9 @@ export const REPORT_SCHEMA_VERSION = 1;
 
 /** Default report name, written inside the dist directory - an artifact. */
 export const REPORT_FILENAME = "bundle-budget.report.json";
+
+/** The committed policy the CI gate is required to run against (M15b). */
+export const POLICY_PATH = "tools/bundle-budget.policy.json";
 
 export function findManifest(distDir: string): string | null {
   for (const rel of [join(".vite", "manifest.json"), "manifest.json"]) {
@@ -168,7 +187,318 @@ export function writeReport(path: string, report: BundleBudgetReport): void {
   writeFileSync(path, serializeReport(report), "utf8");
 }
 
+/* -------------------------------------------------------------------------- */
+/* M15b - the committed policy, and enforcement against it                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One error type for every "this gate cannot be trusted" condition: unreadable
+ * policy, unreadable report, nonsense values, bad CLI usage. `main` turns it
+ * into `exit 1`, which is the entire point - none of these may degrade into a
+ * comfortable default.
+ */
+export class PolicyError extends Error {}
+
+/** Same rule as tools/conformance/exceptions.json: an exception needs an ADR. */
+const ADR_REF = /^ADR-\d{3,4}$/;
+
+export interface PolicyException {
+  file?: string;
+  adr: string;
+  reason?: string;
+}
+
+export interface BundleBudgetPolicy {
+  schemaVersion: number;
+  budget: {
+    /** Hard limit, in gzip bytes, for the initial payload. */
+    initialGzipBytes: number;
+    /** Ratio of the limit above which the run warns without failing. */
+    warningThreshold: number;
+  };
+  exceptions: PolicyException[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parsePolicy(raw: string, source: string): BundleBudgetPolicy {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new PolicyError(`policy ${source} is not valid JSON: ${(err as Error).message}`);
+  }
+  if (!isRecord(parsed)) throw new PolicyError(`policy ${source} must contain a JSON object.`);
+
+  const { schemaVersion, budget, exceptions } = parsed;
+  if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    throw new PolicyError(`policy ${source}: schemaVersion must be a positive integer.`);
+  }
+  if (!isRecord(budget)) throw new PolicyError(`policy ${source}: budget must be an object.`);
+
+  const { initialGzipBytes, warningThreshold } = budget;
+  if (typeof initialGzipBytes !== "number" || !Number.isInteger(initialGzipBytes) || initialGzipBytes <= 0) {
+    throw new PolicyError(`policy ${source}: budget.initialGzipBytes must be a positive integer number of bytes.`);
+  }
+  if (
+    typeof warningThreshold !== "number" ||
+    !Number.isFinite(warningThreshold) ||
+    warningThreshold <= 0 ||
+    warningThreshold > 1
+  ) {
+    throw new PolicyError(`policy ${source}: budget.warningThreshold must be a ratio above 0 and at most 1.`);
+  }
+  if (!Array.isArray(exceptions)) {
+    throw new PolicyError(`policy ${source}: exceptions must be an array (use [] when there are none).`);
+  }
+
+  const parsedExceptions = exceptions.map((entry: unknown, index: number): PolicyException => {
+    if (!isRecord(entry)) throw new PolicyError(`policy ${source}: exceptions[${index}] must be an object.`);
+    const { adr, file, reason } = entry;
+    if (typeof adr !== "string" || !ADR_REF.test(adr)) {
+      throw new PolicyError(
+        `policy ${source}: exceptions[${index}] needs an ADR reference (e.g. "ADR-0037"), same rule as tools/conformance/exceptions.json.`,
+      );
+    }
+    const out: PolicyException = { adr };
+    if (typeof file === "string") out.file = file;
+    if (typeof reason === "string") out.reason = reason;
+    return out;
+  });
+
+  return {
+    schemaVersion,
+    budget: { initialGzipBytes, warningThreshold },
+    exceptions: parsedExceptions,
+  };
+}
+
+export function loadPolicy(path: string): BundleBudgetPolicy {
+  if (!existsSync(path)) {
+    throw new PolicyError(
+      `policy ${path} does not exist - the committed policy is the only source of the hard limit, so there is nothing to enforce.`,
+    );
+  }
+  return parsePolicy(readFileSync(path, "utf8"), path);
+}
+
+/** The part of an M15a report that enforcement needs, validated. */
+export interface MeasuredReport {
+  schemaVersion: number;
+  totalGzipBytes: number;
+  files: PayloadRow[];
+}
+
+export function parseMeasuredReport(raw: string, source: string): MeasuredReport {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new PolicyError(`report ${source} is not valid JSON: ${(err as Error).message}`);
+  }
+  if (!isRecord(parsed)) throw new PolicyError(`report ${source} must contain a JSON object.`);
+
+  const { schemaVersion, totalGzipBytes, initialPayload: payload } = parsed;
+  if (typeof schemaVersion !== "number" || !Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    throw new PolicyError(`report ${source}: schemaVersion must be a positive integer.`);
+  }
+  if (typeof totalGzipBytes !== "number" || !Number.isInteger(totalGzipBytes) || totalGzipBytes < 0) {
+    throw new PolicyError(
+      `report ${source}: totalGzipBytes must be a non-negative integer - a measurement error must fail, not read as zero.`,
+    );
+  }
+  if (!isRecord(payload) || !Array.isArray(payload.files)) {
+    throw new PolicyError(`report ${source}: initialPayload.files must be an array of measured files.`);
+  }
+
+  const files = payload.files.map((entry: unknown, index: number): PayloadRow => {
+    if (!isRecord(entry)) throw new PolicyError(`report ${source}: initialPayload.files[${index}] must be an object.`);
+    const { file, gzipBytes } = entry;
+    if (typeof file !== "string" || typeof gzipBytes !== "number" || !Number.isFinite(gzipBytes)) {
+      throw new PolicyError(`report ${source}: initialPayload.files[${index}] needs a file name and a gzipBytes size.`);
+    }
+    return { file, gzipBytes };
+  });
+
+  return { schemaVersion, totalGzipBytes, files };
+}
+
+export function loadMeasuredReport(path: string): MeasuredReport {
+  if (!existsSync(path)) {
+    throw new PolicyError(
+      `report ${path} does not exist - the budget cannot be enforced without a measurement (build first).`,
+    );
+  }
+  return parseMeasuredReport(readFileSync(path, "utf8"), path);
+}
+
+export type EnforcementLevel = "ok" | "warning" | "exceeded" | "error";
+
+export interface Enforcement {
+  ok: boolean;
+  level: EnforcementLevel;
+  limitBytes: number;
+  actualBytes: number;
+  /** actual - limit. Negative is the remaining headroom, which is what a ratchet decision needs. */
+  deltaBytes: number;
+  warningBytes: number;
+  /** The contract line every failure and every success prints. */
+  summary: string;
+  messages: string[];
+}
+
+/** The biggest initial-payload files, so a failure names the culprit. */
+export function topOffenders(files: readonly PayloadRow[], count = 5): PayloadRow[] {
+  return [...files].sort((a, b) => b.gzipBytes - a.gzipBytes || (a.file < b.file ? -1 : 1)).slice(0, count);
+}
+
+/** Pure: the whole verdict, with no I/O and no process exit. */
+export function enforcePolicy(policy: BundleBudgetPolicy, report: MeasuredReport): Enforcement {
+  const limitBytes = policy.budget.initialGzipBytes;
+  const actualBytes = report.totalGzipBytes;
+  const deltaBytes = actualBytes - limitBytes;
+  const warningBytes = Math.floor(limitBytes * policy.budget.warningThreshold);
+  const summary = `limit: ${limitBytes}, actual: ${actualBytes}, delta: ${deltaBytes}`;
+  const base = { limitBytes, actualBytes, deltaBytes, warningBytes, summary };
+
+  if (report.schemaVersion !== policy.schemaVersion) {
+    return {
+      ...base,
+      ok: false,
+      level: "error",
+      messages: [
+        `BUNDLE BUDGET CONTRACT MISMATCH - report schemaVersion ${report.schemaVersion} != policy schemaVersion ${policy.schemaVersion}.`,
+        "Regenerate the report with the current tool, or bump the policy deliberately in a reviewed diff.",
+        summary,
+      ],
+    };
+  }
+
+  if (deltaBytes > 0) {
+    return {
+      ...base,
+      ok: false,
+      level: "exceeded",
+      messages: [
+        `BUNDLE BUDGET EXCEEDED - ${summary}`,
+        `over the committed limit by ${deltaBytes} B gz.`,
+        "largest initial-payload files:",
+        ...topOffenders(report.files).map(
+          (row) => `  ${row.file.padEnd(44)} ${String(row.gzipBytes).padStart(8)} B gz`,
+        ),
+      ],
+    };
+  }
+
+  const headroom = -deltaBytes;
+  if (actualBytes > warningBytes) {
+    return {
+      ...base,
+      ok: true,
+      level: "warning",
+      messages: [
+        `bundle budget WARNING: above ${policy.budget.warningThreshold * 100}% of the committed limit - ${summary}`,
+        `${headroom} B gz of headroom left.`,
+      ],
+    };
+  }
+
+  return {
+    ...base,
+    ok: true,
+    level: "ok",
+    messages: [`bundle budget: within the committed policy - ${summary}`, `${headroom} B gz of headroom left.`],
+  };
+}
+
+export interface CliOptions {
+  /** Enforce the committed policy at this path. Null keeps the pre-M15b env behaviour. */
+  policyPath: string | null;
+  /** Judge this existing report instead of measuring a build. Requires a policy. */
+  reportPath: string | null;
+}
+
+export function parseCliArgs(argv: readonly string[]): CliOptions {
+  const usage = "usage: bundle-budget.ts [--policy <file>] [--report <file>]";
+  let policyPath: string | null = null;
+  let reportPath: string | null = null;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index] ?? "";
+    const eq = arg.indexOf("=");
+    const inline = arg.startsWith("--") && eq !== -1;
+    const flag = inline ? arg.slice(0, eq) : arg;
+    let value = inline ? arg.slice(eq + 1) : null;
+
+    if (flag !== "--policy" && flag !== "--report") {
+      throw new PolicyError(`unknown argument ${arg}. ${usage}`);
+    }
+    if (value === null) {
+      value = argv[index + 1] ?? null;
+      index += 1;
+    }
+    if (value === null || value.length === 0 || value.startsWith("--")) {
+      throw new PolicyError(`${flag} needs a file path. ${usage}`);
+    }
+    if (flag === "--policy") policyPath = value;
+    else reportPath = value;
+  }
+
+  return { policyPath, reportPath };
+}
+
+function fail(message: string): never {
+  console.error(`bundle budget: ${message}`);
+  process.exit(1);
+}
+
+/** Turns a PolicyError into `exit 1`; anything else is a real bug and propagates. */
+function attempt<T>(run: () => T): T {
+  try {
+    return run();
+  } catch (err) {
+    if (err instanceof PolicyError) fail(err.message);
+    throw err;
+  }
+}
+
+function announce(result: Enforcement): void {
+  for (const line of result.messages) {
+    if (result.ok) console.log(line);
+    else console.error(line);
+  }
+  if (!result.ok) process.exit(1);
+}
+
 function main(): void {
+  const { policyPath, reportPath } = attempt(() => parseCliArgs(process.argv.slice(2)));
+
+  if (policyPath !== null && (process.env.BUNDLE_BUDGET_BYTES ?? "") !== "") {
+    // The entire reason M15b exists: no environment variable may raise the
+    // ceiling once a committed policy is in play.
+    console.log("bundle budget: ignoring BUNDLE_BUDGET_BYTES - the committed policy owns the limit.");
+  }
+
+  // Enforcement-only mode: judge a report that already exists. No build, no
+  // measurement, no write - this is the mode the regression suite drives.
+  if (reportPath !== null) {
+    if (policyPath === null) {
+      fail("--report needs --policy: a report on its own has no limit to be judged against.");
+    }
+    const policy = attempt(() => loadPolicy(policyPath));
+    const measured = attempt(() => loadMeasuredReport(reportPath));
+    console.log(`policy ${policyPath} (schemaVersion ${policy.schemaVersion})`);
+    console.log(`report ${reportPath} (schemaVersion ${measured.schemaVersion})`);
+    announce(enforcePolicy(policy, measured));
+    console.log("bundle budget: OK (enforced from the committed policy)");
+    return;
+  }
+
+  const policy = policyPath === null ? null : attempt(() => loadPolicy(policyPath));
+  const limitBytes = policy === null ? LIMIT_BYTES : policy.budget.initialGzipBytes;
+
   const distDir = process.env.WEB_DIST_DIR ?? join(process.cwd(), "apps", "web", "dist");
   const manifestPath = findManifest(distDir);
   if (!manifestPath) {
@@ -188,7 +518,7 @@ function main(): void {
   // cannot drift apart.
   const report = buildReport({
     manifest: toPosix(relative(distDir, manifestPath)),
-    limitBytes: LIMIT_BYTES,
+    limitBytes,
     rows: measure(distDir, files),
     lazyChunks: lazyChunkFiles(manifest, files),
   });
@@ -200,15 +530,26 @@ function main(): void {
     console.log(`${file.padEnd(44)} ${"".padStart(8)}   (lazy chunk - deferred, excluded)`);
   }
 
-  const reportPath = resolveReportPath(distDir);
-  writeReport(reportPath, report);
+  const writtenPath = resolveReportPath(distDir);
+  writeReport(writtenPath, report);
 
   console.log(`${"-".repeat(60)}`);
   console.log(`manifest ${manifestPath}`);
-  console.log(`report ${reportPath} (schemaVersion ${report.schemaVersion}, artifact - not committed)`);
+  console.log(`report ${writtenPath} (schemaVersion ${report.schemaVersion}, artifact - not committed)`);
   console.log(
     `TOTAL ${report.totalGzipBytes} B gz across ${report.initialPayload.fileCount} initial file(s) / limit ${report.limitBytes} B`,
   );
+
+  if (policy !== null) {
+    // Read the artifact back from disk: this gate is only as good as the report
+    // it can actually load, so a report that failed to land is a red build.
+    const measured = attempt(() => loadMeasuredReport(writtenPath));
+    console.log(`policy ${policyPath} (schemaVersion ${policy.schemaVersion})`);
+    announce(enforcePolicy(policy, measured));
+    console.log("bundle budget: OK (enforced from the committed policy)");
+    return;
+  }
+
   if (!report.withinBudget) {
     console.error(`BUNDLE BUDGET EXCEEDED by ${report.deltaBytes} B`);
     process.exit(1);
