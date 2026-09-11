@@ -77,6 +77,100 @@ npm run budget:bundle
 - کاهش واقعی حجم به صورت ratchet در گزارش دیده شود، اما خودکار limit را تغییر ندهد.
 - command، خروجی کامل و exit code طبق ADR-0037 در `ci-evidence` بماند و توسط job نهایی `gate` بازخوانی شود.
 
+#### ۱. Schema فایل policy
+
+فایل جدید `tools/bundle-budget.policy.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "budget": {
+    "initialGzipBytes": 307200,
+    "warningThreshold": 0.9
+  },
+  "exceptions": []
+}
+```
+
+معنای فیلدها:
+
+| فیلد | معنا |
+|---|---|
+| `schemaVersion` | نسخه‌ی قرارداد policy. باید با `schemaVersion` گزارش M15a تطابق داشته باشد؛ عدم تطابق = خطا |
+| `budget.initialGzipBytes` | سقف سخت (hard limit) بر حسب بایت gzip برای payload اولیه. مقدار فعلی ۳۰۷٬۲۰۰ |
+| `budget.warningThreshold` | نسبت آستانه‌ی هشدار، مثلاً `0.9` یعنی ۹۰٪ سقف. عبور از آن warning می‌دهد ولی build را قرمز نمی‌کند |
+| `exceptions` | فهرست استثناها، فعلاً خالی. مطابق الگوی `tools/conformance/exceptions.json` هر ورودی باید ارجاع ADR داشته باشد |
+
+قاعده: این فایل در مخزن commit می‌شود (برخلاف گزارش، که artifact است) تا هر تغییر سقف در diff دیده شود.
+
+#### ۲. منطق checker
+
+```text
+1. policy file را بخوان
+2. bundle report JSON را بخوان
+3. اگر report نبود -> exit 1
+4. اگر report.schemaVersion != policy.schemaVersion -> exit 1
+5. اگر totalGzipBytes > budget.initialGzipBytes -> exit 1
+6. اگر totalGzipBytes > budget.initialGzipBytes * warningThreshold -> warning
+7. delta = totalGzipBytes - budget.initialGzipBytes
+8. پیام خروجی: "limit: {budget}, actual: {total}, delta: {delta}"
+```
+
+نکات پیاده‌سازی:
+
+- نبود خود فایل policy هم مانند نبود report خطای قطعی است، نه fallback به پیش‌فرض راحت.
+- policy معیوب (JSON خراب، `initialGzipBytes` غیرعددی یا منفی، `warningThreshold` خارج از بازه ۰ تا ۱) مساوی خطا است.
+- delta وقتی منفی است یعنی فاصله‌ی مجاز باقیمانده تا سقف؛ در حالت موفق هم چاپ شود تا ratchet قابل تصمیم باشد.
+- در حالت fail، علاوه بر پیام خلاصه، چند فایل بزرگ payload اولیه فهرست شوند تا مقصر مشخص باشد.
+- مقدار `BUNDLE_BUDGET_BYTES` دیگر مرجع CI نیست؛ وقتی `--policy` داده شده، policy برنده است.
+
+#### ۳. اتصال به CI
+
+فلگ جدید `--policy` به `tools/bundle-budget.ts` اضافه می‌شود تا مسیر فایل policy را بگیرد:
+
+```yaml
+# در .github/workflows/ci.yml
+- name: Enforce bundle budget
+  run: |
+    npm run budget:bundle -- --policy tools/bundle-budget.policy.json
+    echo "budget:bundle" >> ci-evidence/gates.log
+```
+
+توضیح:
+
+- `--policy` مسیر policy را می‌گیرد؛ بدون آن، رفتار فعلی (env) فقط برای اجرای محلی معتبر است.
+- خروجی باید در `ci-evidence` ذخیره شود تا قابل ممیزی باشد.
+- job نهایی `gate` همین شواهد را می‌خواند؛ لاگ نباشد = قرمز.
+
+**هشدار هم‌خوانی با ADR-0037:** قرارداد فعلی مخزن این است که هر گیت از درون `tools/ci/run-gate.sh` اجرا شود و همان اسکریپت خودش command، خروجی کامل و exit code را در `ci-evidence/<gate>.log` می‌نویسد. `echo` دستی در `gates.log` یک پاس self-certified است: فقط می‌گوید گیت اجرا شد، نمی‌گوید با چه خروجی و چه exit code. فرم منطبق بر ADR-0037:
+
+```yaml
+- name: Enforce bundle budget from the committed policy (M15b)
+  run: >
+    bash tools/ci/run-gate.sh bundle-budget
+    npm run budget:bundle -- --policy tools/bundle-budget.policy.json
+```
+
+توصیه: فرم `run-gate.sh` ملاک باشد و فرم `echo` فقط به‌عنوان طرح اولیه‌ی مورد نظر مالک ثبت می‌ماند؛ تصمیم نهایی قبل از شروع M15b گرفته شود.
+
+#### ۴. Regression test
+
+```typescript
+// در tools/quality/product.phase10.spec.ts
+it("M15b: bundle budget enforcement works", () => {
+  // 1. build سالم -> pass
+  // 2. policy با سقف پایین -> fail (exit 1)
+  // 3. policy بدون فایل -> fail (exit 1)
+});
+```
+
+قیدهای مهم برای این تست:
+
+- این suite عمداً static و بدون شبکه/DB است؛ پس از fixture موقت و policy موقت در دایرکتوری temp استفاده شود، نه build واقعی درون تست.
+- policy مخزن در طول تست تغییر نکند.
+- در کنار سه مورد بالا، مورد چهارم هم ارزش دارد: عدم تطابق `schemaVersion` بین report و policy باید fail شود.
+- یک assertion ساده هم بر متن workflow: گیت bundle-budget باید `--policy` داشته باشد، تا حذف آن در آینده قرمز شود.
+
 **Acceptance criteria M15b:**
 
 - build سالم با payload زیر ۳۰۷٬۲۰۰ B gzip سبز می‌شود.
@@ -89,10 +183,10 @@ npm run budget:bundle
 
 **فایل‌های مورد نیاز برای تغییر:**
 
-- policy فایل جدید، مثلاً `tools/bundle-budget.policy.json`.
-- `tools/bundle-budget.ts` - خواندن policy و منطق ratchet.
-- `.github/workflows/ci.yml` - enforce، upload artifact و اتصال به evidence gate.
-- `tools/quality/product.phase10.spec.ts` - تست hard limit و failure-path.
+- `tools/bundle-budget.policy.json` (جدید) - schema بخش ۱.
+- `tools/bundle-budget.ts` - فلگ `--policy`، خواندن و اعتبارسنجی policy، منطق بخش ۲.
+- `.github/workflows/ci.yml` - گیت بخش ۳، upload artifact و اتصال به evidence gate.
+- `tools/quality/product.phase10.spec.ts` - تست بخش ۴.
 - `package.json` - فقط در صورت افزودن command جدید.
 
 **دستورات test/verify M15b:**
@@ -100,14 +194,14 @@ npm run budget:bundle
 ```bash
 npm ci --legacy-peer-deps
 npm run build
-npm run budget:bundle
+npm run budget:bundle -- --policy tools/bundle-budget.policy.json
 npm test -- tools/quality/product.phase10.spec.ts
 npm run conformance
 npm run graph -- --check
 npm run ci:gate
 ```
 
-برای failure-path، limit فقط در محیط تست پایین آورده شود و policy مخزن تغییر نکند؛ انتظار می‌رود checker با `exit 1` و پیام delta خارج شود.
+برای failure-path، یک policy موقت با سقف پایین در مسیر temp ساخته شود و policy مخزن تغییر نکند؛ انتظار می‌رود checker با `exit 1` و پیام delta خارج شود.
 
 ## ترتیب اجرا و مرز دامنه
 
