@@ -228,11 +228,11 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### باقی‌مانده (۶ مورد) برای نشست بعدی:
+### باقی‌مانده (۴ مورد) برای نشست بعدی:
 
 - [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
-- [ ] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند)
-- [ ] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded.
+- [x] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند) — **تکمیل شده: ۴ کامپوننت، ~۸۵ کلید fa/en، ۶ تست parity سبز، typecheck/lint بدون خطا)**
+- [x] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded. — **تکمیل شده: ۱۵ کامپوننت، ~۲۸۰ کلید fa/en، ۱۶ فایل تغییر، orphan/dangling=0، ۷۶ تست سبز)**
 - [ ] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود.
 - [ ] **M15** bundle budget با graph واقعی اصلاح شود.
 - [ ] **L1/W01/W22/W23** مستندات drift پاک شود؛ تیک‌های متناقض W01/W06/W07/W12/W23 و PASSهای بدون شواهد اصلاح شوند. (شامل اسنیپت‌های `pnpm` باقی‌مانده در `docs/playbooks/*` و آرشیو `docs/tasks|gates` — مرجع فعلی دستورها `docs/ops/DEPLOYMENT.md` است، ADR-0036. توجه: ADR-0044 در گذر، هدر همین فایل و ادعای `pnpm graph` در `PROJECT_GRAPH.md` را اصلاح کرد؛ آن اصلاح این آیتم نیست)
@@ -258,7 +258,7 @@
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
 - [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
-- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19 و M5 بسته شدند؛ باز: M1، M5b، M14، M15، L1/W01/W22/W23، L2)
+- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19، M5، M5b و M5c بسته شدند؛ باز: M1، M14، M15، L1/W01/W22/W23، L2)
 
 ## روش بستن هر فاز
 
