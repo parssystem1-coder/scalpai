@@ -65,6 +65,7 @@ describe("M15b - the bundle budget is enforced from a committed policy", () => {
     });
 
   const TSX = join(ROOT, "node_modules", ".bin", "tsx");
+  const isWin = process.platform === "win32";
 
   function runChecker(args: string[], env: Record<string, string> = {}): { status: number; output: string } {
     // An inherited value must never be able to decide a verdict in here.
@@ -73,7 +74,8 @@ describe("M15b - the bundle budget is enforced from a committed policy", () => {
     delete clean.BUNDLE_BUDGET_REPORT;
     delete clean.WEB_DIST_DIR;
 
-    const viaBin = existsSync(TSX);
+    // On Windows, .bin/tsx is a shell script that spawnSync cannot execute directly.
+    const viaBin = !isWin && existsSync(TSX);
     const result = spawnSync(
       viaBin ? TSX : process.execPath,
       viaBin ? [CHECKER, ...args] : ["--import", "tsx", CHECKER, ...args],
