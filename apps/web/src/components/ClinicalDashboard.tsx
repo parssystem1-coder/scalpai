@@ -19,8 +19,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, clearAccessToken } from "../api/client";
 import { useSync } from "../offline/SyncProvider";
-import { AmberOrbs } from "./AmberOrbs";
-import { HairCanvas } from "./HairCanvas";
 import DigitalConsentModal from "./DigitalConsentModal";
 import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal";
 import SyncInspectorModal from "./SyncInspectorModal";
@@ -33,15 +31,13 @@ import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D"));
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay";
-import { DemoWatermark } from "./DemoWatermark";
 import { createEngine } from "@scalpai/analysis-engine";
 import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
 import {
   createEmptyDashboardDataProvider,
 } from "../data/dashboard-data-provider";
 import type { DashboardDataProvider } from "../data/dashboard-data-types";
-import DashboardHeader from "./DashboardHeader";
-import DashboardTabs from "./DashboardTabs";
+import DashboardShell from "./DashboardShell";
 import { SECTIONS, type SectionId } from "./dashboard-sections";
 import PatientListSection from "./sections/PatientListSection";
 import ScalpMapSection from "./sections/ScalpMapSection";
@@ -773,31 +769,21 @@ const handleOpenAiEducation = () => {
   // properties off a record that does not exist.
   if (!selectedPatient) {
     return (
-      <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
-        <DemoWatermark mode={dataProvider.mode} surface="dashboard" />
-        <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
-          style={{ backgroundImage: `url('/images/scalp-bg.jpg')` }}
-        />
-        <AmberOrbs />
-        <HairCanvas />
-
-        <DashboardHeader
-          userEmail={userEmail}
-          isOnline={isOnline}
-          pendingCount={pendingCount}
-          activeSection={activeSection}
-          onSectionChange={scrollToSection}
+      <DashboardShell
+        dataMode={dataProvider.mode}
+        userEmail={userEmail}
+        isOnline={isOnline}
+        pendingCount={pendingCount}
+        activeSection={activeSection}
+        onSectionChange={scrollToSection}
           onOpenSyncInspector={openSync}
           onOpenLicenseDiagnostics={openLicense}
           onOpenEducation={openAddPatient}
           onOpenGuidedCapture={openAddPatient}
-          onOpenPdfReport={openAddPatient}
-          onOpenConsent={openAddPatient}
-          onLogout={() => { clearAccessToken(); onLogout(); }}
-        />
-        <DashboardTabs variant="mobile" activeSection={activeSection} onSectionChange={scrollToSection} />
-
+        onOpenPdfReport={openAddPatient}
+        onOpenConsent={openAddPatient}
+        onLogout={() => { clearAccessToken(); onLogout(); }}
+      >
         <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 relative z-10">
           <section id="section-patients" className="scroll-mt-28">
             <div className="rounded-[32px] p-8 md:p-12 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)] flex flex-col items-center text-center gap-4">
@@ -827,42 +813,26 @@ const handleOpenAiEducation = () => {
         {/* Record-independent diagnostics stay reachable on an empty roster. */}
         {isLicenseOpen && <LicenseDiagnosticsModal isOpen={isLicenseOpen} onClose={closeLicense} />}
         {isSyncOpen && <SyncInspectorModal isOpen={isSyncOpen} onClose={closeSync} />}
-      </div>
+      </DashboardShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
-      <DemoWatermark mode={dataProvider.mode} surface="dashboard" />
-      {/* 1. Global Scalp Aesthetic Background Image (Matches Login Page) */}
-      <div
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
-        style={{ backgroundImage: `url('/images/scalp-bg.jpg')` }}
-      />
-
-      {/* 2. Floating Amber Serum Spheres */}
-      <AmberOrbs />
-
-      {/* 3. Floating Hair Strands Canvas */}
-      <HairCanvas />
-
-      {/* 4. Top Frosted Glass Navigation Bar (Persistently Sticky) */}
-      <DashboardHeader
-        userEmail={userEmail}
-        isOnline={isOnline}
-        pendingCount={pendingCount}
-        activeSection={activeSection}
-        onSectionChange={scrollToSection}
-        onOpenSyncInspector={openSync}
-        onOpenLicenseDiagnostics={openLicense}
-        onOpenEducation={openEducation}
-        onOpenGuidedCapture={openGuidedCapture}
-        onOpenPdfReport={openPdfReport}
-        onOpenConsent={openConsent}
-        onLogout={() => { clearAccessToken(); onLogout(); }}
-      />
-      <DashboardTabs variant="mobile" activeSection={activeSection} onSectionChange={scrollToSection} />
-
+    <DashboardShell
+      dataMode={dataProvider.mode}
+      userEmail={userEmail}
+      isOnline={isOnline}
+      pendingCount={pendingCount}
+      activeSection={activeSection}
+      onSectionChange={scrollToSection}
+      onOpenSyncInspector={openSync}
+      onOpenLicenseDiagnostics={openLicense}
+      onOpenEducation={openEducation}
+      onOpenGuidedCapture={openGuidedCapture}
+      onOpenPdfReport={openPdfReport}
+      onOpenConsent={openConsent}
+      onLogout={() => { clearAccessToken(); onLogout(); }}
+    >
       {/* Main Container: Continuous Clinical Dossier */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 relative z-10 space-y-12">
         {/* SECTION 1: PATIENTS & CLINICAL RADAR OVERVIEW */}
@@ -1655,7 +1625,7 @@ const handleOpenAiEducation = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardShell>
   );
 };
 

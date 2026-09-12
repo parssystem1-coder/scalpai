@@ -68,6 +68,24 @@ describe("web bundle splitting", () => {
   });
 });
 
+describe("L2a - ClinicalDashboard composition shell contracts", () => {
+  it("keeps shared chrome in DashboardShell and domain state in ClinicalDashboard", () => {
+    const dashboard = read("apps/web/src/components/ClinicalDashboard.tsx");
+    const shell = read("apps/web/src/components/DashboardShell.tsx");
+    const contracts = read("apps/web/src/components/dashboard-contracts.ts");
+
+    expect(dashboard).toContain('import DashboardShell from "./DashboardShell"');
+    expect(dashboard).toContain("<DashboardShell");
+    expect(dashboard).not.toContain('import DashboardHeader from "./DashboardHeader"');
+    expect(dashboard).not.toContain('import { DemoWatermark } from "./DemoWatermark"');
+    expect(shell).toContain("DashboardShellProps");
+    expect(shell).toContain("<DashboardHeader");
+    expect(shell).toContain('<DashboardTabs variant="mobile"');
+    expect(contracts).toContain("DashboardNavigationContract");
+    expect(contracts).toContain("DashboardShellProps");
+  });
+});
+
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate
  * ran in CI, but its ceiling came from BUNDLE_BUDGET_BYTES - any step could
