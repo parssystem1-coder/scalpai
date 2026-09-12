@@ -10,12 +10,14 @@ import {
   tenantSafety,
 } from "./v1.js";
 import {
+  architectureCallSites,
   configSchemaValidation,
   opsFileConventions,
   packageCallSite,
   packageManager,
   persianLiteralsInTsx,
   productionMocks,
+  tsxImportBoundaries,
 } from "./v2.js";
 
 /**
@@ -37,4 +39,6 @@ export const RULES: Rule[] = [
   persianLiteralsInTsx,
   opsFileConventions,
   configSchemaValidation,
+  architectureCallSites,
+  tsxImportBoundaries,
 ];

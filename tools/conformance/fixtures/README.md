@@ -7,6 +7,8 @@ violations one rule must catch:
 |---|---|---|
 | `ops-file-conventions/` | `ops-file-conventions` | ops document with no `OPERATIONS` header, shell script with no strict mode, compose file with no `services:`, credential literal in an ops file |
 | `config-schema-validation/` | `config-schema-validation` | workspace manifest with no `scripts`, tsconfig that loosens `strict`, missing `.env.example`, Vite config with no `build.manifest`, non-npm `packageManager` |
+| `architecture-call-sites/` | `architecture-call-sites` | controller importing `packages/db` by path, controller no module mounts, service importing a controller, `@Injectable` no module registers, MCP tool with no field whitelist, repository opening its own connection and querying without the tenant `Tx` |
+| `tsx-import-boundaries/` | `tsx-import-boundaries` | web module importing `apps/api`, web component importing `@scalpai/db`, portal importing a web component, shared package re-exporting another package's `src/` path |
 
 Two things use them:
 

@@ -15,9 +15,11 @@ import { listFiles, readRoot } from "../lib/walk.js";
  *
  * Phase B adds a fourth (M5): no-persian-literals-in-tsx, further down.
  *
- * M14a adds two more at the bottom of this file - ops-file-conventions and
- * config-schema-validation - each with a committed fixture and a self-test that
- * runs inside `check()`.
+ * M14a adds two more - ops-file-conventions and config-schema-validation - each
+ * with a committed fixture and a self-test that runs inside `check()`.
+ *
+ * M14b adds the last two, at the bottom of this file - architecture-call-sites
+ * and tsx-import-boundaries - which read the project graph of DESIGN-V2 14.4.
  *
  * Prose lives in docs/: this file only covers EXECUTABLE surfaces, because the
  * leftover non-npm snippets in docs/playbooks are explicitly phase 10 doc-drift
@@ -903,5 +905,475 @@ export const configSchemaValidation: Rule = {
   source: "14.3 (M14a)",
   check(ctx: RuleContext): Violation[] {
     return [...scanConfigSchemas(ctx.root), ...fixtureSelfTest(CONFIG_RULE, ctx.root, scanConfigSchemas)];
+  },
+};
+
+/* ========================================================================== *
+ * M14b - architecture call-sites + import boundaries (14.4, ADR-0037)
+ *
+ * M14a covered the surfaces the harness could not READ. M14b covers the one it
+ * could not REASON about: the project graph of DESIGN-V2 14.4. Every node in
+ * that graph is only real at a CALL-SITE - an endpoint serves nothing until a
+ * module mounts it, a repository query is only tenant-safe inside the
+ * transaction that set the clinic key, an MCP tool is only safe with a declared
+ * field whitelist, and a browser bundle stays a browser bundle only while
+ * nothing inside it reaches for the API or the database.
+ *
+ *   architecture-call-sites  - the graph's EDGES: controller -> service ->
+ *                              repository -> db, endpoint -> module, tool ->
+ *                              field whitelist, connection -> clinic context.
+ *   tsx-import-boundaries    - the graph's WALLS: what a `.tsx`/`.ts` inside an
+ *                              app or a package is allowed to import.
+ *
+ * Same shape as M14a: a pure `scan*` function, a committed fixture that is a
+ * miniature repository, and `fixtureSelfTest` running inside `check()` so a rule
+ * that stops detecting its own seeded violation turns CI red instead of quietly
+ * going green (ADR-21).
+ *
+ * SMART DEVIATIONS from the literal M14b brief. Each one exists because the
+ * literal form would contradict a decision this repository already accepted:
+ *
+ *   - `@scalpai/db` is NOT banned from controllers and services. engineering
+ *     rules 1 routes ALL data access through packages/db and ADR-0002 puts
+ *     `DbService` on that package's PUBLIC surface, so every controller here
+ *     imports it by design. What is banned is the DEEP import: a path-shaped
+ *     `packages/db/...` or `@scalpai/db/src/...` specifier that walks around the
+ *     public entrypoint. Raw `pg`/`drizzle-orm` imports stay the `db-access`
+ *     rule's job and are not reported twice.
+ *   - A repository is NOT required to spell `SET LOCAL app.clinic_id` itself.
+ *     ADR-0003 opens the tenant context exactly once, in `DbService.withTenant`,
+ *     and every repository function receives the resulting `Tx`. Demanding the
+ *     statement per function would report all ten repositories for OBEYING that
+ *     decision. What is enforced is the contract behind it: a repository may not
+ *     open its own connection, it must query through a `Tx`, and any file that
+ *     does open a connection must set the clinic key.
+ *   - Endpoint guards stay with the `feature-gate` rule (9.1), which already
+ *     walks every controller method for `@RequireFeature`/`@Roles`/`@Public`.
+ *     This rule takes the other half of the Endpoints node instead: a controller
+ *     nobody mounts serves nothing, and a provider nobody registers is a broken
+ *     injection at boot - neither of which any gate could see before.
+ *   - The MCP Tool Registry does not exist in the tree yet, so its check is a
+ *     RATCHET scoped to `packages/shared/src/mcp-registry/`: zero findings
+ *     today, and the day the first tool lands it must declare the fields it may
+ *     return. The fixture proves the check works in the meantime.
+ *
+ * No exception was registered for either rule: unlike M14a's ops document,
+ * neither one found legacy debt to carry.
+ * ========================================================================== */
+
+const ARCH_RULE = "architecture-call-sites";
+const BOUNDARY_RULE = "tsx-import-boundaries";
+
+const SRC_EXTS = [".ts", ".tsx"];
+
+/** A module specifier together with the 1-based line it was written on. */
+interface ImportRef {
+  spec: string;
+  line: number;
+}
+
+/**
+ * An alias TABLE is not an import. `apps/web/vite.config.ts` and the web
+ * tsconfig name `../../packages/shared/src/index.ts` on purpose - that mapping is
+ * the mechanism that MAKES `@scalpai/shared` resolve, so config files are skipped
+ * instead of being reported for implementing the very boundary they define.
+ */
+const CONFIG_FILE = /(^|\/)[\w.-]*\.config\.[cm]?tsx?$/;
+
+/** Comments are masked first: a specifier quoted in prose is not a call-site. */
+function importsOf(src: string): ImportRef[] {
+  const out: ImportRef[] = [];
+  maskComments(src).forEach((line, i) => {
+    for (const m of line.matchAll(/\b(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g)) {
+      if (m[1] !== undefined) out.push({ spec: m[1], line: i + 1 });
+    }
+  });
+  return out;
+}
+
+/** `apps/web`, `packages/db` - the workspace a repository-relative path lives in. */
+function workspaceOf(rel: string): string | null {
+  const m = /^((?:apps|packages)\/[^/]+)\//.exec(rel);
+  return m?.[1] ?? null;
+}
+
+/** POSIX resolution of a relative specifier against the importing file. */
+function resolveSpec(fromFile: string, spec: string): string {
+  return toPosix(join(dirname(fromFile), spec));
+}
+
+/** Every first-party source file, minus configs, type declarations and fixtures. */
+function sourceFiles(root: string): string[] {
+  return [...listFiles(root, "apps", SRC_EXTS), ...listFiles(root, "packages", SRC_EXTS)].filter(
+    (f) => !CONFIG_FILE.test(f) && !f.endsWith(".d.ts"),
+  );
+}
+
+const IS_SPEC = /\.spec\.tsx?$|\.test\.tsx?$/;
+
+/* -------------------------------------------------------------------------- *
+ * 3. architecture-call-sites
+ * -------------------------------------------------------------------------- */
+
+type Layer = "module" | "controller" | "repository" | "service";
+
+/**
+ * Layer by NAME first, then by decorator - the NestJS suffix convention is the
+ * cheap signal and the decorator is the honest one. `module` is resolved first
+ * on purpose: the composition root legitimately imports every controller.
+ */
+function layerOf(file: string, src: string): Layer | null {
+  if (/\.module\.ts$/.test(file)) return "module";
+  if (/\.controller\.ts$/.test(file) || /@Controller\s*\(/.test(src)) return "controller";
+  if (/\.repo\.ts$/.test(file) || /(^|\/)repos\//.test(file) || /\bclass\s+\w*Repository\b/.test(src)) {
+    return "repository";
+  }
+  if (/\.service\.ts$/.test(file) || /@Injectable\s*\(/.test(src)) return "service";
+  return null;
+}
+
+/** A path-shaped reach into packages/db. `@scalpai/db/testing` is sanctioned (H18). */
+const DEEP_DB_IMPORT = /(?:^|\/)packages\/db(?:\/|$)|^@scalpai\/db\/(?!testing(?:\.js)?$)/;
+
+/** Which layer may never import which. The call direction only points one way. */
+const FORBIDDEN_EDGES: { from: Layer; to: Layer[] }[] = [
+  { from: "service", to: ["controller"] },
+  { from: "repository", to: ["controller", "service"] },
+];
+
+/** Resolves a relative specifier onto a file that actually exists in the tree. */
+function resolveLocal(fromFile: string, spec: string, known: Set<string>): string | null {
+  if (!spec.startsWith(".")) return null;
+  const base = resolveSpec(fromFile, spec);
+  const candidates = [
+    base.replace(/\.jsx?$/, ".ts"),
+    base.replace(/\.jsx?$/, ".tsx"),
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}/index.ts`,
+    `${base}/index.tsx`,
+  ];
+  return candidates.find((c) => known.has(c)) ?? null;
+}
+
+function crossLayerViolations(root: string, files: string[]): Violation[] {
+  const known = new Set(files);
+  const layers = new Map<string, Layer | null>();
+  const sources = new Map<string, string>();
+  for (const f of files) {
+    const src = readRoot(root, f);
+    sources.set(f, src);
+    layers.set(f, layerOf(f, src));
+  }
+
+  const out: Violation[] = [];
+  for (const f of files) {
+    if (IS_SPEC.test(f)) continue;
+    const layer = layers.get(f) ?? null;
+    if (layer === null) continue;
+    const insideDb = f.startsWith("packages/db/");
+    const edges = FORBIDDEN_EDGES.find((e) => e.from === layer)?.to ?? [];
+
+    for (const { spec, line } of importsOf(sources.get(f) ?? "")) {
+      if (!insideDb && layer !== "module" && DEEP_DB_IMPORT.test(spec)) {
+        out.push({
+          rule: ARCH_RULE,
+          file: `${f}:${line}`,
+          message: `${layer} be masir-e daroonie packages/db vasl mishavad ('${spec}')`,
+          fix: "import the public surface instead: DbService and the repos are exported from '@scalpai/db' (rules 1, ADR-0002)",
+        });
+        continue;
+      }
+      if (edges.length === 0) continue;
+      const target = resolveLocal(f, spec, known);
+      if (target === null) continue;
+      const targetLayer = layers.get(target) ?? null;
+      if (targetLayer === null || !edges.includes(targetLayer)) continue;
+      out.push({
+        rule: ARCH_RULE,
+        file: `${f}:${line}`,
+        message: `jahat-e call barakas ast: ${layer} az ${targetLayer} import mikonad ('${target}')`,
+        fix: "the graph runs controller -> service -> repository -> db in one direction; invert the dependency or move the shared code down a layer",
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Endpoints node, second half. `feature-gate` proves every method DECLARES a
+ * gate; this proves the class is actually wired into the application. A
+ * controller no module mounts answers no request, and an `@Injectable` no module
+ * registers throws at boot on the first injection - both are invisible to a
+ * typecheck and to every other gate.
+ *
+ * Skipped entirely when the tree contains no module at all: a synthetic root
+ * composes nothing, so nothing there is unmounted.
+ */
+function registrationViolations(root: string, files: string[]): Violation[] {
+  const moduleFiles = files.filter((f) => /\.module\.ts$/.test(f));
+  if (moduleFiles.length === 0) return [];
+  const composition = moduleFiles.map((f) => readRoot(root, f)).join("\n");
+
+  const out: Violation[] = [];
+  for (const f of files) {
+    if (!/^apps\/[^/]+\/src\//.test(f)) continue;
+    if (/\.module\.ts$/.test(f) || IS_SPEC.test(f)) continue;
+    const src = readRoot(root, f);
+
+    for (const [decorator, kind, why] of [
+      [/@Controller\s*\(/, "controller", "endpoint-hayash serve nemishavand"],
+      [/@Injectable\s*\(/, "provider", "inject-e an dar boot mishkanad"],
+    ] as [RegExp, string, string][]) {
+      for (const cls of decoratedClasses(src, decorator)) {
+        if (new RegExp(`\\b${cls}\\b`).test(composition)) continue;
+        out.push({
+          rule: ARCH_RULE,
+          file: f,
+          message: `${kind} '${cls}' dar hich module-i sabt nashode: ${why}`,
+          fix: "add it to the controllers/providers of a @Module, or delete it - an unmounted class is not a call-site",
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** `export class Foo` within a few lines of the given decorator. Comments masked. */
+function decoratedClasses(src: string, decorator: RegExp): string[] {
+  const lines = maskComments(src);
+  const out: string[] = [];
+  lines.forEach((line, i) => {
+    if (!decorator.test(line)) return;
+    for (const probe of lines.slice(i, i + 12)) {
+      const m = /^\s*export\s+(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/.exec(probe);
+      if (m?.[1] !== undefined) {
+        out.push(m[1]);
+        return;
+      }
+    }
+  });
+  return [...new Set(out)];
+}
+
+/**
+ * MCP Tool Registry node. A tool that does not name the fields it may return is
+ * an open door onto whatever the query happened to select, which for this
+ * product means PHI. RATCHET: the directory does not exist yet, so this is zero
+ * findings today and a hard requirement the moment the first tool lands.
+ */
+const MCP_REGISTRY_DIR = "packages/shared/src/mcp-registry";
+const MCP_FIELD_WHITELIST = /\b(?:fieldWhitelist|fieldAllowlist|fieldAllowList|allowedFields|whitelistFields)\b/;
+
+function mcpRegistryViolations(root: string): Violation[] {
+  const out: Violation[] = [];
+  for (const f of listFiles(root, MCP_REGISTRY_DIR, SRC_EXTS)) {
+    if (IS_SPEC.test(f)) continue;
+    const src = maskComments(readRoot(root, f)).join("\n");
+    const calls = [...src.matchAll(/\b(?:defineTool|registerTool|createTool|declareTool|mcpTool)\s*\(/g)];
+    for (let i = 0; i < calls.length; i += 1) {
+      const start = calls[i]?.index ?? 0;
+      const end = i + 1 < calls.length ? (calls[i + 1]?.index ?? src.length) : src.length;
+      const block = src.slice(start, end);
+      if (MCP_FIELD_WHITELIST.test(block)) continue;
+      const name = /name\s*:\s*["']([^"']+)["']/.exec(block)?.[1] ?? `#${i + 1}`;
+      out.push({
+        rule: ARCH_RULE,
+        file: `${f}:${src.slice(0, start).split("\n").length}`,
+        message: `MCP tool '${name}' field-whitelist tarif nakarde`,
+        fix: "declare a fieldWhitelist on the tool: a registry entry may only return columns it names",
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * DB Access node. The clinic key is set in exactly one place (ADR-0003), so what
+ * is checked is the contract every repository depends on, not the statement:
+ *
+ *   1. a file that OPENS a connection must set the clinic key;
+ *   2. a repository may not open one at all - it receives the tenant `Tx`;
+ *   3. a repository query must run on that `Tx`, never on a free handle.
+ *
+ * Specs and the `@scalpai/db/testing` entrypoint are out of scope: their whole
+ * job is to run outside a tenant transaction (ADR-0028 H18).
+ */
+const CONNECTION_OPENER = /\bnew\s+Pool\s*\(|\bcreatePool\s*\(|\bdrizzle\s*\(/;
+const TENANT_CONTEXT = /app\.clinic_id/;
+const TENANT_HANDLE = /\bTx\b/;
+const REPO_QUERY = /\.\s*(?:select|insert|update|delete|execute)\s*\(/;
+
+function tenantContextViolations(root: string, files: string[]): Violation[] {
+  const out: Violation[] = [];
+  for (const f of files) {
+    if (IS_SPEC.test(f) || /(^|\/)(test|tests|testing)[./]/.test(f)) continue;
+    const src = readRoot(root, f);
+    const masked = maskComments(src).join("\n");
+    const opensConnection = CONNECTION_OPENER.test(masked);
+
+    if (opensConnection && !TENANT_CONTEXT.test(masked)) {
+      out.push({
+        rule: ARCH_RULE,
+        file: f,
+        message: "connection-e database bedoone set kardan-e context-e clinic baz mishavad",
+        fix: "open it through DbService.withTenant, which sets app.clinic_id inside the transaction (ADR-0003)",
+      });
+    }
+
+    if (layerOf(f, src) !== "repository") continue;
+
+    if (opensConnection) {
+      out.push({
+        rule: ARCH_RULE,
+        file: f,
+        message: "repository connection-e khodash ra baz mikonad va az tarafe withTenant rad nemishavad",
+        fix: "take the tenant-scoped Tx as the first parameter; the transaction owns the connection, not the repository",
+      });
+    }
+    if (REPO_QUERY.test(masked) && !TENANT_HANDLE.test(masked)) {
+      out.push({
+        rule: ARCH_RULE,
+        file: f,
+        message: "query-e repository rooye handle-e tenant-scoped (Tx) ejra nemishavad",
+        fix: "type the handle as Tx and receive it from DbService.withTenant: without it RLS has no clinic_id to filter on",
+      });
+    }
+  }
+  return out;
+}
+
+/** Pure scan, so the fixture self-test and the regression suite can call it. */
+export function scanArchitectureCallSites(root: string): Violation[] {
+  const files = sourceFiles(root);
+  return [
+    ...crossLayerViolations(root, files),
+    ...registrationViolations(root, files),
+    ...mcpRegistryViolations(root),
+    ...tenantContextViolations(root, files),
+  ];
+}
+
+export const architectureCallSites: Rule = {
+  name: ARCH_RULE,
+  source: "14.4 (M14b)",
+  check(ctx: RuleContext): Violation[] {
+    return [
+      ...scanArchitectureCallSites(ctx.root),
+      ...fixtureSelfTest(ARCH_RULE, ctx.root, scanArchitectureCallSites),
+    ];
+  },
+};
+
+/* -------------------------------------------------------------------------- *
+ * 4. tsx-import-boundaries
+ * -------------------------------------------------------------------------- */
+
+/** Apps whose build output is a BROWSER bundle: no server surface may enter it. */
+const BROWSER_APPS = ["apps/web", "apps/portal"];
+
+interface ForbiddenSurface {
+  re: RegExp;
+  what: string;
+  instead: string;
+}
+
+const BROWSER_FORBIDDEN: ForbiddenSurface[] = [
+  {
+    re: /(?:^|\/)apps\/api(?:\/|$)/,
+    what: "kod-e server (apps/api)",
+    instead: "call the API over HTTP through the typed client in apps/web/src/api",
+  },
+  {
+    re: /(?:^|\/)packages\/db(?:\/|$)|^@scalpai\/db(?:\/|$)/,
+    what: "laye-ye database (packages/db)",
+    instead: "take the types from '@scalpai/shared'; rows only ever arrive from the API",
+  },
+  {
+    re: /^(?:pg|drizzle-orm)(?:\/|$)|^@nestjs\//,
+    what: "ketabkhane-ye faghat-server",
+    instead: "this bundle runs in a browser: there is no socket and no process here",
+  },
+];
+
+/** `packages/x/src/...` - the internals of a package instead of its public export. */
+const INTERNAL_PACKAGE_PATH = /(?:^|\/)packages\/[^/]+\/src(?:\/|$)/;
+
+/**
+ * The walls of the graph. Named for `.tsx` because that is where the leak that
+ * matters happens - a component reaching for a repository ships the database
+ * layer to a browser - but every first-party `.ts` is walked too: a boundary that
+ * only holds for one extension is not a boundary.
+ */
+export function scanImportBoundaries(root: string): Violation[] {
+  const out: Violation[] = [];
+  for (const f of sourceFiles(root)) {
+    const own = workspaceOf(f);
+    if (own === null) continue;
+    const isBrowserApp = BROWSER_APPS.includes(own);
+
+    for (const { spec, line } of importsOf(readRoot(root, f))) {
+      const at = `${f}:${line}`;
+
+      // 1. a relative specifier that climbs out of its own workspace
+      if (spec.startsWith(".")) {
+        const target = workspaceOf(resolveSpec(f, spec));
+        if (target !== null && target !== own) {
+          out.push({
+            rule: BOUNDARY_RULE,
+            file: at,
+            message: `import-e nesbi az marz-e '${own}' birun mizanad va be '${target}' miresad`,
+            fix: "cross a workspace boundary through its published '@scalpai/*' entrypoint, never with a relative path",
+          });
+          continue;
+        }
+      }
+
+      // 2. one app reaching into another - two bundles, two deploy units
+      const otherApp = /(?:^|\/)apps\/([^/]+)(?:\/|$)/.exec(spec);
+      if (otherApp?.[1] !== undefined && `apps/${otherApp[1]}` !== own) {
+        out.push({
+          rule: BOUNDARY_RULE,
+          file: at,
+          message: `'${own}' az app-e digari import mikonad ('apps/${otherApp[1]}')`,
+          fix: "shared code belongs in a package under packages/*; an app is never another app's library",
+        });
+        continue;
+      }
+
+      // 3. a browser bundle reaching for a server-only surface
+      if (isBrowserApp) {
+        const hit = BROWSER_FORBIDDEN.find((b) => b.re.test(spec));
+        if (hit !== undefined) {
+          out.push({
+            rule: BOUNDARY_RULE,
+            file: at,
+            message: `bundle-e browser '${own}' be ${hit.what} vasl mishavad ('${spec}')`,
+            fix: hit.instead,
+          });
+          continue;
+        }
+      }
+
+      // 4. anyone reaching past a package's public exports into its src/
+      if (INTERNAL_PACKAGE_PATH.test(spec)) {
+        out.push({
+          rule: BOUNDARY_RULE,
+          file: at,
+          message: `masir-e daroonie yek package import shode ('${spec}') na export-e omoomi-e an`,
+          fix: "import the package by name ('@scalpai/<pkg>'); packages/*/src is an implementation detail, not a contract",
+        });
+      }
+    }
+  }
+  return out;
+}
+
+export const tsxImportBoundaries: Rule = {
+  name: BOUNDARY_RULE,
+  source: "14.4 (M14b)",
+  check(ctx: RuleContext): Violation[] {
+    return [...scanImportBoundaries(ctx.root), ...fixtureSelfTest(BOUNDARY_RULE, ctx.root, scanImportBoundaries)];
   },
 };
