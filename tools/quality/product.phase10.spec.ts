@@ -114,6 +114,19 @@ describe("L2c - dashboard state synchronization event bus", () => {
   });
 });
 
+describe("L2d - error boundaries, Suspense, and performance guardrails", () => {
+  it("keeps lazy routes and the optional 3D stage recoverable", () => {
+    const app = read("apps/web/src/App.tsx");
+    const dashboard = read("apps/web/src/components/ClinicalDashboard.tsx");
+    expect(app).toContain("FeatureErrorBoundary");
+    expect(app).toContain("<Suspense fallback={<RouteFallback />}");
+    expect(dashboard).toContain("<FeatureErrorBoundary");
+    expect(dashboard).toContain("<Suspense");
+    expect(dashboard).toContain('contentVisibility: "auto"');
+    expect(read("apps/web/src/components/FeatureErrorBoundary.tsx")).toContain("getDerivedStateFromError");
+  });
+});
+
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate
  * ran in CI, but its ceiling came from BUNDLE_BUDGET_BYTES - any step could

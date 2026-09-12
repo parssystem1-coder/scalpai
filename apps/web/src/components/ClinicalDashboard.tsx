@@ -36,6 +36,7 @@ import {
 } from "../data/dashboard-data-provider";
 import type { DashboardDataProvider } from "../data/dashboard-data-types";
 import DashboardShell from "./DashboardShell";
+import FeatureErrorBoundary from "./FeatureErrorBoundary";
 import { SECTIONS, type SectionId } from "./dashboard-sections";
 import PatientListSection from "./sections/PatientListSection";
 import ScalpMapSection from "./sections/ScalpMapSection";
@@ -1127,16 +1128,29 @@ const handleOpenAiEducation = () => {
             </div>
 
             {/* Embed 3D Scalp Stage */}
-            <div className="w-full rounded-[28px] overflow-hidden border border-white/80 shadow-2xl bg-white/40 backdrop-blur-xl">
-              <Suspense
-                fallback={
-                  <div className="h-[450px] flex items-center justify-center text-xs font-bold text-stone-500">
-                    {t("dashboard.hologram.loading")}
-                  </div>
-                }
+            <div
+              className="w-full rounded-[28px] overflow-hidden border border-white/80 shadow-2xl bg-white/40 backdrop-blur-xl"
+              style={{ contain: "layout paint", contentVisibility: "auto" }}
+            >
+              <FeatureErrorBoundary
+                title={t("dashboard.hologram.errorTitle", "بارگذاری مدل سه‌بعدی ناموفق بود")}
+                description={t("dashboard.hologram.errorDescription", "می‌توانید دوباره تلاش کنید یا ادامه‌ی داشبورد را ببینید.")}
+                resetLabel={t("dashboard.hologram.retry", "تلاش دوباره")}
               >
-                <LuxuryScalp3D />
-              </Suspense>
+                <Suspense
+                  fallback={
+                    <div
+                      role="status"
+                      aria-label={t("dashboard.hologram.loading")}
+                      className="h-[450px] flex items-center justify-center text-xs font-bold text-stone-500"
+                    >
+                      {t("dashboard.hologram.loading")}
+                    </div>
+                  }
+                >
+                  <LuxuryScalp3D />
+                </Suspense>
+              </FeatureErrorBoundary>
             </div>
           </div>
         </section>

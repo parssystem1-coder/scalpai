@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProPlansView } from "./components/ProPlansView.js";
 import { ProtectedRoute } from "./components/ProtectedRoute.js";
+import FeatureErrorBoundary from "./components/FeatureErrorBoundary.js";
 import { SyncProvider } from "./offline/SyncProvider.js";
 import { AuthProvider, useAuth } from "./context/AuthContext.js";
 import LandingPage from "./pages/LandingPage.js";
@@ -79,7 +80,11 @@ function AppRoutes() {
   return (
     <>
       <Suspense fallback={<RouteFallback />}>
-        <Routes>
+        <FeatureErrorBoundary
+          title="بارگذاری صفحه ناموفق بود"
+          description="این خطا فقط همین صفحه را متوقف کرده است. می‌توانید دوباره تلاش کنید."
+        >
+          <Routes>
           <Route
             path="/"
             element={
@@ -155,7 +160,8 @@ function AppRoutes() {
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </FeatureErrorBoundary>
       </Suspense>
 
       {/* Global Toast Feedback */}
