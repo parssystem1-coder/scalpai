@@ -7,7 +7,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 
-interface FollicleDetection {
+export interface FollicleDetection {
   id: string;
   x: number; // percentage
   y: number; // percentage
@@ -16,30 +16,20 @@ interface FollicleDetection {
   confidence: number; // %
 }
 
-interface NeuralSegmentationOverlayProps {
+export interface NeuralSegmentationOverlayProps {
   imageUrl: string;
   areaName: string;
   patientName: string;
   onRetest?: () => void;
+  /** Analysis output supplied by the real, demo, or test boundary. */
+  detections?: readonly FollicleDetection[];
 }
-
-const SAMPLE_DETECTIONS: FollicleDetection[] = [
-  { id: "f1", x: 28, y: 34, type: "triple", caliber: 78, confidence: 98 },
-  { id: "f2", x: 42, y: 25, type: "double", caliber: 71, confidence: 96 },
-  { id: "f3", x: 62, y: 38, type: "double", caliber: 69, confidence: 94 },
-  { id: "f4", x: 74, y: 52, type: "single", caliber: 54, confidence: 91 },
-  { id: "f5", x: 35, y: 65, type: "triple", caliber: 82, confidence: 99 },
-  { id: "f6", x: 55, y: 70, type: "double", caliber: 73, confidence: 95 },
-  { id: "f7", x: 80, y: 30, type: "empty", caliber: 0, confidence: 88 },
-  { id: "f8", x: 18, y: 55, type: "single", caliber: 58, confidence: 92 },
-];
-
-
 
 export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps> = ({
   imageUrl,
   areaName,
   patientName,
+  detections = [],
 }) => {
   const { t } = useTranslation();
   const [showAiBoxes, setShowAiBoxes] = useState(true);
@@ -53,6 +43,9 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
     triple: t("dashboard.neuralSegmentation.triple"),
     empty: t("dashboard.neuralSegmentation.empty"),
   };
+  const averageCaliber = detections.length
+    ? detections.reduce((sum, detection) => sum + detection.caliber, 0) / detections.length
+    : 0;
 
   return (
     <div className="relative rounded-3xl overflow-hidden bg-white/55 border border-white/80 backdrop-blur-xl shadow-md p-4 select-none">
@@ -147,7 +140,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
 
         {/* AI Follicular Detection Markers */}
         {showAiBoxes &&
-          SAMPLE_DETECTIONS.map((f) => {
+          detections.map((f) => {
             const isHovered = selectedFollicle?.id === f.id;
             const typeColor =
               f.type === "triple"
@@ -211,10 +204,10 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1 text-emerald-300 font-bold">
               <CheckCircle className="w-3.5 h-3.5" />
-              {t("dashboard.neuralSegmentation.detectedCount", { count: SAMPLE_DETECTIONS.length })}
+              {t("dashboard.neuralSegmentation.detectedCount", { count: detections.length })}
             </span>
-            <span className="text-stone-300">{t("dashboard.neuralSegmentation.avgCaliber", { value: 71.4 })}</span>
-            <span className="text-stone-300">{t("dashboard.neuralSegmentation.avgDensity", { value: 154 })}</span>
+            <span className="text-stone-300">{t("dashboard.neuralSegmentation.avgCaliber", { value: averageCaliber.toFixed(1) })}</span>
+            <span className="text-stone-300">{t("dashboard.neuralSegmentation.avgDensity", { value: detections.length })}</span>
           </div>
 
           <span className="text-[0.65rem] font-mono text-rose-300/90">

@@ -34,12 +34,11 @@ import LuxuryTiltCard from "./LuxuryTiltCard.js";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay.js";
 import { createEngine } from "@scalpai/analysis-engine";
+import type { Patient, TrichoscopyImage } from "../data/dashboard-samples.js";
 import {
-  SAMPLE_PATIENTS,
-  SAMPLE_IMAGES,
-  type Patient,
-  type TrichoscopyImage,
-} from "../data/dashboard-samples.js";
+  createEmptyDashboardDataProvider,
+  type DashboardDataProvider,
+} from "../data/dashboard-data-provider.js";
 import DashboardHeader from "./DashboardHeader.js";
 import DashboardTabs from "./DashboardTabs.js";
 import { SECTIONS, type SectionId } from "./dashboard-sections.js";
@@ -58,11 +57,16 @@ const FALLBACK_PHOTO_DATE = "2024-08-31";
 interface ClinicalDashboardProps {
   userEmail?: string;
   onLogout: () => void;
+  /** The caller owns the data mode; production defaults to an empty real provider. */
+  dataProvider?: DashboardDataProvider;
 }
+
+const EMPTY_REAL_DATA_PROVIDER = createEmptyDashboardDataProvider();
 
 export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   userEmail = "tricho@scalpai.clinic",
   onLogout,
+  dataProvider = EMPTY_REAL_DATA_PROVIDER,
 }) => {
   const { isOnline, pendingCount } = useSync();
   const { t } = useTranslation();
@@ -136,8 +140,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     closeBeforeAfter,
   } = useDashboardModals();
 
-  // `null` until a record exists: SAMPLE_PATIENTS is DEV-gated, so a production
-  // build would resolve the first element to undefined and crash on property read.
+  // `null` until a record exists: the real provider intentionally has an empty
+  // state and never falls back to demo data.
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
@@ -146,8 +150,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
   const [compareDefaultA, setCompareDefaultA] = useState<string | undefined>(undefined);
   const [compareDefaultB, setCompareDefaultB] = useState<string | undefined>(undefined);
-  const [localPatients, setLocalPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
-  const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(SAMPLE_IMAGES);
+  const [localPatients, setLocalPatients] = useState<Patient[]>(() => [...dataProvider.getPatients()]);
+  const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(() =>
+    Object.fromEntries(
+      Object.entries(dataProvider.getImages()).map(([patientId, images]) => [patientId, [...images]])
+    )
+  );
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
   const [selectedTagFilter, _setSelectedTagFilter] = useState<string>("all");
   const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);
@@ -518,7 +526,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     follicularUnits: { single: 24, double: 52, triple: 24 },
   });
 
-  // Fetch real API patients if online, with fallback to local state
+  // Fetch real API patients if online, with fallback to the explicitly selected provider.
   const { data: apiPatients } = useQuery({
     queryKey: ["patients"],
     queryFn: () => apiFetch<Patient[]>("/patients?limit=50").catch(() => null),
@@ -527,8 +535,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
   const patientList = apiPatients && apiPatients.length > 0 ? apiPatients : localPatients;
 
-  // Latch onto the first available record once the roster is known. In dev this
-  // is the first sample; in production it is the first API record.
+  // Latch onto the first available record once the roster is known. Demo data
+  // can only arrive through dataProvider.mode="demo".
   useEffect(() => {
     if (selectedPatient) return;
     const first = patientList[0];
