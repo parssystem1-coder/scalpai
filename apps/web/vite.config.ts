@@ -1,15 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
-  // M1d: demo/test fixtures remain available in dev, while production must
-  // not copy the legacy public sample assets into the deployable artifact.
-  publicDir: mode === 'production' ? false : 'public',
+  plugins: [
+    react(),
+    ...(mode === 'production'
+      ? [{ name: 'strip-production-sample-assets', closeBundle: () => rmSync(path.resolve(__dirname, 'dist/trichoscopy'), { recursive: true, force: true }) }]
+      : []),
+  ],
+  // M1d: demo/test fixtures remain available in dev, while production strips
+  // only the legacy public sample assets. Other public assets remain intact.
   build: {
     // WEAKNESSES M15: the bundle budget measures the REAL initial payload by
     // walking this manifest and its static import graph (tools/bundle-budget.ts).
