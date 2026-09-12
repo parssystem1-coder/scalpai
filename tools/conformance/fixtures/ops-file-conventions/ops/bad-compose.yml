@@ -1,0 +1,5 @@
+# M14a fixture (ADR-0037): a compose file with no top-level `services:` key, so
+# `docker compose up` has nothing to start. Broken on purpose.
+containers:
+  web:
+    image: nginx:1.27-alpine

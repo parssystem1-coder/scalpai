@@ -9,7 +9,14 @@ import {
   secrets,
   tenantSafety,
 } from "./v1.js";
-import { packageCallSite, packageManager, persianLiteralsInTsx, productionMocks } from "./v2.js";
+import {
+  configSchemaValidation,
+  opsFileConventions,
+  packageCallSite,
+  packageManager,
+  persianLiteralsInTsx,
+  productionMocks,
+} from "./v2.js";
 
 /**
  * v1 + v2 rule set (ADR-21 / ADR-0037, playbook 1.8). Each rule ships with
@@ -28,4 +35,6 @@ export const RULES: Rule[] = [
   productionMocks,
   packageManager,
   persianLiteralsInTsx,
+  opsFileConventions,
+  configSchemaValidation,
 ];

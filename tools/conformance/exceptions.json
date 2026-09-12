@@ -49,6 +49,13 @@
       "adr": "ADR-0043",
       "reason": "SAMPLE_DETECTIONS overlay data: open half of phase 10 M1, to be replaced by real detections",
       "since": "2026-09-06"
+    },
+    {
+      "rule": "ops-file-conventions",
+      "file": "ops/README.md",
+      "adr": "ADR-0037",
+      "reason": "the self-hosting guide predates M14a and its H1 is the user-facing Persian title, not an OPERATIONS header. Rewriting that heading is phase 10 doc-drift work (ADR-0036/ADR-0045); registering the one legacy hit keeps the rule enabled for every ops document written from here on instead of exempting the whole markdown surface",
+      "since": "2026-09-12"
     }
   ]
 }
