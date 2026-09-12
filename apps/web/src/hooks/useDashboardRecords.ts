@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
 import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
 import type { DashboardDataProvider } from "../data/dashboard-data-types";
+import { dashboardEventBus, type DashboardEventBus } from "../state/dashboard-event-bus";
 
 export interface NewPatientInput {
   firstName: string;
@@ -29,7 +30,10 @@ function snapshotImages(provider: DashboardDataProvider): Record<string, Trichos
 }
 
 /** Owns the real-provider-first roster pipeline and local record mutations. */
-export function useDashboardRecords(provider: DashboardDataProvider): DashboardRecordsState {
+export function useDashboardRecords(
+  provider: DashboardDataProvider,
+  bus: DashboardEventBus = dashboardEventBus,
+): DashboardRecordsState {
   const [patients, setPatients] = useState<Patient[]>(() => [...provider.getPatients()]);
   const [images, setImages] = useState<Record<string, TrichoscopyImage[]>>(() => snapshotImages(provider));
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -44,9 +48,19 @@ export function useDashboardRecords(provider: DashboardDataProvider): DashboardR
     if (!selectedPatient && patientList[0]) setSelectedPatient(patientList[0]);
   }, [patientList, selectedPatient]);
 
+  useEffect(() => {
+    return bus.subscribe("patient:selected", ({ patientId }) => {
+      const found = patientList.find((patient) => patient.id === patientId);
+      if (found && found.id !== selectedPatient?.id) setSelectedPatient(found);
+    });
+  }, [bus, patientList, selectedPatient?.id]);
+
   const selectPatientById = (id: string) => {
     const found = patientList.find((patient) => patient.id === id);
-    if (found) setSelectedPatient(found);
+    if (found) {
+      setSelectedPatient(found);
+      bus.emit("patient:selected", { patientId: found.id });
+    }
   };
 
   const addPatient = (input: NewPatientInput, labels: { today: string; defaultCondition: string }): Patient | null => {
@@ -67,6 +81,8 @@ export function useDashboardRecords(provider: DashboardDataProvider): DashboardR
     };
     setPatients((current) => [created, ...current]);
     setSelectedPatient(created);
+    bus.emit("patient:created", { patient: created });
+    bus.emit("patient:selected", { patientId: created.id });
     return created;
   };
 

@@ -99,6 +99,21 @@ describe("L2b - dashboard state and data pipeline hooks", () => {
   });
 });
 
+describe("L2c - dashboard state synchronization event bus", () => {
+  it("keeps the bus typed, injectable, and shared by records and modals", () => {
+    const dashboard = read("apps/web/src/components/ClinicalDashboard.tsx");
+    const bus = read("apps/web/src/state/dashboard-event-bus.ts");
+    expect(dashboard).toContain("useDashboardEventBus");
+    expect(dashboard).toContain("useDashboardModals(bus)");
+    expect(dashboard).toContain("useDashboardRecords(dataProvider, bus)");
+    expect(bus).toContain("DashboardEventMap");
+    expect(bus).toContain('"patient:selected"');
+    expect(bus).toContain('"modal:opened"');
+    expect(read("apps/web/src/hooks/useDashboardModals.ts")).toContain("DashboardEventBus");
+    expect(read("apps/web/src/hooks/useDashboardRecords.ts")).toContain("patient:created");
+  });
+});
+
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate
  * ran in CI, but its ceiling came from BUNDLE_BUDGET_BYTES - any step could

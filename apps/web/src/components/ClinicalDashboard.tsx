@@ -44,6 +44,7 @@ import { useDashboardModals } from "../hooks/useDashboardModals";
 import { useDashboardNavigation } from "../hooks/useDashboardNavigation";
 import { useDashboardRecords } from "../hooks/useDashboardRecords";
 import { useDashboardAnalysis } from "../hooks/useDashboardAnalysis";
+import { useDashboardEventBus } from "../hooks/useDashboardEventBus";
 import { faNum, formatDate } from "../i18n";
 
 export { SECTIONS };
@@ -73,6 +74,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const areaLabel = (area: string): string => t(`dashboard.galleryVision.areas.${area}`);
 
   const { activeSection, showBackToTop, scrollToSection } = useDashboardNavigation();
+  const { bus } = useDashboardEventBus();
 
   // Phase 4: modal visibility is owned by a dedicated reducer-backed hook.
   const {
@@ -97,7 +99,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     closePdfReport,
     openBeforeAfter,
     closeBeforeAfter,
-  } = useDashboardModals();
+  } = useDashboardModals(bus);
 
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
@@ -113,7 +115,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     setImages: setLocalImages,
     selectPatientById,
     addPatient,
-  } = useDashboardRecords(dataProvider);
+  } = useDashboardRecords(dataProvider, bus);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
   const [selectedTagFilter, _setSelectedTagFilter] = useState<string>("all");
   const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);

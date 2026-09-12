@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { dashboardEventBus, type DashboardEventBus } from "../state/dashboard-event-bus";
 
 /**
  * Phase 4 of the ClinicalDashboard refactor.
@@ -101,35 +102,36 @@ export interface UseDashboardModalsReturn {
  * @example
  * const { isConsentOpen, openConsent, closeConsent } = useDashboardModals();
  */
-export function useDashboardModals(): UseDashboardModalsReturn {
+export function useDashboardModals(bus: DashboardEventBus = dashboardEventBus): UseDashboardModalsReturn {
   const [state, dispatch] = useReducer(dashboardModalsReducer, INITIAL_DASHBOARD_MODAL_STATE);
-
-  const openConsent = useCallback(() => dispatch({ type: "open", modal: "consent" }), []);
-  const closeConsent = useCallback(() => dispatch({ type: "close", modal: "consent" }), []);
-
-  const openLicense = useCallback(() => dispatch({ type: "open", modal: "license" }), []);
-  const closeLicense = useCallback(() => dispatch({ type: "close", modal: "license" }), []);
-
-  const openSync = useCallback(() => dispatch({ type: "open", modal: "sync" }), []);
-  const closeSync = useCallback(() => dispatch({ type: "close", modal: "sync" }), []);
-
-  const openEducation = useCallback(() => dispatch({ type: "open", modal: "education" }), []);
-  const closeEducation = useCallback(() => dispatch({ type: "close", modal: "education" }), []);
-
+  useEffect(() => {
+    const unsubscribeOpened = bus.subscribe("modal:opened", ({ modal }) => dispatch({ type: "open", modal }));
+    const unsubscribeClosed = bus.subscribe("modal:closed", ({ modal }) => dispatch({ type: "close", modal }));
+    return () => {
+      unsubscribeOpened();
+      unsubscribeClosed();
+    };
+  }, [bus]);
+  const openConsent = useCallback(() => { dispatch({ type: "open", modal: "consent" }); bus.emit("modal:opened", { modal: "consent" }); }, [bus]);
+  const closeConsent = useCallback(() => { dispatch({ type: "close", modal: "consent" }); bus.emit("modal:closed", { modal: "consent" }); }, [bus]);
+  const openLicense = useCallback(() => { dispatch({ type: "open", modal: "license" }); bus.emit("modal:opened", { modal: "license" }); }, [bus]);
+  const closeLicense = useCallback(() => { dispatch({ type: "close", modal: "license" }); bus.emit("modal:closed", { modal: "license" }); }, [bus]);
+  const openSync = useCallback(() => { dispatch({ type: "open", modal: "sync" }); bus.emit("modal:opened", { modal: "sync" }); }, [bus]);
+  const closeSync = useCallback(() => { dispatch({ type: "close", modal: "sync" }); bus.emit("modal:closed", { modal: "sync" }); }, [bus]);
+  const openEducation = useCallback(() => { dispatch({ type: "open", modal: "education" }); bus.emit("modal:opened", { modal: "education" }); }, [bus]);
+  const closeEducation = useCallback(() => { dispatch({ type: "close", modal: "education" }); bus.emit("modal:closed", { modal: "education" }); }, [bus]);
   const openGuidedCapture = useCallback(
-    () => dispatch({ type: "open", modal: "guidedCapture" }),
-    []
+    () => { dispatch({ type: "open", modal: "guidedCapture" }); bus.emit("modal:opened", { modal: "guidedCapture" }); },
+    [bus]
   );
   const closeGuidedCapture = useCallback(
-    () => dispatch({ type: "close", modal: "guidedCapture" }),
-    []
+    () => { dispatch({ type: "close", modal: "guidedCapture" }); bus.emit("modal:closed", { modal: "guidedCapture" }); },
+    [bus]
   );
-
-  const openPdfReport = useCallback(() => dispatch({ type: "open", modal: "pdfReport" }), []);
-  const closePdfReport = useCallback(() => dispatch({ type: "close", modal: "pdfReport" }), []);
-
-  const openBeforeAfter = useCallback(() => dispatch({ type: "open", modal: "beforeAfter" }), []);
-  const closeBeforeAfter = useCallback(() => dispatch({ type: "close", modal: "beforeAfter" }), []);
+  const openPdfReport = useCallback(() => { dispatch({ type: "open", modal: "pdfReport" }); bus.emit("modal:opened", { modal: "pdfReport" }); }, [bus]);
+  const closePdfReport = useCallback(() => { dispatch({ type: "close", modal: "pdfReport" }); bus.emit("modal:closed", { modal: "pdfReport" }); }, [bus]);
+  const openBeforeAfter = useCallback(() => { dispatch({ type: "open", modal: "beforeAfter" }); bus.emit("modal:opened", { modal: "beforeAfter" }); }, [bus]);
+  const closeBeforeAfter = useCallback(() => { dispatch({ type: "close", modal: "beforeAfter" }); bus.emit("modal:closed", { modal: "beforeAfter" }); }, [bus]);
 
   return useMemo(
     () => ({
