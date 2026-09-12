@@ -58,6 +58,16 @@ describe("M1d - production sample data is stripped and fail-closed", () => {
   });
 });
 
+describe("web bundle splitting", () => {
+  it("keeps the heavy Three.js runtime and stable vendors in dedicated chunks", () => {
+    const vite = read("apps/web/vite.config.ts");
+    expect(vite).toContain("manualChunks");
+    expect(vite).toContain("three-vendor");
+    expect(vite).toContain("react-vendor");
+    expect(vite).toContain("i18n-vendor");
+  });
+});
+
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate
  * ran in CI, but its ceiling came from BUNDLE_BUDGET_BYTES - any step could
