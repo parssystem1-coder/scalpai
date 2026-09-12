@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
+import React, { useState, useRef, Suspense, lazy } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Camera,
@@ -16,8 +16,7 @@ import {
   RotateCw,
   Move,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch, clearAccessToken } from "../api/client";
+import { clearAccessToken } from "../api/client";
 import { useSync } from "../offline/SyncProvider";
 import DigitalConsentModal from "./DigitalConsentModal";
 import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal";
@@ -31,8 +30,7 @@ import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D"));
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay";
-import { createEngine } from "@scalpai/analysis-engine";
-import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
+import type { TrichoscopyImage } from "../data/dashboard-samples";
 import {
   createEmptyDashboardDataProvider,
 } from "../data/dashboard-data-provider";
@@ -41,8 +39,11 @@ import DashboardShell from "./DashboardShell";
 import { SECTIONS, type SectionId } from "./dashboard-sections";
 import PatientListSection from "./sections/PatientListSection";
 import ScalpMapSection from "./sections/ScalpMapSection";
-import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection";
+import AnalyticsSection from "./sections/AnalyticsSection";
 import { useDashboardModals } from "../hooks/useDashboardModals";
+import { useDashboardNavigation } from "../hooks/useDashboardNavigation";
+import { useDashboardRecords } from "../hooks/useDashboardRecords";
+import { useDashboardAnalysis } from "../hooks/useDashboardAnalysis";
 import { faNum, formatDate } from "../i18n";
 
 export { SECTIONS };
@@ -71,46 +72,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   /** Localised name of a trichoscopy area (`vertex`, `temple`, ...). */
   const areaLabel = (area: string): string => t(`dashboard.galleryVision.areas.${area}`);
 
-  const [activeSection, setActiveSection] = useState<SectionId>("patients");
-  const isManualScrolling = useRef(false);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-
-  const scrollToSection = (sectionId: SectionId) => {
-    setActiveSection(sectionId);
-    isManualScrolling.current = true;
-    const el = document.getElementById(`section-${sectionId}`);
-    if (el) {
-      const yOffset = -90;
-      const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    }
-    setTimeout(() => {
-      isManualScrolling.current = false;
-    }, 850);
-  };
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setShowBackToTop(scrollY > 350);
-
-      if (isManualScrolling.current) return;
-      const scrollPos = scrollY + 160;
-
-      for (let i = SECTIONS.length - 1; i >= 0; i--) {
-        const sec = SECTIONS[i];
-        if (!sec) continue;
-        const el = document.getElementById(`section-${sec.id}`);
-        if (el && el.offsetTop <= scrollPos) {
-          setActiveSection(sec.id);
-          break;
-        }
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const { activeSection, showBackToTop, scrollToSection } = useDashboardNavigation();
 
   // Phase 4: modal visibility is owned by a dedicated reducer-backed hook.
   const {
@@ -137,9 +99,6 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     closeBeforeAfter,
   } = useDashboardModals();
 
-  // `null` until a record exists: the real provider intentionally has an empty
-  // state and never falls back to demo data.
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
   // Modal payload/context state (not open/close state) stays local to the dashboard.
@@ -147,12 +106,14 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
   const [compareDefaultA, setCompareDefaultA] = useState<string | undefined>(undefined);
   const [compareDefaultB, setCompareDefaultB] = useState<string | undefined>(undefined);
-  const [localPatients, setLocalPatients] = useState<Patient[]>(() => [...dataProvider.getPatients()]);
-  const [localImages, setLocalImages] = useState<Record<string, TrichoscopyImage[]>>(() =>
-    Object.fromEntries(
-      Object.entries(dataProvider.getImages()).map(([patientId, images]) => [patientId, [...images]])
-    )
-  );
+  const {
+    images: localImages,
+    patientList,
+    selectedPatient,
+    setImages: setLocalImages,
+    selectPatientById,
+    addPatient,
+  } = useDashboardRecords(dataProvider);
   const [selectedArea, setSelectedArea] = useState<"vertex" | "temple" | "frontal" | "occiput">("vertex");
   const [selectedTagFilter, _setSelectedTagFilter] = useState<string>("all");
   const [activeInspectedPhoto, setActiveInspectedPhoto] = useState<TrichoscopyImage | null>(null);
@@ -510,106 +471,25 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
     setTimeout(() => setUploadFeedback(null), 4000);
   };
 
-  // AI Diagnostic State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<AnalyticsData>({
-    scores: { redness: 22, flakeTexture: 26, densityProxy: 88 },
-    severity: 24,
-    anagenRatio: 87,
-    hairCaliber: t("dashboard.ai.caliberHealthy"),
-    recommendation: t("dashboard.ai.protocolPeptide"),
-    matrixHydration: 92,
-    tensorConfidence: 97.4,
-    follicularUnits: { single: 24, double: 52, triple: 24 },
+  const { isAnalyzing, result: aiResult, runAnalysis: handleRunAiAnalysis } = useDashboardAnalysis({
+    caliberHealthy: t("dashboard.ai.caliberHealthy"),
+    caliberStandard: (microns) => t("dashboard.ai.caliberStandard", { microns }),
+    protocolPeptide: t("dashboard.ai.protocolPeptide"),
+    protocolSoothing: t("dashboard.ai.protocolSoothing"),
+    protocolMeso: t("dashboard.ai.protocolMeso"),
   });
 
-  // Fetch real API patients if online, with fallback to the explicitly selected provider.
-  const { data: apiPatients } = useQuery({
-    queryKey: ["patients"],
-    queryFn: () => apiFetch<Patient[]>("/patients?limit=50").catch(() => null),
-    retry: false,
-  });
-
-  const patientList = apiPatients && apiPatients.length > 0 ? apiPatients : localPatients;
-
-  // Latch onto the first available record once the roster is known. Demo data
-  // can only arrive through dataProvider.mode="demo".
-  useEffect(() => {
-    if (selectedPatient) return;
-    const first = patientList[0];
-    if (first) setSelectedPatient(first);
-  }, [patientList, selectedPatient]);
-
-  const handleSelectPatientById = (id: string) => {
-    const found = patientList.find((p) => p.id === id);
-    if (found) setSelectedPatient(found);
-  };
+  const handleSelectPatientById = selectPatientById;
 
   const handleAddPatient = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPatient.firstName || !newPatient.lastName) return;
-
-    const created: Patient = {
-      id: `pat-${Date.now().toString().slice(-4)}`,
-      firstName: newPatient.firstName,
-      lastName: newPatient.lastName,
-      phone: newPatient.phone || "09120000000",
-      lastVisit: t("dashboard.addPatient.today"),
-      scalpCondition: newPatient.condition || t("dashboard.addPatient.defaultCondition"),
-      hairDensity: 154,
-      anagenRatio: 85,
-      keratinHealth: 90,
-      sebumBalance: 75,
-      microcirculation: 80,
-      stemCellVitality: 85,
-    };
-
-    setLocalPatients([created, ...localPatients]);
-    setSelectedPatient(created);
+    const created = addPatient(newPatient, {
+      today: t("dashboard.addPatient.today"),
+      defaultCondition: t("dashboard.addPatient.defaultCondition"),
+    });
+    if (!created) return;
     setNewPatient({ firstName: "", lastName: "", phone: "", condition: "" });
     setIsAddPatientOpen(false);
-  };
-
-  const handleRunAiAnalysis = async () => {
-    setIsAnalyzing(true);
-    try {
-      const engine = createEngine();
-      const syntheticData = new Uint8ClampedArray(128 * 128 * 4);
-      for (let i = 0; i < syntheticData.length; i += 4) {
-        syntheticData[i] = 225;
-        syntheticData[i + 1] = 185;
-        syntheticData[i + 2] = 175;
-        syntheticData[i + 3] = 255;
-      }
-
-      const out = await engine.analyze({
-        image: { data: syntheticData, width: 128, height: 128 },
-      });
-
-      setAiResult({
-        scores: out.scores,
-        severity: out.severity,
-        anagenRatio: Math.round(82 + Math.random() * 12),
-        hairCaliber: t("dashboard.ai.caliberStandard", {
-          microns: Math.round(68 + Math.random() * 12),
-        }),
-        matrixHydration: Math.round(86 + Math.random() * 10),
-        tensorConfidence: 98.2,
-        follicularUnits: {
-          single: Math.round(18 + Math.random() * 8),
-          double: Math.round(48 + Math.random() * 10),
-          triple: Math.round(25 + Math.random() * 10),
-        },
-        recommendation:
-          out.scores.redness > 35
-            ? t("dashboard.ai.protocolSoothing")
-            : t("dashboard.ai.protocolMeso"),
-      });
-    } catch {
-      // Fallback
-    } finally {
-      setTimeout(() => setIsAnalyzing(false), 900);
-    }
   };
 
   const CONDITION_MATCHERS: Record<ConditionKey, string[]> = {

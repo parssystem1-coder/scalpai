@@ -86,6 +86,19 @@ describe("L2a - ClinicalDashboard composition shell contracts", () => {
   });
 });
 
+describe("L2b - dashboard state and data pipeline hooks", () => {
+  it("keeps navigation, records, and analysis orchestration outside the JSX root", () => {
+    const dashboard = read("apps/web/src/components/ClinicalDashboard.tsx");
+    expect(dashboard).toContain("useDashboardNavigation");
+    expect(dashboard).toContain("useDashboardRecords");
+    expect(dashboard).toContain("useDashboardAnalysis");
+    expect(dashboard).not.toContain('import { useQuery } from "@tanstack/react-query"');
+    expect(dashboard).not.toContain('import { createEngine } from "@scalpai/analysis-engine"');
+    expect(read("apps/web/src/hooks/useDashboardRecords.ts")).toContain("DashboardDataProvider");
+    expect(read("apps/web/src/hooks/useDashboardAnalysis.ts")).toContain("createEngine");
+  });
+});
+
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate
  * ran in CI, but its ceiling came from BUNDLE_BUDGET_BYTES - any step could
