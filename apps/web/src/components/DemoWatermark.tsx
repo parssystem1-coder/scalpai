@@ -1,7 +1,7 @@
 import React from "react";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { DashboardDataMode } from "../data/dashboard-data-provider.js";
+import type { DashboardDataMode } from "../data/dashboard-data-types";
 
 interface DemoWatermarkProps {
   mode: DashboardDataMode;

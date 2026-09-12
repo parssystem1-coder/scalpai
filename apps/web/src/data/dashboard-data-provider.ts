@@ -1,19 +1,4 @@
-import type { Patient, TrichoscopyImage } from "./dashboard-samples.js";
-
-/** The provenance of data exposed to dashboard consumers. */
-export type DashboardDataMode = "real" | "demo" | "test";
-
-export interface DashboardData {
-  readonly mode: DashboardDataMode;
-  readonly patients: readonly Patient[];
-  readonly images: Readonly<Record<string, readonly TrichoscopyImage[]>>;
-}
-
-export interface DashboardDataProvider {
-  readonly mode: DashboardDataMode;
-  getPatients(): readonly Patient[];
-  getImages(): Readonly<Record<string, readonly TrichoscopyImage[]>>;
-}
+import type { DashboardData, DashboardDataProvider } from "./dashboard-data-types";
 
 export const EMPTY_DASHBOARD_DATA: DashboardData = Object.freeze({
   mode: "real" as const,

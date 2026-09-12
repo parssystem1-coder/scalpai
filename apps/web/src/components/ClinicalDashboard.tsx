@@ -17,37 +17,37 @@ import {
   Move,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch, clearAccessToken } from "../api/client.js";
-import { useSync } from "../offline/SyncProvider.js";
-import { AmberOrbs } from "./AmberOrbs.js";
-import { HairCanvas } from "./HairCanvas.js";
-import DigitalConsentModal from "./DigitalConsentModal.js";
-import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal.js";
-import SyncInspectorModal from "./SyncInspectorModal.js";
-import type { ZoneClinicalData } from "./ScalpMap.js";
-import EducationModal from "./EducationModal.js";
-import GuidedCaptureModal from "./GuidedCaptureModal.js";
-import ClinicalPdfReportModal from "./ClinicalPdfReportModal.js";
-import BeforeAfterCompareModal from "./BeforeAfterCompareModal.js";
+import { apiFetch, clearAccessToken } from "../api/client";
+import { useSync } from "../offline/SyncProvider";
+import { AmberOrbs } from "./AmberOrbs";
+import { HairCanvas } from "./HairCanvas";
+import DigitalConsentModal from "./DigitalConsentModal";
+import LicenseDiagnosticsModal from "./LicenseDiagnosticsModal";
+import SyncInspectorModal from "./SyncInspectorModal";
+import type { ZoneClinicalData } from "./ScalpMap";
+import EducationModal from "./EducationModal";
+import GuidedCaptureModal from "./GuidedCaptureModal";
+import ClinicalPdfReportModal from "./ClinicalPdfReportModal";
+import BeforeAfterCompareModal from "./BeforeAfterCompareModal";
 import type { ConditionKey, SeverityLevel } from "@scalpai/education";
-import LuxuryTiltCard from "./LuxuryTiltCard.js";
-const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
-import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay.js";
-import { DemoWatermark } from "./DemoWatermark.js";
+import LuxuryTiltCard from "./LuxuryTiltCard";
+const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D"));
+import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay";
+import { DemoWatermark } from "./DemoWatermark";
 import { createEngine } from "@scalpai/analysis-engine";
-import type { Patient, TrichoscopyImage } from "../data/dashboard-samples.js";
+import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
 import {
   createEmptyDashboardDataProvider,
-  type DashboardDataProvider,
-} from "../data/dashboard-data-provider.js";
-import DashboardHeader from "./DashboardHeader.js";
-import DashboardTabs from "./DashboardTabs.js";
-import { SECTIONS, type SectionId } from "./dashboard-sections.js";
-import PatientListSection from "./sections/PatientListSection.js";
-import ScalpMapSection from "./sections/ScalpMapSection.js";
-import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection.js";
-import { useDashboardModals } from "../hooks/useDashboardModals.js";
-import { faNum, formatDate } from "../i18n.js";
+} from "../data/dashboard-data-provider";
+import type { DashboardDataProvider } from "../data/dashboard-data-types";
+import DashboardHeader from "./DashboardHeader";
+import DashboardTabs from "./DashboardTabs";
+import { SECTIONS, type SectionId } from "./dashboard-sections";
+import PatientListSection from "./sections/PatientListSection";
+import ScalpMapSection from "./sections/ScalpMapSection";
+import AnalyticsSection, { type AnalyticsData } from "./sections/AnalyticsSection";
+import { useDashboardModals } from "../hooks/useDashboardModals";
+import { faNum, formatDate } from "../i18n";
 
 export { SECTIONS };
 export type { SectionId };

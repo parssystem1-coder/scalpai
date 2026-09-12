@@ -3,8 +3,8 @@ import {
   createDemoDashboardDataProvider,
   createEmptyDashboardDataProvider,
   createTestDashboardDataProvider,
-} from "./dashboard-data-provider.js";
-import type { Patient, TrichoscopyImage } from "./dashboard-samples.js";
+} from "./dashboard-data-provider";
+import type { Patient, TrichoscopyImage } from "./dashboard-samples";
 
 const patient: Patient = {
   id: "fixture-patient",

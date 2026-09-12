@@ -6,8 +6,8 @@ import {
   Eye,
   CheckCircle,
 } from "lucide-react";
-import { DemoWatermark } from "./DemoWatermark.js";
-import type { DashboardDataMode } from "../data/dashboard-data-provider.js";
+import { DemoWatermark } from "./DemoWatermark";
+import type { DashboardDataMode } from "../data/dashboard-data-types";
 
 export interface FollicleDetection {
   id: string;
