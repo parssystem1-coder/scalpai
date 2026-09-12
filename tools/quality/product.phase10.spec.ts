@@ -15,10 +15,48 @@ import {
   scanOpsFiles,
   tsxImportBoundaries,
 } from "../conformance/rules/v2.js";
+import { scanProductionArtifact } from "../production-stripping.js";
 
 const ROOT = process.cwd();
 const read = (rel: string): string => readFileSync(join(ROOT, rel), "utf8");
 const has = (rel: string): boolean => existsSync(join(ROOT, rel));
+
+describe("M1d - production sample data is stripped and fail-closed", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "m1d-"));
+  afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+  const fixture = (name: string, content: string): { manifest: string; dist: string } => {
+    const dist = join(tmp, name);
+    const assets = join(dist, "assets");
+    mkdirSync(assets, { recursive: true });
+    const manifest = join(dist, ".vite", "manifest.json");
+    mkdirSync(join(dist, ".vite"), { recursive: true });
+    writeFileSync(manifest, JSON.stringify({ "index.html": { file: "assets/index.js", isEntry: true } }), "utf8");
+    writeFileSync(join(assets, "index.js"), content, "utf8");
+    return { manifest, dist };
+  };
+
+  it("passes a clean production artifact and rejects M1 symbols and fixture assets", () => {
+    const clean = fixture("clean", "export const mode = 'real';");
+    expect(scanProductionArtifact(clean.manifest, clean.dist).findings).toEqual([]);
+
+    const contaminated = fixture("contaminated", "const SAMPLE_PATIENTS = [];");
+    mkdirSync(join(contaminated.dist, "trichoscopy"), { recursive: true });
+    writeFileSync(join(contaminated.dist, "trichoscopy", "vertex.jpg"), "fixture", "utf8");
+    const report = scanProductionArtifact(contaminated.manifest, contaminated.dist);
+    expect(report.ok).toBe(false);
+    expect(report.findings.map((finding) => finding.pattern)).toEqual(
+      expect.arrayContaining(["SAMPLE_PATIENTS", "trichoscopy fixture asset"]),
+    );
+  });
+
+  it("wires the scanner and report through the canonical CI evidence path", () => {
+    const workflow = read(".github/workflows/ci.yml");
+    expect(workflow).toContain("run-gate.sh production-stripping npm run production:strip");
+    expect(workflow).toContain("production-stripping.report.json");
+    expect(read("tools/ci/gate-report.ts")).toContain('"production-stripping"');
+  });
+});
 
 /**
  * M15b (playbook docs/playbooks/phase10-M15-bundle-budget.md). The bundle gate

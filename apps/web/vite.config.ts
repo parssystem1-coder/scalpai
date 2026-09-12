@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // M1d: demo/test fixtures remain available in dev, while production must
+  // not copy the legacy public sample assets into the deployable artifact.
+  publicDir: mode === 'production' ? false : 'public',
   build: {
     // WEAKNESSES M15: the bundle budget measures the REAL initial payload by
     // walking this manifest and its static import graph (tools/bundle-budget.ts).
@@ -26,4 +29,4 @@ export default defineConfig({
       '@scalpai/education': path.resolve(__dirname, '../../packages/education/src/index.ts'),
     },
   },
-});
+}));

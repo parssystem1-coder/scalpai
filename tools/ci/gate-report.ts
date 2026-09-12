@@ -27,6 +27,7 @@ export const REQUIRED_GATES = [
   "db-seed",
   "test-coverage",
   "build",
+  "production-stripping",
   "bundle-budget",
   "conformance",
   "graph",

@@ -152,6 +152,9 @@ jobs:
           bash tools/ci/run-gate.sh bundle-budget
           npm run budget:bundle -- --policy tools/bundle-budget.policy.json
 
+      - name: Reject sample data from the production artifact (M1d)
+        run: bash tools/ci/run-gate.sh production-stripping npm run production:strip
+
       - name: Conformance harness (ADR-21)
         run: bash tools/ci/run-gate.sh conformance npm run conformance
 
@@ -176,6 +179,7 @@ jobs:
           name: bundle-budget
           path: |
             apps/web/dist/bundle-budget.report.json
+            apps/web/dist/production-stripping.report.json
             tools/bundle-budget.policy.json
           retention-days: 14
 
