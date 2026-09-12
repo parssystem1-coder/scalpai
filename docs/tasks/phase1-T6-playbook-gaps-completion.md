@@ -18,11 +18,11 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | **26 passed / 26** (+۷ جدید: ۲ plans-CRUD، ۲ quota، ۳ exceptions-harness) |
+| `npm test` | **26 passed / 26** (+۷ جدید: ۲ plans-CRUD، ۲ quota، ۳ exceptions-harness) |
 | typecheck / lint / build | 16/16 · exit0 · 14/14 |
 | conformance | PASS (7 rules) |
 | graph --check | سبز |
-| `pnpm e2e` @smoke | 1 passed (پس از تغییرات main.ts) |
+| `npm e2e` @smoke | 1 passed (پس از تغییرات main.ts) |
 | OpenAPI زنده | GET /api/v1/docs-json → 200 |
 
 ## سیاست‌هایی که این slice اثبات کرد

@@ -57,8 +57,8 @@
 **⛔ STOP & REPORT**
 
 ## Exit criteria پایان فاز ۳ — همه با اجرا/CI اثبات:
-1. `pnpm e2e --grep "@offline"` سبز — sync بدون خطا و بدون دوباره‌کاری (dedupe تست)
-2. `pnpm e2e --grep "@license"` سبز — ساعت جلو/grace صحیح؛ لایسنس دستکاری‌شده رد می‌شود
+1. `npm e2e --grep "@offline"` سبز — sync بدون خطا و بدون دوباره‌کاری (dedupe تست)
+2. `npm e2e --grep "@license"` سبز — ساعت جلو/grace صحیح؛ لایسنس دستکاری‌شده رد می‌شود
 3. kill وسط آپلود بزرگ → resume تا done (تست P4)
 4. تعارض field-level دو کلاینت بدون گم‌شدن داده (integration P2 + unit P1)
 5. `docker compose -f ops/prod.yml config -q` پاس · backup→restore drill اجرا شده و خروجی ثبت است

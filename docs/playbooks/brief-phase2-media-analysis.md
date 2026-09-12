@@ -56,8 +56,8 @@
 **⛔ STOP & REPORT**
 
 ## Exit criteria پایان فاز ۲ — همه با اجرا/CI اثبات:
-1. `pnpm test` سبز شامل fixture کیفیت (تار رد شود) و roundtrip presign
-2. `pnpm e2e --grep "@analysis"` سبز با assertion تحلیل <۳s
+1. `npm test` سبز شامل fixture کیفیت (تار رد شود) و roundtrip presign
+2. `npm e2e --grep "@analysis"` سبز با assertion تحلیل <۳s
 3. coverage gate ≥70% حفظ — پکیج‌های analysis-core/engine زیر پوشش
 4. conformance PASS · graph --check سبز (endpoints جدید در گراف)
 5. bundle gzip <300KB — step CI سبز

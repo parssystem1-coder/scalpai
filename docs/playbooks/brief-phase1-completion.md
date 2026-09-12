@@ -22,7 +22,7 @@
 
 ## Slice T3 — Playwright @smoke
 - نصب Playwright (+browsers) · e2e/smoke.spec.ts: login→ایجاد بیمار→دیده‌شدن در لیست روی API واقعی لوکال
-- اسکریپت `pnpm e2e` + اجرا در DoD
+- اسکریپت `npm e2e` + اجرا در DoD
 - mini-DoD: @smoke سبز لوکال · push + completion file
 
 **⛔ STOP & REPORT**
@@ -42,7 +42,7 @@
 **⛔ STOP & REPORT**
 
 ## Exit criteria پایان فاز ۱ — همگی با CI/اجرای محلی اثبات:
-1. `pnpm test` سبز شامل @smoke مرورگر
+1. `npm test` سبز شامل @smoke مرورگر
 2. coverage ≥70% قفل‌شده در CI
 3. conformance PASS · graph --check سبز
 4. GATE_REVIEW نهایی فاز ۱ = PASS

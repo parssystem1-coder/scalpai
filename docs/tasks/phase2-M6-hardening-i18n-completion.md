@@ -18,7 +18,7 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | **62 passed / 62** (+۳ throttle/headers، +۳ autolock) |
+| `npm test` | **62 passed / 62** (+۳ throttle/headers، +۳ autolock) |
 | typecheck / lint / build / conformance / graph / budget(144KB) | سبز تمام |
 | e2e smoke + @analysis | هر دو پاس — UI ترجمه‌شده selectors را نشکست (مقادیر fa عیناً حفظ شد) |
 

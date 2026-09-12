@@ -18,7 +18,7 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | **33 passed / 33** (+۷ کیفیت: pass/تار/تاریک/شسته/خالی/قطعیت/ریزکادر) |
+| `npm test` | **33 passed / 33** (+۷ کیفیت: pass/تار/تاریک/شسته/خالی/قطعیت/ریزکادر) |
 | coverage | lines=**84.26%** ≥70 (کد جدید analysis-core زیر پوشش آمد) |
 | typecheck / lint / build / conformance / graph | سبز تمام |
 

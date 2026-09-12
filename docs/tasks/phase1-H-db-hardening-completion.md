@@ -21,8 +21,8 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm db:migrate` | applied=1 (0004) |
-| `pnpm test` | **19 passed / 19** (+۳ تست جدید: concurrency، trigger، encoding self-test) |
+| `npm db:migrate` | applied=1 (0004) |
+| `npm test` | **19 passed / 19** (+۳ تست جدید: concurrency، trigger، encoding self-test) |
 | typecheck / lint / build | 16/16 · exit0 · 14/14 |
 | conformance | **PASS (7 rules)** — شامل encoding-guard روی کل ریپو |
 | graph --check | سبز |

@@ -9,7 +9,7 @@
   - API: build کامل db/shared/api → `node dist/main.js` روی :3001 (health probe)
   - Web: `vite --port 5173 --strictPort --host 127.0.0.1`
 - `e2e/smoke.spec.ts`: مسیر طلایی مرورگری — login (owner@clinic-a.test) → ایجاد بیمار → دیده‌شدن در لیست
-- اسکریپت `pnpm e2e` = migrate + seed + playwright test
+- اسکریپت `npm e2e` = migrate + seed + playwright test
 - endpoint عمومی `GET /api/v1/health` برای probe
 
 ## باگ‌هایی که در راه سبزشدن smoke لو رفت و رفع شد
@@ -24,7 +24,7 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm e2e` (@smoke روی استک واقعی لوکال) | **1 passed** — login→create→listed |
+| `npm e2e` (@smoke روی استک واقعی لوکال) | **1 passed** — login→create→listed |
 | typecheck / lint / build | 16/16 · exit0 · 14/14 |
 | tests (unit+integration روی PG17 native) | **16 passed / 16** |
 | conformance | PASS (6 rules) |

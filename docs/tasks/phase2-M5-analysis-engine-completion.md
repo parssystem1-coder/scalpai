@@ -20,7 +20,7 @@ Seam فاز ۶: `createEngine({backend})` — ONNX بدون تغییر call-site
 |---|---|
 | unit موتور | **۶/۶** — قطعیت، تمایز قرمزی/بافت، bounds قرارداد، رد input ریز |
 | integration analyses | **۴/۴** — ذخیره/خواندن · Gold-label با هویت reviewer · خطای canonical · cross-tenant ‏404 |
-| `pnpm test` کل | **56 passed / 56** |
+| `npm test` کل | **56 passed / 56** |
 | e2e **@analysis** | ✅ آپلود UI → تحلیل → elapsed=**92ms** <۳۰۰۰ → confirm → saved |
 | typecheck/lint/build/conformance/graph | سبز (graph با ۷ یال وابستگی جدید regenerate) |
 

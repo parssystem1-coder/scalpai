@@ -8,11 +8,11 @@
 
 | دستور | خروجی کلیدی | وضعیت |
 |---|---|---|
-| `pnpm typecheck` / `pnpm lint` / `pnpm build` | سبز · exit0 · 14/14 | ✅ |
-| `pnpm db:migrate` | applied=0 skipped=7 (from-empty در CI سبز) | ✅ |
-| `pnpm test:coverage` | **62 passed / 62** · lines=**86.06%** ≥70 بدون ERROR | ✅ |
-| `pnpm conformance` | PASS ‏(7 rules, 0 violations) | ✅ |
-| `pnpm graph -- --check` | exit 0 | ✅ |
+| `npm typecheck` / `npm lint` / `npm build` | سبز · exit0 · 14/14 | ✅ |
+| `npm db:migrate` | applied=0 skipped=7 (from-empty در CI سبز) | ✅ |
+| `npm test:coverage` | **62 passed / 62** · lines=**86.06%** ≥70 بدون ERROR | ✅ |
+| `npm conformance` | PASS ‏(7 rules, 0 violations) | ✅ |
+| `npm graph -- --check` | exit 0 | ✅ |
 | bundle budget | **144,553 B gz** < 300KB · step در CI موجود و سبز | ✅ |
 
 ## ۲. چک‌لیست DoD پلی‌بوک فاز ۲

@@ -21,6 +21,6 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | 62/62 · typecheck/lint/build/conformance/graph سبز |
+| `npm test` | 62/62 · typecheck/lint/build/conformance/graph سبز |
 | e2e smoke + @analysis | پاس |
 | e2e @upload-big (throttle CDP) | پاس — بند DoD «پیشرفت صحیح بدون crash» بسته شد |

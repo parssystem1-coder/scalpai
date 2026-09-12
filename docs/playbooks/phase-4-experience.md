@@ -28,7 +28,7 @@ DESIGN-V2 §11 (storyboards) · §12 (Microscopy Premium) · ADR-8/9
 
 ## Definition of Done
 ```powershell
-pnpm e2e --grep "@education"; pnpm e2e --grep "@pdf"
+npm e2e --grep "@education"; npm e2e --grep "@pdf"
 ```
 - [ ] هر ۸ storyboard برای هر سه شدت بدون خطا پخش می‌شود
 - [ ] reduced-motion → انیمیشن جایگزین ایستا

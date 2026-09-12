@@ -19,7 +19,7 @@
 | مسیر API در پروکسی | `strip_prefix /api` که همه روت‌ها را ۴۰۴ می‌کرد | پرفیکس دست‌نخورده به `api:3000` |
 | ایمیج‌ها | `minio:latest`، pg16 در ops و pg17 در CI | همه pin، pg17 در CI/dev/prod، `postgres:17-alpine` برای pg_dump |
 | عملیات | بدون `.dockerignore`، healthcheck، سقف منابع و shutdown تمیز | هر چهار مورد اضافه شد (drain با SIGTERM/SIGINT + `stop_grace_period`) |
-| ابزار | npm در ریپو، pnpm در Playwright/Husky/graph | همه سطوح اجراشدنی روی npm، قفل‌شده با تست |
+| ابزار | npm در ریپو، npm در Playwright/Husky/graph | همه سطوح اجراشدنی روی npm، قفل‌شده با تست |
 | اسکریپت ریشه | `build`/`typecheck` فقط `app-web` | `npm exec -- turbo run build` و `... typecheck` روی همه workspace‌ها؛ بیلد Vercel در `build:vercel` |
 
 ## شواهد

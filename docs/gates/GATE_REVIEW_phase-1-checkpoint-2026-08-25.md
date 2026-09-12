@@ -9,10 +9,10 @@
 
 | دستور | خروجی کلیدی | وضعیت |
 |---|---|---|
-| `pnpm test` | **12 passed / 12** (۳ فایل) | ✅ |
-| `pnpm typecheck` | Tasks: 14 successful / 14 | ✅ |
-| `pnpm lint` | exit 0 | ✅ |
-| `pnpm build` | Tasks: 14 successful / 14 | ✅ |
+| `npm test` | **12 passed / 12** (۳ فایل) | ✅ |
+| `npm typecheck` | Tasks: 14 successful / 14 | ✅ |
+| `npm lint` | exit 0 | ✅ |
+| `npm build` | Tasks: 14 successful / 14 | ✅ |
 | `docker compose ... e2e @smoke` | **موجود نیست** — Playwright نصب/راه‌اندازی نشده | ⛔ باقی |
 | coverage gate ≥70% | در vitest.config پیکربندی نشده (`coverage` یافت نشد) | ⛔ باقی |
 
@@ -20,8 +20,8 @@
 
 | گیت | نتیجه |
 |---|---|
-| `pnpm conformance` | **PASS (6 rule(s), 0 violations)** |
-| `pnpm graph -- --check` | exit 0 |
+| `npm conformance` | **PASS (6 rule(s), 0 violations)** |
+| `npm graph -- --check` | exit 0 |
 
 ## ۳. نمونه‌گیری امنیتی (اجراهای واقعی، نه ادعا)
 

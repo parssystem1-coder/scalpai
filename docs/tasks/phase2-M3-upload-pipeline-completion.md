@@ -19,7 +19,7 @@ POST /gallery/:gid/complete        → دانلود یک‌باره سمت سر�
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | **43 passed / 43** — شامل: healthy→done با metrics/thumb/sha256 · fake-jpeg → INVALID_IMAGE+cleanup · تار → QUALITY_FAIL «تار» · cross-tenant complete → 404 · unauth init → 401 · magic-bytes unit ×۲ |
+| `npm test` | **43 passed / 43** — شامل: healthy→done با metrics/thumb/sha256 · fake-jpeg → INVALID_IMAGE+cleanup · تار → QUALITY_FAIL «تار» · cross-tenant complete → 404 · unauth init → 401 · magic-bytes unit ×۲ |
 | typecheck / lint / build / conformance / graph | سبز (گراف بعد از endpoint های جدید regenerate شد) |
 | coverage | lines=**84.94%** |
 

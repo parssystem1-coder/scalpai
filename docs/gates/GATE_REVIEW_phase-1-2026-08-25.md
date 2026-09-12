@@ -9,13 +9,13 @@
 
 | دستور | خروجی کلیدی | وضعیت |
 |---|---|---|
-| `pnpm typecheck` | Tasks: 16 successful / 16 | ✅ |
-| `pnpm lint` | exit 0 | ✅ |
-| `pnpm build` | Tasks: 14 successful / 14 | ✅ |
-| `pnpm db:migrate` | applied=0 skipped=4 — اثبات from-empty در CI (run سبز روی main با استپ migration-from-empty) | ✅ |
-| `pnpm test` | **26 passed / 26** (۵ فایل) — شامل cross-tenant منفی، audit-chain، همزمانی زنجیره، trigger ‏updated_at، quota، plans-CRUD | ✅ |
-| `pnpm test:coverage` | lines=**81.06%** ≥ 70% بدون ERROR (آستانه قفل در CI step) | ✅ |
-| `pnpm e2e` (@smoke مرورگری روی استک واقعی لوکال) | **1 passed** (login→ایجاد بیمار→لیست) | ✅ |
+| `npm typecheck` | Tasks: 16 successful / 16 | ✅ |
+| `npm lint` | exit 0 | ✅ |
+| `npm build` | Tasks: 14 successful / 14 | ✅ |
+| `npm db:migrate` | applied=0 skipped=4 — اثبات from-empty در CI (run سبز روی main با استپ migration-from-empty) | ✅ |
+| `npm test` | **26 passed / 26** (۵ فایل) — شامل cross-tenant منفی، audit-chain، همزمانی زنجیره، trigger ‏updated_at، quota، plans-CRUD | ✅ |
+| `npm test:coverage` | lines=**81.06%** ≥ 70% بدون ERROR (آستانه قفل در CI step) | ✅ |
+| `npm e2e` (@smoke مرورگری روی استک واقعی لوکال) | **1 passed** (login→ایجاد بیمار→لیست) | ✅ |
 
 یادداشت انحراف اجرا: بند DoD پلی‌بوک «docker compose up» طبق ADR-0024 به مسیر native PG17 لوکال جایگزین شده — انحراف ثبت‌شده و پذیرفته (سابقه گیت چک‌پوینت). `--grep "@smoke"` ناموثر است چون testDir فقط همین spec را دارد؛ معادل اجرا شد.
 
@@ -35,7 +35,7 @@
 
 | # | معیار | نتیجه |
 |---|---|---|
-| 1 | pnpm test سبز شامل @smoke مرورگر (لوکال — حکم W13 در T3 completion) | ✅ |
+| 1 | npm test سبز شامل @smoke مرورگر (لوکال — حکم W13 در T3 completion) | ✅ |
 | 2 | coverage ≥70% قفل در CI | ✅ 81.06% |
 | 3 | conformance PASS · graph --check سبز | ✅ |
 | 4 | GATE_REVIEW نهایی = PASS | ✅ همین سند |
@@ -44,8 +44,8 @@
 
 | گیت | نتیجه |
 |---|---|
-| `pnpm conformance` | PASS — 7 rule(s), 0 violations |
-| `pnpm graph -- --check` | exit 0 |
+| `npm conformance` | PASS — 7 rule(s), 0 violations |
+| `npm graph -- --check` | exit 0 |
 
 ## ۵. نمونه‌گیری امنیتی زنده (اجرای واقعی توسط ممیز)
 

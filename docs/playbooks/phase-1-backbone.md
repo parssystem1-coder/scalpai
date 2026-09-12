@@ -52,10 +52,10 @@ DESIGN-V2 §6.1 · §7 (چهارلایه ایزوله) · §9.1 (Plans) · §13
 
 ## Definition of Done
 ```powershell
-pnpm test            # unit+integration پاس
-pnpm typecheck; pnpm lint; pnpm build   # پاس
-docker compose -f ops/dev.yml up -d; pnpm e2e --grep "@smoke"   # login+CRUD پاس
-pnpm conformance; pnpm graph --check   # نگهبان معماری پاس
+npm test            # unit+integration پاس
+npm typecheck; npm lint; npm build   # پاس
+docker compose -f ops/dev.yml up -d; npm e2e --grep "@smoke"   # login+CRUD پاس
+npm conformance; npm graph --check   # نگهبان معماری پاس
 ```
 - [ ] تست cross-tenant: دریافت داده clinic دیگر = 404 (اثبات RLS)
 - [ ] endpoint بدون @RequireFeature که فیچر gated را سرو کند وجود ندارد (تست متا)

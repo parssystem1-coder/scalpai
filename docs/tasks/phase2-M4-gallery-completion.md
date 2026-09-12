@@ -11,8 +11,8 @@
 | migration 0006 | `gallery_items.deleted_at` — ستون soft-delete جاافتاده‌ی §4 (analyses طبق سیاست append-only استثناست)؛ تاریخچه 0005 دست‌نخورده ماند |
 | وب | Router واقعی (react-router-dom): `/login · /patients · /patients/:pid/gallery`؛ صفحه گالری با TanStack Query بی‌نهایت + TanStack Virtual (۴ ستونه، overscan)؛ آپلود سه‌مرحله‌ای در UI با نمایش خطای canonical؛ حذف per-item |
 | ضد base64 | رندر فقط با thumbUrl امضاشده — تست render صریحاً src را علیه `^data:` چک می‌کند |
-| seed پرفورمنس | `pnpm db:seed:gallery [count]` — top-up دقیق تا N، آبجکت‌های واقعی jpeg در MinIO؛ اجرا شد: **۵۰۰ رکورد** |
-| بودجه bundle | step جدید CI + `pnpm budget:bundle` → **141KB gzip** از سقف 300KB ✓ |
+| seed پرفورمنس | `npm db:seed:gallery [count]` — top-up دقیق تا N، آبجکت‌های واقعی jpeg در MinIO؛ اجرا شد: **۵۰۰ رکورد** |
+| بودجه bundle | step جدید CI + `npm budget:bundle` → **141KB gzip** از سقف 300KB ✓ |
 
 ## اثبات پرفورمنس (انحراف مستندشده از «Lighthouse»)
 Lighthouse نمی‌تواند به SPA ی با token در حافظه احراز هویت کند و audit صفحه login بی‌معناست. معادل عملیاتیِ قابل‌اجرا جایگزین شد:
@@ -24,9 +24,9 @@ Lighthouse نمی‌تواند به SPA ی با token در حافظه احراز
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm test` | **46 passed / 46** (+۳ لیست/حذف/cross-tenant گالری، +۲ render وب) |
+| `npm test` | **46 passed / 46** (+۳ لیست/حذف/cross-tenant گالری، +۲ render وب) |
 | typecheck / lint / build / conformance / graph / budget | همه سبز — conformance یک بار `pg` خارج از db را در اسکریپت گرفت و اسکریپت به packages/db منتقل شد |
-| `pnpm db:seed:gallery 500` | total=500 دقیق |
+| `npm db:seed:gallery 500` | total=500 دقیق |
 | `playwright e2e/perf` | passed (۳۲۸ms) |
 
 ## یادداشت صادقانه فرآیندی

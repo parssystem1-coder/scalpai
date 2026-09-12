@@ -8,12 +8,12 @@
 
 | دستور | خروجی کلیدی | وضعیت |
 |---|---|---|
-| `pnpm typecheck` / `pnpm lint` / `pnpm build` | سبز · exit0 · 14/14 | ✅ |
-| `pnpm db:migrate` | applied=0 skipped=7 (from-empty در CI سبز) | ✅ |
-| `pnpm test` | **62 passed / 62** (۱۴ فایل) | ✅ |
-| `pnpm test:coverage` | lines=**86.06%** ≥70 بدون ERROR — پکیج‌های analysis-core/engine زیر پوشش | ✅ |
-| `pnpm conformance` | PASS ‏(7 rules) | ✅ |
-| `pnpm graph -- --check` | exit 0 (endpoint های جدید در گراف) | ✅ |
+| `npm typecheck` / `npm lint` / `npm build` | سبز · exit0 · 14/14 | ✅ |
+| `npm db:migrate` | applied=0 skipped=7 (from-empty در CI سبز) | ✅ |
+| `npm test` | **62 passed / 62** (۱۴ فایل) | ✅ |
+| `npm test:coverage` | lines=**86.06%** ≥70 بدون ERROR — پکیج‌های analysis-core/engine زیر پوشش | ✅ |
+| `npm conformance` | PASS ‏(7 rules) | ✅ |
+| `npm graph -- --check` | exit 0 (endpoint های جدید در گراف) | ✅ |
 | bundle budget | **144,210 B gz** < 300KB — step CI موجود و سبز | ✅ |
 | `playwright e2e` کامل | smoke ✓ · @analysis ✓ (**elapsed 60ms**) · @perf ✓ (first tile 1942ms، DOM محدود) | ✅ |
 

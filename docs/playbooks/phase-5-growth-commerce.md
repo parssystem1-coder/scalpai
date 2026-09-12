@@ -39,7 +39,7 @@ DESIGN-V2 §6.2 · §9.1 · §13 (PHI-safe messaging) · §18 Tier-A · ADR-12/1
 
 ## Definition of Done
 ```powershell
-pnpm e2e --grep "@portal"; pnpm k6 run test/load/booking.js
+npm e2e --grep "@portal"; npm k6 run test/load/booking.js
 ```
 - [ ] رزرو E2E از موبایل واقعی: OTP→فرم→نوبت→یادآور SMS دریافتی (sandbox)
 - [ ] قطع adapter Bale → خودکار ارسال SMS fallback (تست contract)

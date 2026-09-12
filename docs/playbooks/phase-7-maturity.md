@@ -50,7 +50,7 @@ DESIGN-V2 §18 Tier B/C/D · §10.5 (فازهای C/D مدل) · ADR-11/12
 
 ## Definition of Done
 ```powershell
-pnpm test; pnpm e2e --grep "@scribe"; pnpm e2e --grep "@copilot"
+npm test; npm e2e --grep "@scribe"; npm e2e --grep "@copilot"
 ```
 - [ ] Copilot روی query cross-tenant هیچ رکوردی برنمی‌گرداند (تست منفی بحرانی)
 - [ ] Copilot داخلی و یک کلاینت MCP خارجی هر دو از همان Tool Registry پاس می‌شوند (contract-test مشترک)

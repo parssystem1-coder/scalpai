@@ -23,9 +23,9 @@
 ## Definition of Done
 ```powershell
 git log --oneline            # حداقل: init, legacy archive, scaffold, ci
-pnpm install; pnpm build     # همه اپ‌ها/پکیج‌ها بدون خطا build شوند
+npm install; npm build     # همه اپ‌ها/پکیج‌ها بدون خطا build شوند
 gh workflow list             # CI فعال
 ```
 - [ ] هیچ فایلی از v1 در main نیست (فقط برنچ legacy)
-- [ ] `pnpm -r typecheck` سبز است
+- [ ] `npm -r typecheck` سبز است
 - [ ] branch protection + auto-merge روی main فعال است (دو لاین Fast/Gated)

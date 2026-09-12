@@ -14,7 +14,7 @@
 | `npm run typecheck` | بررسی تایپ کامل TypeScript بدون خطای نوعی | ✅ PASS |
 | `npm run build` | خروجی باندل بهینه کلاینت در `dist/` | ✅ PASS |
 | `npx vitest run (packages/shared, licensing, sync-client, apps/web)` | **36 passed / 36** بدون هیچ خطای یونیت تست | ✅ PASS |
-| `pnpm conformance` | انطباق کامل با قوانین معماری و بدون circular dependency | ✅ PASS |
+| `npm conformance` | انطباق کامل با قوانین معماری و بدون circular dependency | ✅ PASS |
 
 ---
 

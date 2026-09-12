@@ -28,7 +28,7 @@ DESIGN-V2 §10.1 (Quality Gate) · §10.5 (baseline) · §12 (UI) · ADR-6
 
 ## Definition of Done
 ```powershell
-pnpm test; pnpm e2e --grep "@analysis"
+npm test; npm e2e --grep "@analysis"
 ```
 - [ ] آپلود 50MB روی شبکه کند (throttle) بدون crash و با پیشرفت صحیح
 - [ ] تصویر تار عمدی توسط quality-gate رد می‌شود (تست واحد با fixture)

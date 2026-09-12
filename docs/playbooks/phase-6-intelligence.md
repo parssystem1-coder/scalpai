@@ -36,7 +36,7 @@ DESIGN-V2 §10 کامل · §11 E2 · §6.4 · ADR-7/16
 
 ## Definition of Done
 ```powershell
-pnpm test --filter analysis-core; pnpm e2e --grep "@explorer"
+npm test --filter analysis-core; npm e2e --grep "@explorer"
 ```
 - [ ] هیچ داده بدون consent وارد Data Lake نمی‌شود (تست متا)
 - [ ] باندل مدل امضانامعتبر → رد و ادامه با baseline

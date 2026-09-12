@@ -39,8 +39,8 @@ DESIGN-V2 §8 (Sync) · §9+§9.1 (Licensing/Entitlement) · §13 · ADR-4/5/15
 
 ## Definition of Done
 ```powershell
-pnpm e2e --grep "@offline"   # قطع نت→ثبت بیمار/جلسه/تحلیل→وصل→sync بدون خطا
-pnpm e2e --grep "@license"   # جلو زدن ساعت سیستم → grace رفتار صحیح
+npm e2e --grep "@offline"   # قطع نت→ثبت بیمار/جلسه/تحلیل→وصل→sync بدون خطا
+npm e2e --grep "@license"   # جلو زدن ساعت سیستم → grace رفتار صحیح
 docker compose -f ops/prod.yml config -q   # compose معتبر
 ```
 - [ ] sync دوباره‌کاری صفر (clientMutationId dedupe تست)

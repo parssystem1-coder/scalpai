@@ -17,8 +17,8 @@
 ## mini-DoD
 | گام | نتیجه |
 |---|---|
-| `pnpm db:migrate` | applied=1 (0005) |
-| `pnpm test` | **29 passed / 29** (+۳ storage) |
+| `npm db:migrate` | applied=1 (0005) |
+| `npm test` | **29 passed / 29** (+۳ storage) |
 | typecheck / lint / build / conformance / graph | 16/16 · 0 · 14/14 · PASS(7) · سبز |
 | MinIO لوکال | health 200 روی 127.0.0.1:9000 با اعتبار env |
 

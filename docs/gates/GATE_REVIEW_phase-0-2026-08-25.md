@@ -9,9 +9,9 @@
 | # | آیتم / دستور | خروجی کلیدی | وضعیت |
 |---|---|---|---|
 | 1 | `git log --oneline` — حداقل init/archive/scaffold/ci | 14 کامیت؛ scaffold+ci+guards+adr موجود؛ archive=N/A (کد v1 وجود نداشت — در PROGRESS ثبت شده) | ✅ |
-| 2 | `pnpm install --frozen-lockfile` | Done in 450ms، بدون خطا | ✅ |
-| 3 | `pnpm build` | Tasks: **14 successful / 14 total** | ✅ |
-| 4 | `pnpm -r typecheck` | Tasks: **14 successful / 14 total** | ✅ |
+| 2 | `npm install --frozen-lockfile` | Done in 450ms، بدون خطا | ✅ |
+| 3 | `npm build` | Tasks: **14 successful / 14 total** | ✅ |
+| 4 | `npm -r typecheck` | Tasks: **14 successful / 14 total** | ✅ |
 | 5 | `gh workflow list` | `CI active` | ✅ |
 | 6 | هیچ فایل v1 در main نیست | ریپو از صفر ساخته شده — برقرار | ✅ |
 | 7 | Branch protection + auto-merge روی main | required=`["base"]`, strict=true, enforce_admins=false (طراحی ADR-23), allow_auto_merge=true — **اثبات عملی:** PR #2 با auto-merge خودکار merge شد | ✅ |
@@ -20,8 +20,8 @@
 
 | گیت | نتیجه |
 |---|---|
-| `pnpm conformance` | PASS (0 rule در فاز ۰ — registry عمداً خالی؛ پرشدن = تسک 1.8 فاز ۱) |
-| `pnpm graph -- --check` | exit 0 — outputs همگام |
+| `npm conformance` | PASS (0 rule در فاز ۰ — registry عمداً خالی؛ پرشدن = تسک 1.8 فاز ۱) |
+| `npm graph -- --check` | exit 0 — outputs همگام |
 
 ## ۳. نمونه‌گیری امنیتی (متناسب با فاز ۰)
 
