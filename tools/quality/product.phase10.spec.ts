@@ -5,7 +5,16 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { RULES } from "../conformance/rules/index.js";
 import { runRules } from "../conformance/run.js";
-import { configSchemaValidation, opsFileConventions, scanConfigSchemas, scanOpsFiles } from "../conformance/rules/v2.js";
+import {
+  architectureCallSites,
+  configSchemaValidation,
+  opsFileConventions,
+  scanArchitectureCallSites,
+  scanConfigSchemas,
+  scanImportBoundaries,
+  scanOpsFiles,
+  tsxImportBoundaries,
+} from "../conformance/rules/v2.js";
 
 const ROOT = process.cwd();
 const read = (rel: string): string => readFileSync(join(ROOT, rel), "utf8");
@@ -275,5 +284,148 @@ describe("M14a - ops conventions and config schemas are machine-checked", () => 
     // of deliberately broken files live inside the repository.
     expect(read("tools/conformance/lib/walk.ts")).toContain('"fixtures"');
     expect(has("tools/conformance/fixtures/README.md")).toBe(true);
+  });
+});
+
+/**
+ * M14b (WEAKNESSES M14, DESIGN-V2 14.4, ADR-0037).
+ *
+ * M14a taught the harness to READ two new surfaces. M14b teaches it to REASON
+ * about the project graph: the edges between the layers, and the walls between
+ * the workspaces. Both are things a typecheck cannot see, because every one of
+ * them compiles perfectly.
+ *
+ * What is proven here, again as an agreement rather than a behaviour:
+ *
+ *   1. both rules are registered, so they really run in CI;
+ *   2. they are green on this repository with NO exception at all - unlike M14a,
+ *      neither one found legacy debt to carry;
+ *   3. they still report every violation seeded in their committed fixtures, and
+ *      the harness reports ITSELF the moment one stops;
+ *   4. the deliberate deviations hold: '@scalpai/db' stays legal for a
+ *      controller, tenant context stays in withTenant, and an alias table is not
+ *      an import.
+ *
+ * Static and offline: fixtures are read, never written; the only mutation is in a
+ * temp directory.
+ */
+describe("M14b - architecture call-sites and import boundaries are machine-checked", () => {
+  const ARCH_RULE = "architecture-call-sites";
+  const BOUNDARY_RULE = "tsx-import-boundaries";
+  const fixtureRoot = (rule: string): string => join(ROOT, "tools", "conformance", "fixtures", rule);
+
+  it("registers both rules in the harness", () => {
+    const names = RULES.map((r) => r.name);
+    expect(names).toContain(ARCH_RULE);
+    expect(names).toContain(BOUNDARY_RULE);
+    expect(RULES.length, "M14b takes the ruleset to 16").toBeGreaterThanOrEqual(16);
+  });
+
+  it("leaves this repository green with nothing suppressed", async () => {
+    const res = await runRules([architectureCallSites, tsxImportBoundaries], { root: ROOT });
+    expect(res.violations, JSON.stringify(res.violations, null, 2)).toEqual([]);
+    expect(res.suppressed, "M14b carries no legacy debt: nothing may be hidden behind an exception").toBe(0);
+  });
+
+  it("registers no exception for either rule", () => {
+    const registry = JSON.parse(read("tools/conformance/exceptions.json")) as {
+      exceptions: { rule?: string; adr: string }[];
+    };
+    expect(registry.exceptions.some((e) => e.rule === ARCH_RULE)).toBe(false);
+    expect(registry.exceptions.some((e) => e.rule === BOUNDARY_RULE)).toBe(false);
+  });
+
+  it(`${ARCH_RULE} reports every violation seeded in its fixture`, () => {
+    const root = fixtureRoot(ARCH_RULE);
+    expect(existsSync(root), `${ARCH_RULE} must ship a fixture (ADR-21)`).toBe(true);
+    const violations = scanArchitectureCallSites(root);
+    const reported = violations.map((v) => v.file.split(":")[0]);
+    for (const seeded of [
+      "apps/api/src/bad-controller-direct-db.ts",
+      "apps/api/src/bad-service-no-guard.ts",
+      "packages/shared/src/mcp-registry/bad-mcp-tool-no-whitelist.ts",
+      "packages/db/src/repos/bad-repo-no-clinic-id.ts",
+    ]) {
+      expect(reported, `${seeded} must still be reported`).toContain(seeded);
+    }
+
+    // Each of the four graph nodes has to be represented, not just the file list.
+    const messages = violations.map((v) => v.message).join("\n");
+    expect(messages, "cross-layer edge").toContain("packages/db");
+    expect(messages, "endpoint node: an unmounted controller").toContain("BadDirectDbController");
+    expect(messages, "provider registration").toContain("BadUnregisteredService");
+    expect(messages, "MCP tool registry node").toContain("patients.search");
+    expect(messages, "db access node").toContain("Tx");
+    // The compliant tool in the same fixture file must NOT be reported.
+    expect(messages).not.toContain("patients.summary");
+  });
+
+  it(`${BOUNDARY_RULE} reports every violation seeded in its fixture`, () => {
+    const root = fixtureRoot(BOUNDARY_RULE);
+    expect(existsSync(root), `${BOUNDARY_RULE} must ship a fixture (ADR-21)`).toBe(true);
+    const reported = scanImportBoundaries(root).map((v) => v.file.split(":")[0]);
+    for (const seeded of [
+      "apps/web/src/web-bad-import-api.ts",
+      "apps/web/src/web-bad-import-db.tsx",
+      "apps/portal/src/portal-bad-import-web.tsx",
+      "packages/shared/src/shared-bad-internal-export.ts",
+    ]) {
+      expect(reported, `${seeded} must still be reported`).toContain(seeded);
+    }
+  });
+
+  it("keeps '@scalpai/db' legal for a controller and bans only the deep path", () => {
+    // engineering rules 1 routes all data access through packages/db and ADR-0002
+    // puts DbService on its PUBLIC surface: a rule banning the package name would
+    // report every controller in the repository for obeying the decision.
+    expect(read("apps/api/src/app.module.ts")).toContain('from "@scalpai/db"');
+    expect(scanArchitectureCallSites(ROOT)).toEqual([]);
+  });
+
+  it("leaves the tenant context where ADR-0003 put it", () => {
+    // The clinic key is set once, in withTenant, and every repository receives
+    // the resulting Tx. Demanding the statement per function would report all ten.
+    expect(read("packages/db/src/tenant.ts")).toContain("set_config('app.clinic_id'");
+    const repoFindings = scanArchitectureCallSites(ROOT).filter((v) => v.file.includes("/repos/"));
+    expect(repoFindings).toEqual([]);
+  });
+
+  it("mounts every controller it finds in a module", () => {
+    const module = read("apps/api/src/app.module.ts");
+    for (const cls of ["GalleryController", "SyncController", "OpsController", "PrivacyController"]) {
+      expect(module, `${cls} must be mounted`).toContain(cls);
+    }
+  });
+
+  it("does not mistake an alias table for an import", () => {
+    // vite.config.ts and the web tsconfig name ../../packages/shared/src on
+    // purpose - that mapping is what MAKES '@scalpai/shared' resolve.
+    expect(read("apps/web/vite.config.ts")).toContain("packages/shared/src");
+    expect(scanImportBoundaries(ROOT)).toEqual([]);
+  });
+
+  it("reports the RULE, not the tree, when either rule stops detecting its own fixture", async () => {
+    const root = mkdtempSync(join(tmpdir(), "m14b-"));
+    try {
+      const arch = join(root, "tools", "conformance", "fixtures", ARCH_RULE, "apps", "api", "src");
+      mkdirSync(arch, { recursive: true });
+      writeFileSync(join(arch, "compliant.ts"), 'export const ok = "nothing to find here";\n', "utf8");
+
+      const boundary = join(root, "tools", "conformance", "fixtures", BOUNDARY_RULE, "apps", "web", "src");
+      mkdirSync(boundary, { recursive: true });
+      writeFileSync(join(boundary, "compliant.tsx"), 'import { t } from "@scalpai/shared";\nexport const Ok = () => t;\n', "utf8");
+
+      for (const [rule, name] of [
+        [architectureCallSites, ARCH_RULE],
+        [tsxImportBoundaries, BOUNDARY_RULE],
+      ] as const) {
+        const res = await rule.check({ root });
+        expect(res, `${name} must report itself`).toHaveLength(1);
+        expect(res[0]?.message).toContain("self-test failed");
+        expect(res[0]?.file).toContain(`fixtures/${name}`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
