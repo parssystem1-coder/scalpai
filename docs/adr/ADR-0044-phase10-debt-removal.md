@@ -5,7 +5,7 @@
 - **Relates to:** ADR-0043 (phase 10 batch 1), ADR-0036 (npm is the only package
   manager), ADR-0037 (evidence-carrying gates)
 - **Weaknesses addressed:** M4/M16, R14, PR #21/#23
-- **Weaknesses still NOT addressed:** M1, M14, M15, L1, L2
+- **Weaknesses still NOT addressed:** M1, L1, L2
 
 ## Context
 
@@ -137,7 +137,7 @@ archive still carry pnpm snippets and PASS marks with no evidence log.
   remain in history; this is not a size reduction of an existing clone.
 - Two `package-call-site` exceptions are removed. Any future scaffold fails
   conformance immediately.
-- Phase 10 remains OPEN. Five items are still `[ ]`: M1, M14, M15,
+- Phase 10 remains OPEN. Three items are still `[ ]`: M1,
   L1/W01/W22/W23 and L2. `product.phase10.spec.ts` asserts that count, so
   ticking a box without adding evidence turns the suite red.
 - **M19 is now unblocked** by the same lockfile regeneration, but it is not done
