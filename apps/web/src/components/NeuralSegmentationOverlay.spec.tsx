@@ -19,6 +19,7 @@ describe("NeuralSegmentationOverlay runtime input boundary", () => {
         areaName="Vertex"
         patientName="Real Patient"
         detections={detections}
+        dataMode="demo"
       />
     );
 
@@ -26,6 +27,7 @@ describe("NeuralSegmentationOverlay runtime input boundary", () => {
     expect(
       screen.getByText(i18n.t("dashboard.neuralSegmentation.avgCaliber", { value: "50.0" }))
     ).toBeDefined();
+    expect(screen.getByTestId("demo-watermark-overlay")).toBeDefined();
     expect(container.querySelectorAll('[role="button"]').length).toBe(2);
   });
 
@@ -36,10 +38,12 @@ describe("NeuralSegmentationOverlay runtime input boundary", () => {
         areaName="Vertex"
         patientName="Real Patient"
         detections={[]}
+        dataMode="real"
       />
     );
 
     expect(screen.getByText(i18n.t("dashboard.neuralSegmentation.detectedCount", { count: 0 }))).toBeDefined();
+    expect(screen.queryByTestId("demo-watermark-overlay")).toBeNull();
     expect(screen.queryByRole("button", { name: /follicle|follicular/i })).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ import {
   Eye,
   CheckCircle,
 } from "lucide-react";
+import { DemoWatermark } from "./DemoWatermark.js";
+import type { DashboardDataMode } from "../data/dashboard-data-provider.js";
 
 export interface FollicleDetection {
   id: string;
@@ -23,6 +25,7 @@ export interface NeuralSegmentationOverlayProps {
   onRetest?: () => void;
   /** Analysis output supplied by the real, demo, or test boundary. */
   detections?: readonly FollicleDetection[];
+  dataMode?: DashboardDataMode;
 }
 
 export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps> = ({
@@ -30,6 +33,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
   areaName,
   patientName,
   detections = [],
+  dataMode = "real",
 }) => {
   const { t } = useTranslation();
   const [showAiBoxes, setShowAiBoxes] = useState(true);
@@ -49,6 +53,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
 
   return (
     <div className="relative rounded-3xl overflow-hidden bg-white/55 border border-white/80 backdrop-blur-xl shadow-md p-4 select-none">
+      <DemoWatermark mode={dataMode} surface="overlay" />
       {/* HUD Header */}
       <div className="flex items-center justify-between mb-3 text-xs">
         <div className="flex items-center gap-2">

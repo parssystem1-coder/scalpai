@@ -99,6 +99,10 @@ const fa = {
     activeClinic: "کلینیک فعال",
     totalPatients: "تعداد مراجعین",
     totalAnalyses: "آنالیزهای انجام‌شده",
+    demoWatermark: {
+      label: "دمو / داده نمونه — داده بالینی نیست",
+      ariaLabel: "هشدار: این صفحه داده نمونه دارد و داده بالینی نیست",
+    },
     header: {
       clinicName: "کلینیک عصبی ScalpAI",
       version: "AI Vision Core v4.8",
@@ -807,6 +811,10 @@ const en = {
     activeClinic: "Active Clinic",
     totalPatients: "Total Patients",
     totalAnalyses: "Analyses Performed",
+    demoWatermark: {
+      label: "Demo / Sample data — not clinical data",
+      ariaLabel: "Warning: this surface contains sample data and is not clinical data",
+    },
     header: {
       clinicName: "ScalpAI Neural Clinic",
       version: "AI Vision Core v4.8",

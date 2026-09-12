@@ -13,6 +13,8 @@ describe("M1b runtime wiring", () => {
     expect(dashboardSource).toContain("DashboardDataProvider");
     expect(dashboardSource).toContain("dataProvider = EMPTY_REAL_DATA_PROVIDER");
     expect(dashboardSource).toContain("dataProvider.mode=\"demo\"");
+    expect(dashboardSource).toContain("<DemoWatermark mode={dataProvider.mode} surface=\"dashboard\" />");
+    expect(dashboardSource).toContain("dataMode={dataProvider.mode}");
   });
 
   it("keeps overlay detections behind an explicit input boundary", () => {

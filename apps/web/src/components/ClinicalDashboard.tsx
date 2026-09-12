@@ -33,6 +33,7 @@ import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard.js";
 const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D.js"));
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay.js";
+import { DemoWatermark } from "./DemoWatermark.js";
 import { createEngine } from "@scalpai/analysis-engine";
 import type { Patient, TrichoscopyImage } from "../data/dashboard-samples.js";
 import {
@@ -773,6 +774,7 @@ const handleOpenAiEducation = () => {
   if (!selectedPatient) {
     return (
       <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
+        <DemoWatermark mode={dataProvider.mode} surface="dashboard" />
         <div
           className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
           style={{ backgroundImage: `url('/images/scalp-bg.jpg')` }}
@@ -831,6 +833,7 @@ const handleOpenAiEducation = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
+      <DemoWatermark mode={dataProvider.mode} surface="dashboard" />
       {/* 1. Global Scalp Aesthetic Background Image (Matches Login Page) */}
       <div
         className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
@@ -984,6 +987,7 @@ const handleOpenAiEducation = () => {
                   imageUrl={activeInspectedPhoto?.url || patientPhotos[0]?.url || "/trichoscopy/vertex.jpg"}
                   areaName={areaLabel(activeInspectedPhoto ? activeInspectedPhoto.area : selectedArea)}
                   patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
+                  dataMode={dataProvider.mode}
                 />
               </div>
 
