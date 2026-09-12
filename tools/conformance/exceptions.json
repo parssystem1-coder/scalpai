@@ -50,12 +50,40 @@
       "reason": "SAMPLE_DETECTIONS overlay data: open half of phase 10 M1, to be replaced by real detections",
       "since": "2026-09-06"
     },
-    {
-      "rule": "ops-file-conventions",
-      "file": "ops/README.md",
-      "adr": "ADR-0037",
-      "reason": "the self-hosting guide predates M14a and its H1 is the user-facing Persian title, not an OPERATIONS header. Rewriting that heading is phase 10 doc-drift work (ADR-0036/ADR-0045); registering the one legacy hit keeps the rule enabled for every ops document written from here on instead of exempting the whole markdown surface",
-      "since": "2026-09-12"
-    }
-  ]
+{
+    "rule": "ops-file-conventions",
+    "file": "ops/README.md",
+    "adr": "ADR-0037",
+    "reason": "the self-hosting guide predates M14a and its H1 is the user-facing Persian title, not an OPERATIONS header. Rewriting that heading is phase 10 doc-drift work (ADR-0036/ADR-0045); registering the one legacy hit keeps the rule enabled for every ops document written from here on instead of exempting the whole markdown surface",
+    "since": "2026-09-12"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "packages/db/scripts/seed-gallery.ts",
+    "adr": "ADR-0003",
+    "reason": "dev/demo seed script for gallery images; operates at platform level with explicit clinic_id selection, not tenant-scoped request flow",
+    "since": "2026-09-12"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "packages/db/src/migrate.ts",
+    "adr": "ADR-0003",
+    "reason": "migration runner runs during deployment/bootstrap; uses dedicated migration role, not app role with clinic_id context",
+    "since": "2026-09-12"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "packages/db/src/plans-admin.ts",
+    "adr": "ADR-0003",
+    "reason": "platform-level plan management CLI; operates on platform catalog (plans table) which is tenant-shared per ADR-0031, not clinic-scoped",
+    "since": "2026-09-12"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "packages/db/src/seed.ts",
+    "adr": "ADR-0003",
+    "reason": "dev/demo seed for two clinics (phase 1 cross-tenant tests); runs once during setup with platform role, not tenant-scoped request",
+    "since": "2026-09-12"
+  }
+]
 }
