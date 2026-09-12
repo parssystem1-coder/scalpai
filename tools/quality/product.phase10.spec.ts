@@ -3,6 +3,9 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { RULES } from "../conformance/rules/index.js";
+import { runRules } from "../conformance/run.js";
+import { configSchemaValidation, opsFileConventions, scanConfigSchemas, scanOpsFiles } from "../conformance/rules/v2.js";
 
 const ROOT = process.cwd();
 const read = (rel: string): string => readFileSync(join(ROOT, rel), "utf8");
@@ -161,5 +164,116 @@ describe("M15b - the bundle budget is enforced from a committed policy", () => {
     }
     // ADR-0037: the gate is only real if its evidence is required.
     expect(read("tools/ci/gate-report.ts")).toContain('"bundle-budget"');
+  });
+});
+
+/**
+ * M14a (playbook docs/playbooks/phase10-M14-conformance-extension.md, 14.3).
+ *
+ * Two new conformance rules cover the surfaces the harness could not see: the
+ * scripts and compose files under `ops/`, and the JSON/TS configuration the
+ * gates themselves depend on. What is proven here is not a behaviour but an
+ * AGREEMENT, in three parts:
+ *
+ *   1. both rules are registered, so they actually run in CI;
+ *   2. they are green on this repository, with the single legacy hit registered
+ *      against an ADR instead of the rule being weakened to fit;
+ *   3. they still detect every violation seeded in their committed fixtures -
+ *      and the harness reports ITSELF when they stop.
+ *
+ * Static and offline like the rest of this suite: the fixtures are read, never
+ * written, and the only mutation happens in a temp directory.
+ */
+describe("M14a - ops conventions and config schemas are machine-checked", () => {
+  const OPS_RULE = "ops-file-conventions";
+  const CONFIG_RULE = "config-schema-validation";
+  const fixtureRoot = (rule: string): string => join(ROOT, "tools", "conformance", "fixtures", rule);
+
+  it("registers both rules in the harness", () => {
+    const names = RULES.map((r) => r.name);
+    expect(names).toContain(OPS_RULE);
+    expect(names).toContain(CONFIG_RULE);
+    expect(RULES.length, "M14a takes the ruleset to 14").toBeGreaterThanOrEqual(14);
+  });
+
+  it("leaves this repository green, with the one legacy hit suppressed by ADR", async () => {
+    const res = await runRules([opsFileConventions, configSchemaValidation], { root: ROOT });
+    expect(res.violations, JSON.stringify(res.violations, null, 2)).toEqual([]);
+    // ops/README.md is the only pre-M14a document without an OPERATIONS header.
+    expect(res.suppressed).toBe(1);
+  });
+
+  it("registers that legacy hit against ADR-0037 rather than exempting the surface", () => {
+    const registry = JSON.parse(read("tools/conformance/exceptions.json")) as {
+      exceptions: { rule?: string; file?: string; adr: string; reason?: string }[];
+    };
+    const entries = registry.exceptions.filter((e) => e.rule === OPS_RULE);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.file).toBe("ops/README.md");
+    expect(entries[0]?.adr).toBe("ADR-0037");
+    // No exception may silence the config rule: it has no legacy debt to carry.
+    expect(registry.exceptions.some((e) => e.rule === CONFIG_RULE)).toBe(false);
+  });
+
+  it(`${OPS_RULE} reports every violation seeded in its fixture`, () => {
+    const root = fixtureRoot(OPS_RULE);
+    expect(existsSync(root), `${OPS_RULE} must ship a fixture (ADR-21)`).toBe(true);
+    const reported = scanOpsFiles(root).map((v) => v.file.split(":")[0]);
+    for (const seeded of [
+      "ops/bad-deployment.md",
+      "ops/bad-script.sh",
+      "ops/bad-compose.yml",
+      "ops/secret-in-ops.txt",
+    ]) {
+      expect(reported, `${seeded} must still be reported`).toContain(seeded);
+    }
+  });
+
+  it(`${CONFIG_RULE} reports every violation seeded in its fixture`, () => {
+    const root = fixtureRoot(CONFIG_RULE);
+    expect(existsSync(root), `${CONFIG_RULE} must ship a fixture (ADR-21)`).toBe(true);
+    const reported = scanConfigSchemas(root).map((v) => v.file.split(":")[0]);
+    for (const seeded of [
+      "packages/bad-package/package.json",
+      "packages/bad-package/tsconfig.json",
+      "apps/web/vite.config.ts",
+      ".env.example",
+      "package.json",
+    ]) {
+      expect(reported, `${seeded} must still be reported`).toContain(seeded);
+    }
+  });
+
+  it("resolves tsconfig strictness through extends instead of demanding a local flag", () => {
+    // ADR-0046 keeps the strict flags in ONE file and forbids workspaces from
+    // redefining them, so a rule that wanted a literal `strict: true` everywhere
+    // would contradict the decision it enforces. Every project inherits it, and
+    // none of them is reported.
+    const reported = scanConfigSchemas(ROOT).map((v) => v.file);
+    expect(reported.filter((f) => f.includes("tsconfig"))).toEqual([]);
+    expect(read("tooling/tsconfig/base.json")).toContain('"noUncheckedIndexedAccess": true');
+  });
+
+  it("reports the RULE, not the tree, when a rule stops detecting its own fixture", async () => {
+    const root = mkdtempSync(join(tmpdir(), "m14a-"));
+    try {
+      const neutered = join(root, "tools", "conformance", "fixtures", OPS_RULE, "ops");
+      mkdirSync(neutered, { recursive: true });
+      writeFileSync(join(neutered, "compliant.md"), "# OPERATIONS: a fixture that no longer violates anything\n", "utf8");
+
+      const res = await opsFileConventions.check({ root });
+      expect(res).toHaveLength(1);
+      expect(res[0]?.message).toContain("self-test failed");
+      expect(res[0]?.file).toContain(`fixtures/${OPS_RULE}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the fixtures out of every normal scan", () => {
+    // walk.ts ignores any directory named `fixtures`, which is what lets a tree
+    // of deliberately broken files live inside the repository.
+    expect(read("tools/conformance/lib/walk.ts")).toContain('"fixtures"');
+    expect(has("tools/conformance/fixtures/README.md")).toBe(true);
   });
 });
