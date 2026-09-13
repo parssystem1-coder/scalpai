@@ -9,4 +9,4 @@ for name in MC_HOST_local MC_HOST_offsite; do
   fi
 done
 
-exec docker run --rm --network host "${args[@]}" "$MC_IMAGE" "$@"
+exec docker run --rm --network host -v /tmp:/tmp "${args[@]}" "$MC_IMAGE" "$@"

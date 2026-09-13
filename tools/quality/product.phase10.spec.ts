@@ -440,7 +440,7 @@ describe("M14b - architecture call-sites and import boundaries are machine-check
 
   it("registers exceptions only for architecture-call-sites infrastructure scripts", () => {
     const registry = JSON.parse(read("tools/conformance/exceptions.json")) as {
-      exceptions: { rule?: string; adr: string }[];
+      exceptions: { rule?: string; adr: string; file?: string }[];
     };
     const archExceptions = registry.exceptions.filter((e) => e.rule === ARCH_RULE);
     expect(archExceptions.length, "architecture-call-sites must have exactly 4 infrastructure exceptions").toBe(4);
