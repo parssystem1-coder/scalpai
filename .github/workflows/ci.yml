@@ -145,7 +145,7 @@ jobs:
         run: bash tools/ci/run-gate.sh build npm run build
 
       # M15b: the ceiling comes from the COMMITTED policy, not from an
-      # environment variable a step could raise. run-gate.sh records the command,
+      # environment variable a step could raise. the gate wrapper records the command,
       # the full output and the exit code, and the final `gate` job re-reads it.
       - name: Enforce bundle budget from the committed policy (M15b)
         run: >
@@ -437,6 +437,7 @@ jobs:
         working-directory: ops
         run: |
           umask 077
+          PHI_KEY=$(openssl rand -base64 32 | tr -d '\n')
           cat > ci.env <<ENV
           SCALPAI_DOMAIN=clinic.example.com
           ACME_EMAIL=admin@example.com
@@ -448,8 +449,7 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
-          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '
-')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$PHI_KEY","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
           ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
           BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-secrets/recipients.txt
           BACKUP_OFFSITE_ENDPOINT=http://127.0.0.1:9000
@@ -490,6 +490,7 @@ jobs:
         working-directory: ops
         run: |
           umask 077
+          PHI_KEY=$(openssl rand -base64 32 | tr -d '\n')
           cat > ci.env <<ENV
           SCALPAI_DOMAIN=clinic.example.com
           ACME_EMAIL=admin@example.com
@@ -501,8 +502,7 @@ jobs:
           MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
           S3_BUCKET=scalpai-media
           JWT_SECRET=$(openssl rand -hex 32)
-          PHI_KEY_RING=[{"kid":"k2026ci","key":"$(openssl rand -base64 32 | tr -d '
-')","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$PHI_KEY","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
           ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
           BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-recipients.txt
           BACKUP_OFFSITE_ENDPOINT=https://s3.provider.example
@@ -510,8 +510,7 @@ jobs:
           BACKUP_OFFSITE_ACCESS_KEY=$(openssl rand -hex 12)
           BACKUP_OFFSITE_SECRET_KEY=$(openssl rand -hex 16)
           ENV
-          printf 'age1ci0000000000000000000000000000000000000000000000000000000
-' > /tmp/scalpai-recipients.txt
+          printf '%s\n' 'age1ci0000000000000000000000000000000000000000000000000000000' > /tmp/scalpai-recipients.txt
 
       - name: prod.yml and dev.yml render with a full secret set
         working-directory: ops
