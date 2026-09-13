@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
 import type { Patient, TrichoscopyImage } from "../data/dashboard-types";
@@ -42,28 +42,37 @@ export function useDashboardRecords(
     queryFn: () => apiFetch<Patient[]>("/patients?limit=50").catch(() => null),
     retry: false,
   });
-  const patientList = apiPatients && apiPatients.length > 0 ? apiPatients : patients;
+  const patientList = useMemo(() => {
+    if (!apiPatients || apiPatients.length === 0) return patients;
+    const merged = new Map(apiPatients.map((patient) => [patient.id, patient]));
+    for (const patient of patients) {
+      if (!merged.has(patient.id)) merged.set(patient.id, patient);
+    }
+    return [...merged.values()];
+  }, [apiPatients, patients]);
+  const patientListRef = useRef(patientList);
+  const selectedPatientRef = useRef(selectedPatient);
+  patientListRef.current = patientList;
+  selectedPatientRef.current = selectedPatient;
 
   useEffect(() => {
     if (!selectedPatient && patientList[0]) setSelectedPatient(patientList[0]);
   }, [patientList, selectedPatient]);
 
-  useEffect(() => {
-    return bus.subscribe("patient:selected", ({ patientId }) => {
-      const found = patientList.find((patient) => patient.id === patientId);
-      if (found && found.id !== selectedPatient?.id) setSelectedPatient(found);
-    });
-  }, [bus, patientList, selectedPatient?.id]);
+  useEffect(() => bus.subscribe("patient:selected", ({ patientId }) => {
+    const found = patientListRef.current.find((patient) => patient.id === patientId);
+    if (found && found.id !== selectedPatientRef.current?.id) setSelectedPatient(found);
+  }), [bus]);
 
-  const selectPatientById = (id: string) => {
-    const found = patientList.find((patient) => patient.id === id);
+  const selectPatientById = useCallback((id: string) => {
+    const found = patientListRef.current.find((patient) => patient.id === id);
     if (found) {
       setSelectedPatient(found);
       bus.emit("patient:selected", { patientId: found.id });
     }
-  };
+  }, [bus]);
 
-  const addPatient = (input: NewPatientInput, labels: { today: string; defaultCondition: string }): Patient | null => {
+  const addPatient = useCallback((input: NewPatientInput, labels: { today: string; defaultCondition: string }): Patient | null => {
     if (!input.firstName || !input.lastName) return null;
     const created: Patient = {
       id: `pat-${Date.now().toString().slice(-4)}`,
@@ -84,7 +93,7 @@ export function useDashboardRecords(
     bus.emit("patient:created", { patient: created });
     bus.emit("patient:selected", { patientId: created.id });
     return created;
-  };
+  }, [bus]);
 
   return { patients, images, patientList, selectedPatient, selectPatientById, addPatient, setSelectedPatient, setImages };
 }

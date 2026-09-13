@@ -1,76 +1,83 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { TrichoscopyImage } from "../data/dashboard-types";
 
-export function usePhotoMutations({ selectedPatient, selectedArea, localImages, activeInspectedPhoto, previewPhotoModal, setLocalImages, setActiveInspectedPhoto, setPreviewPhotoModal, setUploadFeedback, t, faNum }: { selectedPatient: { id: string } | null; selectedArea: TrichoscopyImage["area"]; localImages: Record<string, TrichoscopyImage[]>; activeInspectedPhoto: TrichoscopyImage | null; previewPhotoModal: TrichoscopyImage | null; setLocalImages: Dispatch<SetStateAction<Record<string, TrichoscopyImage[]>>>; setActiveInspectedPhoto: (photo: TrichoscopyImage | null) => void; setPreviewPhotoModal: (photo: TrichoscopyImage | null) => void; setUploadFeedback: (message: string | null) => void; t: (key: string, options?: Record<string, unknown>) => string; faNum: (value: string | number | null | undefined) => string; }) {
-  const handleCompleteGuidedCapture = (
-    capturedCount: number,
-    frames?: Record<string, string>,
-    stepTags?: Record<string, string[]>
-  ) => {
-    if (!selectedPatient) return;
-    if (frames && Object.keys(frames).length > 0) {
-      const newImagesList: TrichoscopyImage[] = [];
-      const zoneMapping: Record<string, "vertex" | "temple" | "frontal" | "occiput"> = {
-        "step-frontal": "frontal",
-        "step-vertex": "vertex",
-        "step-temporal": "temple",
-        "step-occiput": "occiput",
-      };
+interface PhotoMutationInput {
+  selectedPatient: { id: string } | null;
+  selectedArea: TrichoscopyImage["area"];
+  localImages: Record<string, TrichoscopyImage[]>;
+  activeInspectedPhoto: TrichoscopyImage | null;
+  previewPhotoModal: TrichoscopyImage | null;
+  setLocalImages: Dispatch<SetStateAction<Record<string, TrichoscopyImage[]>>>;
+  setActiveInspectedPhoto: (photo: TrichoscopyImage | null) => void;
+  setPreviewPhotoModal: (photo: TrichoscopyImage | null) => void;
+  setUploadFeedback: (message: string | null) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  faNum: (value: string | number | null | undefined) => string;
+}
 
-      Object.entries(frames).forEach(([stepId, frameUrl], idx) => {
-        const mappedArea = zoneMapping[stepId] || selectedArea;
-        const tags = stepTags?.[stepId] || [];
-        newImagesList.push({
-          id: `capture-${Date.now()}-${idx}`,
-          patientId: selectedPatient.id,
-          url: frameUrl,
-          area: mappedArea,
-          date: t("dashboard.photoDates.captured"),
-          density: mappedArea === "occiput" ? 205 : Math.round(135 + Math.random() * 30),
-          thickness: `${Math.round(65 + Math.random() * 12)} µm`,
-          qualityScore: 99,
-          tags: tags.length > 0 ? tags : undefined,
-        });
-      });
+export function usePhotoMutations({
+  selectedPatient,
+  selectedArea,
+  localImages,
+  activeInspectedPhoto,
+  previewPhotoModal,
+  setLocalImages,
+  setActiveInspectedPhoto,
+  setPreviewPhotoModal,
+  setUploadFeedback,
+  t,
+  faNum,
+}: PhotoMutationInput) {
+  const feedbackTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+  }, []);
+  const showFeedback = useCallback((message: string, duration: number) => {
+    setUploadFeedback(message);
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = window.setTimeout(() => {
+      setUploadFeedback(null);
+      feedbackTimer.current = null;
+    }, duration);
+  }, [setUploadFeedback]);
 
-      if (newImagesList.length > 0) {
-        setLocalImages((prev) => ({
-          ...prev,
-          [selectedPatient.id]: [...newImagesList, ...(prev[selectedPatient.id] || [])],
-        }));
-        setActiveInspectedPhoto(newImagesList[0] ?? null);
-        setUploadFeedback(
-          t("dashboard.toasts.captured", { frames: faNum(newImagesList.length) })
-        );
-        setTimeout(() => setUploadFeedback(null), 6000);
-      }
-    }
-  };
-
-  const handleDeletePhoto = (photoId: string) => {
-    if (!selectedPatient) return;
-    setLocalImages((prev) => {
-      const currentList = prev[selectedPatient.id] || [];
-      const updated = currentList.filter((img) => img.id !== photoId);
+  const handleCompleteGuidedCapture = useCallback((capturedCount: number, frames?: Record<string, string>, stepTags?: Record<string, string[]>) => {
+    if (!selectedPatient || !frames || Object.keys(frames).length === 0) return;
+    const zoneMapping: Record<string, TrichoscopyImage["area"]> = {
+      "step-frontal": "frontal",
+      "step-vertex": "vertex",
+      "step-temporal": "temple",
+      "step-occiput": "occiput",
+    };
+    const newImagesList = Object.entries(frames).map(([stepId, frameUrl], index): TrichoscopyImage => {
+      const area = zoneMapping[stepId] || selectedArea;
+      const tags = stepTags?.[stepId] || [];
       return {
-        ...prev,
-        [selectedPatient.id]: updated,
+        id: `capture-${Date.now()}-${index}`,
+        patientId: selectedPatient.id,
+        url: frameUrl,
+        area,
+        date: t("dashboard.photoDates.captured"),
+        density: area === "occiput" ? 205 : Math.round(135 + Math.random() * 30),
+        thickness: `${Math.round(65 + Math.random() * 12)} µm`,
+        qualityScore: 99,
+        tags: tags.length > 0 ? tags : undefined,
       };
     });
+    setLocalImages((previous) => ({ ...previous, [selectedPatient.id]: [...newImagesList, ...(previous[selectedPatient.id] || [])] }));
+    setActiveInspectedPhoto(newImagesList[0] ?? null);
+    showFeedback(t("dashboard.toasts.captured", { frames: faNum(newImagesList.length || capturedCount) }), 6000);
+  }, [faNum, selectedArea, selectedPatient, setActiveInspectedPhoto, setLocalImages, showFeedback, t]);
 
-    if (activeInspectedPhoto?.id === photoId) {
-      const currentList = localImages[selectedPatient.id] || [];
-      const remaining = currentList.filter((img) => img.id !== photoId);
-      setActiveInspectedPhoto(remaining.length > 0 ? remaining[0] ?? null : null);
-    }
-
-    if (previewPhotoModal?.id === photoId) {
-      setPreviewPhotoModal(null);
-    }
-
-    setUploadFeedback(t("dashboard.toasts.photoDeleted"));
-    setTimeout(() => setUploadFeedback(null), 4000);
-  };
+  const handleDeletePhoto = useCallback((photoId: string) => {
+    if (!selectedPatient) return;
+    const currentList = localImages[selectedPatient.id] || [];
+    const remaining = currentList.filter((image) => image.id !== photoId);
+    setLocalImages((previous) => ({ ...previous, [selectedPatient.id]: (previous[selectedPatient.id] || []).filter((image) => image.id !== photoId) }));
+    if (activeInspectedPhoto?.id === photoId) setActiveInspectedPhoto(remaining[0] ?? null);
+    if (previewPhotoModal?.id === photoId) setPreviewPhotoModal(null);
+    showFeedback(t("dashboard.toasts.photoDeleted"), 4000);
+  }, [activeInspectedPhoto?.id, localImages, previewPhotoModal?.id, selectedPatient, setActiveInspectedPhoto, setLocalImages, setPreviewPhotoModal, showFeedback, t]);
 
   return { handleCompleteGuidedCapture, handleDeletePhoto };
 }

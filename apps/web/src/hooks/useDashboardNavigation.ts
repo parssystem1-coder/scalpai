@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SECTIONS, type SectionId } from "../components/dashboard-sections";
 
 export interface DashboardNavigationState {
@@ -11,9 +11,10 @@ export interface DashboardNavigationState {
 export function useDashboardNavigation(): DashboardNavigationState {
   const [activeSection, setActiveSection] = useState<SectionId>("patients");
   const isManualScrolling = useRef(false);
+  const releaseManualScrollTimer = useRef<number | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  const scrollToSection = (sectionId: SectionId) => {
+  const scrollToSection = useCallback((sectionId: SectionId) => {
     setActiveSection(sectionId);
     isManualScrolling.current = true;
     const element = document.getElementById(`section-${sectionId}`);
@@ -21,10 +22,14 @@ export function useDashboardNavigation(): DashboardNavigationState {
       const y = element.getBoundingClientRect().top + window.pageYOffset - 90;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
-    window.setTimeout(() => {
+    if (releaseManualScrollTimer.current !== null) {
+      window.clearTimeout(releaseManualScrollTimer.current);
+    }
+    releaseManualScrollTimer.current = window.setTimeout(() => {
       isManualScrolling.current = false;
+      releaseManualScrollTimer.current = null;
     }, 850);
-  };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,7 +50,12 @@ export function useDashboardNavigation(): DashboardNavigationState {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (releaseManualScrollTimer.current !== null) {
+        window.clearTimeout(releaseManualScrollTimer.current);
+      }
+    };
   }, []);
 
   return { activeSection, showBackToTop, scrollToSection };

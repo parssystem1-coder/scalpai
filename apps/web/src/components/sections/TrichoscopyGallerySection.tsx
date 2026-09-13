@@ -1,16 +1,67 @@
-import React from "react";
+import React, { type ChangeEvent, type Dispatch, type DragEvent, type RefObject, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { Camera, ArrowUp, UploadCloud, CheckCircle2, Split, Trash2, Maximize2, Eye } from "lucide-react";
 import LuxuryTiltCard from "../LuxuryTiltCard";
 import NeuralSegmentationOverlay from "../NeuralSegmentationOverlay";
 import { faNum, formatDate } from "../../i18n";
 import type { TrichoscopyImage } from "../../data/dashboard-types";
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+import type { Patient } from "../../data/dashboard-types";
+import type { DashboardDataMode } from "../../data/dashboard-data-types";
+import type { SectionId } from "../dashboard-sections";
 
-export interface TrichoscopyGallerySectionProps { [key: string]: any; }
-export default function TrichoscopyGallerySection(props: TrichoscopyGallerySectionProps) {
-  const { selectedArea, setSelectedArea, activeInspectedPhoto, setActiveInspectedPhoto, uploadFeedback, setUploadFeedback, isDraggingOver, dataMode, fileInputRef, handleDrop, handleDragOver, handleDragLeave, handleFileInputChange, handleDeletePhoto, handleOpenLightbox, openGuidedCapture, openBeforeAfter, scrollToSection, areaLabel, selectedPatient, localImages, setCompareDefaultA, setCompareDefaultB } = props;
-  const patientPhotos: TrichoscopyImage[] = props.patientPhotos;
+export interface TrichoscopyGallerySectionProps {
+  selectedArea: TrichoscopyImage["area"];
+  setSelectedArea: Dispatch<SetStateAction<TrichoscopyImage["area"]>>;
+  activeInspectedPhoto: TrichoscopyImage | null;
+  setActiveInspectedPhoto: (photo: TrichoscopyImage | null) => void;
+  patientPhotos: TrichoscopyImage[];
+  uploadFeedback: string | null;
+  setUploadFeedback: (message: string | null) => void;
+  isDraggingOver: boolean;
+  dataMode: DashboardDataMode;
+  fileInputRef: RefObject<HTMLInputElement | null>;
+  handleDrop: (event: DragEvent<HTMLDivElement>) => void;
+  handleDragOver: (event: DragEvent<HTMLDivElement>) => void;
+  handleDragLeave: (event: DragEvent<HTMLDivElement>) => void;
+  handleFileInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  handleDeletePhoto: (photoId: string) => void;
+  handleOpenLightbox: (photo: TrichoscopyImage) => void;
+  openGuidedCapture: () => void;
+  openBeforeAfter: () => void;
+  scrollToSection: (sectionId: SectionId) => void;
+  areaLabel: (area: string) => string;
+  selectedPatient: Patient;
+  localImages: Record<string, TrichoscopyImage[]>;
+  setCompareDefaultA: (photoId: string | undefined) => void;
+  setCompareDefaultB: (photoId: string | undefined) => void;
+}
+
+export function TrichoscopyGallerySection({
+  selectedArea,
+  setSelectedArea,
+  activeInspectedPhoto,
+  setActiveInspectedPhoto,
+  patientPhotos,
+  uploadFeedback,
+  setUploadFeedback,
+  isDraggingOver,
+  dataMode,
+  fileInputRef,
+  handleDrop,
+  handleDragOver,
+  handleDragLeave,
+  handleFileInputChange,
+  handleDeletePhoto,
+  handleOpenLightbox,
+  openGuidedCapture,
+  openBeforeAfter,
+  scrollToSection,
+  areaLabel,
+  selectedPatient,
+  localImages,
+  setCompareDefaultA,
+  setCompareDefaultB,
+}: TrichoscopyGallerySectionProps) {
   const { t } = useTranslation();
   return (
         <section id="section-gallery" className="scroll-mt-28 space-y-6">
@@ -320,3 +371,5 @@ export default function TrichoscopyGallerySection(props: TrichoscopyGallerySecti
 
   );
 }
+
+export default React.memo(TrichoscopyGallerySection);
