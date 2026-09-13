@@ -1,8 +1,8 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فازهای ۱ تا ۹ بسته شده‌اند (آخرین: فاز ۹ با ADR-0042). فاز ۱۰ در جریان است: batch 1 (ADR-0043) ده مورد و batch 2 (ADR-0044) سه مورد را بست؛ M19 بسته شد. ۵ مورد باز مانده: M1، M14، M15، L1/W01/W22/W23 و L2.**
+> وضعیت: **فازهای ۱ تا ۱۰ بسته شده‌اند (آخرین: فاز ۱۰ — M1، L2 تکمیل شدند).**
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
-> تاریخ آخرین بروزرسانی: 2026-09-08 · مخزن: `parssystem1-coder/scalpai`
+> تاریخ آخرین بروزرسانی: 2026-09-13 · مخزن: `parssystem1-coder/scalpai`
 
 ## حکم ممیزی
 
@@ -228,15 +228,15 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### باقی‌مانده (۴ مورد) برای نشست بعدی:
+### باقی‌مانده: **هیچ موردی باقی نمانده — فاز ۱۰ تکمیل شد.**
 
-- [ ] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود.
+- [x] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود. — **تکمیل شده: ClinicalDashboard و NeuralSegmentationOverlay هیچ import از SAMPLE_* ندارند؛ dashboard-samples.ts پشت import.meta.env.DEV guard قرار دارد؛ DemoWatermark در DashboardShell و NeuralSegmentationOverlay رندر می‌شود؛ m1b-runtime-wiring.spec.ts سبز؛ production-mocks exceptions از exceptions.json حذف شد.**
 - [x] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند) — **تکمیل شده: ۴ کامپوننت، ~۸۵ کلید fa/en، ۶ تست parity سبز، typecheck/lint بدون خطا)**
 - [x] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded. — **تکمیل شده: ۱۵ کامپوننت، ~۲۸۰ کلید fa/en، ۱۶ فایل تغییر، orphan/dangling=0، ۷۶ تست سبز)**
 - [x] **M14** conformance روی `.tsx`, `ops`, JSON/YAML و call-siteهای معماری کامل شود. — **تکمیل شده: ۱۶ rule، M14a (ops-file-conventions + config-schema-validation) + M14b (architecture-call-sites + tsx-import-boundaries)، fixtureها و self-test، ۴ exception مستند ADR-0003، conformance PASS، ۲۷ تست phase10 سبز**
 - [x] **M15** bundle budget با graph واقعی اصلاح شود. — **تکمیل شده: M15a (JSON schema output deterministic) + M15b (policy enforcement با --policy flag، CI gate از طریق run-gate.sh، regression tests)، bundle budget PASS، ۹ تست phase10 سبز**
 - [x] **L1/W01/W22/W23** مستندات drift پاک شد؛ pnpm → npm در `docs/playbooks/*`، `docs/tasks/*`، `docs/gates/*`؛ encoding UTF-8 تعمیر شد. (مرجع: `docs/ops/DEPLOYMENT.md`، ADR-0036)
-- [ ] **L2** dashboard بزرگ به component/hookهای کوچک‌تر و یک سیستم style استاندارد شکسته شود.
+- [x] **L2** dashboard بزرگ به component/hookهای کوچک‌تر و یک سیستم style استاندارد شکسته شود. — **تکمیل شده: ClinicalDashboard از ۹۰۴ به ۳۰۰ خط کاهش یافت (۶۷٪ کاهش)؛ useImageUpload، usePhotoMutations، useConditionMapping، useGalleryFilters استخراج شدند؛ TrichoscopyGallerySection، EmptyRosterSection، SectionDivider ایجاد شدند؛ تمام ۷۴۱ تست سبز.**
 - [x] **M19** ESLint type-aware، react-hooks، jsx-a11y و no-floating-promises اضافه؛ TypeScript strict flags روشن و specها typecheck شوند. `noUncheckedIndexedAccess`، `noImplicitOverride`، `noImplicitReturns`، `noFallthroughCasesInSwitch` در `tooling/tsconfig/base.json` فعال شد؛ ESLint با `type-aware` rules، `react-hooks` و `jsx-a11y` پیکربندی شد؛ `typesafety.phase10-m19.spec.ts` نوشته شد؛ تمام خطاهای typecheck در `app-web` و `app-api` (بیش از ۱۰۰ خطا) بسته شد؛ تمام ۷۲ خطای lint (jsx-a11y، no-floating-promises، no-misused-promises، no-unsafe-*) در ۲۴ فایل اصلاح شد. ADR-0046 مستند شد.
 - [x] **PR #21** به‌دلیل base قدیمی و diff آرایشی rebase/بسته شود؛ **PR #23** چون diff مؤثر ندارد بسته شود. (تأیید شد: هر دو در 2026-09-06 بدون merge بسته شده‌اند — #21 با +13/-12 روی یک فایل و base سه کامیت عقب‌تر از main، #23 بدون diff مؤثر. هیچ‌کدام بازگشایی نشد — ADR-0044)
 - [x] **M7/R13** Firebase/metadata و هر secret/scaffold غیرمصرفی بررسی، حذف یا rotate شود؛ secret scan باید json/yaml/ops/root را هم ببیند.
@@ -258,7 +258,7 @@
 - [x] فاز ۷: sync چنددستگاهی و offline correctness (تکمیل — PR #43، مایگریشن 0013، cursor مبهم commit-safe با pg_snapshot_xmin، ledger فقط applied با delta فیلترشده، ایزولاسیون SAVEPOINT برای هر mutation، ایندکس یکتای `(clinic_id, client_mutation_id)`، LWW مبتنی بر version سروری با baseVersion الزامی، Dexie اتمیک، dead-letter با retry/backoff، پارتیشن آفلاین per clinic/user و پاک‌سازی logout، ADR-0039)
 - [x] فاز ۸: مدیا، آپلود و سهمیه (تکمیل — ADR-0041، مایگریشن 0014، upload_sessions سروری با uploadId و ListParts، presigned URLهای part-based در پنجره 16تایی، اعتبارسنجی Zod کامل، fn_usage_consume اتمیک با FOR UPDATE، دوره سهمیه با timezone کلینیک، storage_usage اندازه‌گیری‌شده با fn_storage_reserve، کلید clinic-scoped با CHECK constraint، rate limit و concurrency semaphore)
 - [x] فاز ۹: بکاپ، بازیابی و عملیات قابل اعتماد (تکمیل — ADR-0042، backup.sh با age encryption، off-site WORM با retention قفل‌شده، restore drill ماهانه در CI، structured logs با PHI scrub، metrics و alerting با webhook، rate limit سراسری و per-clinic، pool timeouts، runbook کامل، CI gate با backup/restore evidence)
-- [ ] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (در جریان — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19، M5، M5b، M5c، M14، M15، L1/W01/W22/W23 بسته شدند؛ باز: M1، L2)
+- [x] فاز ۱۰: کیفیت محصول، مستندات و حذف بدهی فنی (تکمیل — batch 1 با ADR-0043 ده مورد و batch 2 با ADR-0044 سه مورد را بست؛ M19، M5، M5b، M5c، M14، M15، L1/W01/W22/W23 بسته شدند؛ M1 (SAMPLE data separation + DemoWatermark) و L2 (dashboard decomposition از ۹۰۴ به ۳۰۰ خط) تکمیل شدند — ۲۰۲۶-۰۹-۱۳)
 
 ## روش بستن هر فاز
 

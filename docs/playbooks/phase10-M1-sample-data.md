@@ -1,8 +1,8 @@
 # Playbook فاز ۱۰: M1 — SAMPLE Data Separation
 
-> **وضعیت:** فازبندی شده · **دامنه:** تحلیل ایستا و برنامه‌ریزی · **اجرا:** شروع نشده
+> **وضعیت:** تکمیل شده · **دامنه:** ClinicalDashboard + NeuralSegmentationOverlay + DashboardShell · **اجرا:** تکمیل شده (2026-09-13)
 >
-> این سند فقط برنامه‌ی اجراست. هیچ build، test، migration یا تغییر در `apps/web/src/` در زمان تهیه‌ی آن انجام نشده است.
+> شواهد: ClinicalDashboard zero SAMPLE imports، DashboardShell renders DemoWatermark، dashboard-samples.ts DEV-guarded، m1b-runtime-wiring.spec.ts سبز، production-mocks exceptions حذف شد.
 
 ## Context
 

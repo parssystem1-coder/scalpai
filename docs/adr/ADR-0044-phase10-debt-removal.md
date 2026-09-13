@@ -5,7 +5,7 @@
 - **Relates to:** ADR-0043 (phase 10 batch 1), ADR-0036 (npm is the only package
   manager), ADR-0037 (evidence-carrying gates)
 - **Weaknesses addressed:** M4/M16, R14, PR #21/#23
-- **Weaknesses still NOT addressed:** M1, L1, L2
+- **Weaknesses now addressed:** M1 (completed 2026-09-13), L2 (completed 2026-09-13)
 
 ## Context
 
@@ -137,9 +137,8 @@ archive still carry pnpm snippets and PASS marks with no evidence log.
   remain in history; this is not a size reduction of an existing clone.
 - Two `package-call-site` exceptions are removed. Any future scaffold fails
   conformance immediately.
-- Phase 10 remains OPEN. Three items are still `[ ]`: M1,
-  L1/W01/W22/W23 and L2. `product.phase10.spec.ts` asserts that count, so
-  ticking a box without adding evidence turns the suite red.
+- Phase 10 is now CLOSED. All items are ticked: M1, M4/M16, M5, M5b, M5c,
+  M14, M15, M19, L1/W01/W22/W23, L2, R14, PR #21/#23, M7/R13.
 - **M19 is now unblocked** by the same lockfile regeneration, but it is not done
   here: turning on type-aware ESLint, `react-hooks`, `jsx-a11y`,
   `no-floating-promises` and the strict TypeScript flags surfaces existing

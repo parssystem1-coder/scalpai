@@ -269,11 +269,11 @@ Phase 4 and has been progressing ahead of it.
 - [x] Phase 1: Data extraction complete, ClinicalDashboard imports both files
 - [x] Phase 2: Header & Tabs extracted, section state flows through props
 - [x] Phase 3: Sections extracted, content renders per section
-- [ ] Phase 4: Modals extracted into `components/modals/`, focus/Escape handled
-- [ ] Phase 5: every dashboard string translated, tests green, no hardcoded direction
+- [x] Phase 4: Modals extracted into `components/modals/`, focus/Escape handled
+- [x] Phase 5: every dashboard string translated, tests green, no hardcoded direction
 - [ ] No visual regression (no before/after screenshot evidence exists)
 - [ ] No console errors or warnings (unverified)
-- [ ] Bundle size measured with `npm run build` (see `tools/bundle-budget.ts`; M15 is still open)
+- [x] Bundle size measured with `npm run build` (see `tools/bundle-budget.ts`; M15 completed)
 - [ ] Lighthouse score measured (never run)
 
 ---

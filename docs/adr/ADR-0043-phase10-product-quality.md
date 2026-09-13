@@ -166,7 +166,9 @@ this ADR for the same reason, so the rules stay ENABLED rather than weakened.
 > lockfile constraint was not routed around - the manifests are edited and the
 > lockfile regenerated with npm in the same change, which is what the gate always
 > asked for. Both `package-call-site` exceptions are removed. The two
-> `production-mocks` exceptions for M1 remain registered against this ADR.
+> `production-mocks` exceptions for M1 have also been removed (M1 completed
+> 2026-09-13 — ClinicalDashboard and NeuralSegmentationOverlay have zero SAMPLE
+> imports, DemoWatermark is active, and DEV guards are in place).
 
 ## Consequences
 
