@@ -23,7 +23,8 @@ export type DashboardModalKey =
   | "education"
   | "guidedCapture"
   | "pdfReport"
-  | "beforeAfter";
+  | "beforeAfter"
+  | "addPatient";
 
 /** Visibility map: one boolean per managed modal. */
 export type DashboardModalState = Record<DashboardModalKey, boolean>;
@@ -42,6 +43,7 @@ export const INITIAL_DASHBOARD_MODAL_STATE: DashboardModalState = {
   guidedCapture: false,
   pdfReport: false,
   beforeAfter: false,
+  addPatient: false,
 };
 
 /**
@@ -74,6 +76,7 @@ export interface UseDashboardModalsReturn {
   isGuidedCaptureOpen: boolean;
   isPdfReportOpen: boolean;
   isBeforeAfterOpen: boolean;
+  isAddPatientOpen: boolean;
 
   // Actions
   openConsent: () => void;
@@ -90,6 +93,8 @@ export interface UseDashboardModalsReturn {
   closePdfReport: () => void;
   openBeforeAfter: () => void;
   closeBeforeAfter: () => void;
+  openAddPatient: () => void;
+  closeAddPatient: () => void;
 }
 
 /**
@@ -132,6 +137,8 @@ export function useDashboardModals(bus: DashboardEventBus = dashboardEventBus): 
   const closePdfReport = useCallback(() => { dispatch({ type: "close", modal: "pdfReport" }); bus.emit("modal:closed", { modal: "pdfReport" }); }, [bus]);
   const openBeforeAfter = useCallback(() => { dispatch({ type: "open", modal: "beforeAfter" }); bus.emit("modal:opened", { modal: "beforeAfter" }); }, [bus]);
   const closeBeforeAfter = useCallback(() => { dispatch({ type: "close", modal: "beforeAfter" }); bus.emit("modal:closed", { modal: "beforeAfter" }); }, [bus]);
+  const openAddPatient = useCallback(() => { dispatch({ type: "open", modal: "addPatient" }); bus.emit("modal:opened", { modal: "addPatient" }); }, [bus]);
+  const closeAddPatient = useCallback(() => { dispatch({ type: "close", modal: "addPatient" }); bus.emit("modal:closed", { modal: "addPatient" }); }, [bus]);
 
   return useMemo(
     () => ({
@@ -142,6 +149,7 @@ export function useDashboardModals(bus: DashboardEventBus = dashboardEventBus): 
       isGuidedCaptureOpen: state.guidedCapture,
       isPdfReportOpen: state.pdfReport,
       isBeforeAfterOpen: state.beforeAfter,
+      isAddPatientOpen: state.addPatient,
 
       openConsent,
       closeConsent,
@@ -157,6 +165,8 @@ export function useDashboardModals(bus: DashboardEventBus = dashboardEventBus): 
       closePdfReport,
       openBeforeAfter,
       closeBeforeAfter,
+      openAddPatient,
+      closeAddPatient,
     }),
     [
       state,
@@ -174,6 +184,8 @@ export function useDashboardModals(bus: DashboardEventBus = dashboardEventBus): 
       closePdfReport,
       openBeforeAfter,
       closeBeforeAfter,
+      openAddPatient,
+      closeAddPatient,
     ]
   );
 }
