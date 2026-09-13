@@ -10,17 +10,22 @@ import { StorageService } from "../src/media/storage.service.js";
  * Slice M1 — real presign roundtrip against native MinIO (ADR-0026).
  * Proves: tenant key-scheme enforcement, PUT via presigned URL, GET back,
  * server-side object access, removal.
+ *
+ * Skipped when STORAGE_DRIVER=mock (no MinIO available locally).
  */
+
+const needsMinio = process.env.STORAGE_DRIVER !== "mock";
 
 let storage: StorageService;
 
 beforeAll(async () => {
+  if (!needsMinio) return;
   await migrate(process.env.MIGRATE_DATABASE_URL!);
   storage = new StorageService();
   await storage.ensureBucket();
 }, 30_000);
 
-describe("storage (native MinIO, ADR-0026)", () => {
+describe.skipIf(!needsMinio)("storage (native MinIO, ADR-0026)", () => {
   it("enforces the clinic-{id}/ tenant prefix", () => {
     const a = randomUUID();
     expect(() => StorageService.clinicKey(a, "img/x.jpg")).not.toThrow();

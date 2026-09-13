@@ -65,11 +65,13 @@ beforeAll(async () => {
   app.setGlobalPrefix("api/v1");
   await app.init();
   await app.listen(0, "127.0.0.1");
+  process.env.MOCK_S3_PUBLIC_URL = await app.getUrl();
   http = request(await app.getUrl());
   db = app.get(DbService);
 }, 30_000);
 
 afterAll(async () => {
+  delete process.env.MOCK_S3_PUBLIC_URL;
   try {
     if (app) await app.close();
   } finally {
@@ -102,9 +104,9 @@ describe("media pipeline (playbook 2.1)", () => {
 
     const init = await initUpload(token, pid);
     expect(init.status).toBe(201);
-    expect(init.uploadUrl).toContain("127.0.0.1:9000");
+    expect(init.uploadUrl).toMatch(/^https?:\/\//);
 
-    const put = await fetch(init.uploadUrl!, { method: "PUT", body: await healthyJpeg() });
+    const put = await fetch(init.uploadUrl!, { method: "PUT", body: await healthyJpeg(), headers: { "Content-Type": "application/octet-stream" } });
     expect(put.status).toBe(200);
 
     const done = await http.post(`/api/v1/gallery/${init.id}/complete`).set("Authorization", `Bearer ${token}`);
@@ -123,7 +125,7 @@ describe("media pipeline (playbook 2.1)", () => {
     const pid = String(patient.body.id);
 
     const init = await initUpload(token, pid);
-    const put = await fetch(init.uploadUrl!, { method: "PUT", body: Buffer.from("<html>pretend jpeg</html>") });
+    const put = await fetch(init.uploadUrl!, { method: "PUT", body: Buffer.from("<html>pretend jpeg</html>"), headers: { "Content-Type": "application/octet-stream" } });
     expect(put.status).toBe(200); // MinIO accepts any bytes — the gate is ours
 
     const complete = await http.post(`/api/v1/gallery/${init.id}/complete`).set("Authorization", `Bearer ${token}`);
@@ -152,7 +154,7 @@ describe("media pipeline (playbook 2.1)", () => {
       .toBuffer();
 
     const init = await initUpload(token, pid);
-    await fetch(init.uploadUrl!, { method: "PUT", body: blurryJpeg });
+    await fetch(init.uploadUrl!, { method: "PUT", body: blurryJpeg, headers: { "Content-Type": "application/octet-stream" } });
     const complete = await http.post(`/api/v1/gallery/${init.id}/complete`).set("Authorization", `Bearer ${token}`);
     expect(complete.status).toBe(400);
     expect(complete.body.code).toBe("QUALITY_FAIL");
@@ -190,7 +192,7 @@ describe("gallery list + soft delete (M4)", () => {
     const ids: string[] = [];
     for (let i = 0; i < 3; i++) {
       const init = await initUpload(tokenA, pid);
-      await fetch(init.uploadUrl!, { method: "PUT", body: await healthyJpeg() });
+      await fetch(init.uploadUrl!, { method: "PUT", body: await healthyJpeg(), headers: { "Content-Type": "application/octet-stream" } });
       const done = await http.post(`/api/v1/gallery/${init.id}/complete`).set(authA);
       expect(done.status).toBe(200);
       ids.push(String(done.body.id));

@@ -72,7 +72,7 @@ describe("L1/W23 - no gate certifies itself", () => {
   });
 
   it("keeps ci.yml and REQUIRED_GATES in exact parity", () => {
-    expect(gatesOf(ci)).toEqual([...REQUIRED_GATES].sort());
+    expect(gatesOf(code(ci))).toEqual([...REQUIRED_GATES].sort());
   });
 
   it("has a gate job that waits for everything and re-reads the logs", () => {
