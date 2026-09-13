@@ -4,7 +4,7 @@ import { Camera, ChevronRight, Layers, Plus, Search, Sparkles } from "lucide-rea
 import LuxuryTiltCard from "../LuxuryTiltCard.js";
 import TrichologyRadarChart, { RadarMetric } from "../TrichologyRadarChart.js";
 import FollicleCaliberWaveform from "../FollicleCaliberWaveform.js";
-import type { Patient } from "../../data/dashboard-samples.js";
+import type { Patient } from "../../data/dashboard-types";
 import type { SectionId } from "../dashboard-sections.js";
 import { faNum, formatDate } from "../../i18n.js";
 

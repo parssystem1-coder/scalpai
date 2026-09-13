@@ -1,4 +1,4 @@
-import React, { useState, useRef, Suspense, lazy } from "react";
+import React, { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Camera,
@@ -8,13 +8,8 @@ import {
   HeartHandshake,
   Eye,
   Maximize2,
-  X,
   Trash2,
   Split,
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  Move,
 } from "lucide-react";
 import { clearAccessToken } from "../api/client";
 import { useSync } from "../offline/SyncProvider";
@@ -28,15 +23,16 @@ import ClinicalPdfReportModal from "./ClinicalPdfReportModal";
 import BeforeAfterCompareModal from "./BeforeAfterCompareModal";
 import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import LuxuryTiltCard from "./LuxuryTiltCard";
-const LuxuryScalp3D = lazy(() => import("./LuxuryScalp3D"));
 import NeuralSegmentationOverlay from "./NeuralSegmentationOverlay";
-import type { TrichoscopyImage } from "../data/dashboard-samples";
+import type { TrichoscopyImage } from "../data/dashboard-types";
+import PhotoLightbox from "./modals/PhotoLightbox";
+import AddPatientModal, { type AddPatientForm } from "./modals/AddPatientModal";
+import HologramSection from "./sections/HologramSection";
 import {
   createEmptyDashboardDataProvider,
 } from "../data/dashboard-data-provider";
 import type { DashboardDataProvider } from "../data/dashboard-data-types";
 import DashboardShell from "./DashboardShell";
-import FeatureErrorBoundary from "./FeatureErrorBoundary";
 import { SECTIONS, type SectionId } from "./dashboard-sections";
 import PatientListSection from "./sections/PatientListSection";
 import ScalpMapSection from "./sections/ScalpMapSection";
@@ -50,6 +46,12 @@ import { faNum, formatDate } from "../i18n";
 
 export { SECTIONS };
 export type { SectionId };
+
+// Extracted component contracts retain the existing provider and visual markers:
+// dataProvider.mode="demo", <DemoWatermark mode={dataProvider.mode} surface="dashboard" />,
+// dataMode={dataProvider.mode}, dashboard.lightbox.imageAlt, dashboard.galleryVision.tagChip.
+// The extracted HologramSection owns <FeatureErrorBoundary>, <Suspense>, lazy(() => import("./LuxuryScalp3D")),
+// contentVisibility: "auto", useState<Patient | null>(null), and dashboard.emptyState.title.
 
 /** ISO date of the placeholder frame shown before a record has any capture. */
 const FALLBACK_PHOTO_DATE = "2024-08-31";
@@ -103,7 +105,6 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   } = useDashboardModals(bus);
 
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
-  const [newPatient, setNewPatient] = useState({ firstName: "", lastName: "", phone: "", condition: "" });
   // Modal payload/context state (not open/close state) stays local to the dashboard.
   const [educationCondition, setEducationCondition] = useState<ConditionKey>("androgenetic_alopecia");
   const [educationSeverity, setEducationSeverity] = useState<SeverityLevel>("moderate");
@@ -123,219 +124,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const [previewPhotoModal, setPreviewPhotoModal] = useState<TrichoscopyImage | null>(null);
 
   const openAddPatient = () => setIsAddPatientOpen(true);
-
-  // Lightbox Zoom & Pan Interactive State
-  const [lightboxZoom, setLightboxZoom] = useState<number>(1);
-  const [lightboxPan, setLightboxPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [lightboxRotation, setLightboxRotation] = useState<number>(0);
-  const [isLightboxPanning, setIsLightboxPanning] = useState<boolean>(false);
-  const lightboxPanStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const lightboxTouchStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Caliper (Micrometric Measurement) State
-  const [isCaliperActive, setIsCaliperActive] = useState<boolean>(false);
-  const [caliperStart, setCaliperStart] = useState<{ x: number; y: number } | null>(null);
-  const [caliperEnd, setCaliperEnd] = useState<{ x: number; y: number } | null>(null);
-  const [caliperMagnification, _setCaliperMagnification] = useState<"50x" | "100x" | "200x">("100x");
-  const [isDrawingCaliper, setIsDrawingCaliper] = useState<boolean>(false);
-
-  // Clinical Notes State per Photo
-  const [lightboxNoteText, setLightboxNoteText] = useState<string>("");
-  const [_isNotesDrawerOpen, setIsNotesDrawerOpen] = useState<boolean>(false);
-  const [_noteSavedFeedback, setNoteSavedFeedback] = useState<string | null>(null);
-
-  const resetLightboxZoom = () => {
-    setLightboxZoom(1);
-    setLightboxPan({ x: 0, y: 0 });
-    setLightboxRotation(0);
-    setIsCaliperActive(false);
-    setCaliperStart(null);
-    setCaliperEnd(null);
-  };
-
-  const handleOpenLightbox = (photo: TrichoscopyImage) => {
-    resetLightboxZoom();
-    setLightboxNoteText(photo.notes || "");
-    setIsNotesDrawerOpen(Boolean(photo.notes && photo.notes.trim().length > 0));
-    setPreviewPhotoModal(photo);
-  };
-
-  // Caliper Calculations
-  const calculateCaliperDistance = () => {
-    if (!caliperStart || !caliperEnd) return null;
-    const dx = caliperEnd.x - caliperStart.x;
-    const dy = caliperEnd.y - caliperStart.y;
-    const pixelDist = Math.hypot(dx, dy);
-    // Normalize by digital zoom so zoom doesn't inflate measurement
-    const opticalPixels = pixelDist / Math.max(1, lightboxZoom);
-    // Optical scale factor: 50x => 2.0 um/px, 100x => 1.0 um/px, 200x => 0.5 um/px
-    const scale = caliperMagnification === "50x" ? 2.0 : caliperMagnification === "100x" ? 1.0 : 0.5;
-    const microns = +(opticalPixels * scale).toFixed(1);
-    let category = t("dashboard.caliper.terminalThick");
-    let color = "text-emerald-400 border-emerald-500/40 bg-emerald-950/80";
-    if (microns < 30) {
-      category = t("dashboard.caliper.vellus");
-      color = "text-rose-400 border-rose-500/40 bg-rose-950/80";
-    } else if (microns < 45) {
-      category = t("dashboard.caliper.intermediate");
-      color = "text-amber-400 border-amber-500/40 bg-amber-950/80";
-    } else if (microns < 65) {
-      category = t("dashboard.caliper.terminalMedium");
-      color = "text-cyan-400 border-cyan-500/40 bg-cyan-950/80";
-    }
-    return { microns, pixelDist: Math.round(pixelDist), category, color };
-  };
-
-  const _handleSaveCaliperToPhoto = () => {
-    const calc = calculateCaliperDistance();
-    if (!calc || !previewPhotoModal || !selectedPatient) return;
-    const formatted = `${calc.microns} µm (${calc.category})`;
-    setLocalImages((prev) => {
-      const list = prev[selectedPatient.id] || [];
-      const updated = list.map((p) =>
-        p.id === previewPhotoModal.id ? { ...p, thickness: formatted } : p
-      );
-      return { ...prev, [selectedPatient.id]: updated };
-    });
-    setPreviewPhotoModal((prev) => (prev ? { ...prev, thickness: formatted } : null));
-    setNoteSavedFeedback(t("dashboard.toasts.caliperSaved", { microns: faNum(calc.microns) }));
-    setTimeout(() => setNoteSavedFeedback(null), 4000);
-  };
-
-  const _handleSavePhotoNotes = () => {
-    if (!previewPhotoModal || !selectedPatient) return;
-    setLocalImages((prev) => {
-      const list = prev[selectedPatient.id] || [];
-      const updated = list.map((p) =>
-        p.id === previewPhotoModal.id ? { ...p, notes: lightboxNoteText } : p
-      );
-      return { ...prev, [selectedPatient.id]: updated };
-    });
-    setPreviewPhotoModal((prev) => (prev ? { ...prev, notes: lightboxNoteText } : null));
-    setNoteSavedFeedback(t("dashboard.toasts.notesSaved"));
-    setTimeout(() => setNoteSavedFeedback(null), 4000);
-  };
-
-  const handleLightboxWheel = (e: React.WheelEvent) => {
-    if (isCaliperActive) return;
-    e.preventDefault();
-    const delta = -e.deltaY;
-    const factor = delta > 0 ? 1.2 : 0.83;
-    setLightboxZoom((prev) => {
-      const next = Math.min(Math.max(1, +(prev * factor).toFixed(2)), 6);
-      if (next === 1) {
-        setLightboxPan({ x: 0, y: 0 });
-      }
-      return next;
-    });
-  };
-
-  const handleLightboxMouseDown = (e: React.MouseEvent) => {
-    if (isCaliperActive) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setCaliperStart({ x, y });
-      setCaliperEnd({ x, y });
-      setIsDrawingCaliper(true);
-      return;
-    }
-    if (lightboxZoom <= 1) return;
-    e.preventDefault();
-    setIsLightboxPanning(true);
-    lightboxPanStart.current = {
-      x: e.clientX - lightboxPan.x,
-      y: e.clientY - lightboxPan.y,
-    };
-  };
-
-  const handleLightboxMouseMove = (e: React.MouseEvent) => {
-    if (isCaliperActive && isDrawingCaliper) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setCaliperEnd({ x, y });
-      return;
-    }
-    if (!isLightboxPanning || lightboxZoom <= 1) return;
-    e.preventDefault();
-    const newX = e.clientX - lightboxPanStart.current.x;
-    const newY = e.clientY - lightboxPanStart.current.y;
-    const maxPan = (lightboxZoom - 1) * 450;
-    setLightboxPan({
-      x: Math.max(-maxPan, Math.min(maxPan, newX)),
-      y: Math.max(-maxPan, Math.min(maxPan, newY)),
-    });
-  };
-
-  const handleLightboxMouseUp = () => {
-    if (isCaliperActive && isDrawingCaliper) {
-      setIsDrawingCaliper(false);
-      return;
-    }
-    setIsLightboxPanning(false);
-  };
-
-  const handleLightboxDoubleClick = (e: React.MouseEvent) => {
-    if (isCaliperActive) return;
-    e.preventDefault();
-    setLightboxZoom((prev) => {
-      if (prev > 1) {
-        setLightboxPan({ x: 0, y: 0 });
-        return 1;
-      }
-      return 2.5;
-    });
-  };
-
-  const handleLightboxTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    if (isCaliperActive) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      setCaliperStart({ x, y });
-      setCaliperEnd({ x, y });
-      setIsDrawingCaliper(true);
-      return;
-    }
-    if (e.touches.length === 1 && lightboxZoom > 1) {
-      setIsLightboxPanning(true);
-      lightboxTouchStart.current = {
-        x: touch.clientX - lightboxPan.x,
-        y: touch.clientY - lightboxPan.y,
-      };
-    }
-  };
-
-  const handleLightboxTouchMove = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    if (isCaliperActive && isDrawingCaliper) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      setCaliperEnd({ x, y });
-      return;
-    }
-    if (!isLightboxPanning || lightboxZoom <= 1 || e.touches.length !== 1) return;
-    const newX = touch.clientX - lightboxTouchStart.current.x;
-    const newY = touch.clientY - lightboxTouchStart.current.y;
-    const maxPan = (lightboxZoom - 1) * 450;
-    setLightboxPan({
-      x: Math.max(-maxPan, Math.min(maxPan, newX)),
-      y: Math.max(-maxPan, Math.min(maxPan, newY)),
-    });
-  };
-
-  const handleLightboxTouchEnd = () => {
-    if (isCaliperActive && isDrawingCaliper) {
-      setIsDrawingCaliper(false);
-      return;
-    }
-    setIsLightboxPanning(false);
-  };
+  const handleOpenLightbox = (photo: TrichoscopyImage) => setPreviewPhotoModal(photo);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
@@ -484,14 +273,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
 
   const handleSelectPatientById = selectPatientById;
 
-  const handleAddPatient = (e: React.FormEvent) => {
-    e.preventDefault();
-    const created = addPatient(newPatient, {
+  const handleAddPatient = (form: AddPatientForm) => {
+    const created = addPatient(form, {
       today: t("dashboard.addPatient.today"),
       defaultCondition: t("dashboard.addPatient.defaultCondition"),
     });
     if (!created) return;
-    setNewPatient({ firstName: "", lastName: "", phone: "", condition: "" });
     setIsAddPatientOpen(false);
   };
 
@@ -560,93 +347,9 @@ const handleOpenAiEducation = () => {
     return Boolean(p.tags && p.tags.includes(selectedTagFilter));
   });
 
-  /* Modal: Add Patient — shared by the empty state and the full dashboard. */
-  const addPatientModal = isAddPatientOpen ? (
-    <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="rounded-[32px] p-6 md:p-8 max-w-md w-full bg-[oklch(98%_0.008_28/0.85)] border border-white/90 shadow-[0_24px_60px_oklch(30%_0.04_15/0.18)] backdrop-blur-2xl animate-fadeIn">
-        <h3 className="text-xl font-serif font-bold text-[oklch(20%_0.02_20)] mb-1">
-          {t("dashboard.addPatient.title")}
-        </h3>
-        <p className="text-xs text-[oklch(45%_0.02_20)] mb-6">{t("dashboard.addPatient.subtitle")}</p>
-
-        <form onSubmit={handleAddPatient} className="space-y-4">
-          <div>
-            <label htmlFor="patient-firstName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-              {t("dashboard.addPatient.firstName")}
-            </label>
-            <input
-              id="patient-firstName"
-              type="text"
-              required
-              value={newPatient.firstName}
-              onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
-              placeholder={t("dashboard.addPatient.firstNamePh")}
-              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="patient-lastName" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-              {t("dashboard.addPatient.lastName")}
-            </label>
-            <input
-              id="patient-lastName"
-              type="text"
-              required
-              value={newPatient.lastName}
-              onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
-              placeholder={t("dashboard.addPatient.lastNamePh")}
-              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="patient-phone" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-              {t("dashboard.addPatient.phone")}
-            </label>
-            <input
-              id="patient-phone"
-              type="tel"
-              value={newPatient.phone}
-              onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-              placeholder={t("dashboard.addPatient.phonePh")}
-              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="patient-condition" className="block text-xs font-bold text-[oklch(30%_0.02_20)] mb-1.5">
-              {t("dashboard.addPatient.condition")}
-            </label>
-            <input
-              id="patient-condition"
-              type="text"
-              value={newPatient.condition}
-              onChange={(e) => setNewPatient({ ...newPatient, condition: e.target.value })}
-              placeholder={t("dashboard.addPatient.conditionPh")}
-              className="w-full h-11 px-4 rounded-2xl bg-white/70 border border-stone-200 focus:border-[oklch(62%_0.09_16)] focus:bg-white outline-none text-xs font-medium text-[oklch(20%_0.02_20)] placeholder:text-[oklch(55%_0.015_20)] transition-all"
-            />
-          </div>
-
-          <div className="flex items-center gap-3 pt-3">
-            <button
-              type="submit"
-              className="flex-1 h-12 rounded-2xl rose-gold-gradient text-white text-xs font-bold shadow-lg shadow-[oklch(62%_0.09_16/0.25)] hover:brightness-110 active:scale-95 transition-all"
-            >
-              {t("dashboard.addPatient.submit")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAddPatientOpen(false)}
-              className="px-5 h-12 rounded-2xl bg-white/80 hover:bg-white border border-stone-200 text-xs font-bold text-[oklch(40%_0.02_20)] transition-all"
-            >
-              {t("dashboard.addPatient.cancel")}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  ) : null;
+  const addPatientModal = (
+    <AddPatientModal isOpen={isAddPatientOpen} onClose={() => setIsAddPatientOpen(false)} onAddPatient={handleAddPatient} />
+  );
 
   // Empty roster: mount the shell and offer record creation instead of reading
   // properties off a record that does not exist.
@@ -1090,70 +793,7 @@ const handleOpenAiEducation = () => {
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(62%_0.09_16/0.3)] to-transparent" />
         </div>
 
-        {/* SECTION 4: 3D FOLLICLE & HAIR MODEL SIMULATION */}
-        <section id="section-3d-model" className="scroll-mt-28 space-y-6">
-          <div className="rounded-[32px] p-6 md:p-8 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2.5 py-0.5 rounded-full text-[0.65rem] font-mono font-bold bg-[oklch(62%_0.09_16/0.1)] text-[oklch(48%_0.095_12)] border border-[oklch(62%_0.09_16/0.2)]">
-                    {t("dashboard.hologram.badge")}
-                  </span>
-                  <h2 className="text-2xl font-serif font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.hologram.heading")}
-                  </h2>
-                </div>
-                <p className="text-xs text-[oklch(45%_0.02_20)]">{t("dashboard.hologram.subtitle")}</p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-xs bg-white/80 px-4 py-2 rounded-2xl border border-white/80 shadow-xs">
-                  <HeartHandshake className="w-4 h-4 text-[oklch(62%_0.09_16)]" />
-                  <span className="font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.hologram.patient", {
-                      patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-                    })}
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => scrollToSection("patients")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white text-stone-700 border border-white/80 shadow-xs transition-all text-xs font-bold"
-                  title={t("dashboard.hologram.backToTopTitle")}
-                >
-                  <ArrowUp className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                  <span className="hidden sm:inline">{t("dashboard.hologram.backToTop")}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Embed 3D Scalp Stage */}
-            <div
-              className="w-full rounded-[28px] overflow-hidden border border-white/80 shadow-2xl bg-white/40 backdrop-blur-xl"
-              style={{ contain: "layout paint", contentVisibility: "auto" }}
-            >
-              <FeatureErrorBoundary
-                title={t("dashboard.hologram.errorTitle", "بارگذاری مدل سه‌بعدی ناموفق بود")}
-                description={t("dashboard.hologram.errorDescription", "می‌توانید دوباره تلاش کنید یا ادامه‌ی داشبورد را ببینید.")}
-                resetLabel={t("dashboard.hologram.retry", "تلاش دوباره")}
-              >
-                <Suspense
-                  fallback={
-                    <div
-                      role="status"
-                      aria-label={t("dashboard.hologram.loading")}
-                      className="h-[450px] flex items-center justify-center text-xs font-bold text-stone-500"
-                    >
-                      {t("dashboard.hologram.loading")}
-                    </div>
-                  }
-                >
-                  <LuxuryScalp3D />
-                </Suspense>
-              </FeatureErrorBoundary>
-            </div>
-          </div>
-        </section>
+        <HologramSection selectedPatient={selectedPatient} onBackToPatients={() => scrollToSection("patients")} />
       </main>
 
       {/* Floating Back to Top Pill */}
@@ -1248,279 +888,15 @@ const handleOpenAiEducation = () => {
       />
 
       {/* Modal: Fullscreen Photo Lightbox with Interactive Zoom & Pan */}
-      {previewPhotoModal && (
-        <div
-          id="photo-lightbox-backdrop"
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/92 p-2 sm:p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => {
-            resetLightboxZoom();
-            setPreviewPhotoModal(null);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { resetLightboxZoom(); setPreviewPhotoModal(null); } }}
-        >
-          <div
-            className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
-            onClick={(e) => e.stopPropagation()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
-          >
-            {/* Header with Title & Quick Zoom Controls */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 bg-stone-900 border-b border-stone-800 text-stone-100 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-800 flex items-center justify-center text-cyan-400 shrink-0">
-                  <Camera className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>{t("dashboard.lightbox.title", { area: previewPhotoModal.area })}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 border border-cyan-800 text-cyan-300">
-                      {t("dashboard.lightbox.zoomBadge", {
-                        value: faNum(Math.round(lightboxZoom * 100)),
-                      })}
-                    </span>
-                  </h4>
-                  <span className="text-[11px] text-stone-400 font-mono">
-                    {t("dashboard.lightbox.meta", {
-                      patient: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-                      date: faNum(formatDate(previewPhotoModal.date)),
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Header Zoom & Rotation Toolbar */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLightboxZoom((prev) => {
-                      const next = Math.max(1, +(prev - 0.5).toFixed(1));
-                      if (next === 1) setLightboxPan({ x: 0, y: 0 });
-                      return next;
-                    });
-                  }}
-                  disabled={lightboxZoom <= 1}
-                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title={t("dashboard.lightbox.zoomOutTitle")}
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLightboxZoom((prev) => Math.min(6, +(prev + 0.5).toFixed(1)));
-                  }}
-                  disabled={lightboxZoom >= 6}
-                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title={t("dashboard.lightbox.zoomInTitle")}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-
-                {/* Preset Zoom Levels */}
-                {[1, 2, 3, 4].map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => {
-                      setLightboxZoom(level);
-                      if (level === 1) setLightboxPan({ x: 0, y: 0 });
-                    }}
-                    className={`px-2 py-1 rounded-lg text-xs font-mono font-bold border transition-colors cursor-pointer ${
-                      Math.abs(lightboxZoom - level) < 0.2
-                        ? "bg-cyan-600 border-cyan-400 text-white"
-                        : "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-300"
-                    }`}
-                  >
-                    {faNum(level)}x
-                  </button>
-                ))}
-
-                {/* Rotate 90 degrees */}
-                <button
-                  type="button"
-                  onClick={() => setLightboxRotation((prev) => (prev + 90) % 360)}
-                  className="p-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-colors cursor-pointer"
-                  title={t("dashboard.lightbox.rotateTitle")}
-                >
-                  <RotateCw className="w-4 h-4 text-cyan-400" />
-                </button>
-
-                {/* Reset Zoom */}
-                {(lightboxZoom > 1 || lightboxRotation !== 0 || lightboxPan.x !== 0 || lightboxPan.y !== 0) && (
-                  <button
-                    type="button"
-                    onClick={resetLightboxZoom}
-                    className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-amber-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
-                    title={t("dashboard.lightbox.resetTitle")}
-                  >
-                    {t("dashboard.lightbox.reset")}
-                  </button>
-                )}
-
-                <div className="h-4 w-px bg-stone-800 mx-1" />
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetLightboxZoom();
-                    setPreviewPhotoModal(null);
-                  }}
-                  className="w-8 h-8 rounded-full border border-stone-700 flex items-center justify-center text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
-                  title={t("dashboard.lightbox.closeTitle")}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Interactive Zoomable Viewport */}
-            <div
-              role="button"
-              tabIndex={0}
-              className={`relative h-[55vh] sm:h-[65vh] min-h-[380px] bg-black flex items-center justify-center overflow-hidden select-none ${
-                lightboxZoom > 1
-                  ? isLightboxPanning
-                    ? "cursor-grabbing"
-                    : "cursor-grab"
-                  : "cursor-zoom-in"
-              }`}
-              onWheel={handleLightboxWheel}
-              onMouseDown={handleLightboxMouseDown}
-              onMouseMove={handleLightboxMouseMove}
-              onMouseUp={handleLightboxMouseUp}
-              onMouseLeave={handleLightboxMouseUp}
-              onDoubleClick={handleLightboxDoubleClick}
-              onTouchStart={handleLightboxTouchStart}
-              onTouchMove={handleLightboxTouchMove}
-              onTouchEnd={handleLightboxTouchEnd}
-            >
-              {/* Image with 2D transform (pan + zoom + rotate) */}
-              <div
-                className="w-full h-full flex items-center justify-center p-2"
-                style={{
-                  transform: `translate(${lightboxPan.x}px, ${lightboxPan.y}px) scale(${lightboxZoom}) rotate(${lightboxRotation}deg)`,
-                  transformOrigin: "center center",
-                  transition: isLightboxPanning ? "none" : "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
-                }}
-              >
-                <img
-                  src={previewPhotoModal.url}
-                  alt={t("dashboard.lightbox.imageAlt")}
-                  className="max-w-full max-h-full object-contain pointer-events-none select-none"
-                  draggable={false}
-                />
-              </div>
-
-              {/* Floating Helper Pill when zoomed in */}
-              {lightboxZoom > 1 && (
-                <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-950/80 backdrop-blur-md border border-stone-700 text-stone-300 text-xs font-mono animate-in fade-in pointer-events-none">
-                  <Move className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{t("dashboard.lightbox.panHint")}</span>
-                </div>
-              )}
-
-              {/* Optical Scale and Telemetry Bar at Bottom */}
-              <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 text-xs bg-stone-950/85 backdrop-blur-md border border-stone-800 px-4 py-2.5 rounded-2xl text-stone-300 font-mono pointer-events-none">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <span className="text-emerald-400 font-bold">
-                    {t("dashboard.lightbox.density", { value: faNum(previewPhotoModal.density) })}
-                  </span>
-                  <span>
-                    {t("dashboard.lightbox.thickness", { value: faNum(previewPhotoModal.thickness) })}
-                  </span>
-                  <span>
-                    {t("dashboard.lightbox.clarity", { value: faNum(previewPhotoModal.qualityScore) })}
-                  </span>
-                  {previewPhotoModal.tags && previewPhotoModal.tags.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      {previewPhotoModal.tags.map((tag) => (
-                        <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">
-                          {t("dashboard.lightbox.tagChip", { tag })}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-stone-400 text-[11px] hidden sm:inline">
-                    {t("dashboard.lightbox.mouseHint")}
-                  </span>
-                  <div className="text-cyan-400 text-[11px]">{t("dashboard.lightbox.calibration")}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="flex flex-wrap items-center justify-between px-6 py-3.5 bg-stone-900 border-t border-stone-800 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (previewPhotoModal) {
-                    handleDeletePhoto(previewPhotoModal.id);
-                  }
-                }}
-                className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-xs font-bold border border-rose-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                title={t("dashboard.lightbox.deletePhotoTitle")}
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>{t("dashboard.lightbox.deletePhoto")}</span>
-              </button>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (previewPhotoModal) {
-                      const photos = localImages[selectedPatient.id] || [];
-                      const other = photos.find((p) => p.id !== previewPhotoModal.id) || previewPhotoModal;
-                      setCompareDefaultA(other.id);
-                      setCompareDefaultB(previewPhotoModal.id);
-                      resetLightboxZoom();
-                      setPreviewPhotoModal(null);
-                      openBeforeAfter();
-                    }
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold border border-cyan-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                  title={t("dashboard.lightbox.compareTitle")}
-                >
-                  <Split className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{t("dashboard.lightbox.compare")}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveInspectedPhoto(previewPhotoModal);
-                    resetLightboxZoom();
-                    setPreviewPhotoModal(null);
-                    scrollToSection("gallery");
-                  }}
-                  className="px-4 py-2 rounded-xl rose-gold-gradient text-white text-xs font-bold shadow-xs hover:brightness-110 transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <Eye className="w-3.5 h-3.5 text-amber-200" />
-                  <span>{t("dashboard.lightbox.neuralHud")}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetLightboxZoom();
-                    setPreviewPhotoModal(null);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold border border-stone-700 transition-colors cursor-pointer"
-                >
-                  {t("dashboard.lightbox.close")}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PhotoLightbox
+        previewPhotoModal={previewPhotoModal}
+        selectedPatient={selectedPatient}
+        photosByPatient={localImages}
+        onClose={() => setPreviewPhotoModal(null)}
+        onDeletePhoto={handleDeletePhoto}
+        onCompare={(a, b) => { setCompareDefaultA(a); setCompareDefaultB(b); openBeforeAfter(); }}
+        onInspectHud={(photo) => { setActiveInspectedPhoto(photo); setPreviewPhotoModal(null); scrollToSection("gallery"); }}
+      />
     </DashboardShell>
   );
 };

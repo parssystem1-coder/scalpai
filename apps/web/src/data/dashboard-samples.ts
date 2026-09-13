@@ -4,36 +4,7 @@
 // the only place allowed to localise them (see `formatDate` in `../i18n.ts`,
 // which renders the Jalali calendar for `fa` and ISO for `en`).
 
-export interface Patient {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  createdAt?: string;
-  /** ISO `YYYY-MM-DD`. Localise with `formatDate()` before display. */
-  lastVisit?: string;
-  scalpCondition?: string;
-  hairDensity?: number;
-  anagenRatio?: number;
-  keratinHealth?: number;
-  sebumBalance?: number;
-  microcirculation?: number;
-  stemCellVitality?: number;
-}
-
-export interface TrichoscopyImage {
-  id: string;
-  patientId: string;
-  url: string;
-  area: "vertex" | "temple" | "frontal" | "occiput";
-  /** ISO `YYYY-MM-DD` for stored frames; freshly captured frames carry a label. */
-  date: string;
-  density: number;
-  thickness: string;
-  qualityScore: number;
-  tags?: string[];
-  notes?: string;
-}
+import type { Patient, TrichoscopyImage } from "./dashboard-types";
 
 // Gated behind DEV to satisfy production-mocks conformance (ADR-21)
 export const SAMPLE_PATIENTS: Patient[] = import.meta.env.DEV ? [

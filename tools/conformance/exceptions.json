@@ -36,20 +36,6 @@
       "reason": "platform catalog shared by all tenants: read-only policy for the app role, writes only via platform CLI/migration",
       "since": "2026-09-06"
     },
-    {
-      "rule": "production-mocks",
-      "file": "apps/web/src/components/ClinicalDashboard.tsx",
-      "adr": "ADR-0043",
-      "reason": "SAMPLE_PATIENTS/SAMPLE_IMAGES demo data: still the OPEN half of phase 10 M1, tracked with the L2 decomposition of this 110KB component. Registered so the rule stays enabled instead of being weakened",
-      "since": "2026-09-06"
-    },
-    {
-      "rule": "production-mocks",
-      "file": "apps/web/src/components/NeuralSegmentationOverlay.tsx",
-      "adr": "ADR-0043",
-      "reason": "SAMPLE_DETECTIONS overlay data: open half of phase 10 M1, to be replaced by real detections",
-      "since": "2026-09-06"
-    },
 {
     "rule": "ops-file-conventions",
     "file": "ops/README.md",

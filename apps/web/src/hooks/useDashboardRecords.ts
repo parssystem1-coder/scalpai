@@ -1,7 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
-import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
+import type { Patient, TrichoscopyImage } from "../data/dashboard-types";
 import type { DashboardDataProvider } from "../data/dashboard-data-types";
 import { dashboardEventBus, type DashboardEventBus } from "../state/dashboard-event-bus";
 

@@ -2,7 +2,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import PatientListSection from "../sections/PatientListSection.js";
-import { SAMPLE_PATIENTS, type Patient } from "../../data/dashboard-samples.js";
+import { SAMPLE_PATIENTS } from "../../data/dashboard-samples.js";
+import type { Patient } from "../../data/dashboard-types";
 import i18n from "../../i18n.js";
 
 /**

@@ -267,6 +267,9 @@ const fa = {
       backToTop: "ابتدای پرونده",
       backToTopTitle: "بازگشت به ابتدای پرونده",
       loading: "در حال بارگذاری شبیه‌ساز سه‌بعدی فولیکول...",
+      errorTitle: "بارگذاری مدل سه‌بعدی ناموفق بود",
+      errorDescription: "می‌توانید دوباره تلاش کنید یا ادامه‌ی داشبورد را ببینید.",
+      retry: "تلاش دوباره",
     },
     backToTopPill: {
       label: "ابتدای پرونده",
@@ -979,6 +982,9 @@ const en = {
       backToTop: "Top of record",
       backToTopTitle: "Back to the top of the record",
       loading: "Loading the 3D follicle simulator...",
+      errorTitle: "The 3D model could not be loaded",
+      errorDescription: "You can try again or continue viewing the dashboard.",
+      retry: "Try again",
     },
     backToTopPill: {
       label: "Top of record",

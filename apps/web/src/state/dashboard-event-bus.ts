@@ -1,4 +1,4 @@
-import type { Patient, TrichoscopyImage } from "../data/dashboard-samples";
+import type { Patient, TrichoscopyImage } from "../data/dashboard-types";
 import type { DashboardModalKey } from "../hooks/useDashboardModals";
 
 export interface DashboardAnalysisSnapshot {

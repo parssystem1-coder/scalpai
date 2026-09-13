@@ -4,7 +4,7 @@ import {
   createEmptyDashboardDataProvider,
   createTestDashboardDataProvider,
 } from "./dashboard-data-provider";
-import type { Patient, TrichoscopyImage } from "./dashboard-samples";
+import type { Patient, TrichoscopyImage } from "./dashboard-types";
 
 const patient: Patient = {
   id: "fixture-patient",

@@ -1,4 +1,4 @@
-import type { Patient, TrichoscopyImage } from "./dashboard-samples";
+import type { Patient, TrichoscopyImage } from "./dashboard-types";
 
 /** The provenance of data exposed to dashboard consumers. */
 export type DashboardDataMode = "real" | "demo" | "test";
