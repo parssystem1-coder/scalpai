@@ -44,6 +44,9 @@ export default defineConfig({
       stderr: "pipe",
       env: {
         PORT: String(API_PORT),
+        // Local E2E only: production deployments must provide their own secret.
+        JWT_SECRET: process.env.JWT_SECRET ?? "l3-local-e2e-jwt-secret-not-for-production",
+        STORAGE_DRIVER: process.env.STORAGE_DRIVER ?? "mock",
       },
     },
     {

@@ -31,7 +31,18 @@ export async function login(page: Page, who: Credentials = CLINIC_A_OWNER): Prom
   await page.getByTestId("login-password").fill(who.password);
   await page.getByTestId("login-submit").click();
   // The app routes to /dashboard on success; a server error renders login-error.
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  // Race both outcomes so an unavailable API/database is reported immediately
+  // instead of becoming an opaque 30-second navigation timeout.
+  await Promise.race([
+    page.waitForURL(/\/dashboard/, { timeout: 30_000 }),
+    page
+      .getByTestId("login-error")
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(async () => {
+        const message = (await page.getByTestId("login-error").textContent())?.trim() ?? "unknown login error";
+        throw new Error(`login failed: ${message}`);
+      }),
+  ]);
 }
 
 export async function openPatients(page: Page): Promise<void> {
