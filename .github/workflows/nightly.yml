@@ -173,8 +173,7 @@ jobs:
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update -qq
           sudo apt-get install -y -qq age jq postgresql-client-17
-          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x /usr/local/bin/mc
+          install -m 0755 tools/ci/mc-wrapper.sh /usr/local/bin/mc
 
       - name: Generate the age keypair and the drill signing key
         run: |
@@ -187,10 +186,11 @@ jobs:
 
       - name: Start MinIO with a media bucket and an object-locked off-site bucket
         run: |
-          curl -fsSL -o /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
-          chmod +x /usr/local/bin/minio
-          MINIO_ROOT_USER=minioadmin MINIO_ROOT_PASSWORD=minioadmin-dev-only \
-            nohup /usr/local/bin/minio server /tmp/minio-data --address 127.0.0.1:9000 > /tmp/minio.log 2>&1 &
+          docker run -d --name scalpai-minio --network host \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin-dev-only \
+            -v /tmp/minio-data:/data \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data --address 127.0.0.1:9000 > /tmp/minio.container-id
           ok=""
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then ok=1; break; fi

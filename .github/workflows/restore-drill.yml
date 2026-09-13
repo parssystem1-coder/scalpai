@@ -64,8 +64,7 @@ jobs:
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update -qq
           sudo apt-get install -y -qq age jq postgresql-client-17
-          curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x /usr/local/bin/mc
+          install -m 0755 tools/ci/mc-wrapper.sh /usr/local/bin/mc
 
       # The restore identity is the ONLY place it is ever used: nothing on the
       # clinic host can decrypt a snapshot.

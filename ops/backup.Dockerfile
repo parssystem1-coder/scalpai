@@ -5,6 +5,7 @@
 # and the tooling was never pinned. It is baked in here instead, and the scripts
 # are COPIED in rather than bind-mounted so what runs is what was reviewed.
 ARG POSTGRES_IMAGE=postgres:17-alpine
+FROM quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z AS minio-client
 FROM ${POSTGRES_IMAGE}
 
 ARG BACKUP_CRON="0 2 * * *"
@@ -14,10 +15,11 @@ ARG BACKUP_CRON="0 2 * * *"
 # mc  -> MinIO client: the media bucket is half of the clinical record, so it is
 #        backed up next to the database and pushed off-site (ADR-0026 pattern).
 RUN apk add --no-cache bash age jq curl tar gzip coreutils openssl ca-certificates \
- && curl -fsSL -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc \
- && chmod 0755 /usr/local/bin/mc \
- && mc --version \
  && age --version
+
+COPY --from=minio-client /usr/bin/mc /usr/local/bin/mc
+RUN chmod 0755 /usr/local/bin/mc \
+ && mc --version
 
 COPY ops/backup.sh /usr/local/bin/scalpai-backup
 COPY ops/restore.sh /usr/local/bin/scalpai-restore
