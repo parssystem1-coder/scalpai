@@ -12,7 +12,7 @@
 # either - it runs with --omit=dev, so it never described this image. The runtime
 # tree is therefore resolved from the SAME lockfile with --omit=dev, in its own
 # stage, and the builder's node_modules is copied nowhere.
-FROM node:22.23.2-alpine AS builder
+FROM node:26.8-alpine AS builder
 WORKDIR /app
 
 # Toolchain for the native modules (sharp -> libvips, argon2 -> cc).
@@ -31,14 +31,14 @@ RUN npm exec -- turbo run build --filter=@scalpai/app-api...
 # the builder, so what the runtime receives is defined by the lockfile and not by
 # whatever the build happened to leave behind. Native modules still compile here,
 # which is why the toolchain is installed again.
-FROM node:22.23.2-alpine AS prod-deps
+FROM node:26.8-alpine AS prod-deps
 WORKDIR /app
 RUN apk add --no-cache python3 make g++ libc6-compat vips-dev
 RUN npm install --global npm@11.19.1 --no-fund --no-audit
 COPY . .
 RUN npm ci --omit=dev --legacy-peer-deps
 
-FROM node:22.23.2-alpine AS runner
+FROM node:26.8-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # The one-shot migrate container runs `npm run db:migrate:prod` as the
