@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 import type { Patient, TrichoscopyImage } from "../../data/dashboard-types";
 import { faNum, formatDate } from "../../i18n";
 
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
-
 export interface PhotoLightboxProps {
   previewPhotoModal: TrichoscopyImage | null; selectedPatient: Patient; photosByPatient: Record<string, readonly TrichoscopyImage[]>;
   onClose: () => void; onDeletePhoto: (id: string) => void; onCompare: (a: string, b: string) => void; onInspectHud: (photo: TrichoscopyImage) => void;
@@ -31,19 +29,25 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
         <div
           id="photo-lightbox-backdrop"
           className="fixed inset-0 z-[80] flex items-center justify-center bg-black/92 p-2 sm:p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => {
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
             resetLightboxZoom();
             onClose();
           }}
-          role="dialog"
-          aria-modal="true"
+          role="button"
+          tabIndex={0}
+          aria-label={t("dashboard.lightbox.close")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              resetLightboxZoom();
+              onClose();
+            }
+          }}
         >
           <div
             className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
-            onClick={(e) => e.stopPropagation()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+            role="dialog"
+            aria-modal="true"
           >
             {/* Header with Title & Quick Zoom Controls */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 bg-stone-900 border-b border-stone-800 text-stone-100 flex-wrap gap-2">
@@ -298,5 +302,3 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
         </div>
   );
 }
-
-/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
