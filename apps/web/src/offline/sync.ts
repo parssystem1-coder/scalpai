@@ -6,7 +6,7 @@ import {
   type OutboxItem,
   type OutboxStore,
 } from "@scalpai/sync-client";
-import { redactPhiPayload } from "@scalpai/shared";
+import { assertRedactedPhiPayload, redactPhiPayload } from "@scalpai/shared";
 import {
   getOfflineDb,
   type DeadLetterRecord,
@@ -21,6 +21,8 @@ const PULL_CURSOR_KEY = "pull-cursor";
 
 export function toRecord(item: OutboxItem, scope: OfflineScope, createdAt?: number): OutboxRecord {
   const envelope = item.envelope;
+  const payload = redactPhiPayload(envelope.payload);
+  assertRedactedPhiPayload(payload);
   return {
     id: envelope.clientMutationId,
     entity: envelope.entity,
@@ -30,7 +32,7 @@ export function toRecord(item: OutboxItem, scope: OfflineScope, createdAt?: numb
     baseVersion: envelope.baseVersion ?? null,
     // IndexedDB is not a secret store: keep the same redacted delta that the
     // server ledger will receive. Ciphertext survives; readable notes do not.
-    payload: JSON.stringify(redactPhiPayload(envelope.payload)),
+    payload: JSON.stringify(payload),
     createdAt: createdAt ?? Date.now(),
     attempts: item.attempts,
     nextAttemptAt: item.nextAttemptAt,

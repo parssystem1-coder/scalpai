@@ -24,6 +24,13 @@ are rejected or removed before persistence. Audit metadata is allowlisted and
 canonicalized; row hashes are recomputed from canonical JSON with millisecond UTC
 timestamps.
 
+For browser offline storage, the accepted B05 boundary is redaction rather than
+reuse of the server-side `PHI_KEY_RING`: the browser never receives that key
+ring. The shared `assertRedactedPhiPayload` guard fails closed if a persistence
+adapter attempts to write a readable PHI or secret field. Logout and principal
+change close and wipe the scoped Dexie database (`closeOfflineScope({ wipe:
+true })`), so a later principal cannot read the previous principal's queue.
+
 Audit anchors are real Merkle roots with inclusion proofs, persisted in an
 insert-only RLS table and optionally written as signed, exclusive-create files on
 an object-lock/WORM mount. A chained digest is not called a Merkle tree.
