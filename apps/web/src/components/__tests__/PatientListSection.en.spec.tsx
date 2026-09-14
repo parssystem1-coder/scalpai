@@ -2,7 +2,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import PatientListSection from "../sections/PatientListSection.js";
-import { SAMPLE_PATIENTS } from "../../data/dashboard-samples.js";
 import type { Patient } from "../../data/dashboard-types";
 import i18n from "../../i18n.js";
 
@@ -18,7 +17,7 @@ import i18n from "../../i18n.js";
  */
 const PERSIAN = /[\u0600-\u06FF]/;
 
-const base = SAMPLE_PATIENTS[0]!;
+const base: Patient = { id: "base", firstName: "Base", lastName: "Patient", phone: "09120000000" };
 
 const PATIENTS: Patient[] = [
   {

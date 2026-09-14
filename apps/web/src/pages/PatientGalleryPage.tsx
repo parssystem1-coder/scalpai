@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useInfiniteQuery, useQuery } from "@tansta
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
-import DigitalConsentModal from "../components/DigitalConsentModal.js";
+import DigitalConsentModal from "../components/modals/DigitalConsentModal.js";
 import { faNum, toggleLang } from "../i18n.js";
 import { uploadChunked, getPendingUploads, type PendingUploadState } from "../offline/chunked-upload.js";
 import { formatDate } from "@scalpai/shared";

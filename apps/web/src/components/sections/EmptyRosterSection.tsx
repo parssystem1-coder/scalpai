@@ -2,8 +2,8 @@ import React, { useCallback, type ReactNode } from "react";
 import { HeartHandshake } from "lucide-react";
 import DashboardShell from "../DashboardShell";
 import { clearAccessToken } from "../../api/client";
-import LicenseDiagnosticsModal from "../LicenseDiagnosticsModal";
-import SyncInspectorModal from "../SyncInspectorModal";
+import LicenseDiagnosticsModal from "../modals/LicenseDiagnosticsModal.js";
+import SyncInspectorModal from "../modals/SyncInspectorModal.js";
 import type { DashboardDataProvider } from "../../data/dashboard-data-types";
 import type { SectionId } from "../dashboard-sections";
 

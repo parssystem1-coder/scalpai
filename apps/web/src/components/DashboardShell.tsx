@@ -30,7 +30,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   children,
 }) => (
   <div className="min-h-screen flex flex-col font-sans relative text-[oklch(20%_0.02_20)] bg-[oklch(85%_0.03_28)] antialiased select-none">
-    <DemoWatermark mode={dataMode} surface="dashboard" />
+    {import.meta.env.DEV && <DemoWatermark mode={dataMode} surface="dashboard" />}
     <div
       className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat filter contrast-[1.02] saturate-[1.04] pointer-events-none"
       style={{ backgroundImage: "url('/images/scalp-bg.jpg')" }}

@@ -2,7 +2,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import DigitalConsentModal from "./components/DigitalConsentModal.js";
+import DigitalConsentModal from "./components/modals/DigitalConsentModal.js";
 import "./i18n.js";
 
 vi.mock("./api/client.js", () => ({

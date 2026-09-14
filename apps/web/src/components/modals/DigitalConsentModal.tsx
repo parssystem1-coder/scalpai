@@ -2,9 +2,9 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Award } from "lucide-react";
-import { apiFetch, ApiError } from "../api/client.js";
-import { useSync } from "../offline/SyncProvider.js";
-import SignatureCanvas, { type SignatureCanvasRef } from "./SignatureCanvas.js";
+import { apiFetch, ApiError } from "../../api/client.js";
+import { useSync } from "../../offline/SyncProvider.js";
+import SignatureCanvas, { type SignatureCanvasRef } from "../SignatureCanvas.js";
 import ConsentCertificateModal from "./ConsentCertificateModal.js";
 
 export interface ConsentRecord {

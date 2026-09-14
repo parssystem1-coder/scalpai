@@ -8,7 +8,7 @@ import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
 import AutoLock from "../components/AutoLock.js";
 import PendingBadge from "../components/PendingBadge.js";
-import DigitalConsentModal from "../components/DigitalConsentModal.js";
+import DigitalConsentModal from "../components/modals/DigitalConsentModal.js";
 import { useSync } from "../offline/SyncProvider.js";
 import { toggleLang } from "../i18n.js";
 
