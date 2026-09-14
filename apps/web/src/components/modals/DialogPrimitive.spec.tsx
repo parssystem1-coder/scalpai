@@ -41,7 +41,9 @@ describe("DialogPrimitive", () => {
   it("traps focus with Tab", () => {
     render(<DialogTest onClose={() => {}} />);
     const buttons = screen.getAllByRole("button");
-    buttons[2].focus();
+    const lastBtn = buttons[2];
+    expect(lastBtn).toBeDefined();
+    lastBtn!.focus();
     fireEvent.keyDown(document.activeElement!, { key: "Tab" });
     expect(document.activeElement).toBe(buttons[0]);
   });
@@ -49,7 +51,9 @@ describe("DialogPrimitive", () => {
   it("traps focus with Shift+Tab", () => {
     render(<DialogTest onClose={() => {}} />);
     const buttons = screen.getAllByRole("button");
-    buttons[0].focus();
+    const firstBtn = buttons[0];
+    expect(firstBtn).toBeDefined();
+    firstBtn!.focus();
     fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(buttons[2]);
   });
