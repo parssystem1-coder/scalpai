@@ -428,6 +428,9 @@ jobs:
       - name: Encrypted backup of Postgres AND MinIO, pushed off-site
         run: bash tools/ci/run-gate.sh backup-run bash ops/backup.sh
 
+      - name: Backup freshness is within the RPO
+        run: bash tools/ci/run-gate.sh backup-freshness bash ops/backup-freshness.sh
+
       - name: The off-site copy exists and is immutable (negative proof)
         run: bash tools/ci/run-gate.sh backup-offsite bash tools/ci/offsite-check.sh
 
