@@ -22,10 +22,11 @@ RUN chmod 0755 /usr/local/bin/mc \
  && mc --version
 
 COPY ops/backup.sh /usr/local/bin/scalpai-backup
+COPY ops/backup-freshness.sh /usr/local/bin/scalpai-backup-freshness
 COPY ops/restore.sh /usr/local/bin/scalpai-restore
 COPY ops/restore-drill.sh /usr/local/bin/scalpai-restore-drill
-RUN chmod 0755 /usr/local/bin/scalpai-backup /usr/local/bin/scalpai-restore /usr/local/bin/scalpai-restore-drill \
- && printf '%s /usr/local/bin/scalpai-backup >> /var/log/backup.log 2>&1\n' "${BACKUP_CRON}" > /etc/crontabs/root
+RUN chmod 0755 /usr/local/bin/scalpai-backup /usr/local/bin/scalpai-backup-freshness /usr/local/bin/scalpai-restore /usr/local/bin/scalpai-restore-drill \
+ && printf '%s /usr/local/bin/scalpai-backup >> /var/log/backup.log 2>&1\n*/15 * * * * /usr/local/bin/scalpai-backup-freshness >> /var/log/backup-freshness.log 2>&1\n' "${BACKUP_CRON}" > /etc/crontabs/root
 
 # A dead cron daemon means no backups at all, which is exactly the failure this
 # phase exists to remove - so it is a container health signal.

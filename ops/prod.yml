@@ -13,9 +13,16 @@
 # instead of silently booting the stack with a shared default password.
 name: scalpai
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   caddy:
     image: caddy:2.8.4-alpine
+    logging: *default-logging
     restart: unless-stopped
     ports:
       - "80:80"
@@ -43,6 +50,7 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+    logging: *default-logging
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -70,6 +78,7 @@ services:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+    logging: *default-logging
     working_dir: /app
     command: ["npm", "run", "db:migrate:prod"]
     restart: "no"
@@ -92,6 +101,7 @@ services:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+    logging: *default-logging
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -153,6 +163,7 @@ services:
   postgres:
     # Major version is pinned AND identical to CI (.github/workflows/ci.yml).
     image: pgvector/pgvector:pg17
+    logging: *default-logging
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
@@ -174,6 +185,7 @@ services:
 
   minio:
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    logging: *default-logging
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
@@ -194,6 +206,7 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    logging: *default-logging
     restart: unless-stopped
     volumes:
       - redisdata:/data
@@ -216,6 +229,7 @@ services:
     build:
       context: ..
       dockerfile: ops/backup.Dockerfile
+    logging: *default-logging
       args:
         # Same Postgres major as the database service and CI (M17).
         POSTGRES_IMAGE: postgres:17-alpine
@@ -245,6 +259,7 @@ services:
       - BACKUP_OFFSITE_SECRET_KEY=${BACKUP_OFFSITE_SECRET_KEY:?BACKUP_OFFSITE_SECRET_KEY is required}
       - BACKUP_OFFSITE_RETENTION_DAYS=${BACKUP_OFFSITE_RETENTION_DAYS:-90}
       - BACKUP_OFFSITE_LOCK_MODE=${BACKUP_OFFSITE_LOCK_MODE:-COMPLIANCE}
+      - BACKUP_RPO_HOURS=${BACKUP_RPO_HOURS:-24}
       - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:?ALERT_WEBHOOK_URL is required - a failed backup has to page someone}
     volumes:
       - ${BACKUP_AGE_RECIPIENTS_FILE:?BACKUP_AGE_RECIPIENTS_FILE is required}:${BACKUP_AGE_RECIPIENTS_FILE:?BACKUP_AGE_RECIPIENTS_FILE is required}:ro
