@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { StringValue } from "ms";
 import { isProduction } from "../common/security.config.js";
 
 /**
@@ -26,7 +27,7 @@ export interface JwtConfig {
   previousAcceptedUntil: Date | null;
   issuer: string;
   audience: string;
-  accessTtl: string;
+  accessTtl: StringValue;
 }
 
 export function keyId(secret: string): string {
@@ -85,7 +86,7 @@ export function resolveJwtConfig(): JwtConfig {
     previousAcceptedUntil,
     issuer: process.env.JWT_ISSUER?.trim() ?? "scalpai",
     audience: process.env.JWT_AUDIENCE?.trim() ?? "scalpai-api",
-    accessTtl: process.env.JWT_ACCESS_TTL?.trim() ?? "15m",
+    accessTtl: (process.env.JWT_ACCESS_TTL?.trim() ?? "15m") as StringValue,
   };
   return cached;
 }
