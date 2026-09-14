@@ -109,7 +109,7 @@ describe("batch 3 / phase 8 - the gallery fixtures point at an endpoint that exi
 
 describe("batch 3 / M2 - the licence spec asserts the server-side panel", () => {
   const spec = "apps/web/src/phase3-improvements.spec.tsx";
-  const modal = "apps/web/src/components/LicenseDiagnosticsModal.tsx";
+  const modal = "apps/web/src/components/modals/LicenseDiagnosticsModal.tsx";
   const SERVER_SIDE = "licenseDiagnostics.subtitle"; // i18n key for server-side verification
   const CLOCK_SIMULATOR = "\u0634\u0628\u06cc\u0647\u200c\u0633\u0627\u0632\u06cc \u0639\u0642\u0628\u200c\u06a9\u0634\u06cc\u062f\u0646 \u0633\u0627\u0639\u062a \u0633\u06cc\u0633\u062a\u0645"; // the deleted "simulate clock rollback" button
 

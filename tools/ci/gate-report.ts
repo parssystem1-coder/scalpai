@@ -45,6 +45,7 @@ export const REQUIRED_GATES = [
   // restoring from it, not by reading a cron log.
   "backup-image",
   "backup-run",
+  "backup-freshness",
   "backup-offsite",
   "restore-drill",
 ] as const;

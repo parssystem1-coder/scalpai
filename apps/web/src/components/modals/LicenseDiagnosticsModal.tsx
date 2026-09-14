@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldCheck, ShieldAlert, Clock, CheckCircle2, AlertTriangle, Key, Cpu, RefreshCw, X, Database, Users, Laptop } from "lucide-react";
 import { formatDate, formatRelativeTime, CLINIC_DEFAULT_TIMEZONE, type LicenseStatusDto } from "@scalpai/shared";
-import { apiFetch, ApiError } from "../api/client.js";
+import { apiFetch, ApiError } from "../../api/client.js";
 
 interface LicenseDiagnosticsModalProps {
   isOpen: boolean;

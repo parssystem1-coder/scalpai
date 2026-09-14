@@ -104,6 +104,14 @@ describe("C8 - production secrets have no fallbacks", () => {
   });
 });
 
+describe("R07 - proxy trust and CSP reporting are bounded", () => {
+  it("trusts only private CIDR ranges and emits report-only CSP", () => {
+    expect(caddy).toContain("trusted_proxies static 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16");
+    expect(caddy).toContain("Content-Security-Policy-Report-Only");
+    expect(caddy).not.toContain("trusted_proxies_insecure");
+  });
+});
+
 describe("C8 - runtime never uses the database owner role", () => {
   it("connects the API as scalpai_app", () => {
     const dbUrls = [...prod.matchAll(/DATABASE_URL=([^\n]+)/g)].map((m) => m[1]!);

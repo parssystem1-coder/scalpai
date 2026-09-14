@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { CURSOR_ZERO, makeMutation, type OutboxItem } from "@scalpai/sync-client";
-import { offlineDbName, sameScope, type OfflineScope } from "./db.js";
+import { closeOfflineScope, offlineDbName, sameScope, type OfflineScope } from "./db.js";
 import { drainPull, toItem, toRecord, type CursorStore, type PullPage } from "./sync.js";
 
 const scope: OfflineScope = { clinicId: "11111111-1111-4111-8111-111111111111", userId: "owner@clinic-a.test" };
@@ -43,6 +43,10 @@ describe("offline scope (WEAKNESSES H8)", () => {
     expect(sameScope(scope, { ...scope })).toBe(true);
     expect(sameScope(scope, { ...scope, userId: "someone-else" })).toBe(false);
     expect(sameScope(null, scope)).toBe(false);
+  });
+
+  it("exposes an explicit wipe boundary for logout and principal change (B05)", async () => {
+    await expect(closeOfflineScope({ wipe: true })).resolves.toBeUndefined();
   });
 });
 

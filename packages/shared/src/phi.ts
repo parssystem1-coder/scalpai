@@ -157,6 +157,15 @@ export function redactPhiPayload(payload: Record<string, unknown>): Record<strin
   return out;
 }
 
+/** Fail-closed assertion for persistence adapters (B05 / ADR-0038). */
+export function assertRedactedPhiPayload(payload: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(payload)) {
+    if (isSensitiveKey(key) && !isPhiCiphertext(value)) {
+      throw new PhiLeakError(`payload.${key} must be redacted or ciphertext`);
+    }
+  }
+}
+
 /** Field names present in a payload — the only shape allowed to travel in audit meta. */
 export function payloadFieldNames(payload: Record<string, unknown>): string[] {
   return Object.keys(payload).sort();

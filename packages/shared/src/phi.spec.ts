@@ -3,6 +3,7 @@ import {
   PhiLeakError,
   REDACTED,
   assertAuditMetaSafe,
+  assertRedactedPhiPayload,
   isActiveConsentTemplate,
   isKnownConsentTemplate,
   isPhiCiphertext,
@@ -72,6 +73,12 @@ describe("ledger redaction (H3)", () => {
     });
     expect(out).toEqual({ id: "p1", notesEncrypted: CIPHERTEXT, tags: ["vip"] });
     expect(payloadFieldNames(out)).toEqual(["id", "notesEncrypted", "tags"]);
+  });
+
+  it("rejects a persistence payload that bypassed redaction", () => {
+    expect(() => assertRedactedPhiPayload({ phone: "09120000000" })).toThrow(PhiLeakError);
+    expect(() => assertRedactedPhiPayload({ notes: CIPHERTEXT })).not.toThrow();
+    expect(() => assertRedactedPhiPayload({ gender: "male" })).not.toThrow();
   });
 });
 

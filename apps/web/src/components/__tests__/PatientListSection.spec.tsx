@@ -2,12 +2,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import PatientListSection from "../sections/PatientListSection.js";
-import { SAMPLE_PATIENTS } from "../../data/dashboard-samples.js";
+import type { Patient } from "../../data/dashboard-types";
 import i18n, { faNum } from "../../i18n.js";
+
+const PATIENTS: Patient[] = [{
+  id: "fa-patient-1", firstName: "سارا", lastName: "احمدی", phone: "09120000001",
+  scalpCondition: "کنترل تراکم", lastVisit: "2026-08-21", hairDensity: 148,
+  anagenRatio: 86, keratinHealth: 92, stemCellVitality: 88,
+}];
 
 afterEach(cleanup);
 
-const selected = SAMPLE_PATIENTS[0]!;
+const selected = PATIENTS[0]!;
 
 const tr = (key: string, options: Record<string, unknown> = {}): string =>
   String(i18n.t(key, options));
@@ -22,7 +28,7 @@ const hasText = (needle: string) => (content: string): boolean => content.includ
 
 describe("PatientListSection (Phase 5 i18n, Phase B testids)", () => {
   it("renders the translated header, search field and roster", () => {
-    render(<PatientListSection patients={SAMPLE_PATIENTS} selectedPatient={selected} />);
+    render(<PatientListSection patients={PATIENTS} selectedPatient={selected} />);
 
     expect(screen.getByTestId("patient-list")).toBeDefined();
     expect(screen.getByTestId("patient-list-badge").textContent).toBe(
@@ -43,7 +49,7 @@ describe("PatientListSection (Phase 5 i18n, Phase B testids)", () => {
   });
 
   it("shows the empty state when the search matches nobody", () => {
-    render(<PatientListSection patients={SAMPLE_PATIENTS} selectedPatient={selected} />);
+    render(<PatientListSection patients={PATIENTS} selectedPatient={selected} />);
 
     expect(screen.queryByTestId("patient-list-empty")).toBeNull();
 
@@ -58,7 +64,7 @@ describe("PatientListSection (Phase 5 i18n, Phase B testids)", () => {
   });
 
   it("shapes the telemetry gauges with the active locale digits", () => {
-    render(<PatientListSection patients={SAMPLE_PATIENTS} selectedPatient={selected} />);
+    render(<PatientListSection patients={PATIENTS} selectedPatient={selected} />);
 
     expect(screen.getByTestId("patient-telemetry").textContent).toBe(
       tr("dashboard.patientList.telemetry.matrix")
@@ -76,7 +82,7 @@ describe("PatientListSection (Phase 5 i18n, Phase B testids)", () => {
   });
 
   it("passes translated radar labels and the patient name to the radar chart", () => {
-    render(<PatientListSection patients={SAMPLE_PATIENTS} selectedPatient={selected} />);
+    render(<PatientListSection patients={PATIENTS} selectedPatient={selected} />);
 
     expect(
       screen.getByText(
@@ -97,7 +103,7 @@ describe("PatientListSection (Phase 5 i18n, Phase B testids)", () => {
 
     render(
       <PatientListSection
-        patients={SAMPLE_PATIENTS}
+        patients={PATIENTS}
         selectedPatient={selected}
         onSelectPatient={onSelectPatient}
         onAddPatient={onAddPatient}

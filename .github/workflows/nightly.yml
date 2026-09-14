@@ -219,6 +219,9 @@ jobs:
       - name: Backup both stores
         run: bash tools/ci/run-gate.sh backup-run bash ops/backup.sh
 
+      - name: Backup freshness is within the RPO
+        run: bash tools/ci/run-gate.sh backup-freshness bash ops/backup-freshness.sh
+
       - name: Off-site copy is complete and immutable
         run: bash tools/ci/run-gate.sh backup-offsite bash tools/ci/offsite-check.sh
 

@@ -1,6 +1,6 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: **فازهای ۱ تا ۱۰ بسته شده‌اند (آخرین: فاز ۱۰ — M1، L2 تکمیل شدند).**
+> وضعیت: این فایل سابقهٔ فازهای ۱ تا ۱۰ را ثبت می‌کند؛ **Closure Gate فاز ۴ هنوز باز است** و ادعاهای تکمیل M1/L2 تا ارائهٔ شواهد مستقل در آن gate قطعی محسوب نمی‌شوند.
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
 > تاریخ آخرین بروزرسانی: 2026-09-13 · مخزن: `parssystem1-coder/scalpai`
 
@@ -228,7 +228,7 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### باقی‌مانده: **هیچ موردی باقی نمانده — فاز ۱۰ تکمیل شد.**
+### باقی‌مانده: **موارد Closure Gate فاز ۴ هنوز نیازمند شواهد مستقل هستند.**
 
 - [x] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود. — **تکمیل شده: ClinicalDashboard و NeuralSegmentationOverlay هیچ import از SAMPLE_* ندارند؛ dashboard-samples.ts پشت import.meta.env.DEV guard قرار دارد؛ DemoWatermark در DashboardShell و NeuralSegmentationOverlay رندر می‌شود؛ m1b-runtime-wiring.spec.ts سبز؛ production-mocks exceptions از exceptions.json حذف شد.**
 - [x] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند) — **تکمیل شده: ۴ کامپوننت، ~۸۵ کلید fa/en، ۶ تست parity سبز، typecheck/lint بدون خطا)**

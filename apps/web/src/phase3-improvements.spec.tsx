@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import ConsentCertificateModal from "./components/ConsentCertificateModal.js";
-import LicenseDiagnosticsModal from "./components/LicenseDiagnosticsModal.js";
-import SyncInspectorModal from "./components/SyncInspectorModal.js";
+import ConsentCertificateModal from "./components/modals/ConsentCertificateModal.js";
+import LicenseDiagnosticsModal from "./components/modals/LicenseDiagnosticsModal.js";
+import SyncInspectorModal from "./components/modals/SyncInspectorModal.js";
 import "./i18n.js";
 
 vi.mock("./offline/SyncProvider.js", () => ({

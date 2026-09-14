@@ -32,6 +32,7 @@ function code(text: string): string {
 }
 
 const backup = read("ops/backup.sh");
+const freshness = read("ops/backup-freshness.sh");
 const restore = read("ops/restore.sh");
 const drill = read("ops/restore-drill.sh");
 const backupImage = read("ops/backup.Dockerfile");
@@ -62,6 +63,25 @@ describe("C10 - the backup covers PostgreSQL AND the object store", () => {
     expect(restore).toContain("pg_restore");
     expect(restore).toContain("checksum mismatch");
     expect(restore).toContain("mc mirror");
+  });
+});
+
+describe("R10 - backup freshness is an RPO gate", () => {
+  it("fails closed on missing or stale evidence and alerts", () => {
+    expect(freshness).toContain("last-run.json");
+    expect(freshness).toContain("BACKUP_RPO_HOURS");
+    expect(freshness).toContain("backup.stale");
+    expect(freshness).toContain("exit 1");
+    expect(freshness).toContain("finishedAt");
+  });
+});
+
+describe("R11 - container logs rotate with bounded retention", () => {
+  it("defines a bounded json-file policy for every production service", () => {
+    expect(prod).toContain("x-default-logging: &default-logging");
+    expect(prod).toContain('max-size: "10m"');
+    expect(prod).toContain('max-file: "5"');
+    expect((prod.match(/logging: \*default-logging/g) ?? []).length).toBe(8);
   });
 });
 

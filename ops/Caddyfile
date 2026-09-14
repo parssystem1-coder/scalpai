@@ -18,8 +18,10 @@ https://{$SCALPAI_DOMAIN} {
 
 	# The API owns the whole /api/* prefix and serves /api/v1/... itself:
 	# stripping the prefix here used to produce 404s for every route.
-	handle /api/* {
-		reverse_proxy api:3000
+		handle /api/* {
+			reverse_proxy api:3000 {
+			trusted_proxies static 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+		}
 	}
 
 	# MinIO presigned media access
@@ -33,6 +35,7 @@ https://{$SCALPAI_DOMAIN} {
 	}
 
 	header {
+		Content-Security-Policy-Report-Only "default-src 'self'; report-uri /csp-report"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Frame-Options "SAMEORIGIN"
 		X-Content-Type-Options "nosniff"

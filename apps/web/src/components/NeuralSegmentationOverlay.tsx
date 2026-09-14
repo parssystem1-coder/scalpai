@@ -53,7 +53,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
 
   return (
     <div className="relative rounded-3xl overflow-hidden bg-white/55 border border-white/80 backdrop-blur-xl shadow-md p-4 select-none">
-      <DemoWatermark mode={dataMode} surface="overlay" />
+      {import.meta.env.DEV && <DemoWatermark mode={dataMode} surface="overlay" />}
       {/* HUD Header */}
       <div className="flex items-center justify-between mb-3 text-xs">
         <div className="flex items-center gap-2">
