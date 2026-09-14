@@ -229,11 +229,11 @@ services:
     build:
       context: ..
       dockerfile: ops/backup.Dockerfile
-    logging: *default-logging
       args:
         # Same Postgres major as the database service and CI (M17).
         POSTGRES_IMAGE: postgres:17-alpine
         BACKUP_CRON: ${BACKUP_CRON:-0 2 * * *}
+    logging: *default-logging
     restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
