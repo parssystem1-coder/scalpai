@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import DialogPrimitive from "./DialogPrimitive";
 
 export interface ComparePhotoItem {
   id: string;
@@ -282,8 +283,6 @@ export default function BeforeAfterCompareModal({
     return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
   }, []);
 
-  if (!isOpen) return null;
-
   const densityDelta =
     photoA && photoB ? photoB.density - photoA.density : 0;
   const densityPercentChange =
@@ -297,25 +296,17 @@ export default function BeforeAfterCompareModal({
       : photos.filter((p) => p.area === filterArea);
 
   return (
-    <div
-      id="before-after-modal-backdrop"
-      className="fixed inset-0 z-[85] flex items-center justify-center bg-black/90 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-y-auto"
-      role="button"
-      tabIndex={0}
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
       aria-label={t("dashboard.compareModal.backdropLabel")}
-      onMouseUp={stopDragging}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          stopDragging();
-        }
-      }}
+      className="relative my-auto w-full max-w-5xl rounded-3xl bg-stone-950 text-stone-100 shadow-2xl border border-stone-800 flex flex-col max-h-[96vh] overflow-hidden"
+      backdropClassName="bg-black/90 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none overflow-y-auto"
     >
       <div
         id="before-after-container"
-        className="relative my-auto w-full max-w-5xl rounded-3xl bg-stone-950 text-stone-100 shadow-2xl border border-stone-800 flex flex-col max-h-[96vh] overflow-hidden"
-        dir="rtl"
+        role="presentation"
+        onMouseUp={stopDragging}
       >
         <div className="flex flex-wrap items-center justify-between px-6 py-4 bg-stone-900/90 border-b border-stone-800 gap-4 shrink-0">
           <div className="flex items-center gap-3">
@@ -684,6 +675,6 @@ export default function BeforeAfterCompareModal({
           </div>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

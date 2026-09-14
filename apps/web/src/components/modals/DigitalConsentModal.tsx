@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from "../../api/client.js";
 import { useSync } from "../../offline/SyncProvider.js";
 import SignatureCanvas, { type SignatureCanvasRef } from "../SignatureCanvas.js";
 import ConsentCertificateModal from "./ConsentCertificateModal.js";
+import DialogPrimitive from "./DialogPrimitive";
 
 export interface ConsentRecord {
   id: string;
@@ -92,8 +93,6 @@ export default function DigitalConsentModal({
     },
   });
 
-  if (!isOpen) return null;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -118,26 +117,15 @@ export default function DigitalConsentModal({
   const historyList = consentsQuery.data ?? [];
 
   return (
-    <div
-      id="consent-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 p-4 backdrop-blur-md animate-in fade-in duration-200"
-      role="button"
-      tabIndex={0}
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
       aria-label={t("dashboard.consent.backdropLabel")}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClose();
-        }
-      }}
+      className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/80 bg-white/95 backdrop-blur-2xl text-[oklch(20%_0.02_20)] shadow-2xl"
+      backdropClassName="bg-stone-900/40 p-4 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
         id="consent-modal-container"
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/80 bg-white/95 backdrop-blur-2xl text-[oklch(20%_0.02_20)] shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-black/5 bg-white/60 px-6 py-4">
           <div>
@@ -343,6 +331,6 @@ export default function DigitalConsentModal({
           onClose={() => setSelectedCertConsent(null)}
         />
       )}
-    </div>
+    </DialogPrimitive>
   );
 }

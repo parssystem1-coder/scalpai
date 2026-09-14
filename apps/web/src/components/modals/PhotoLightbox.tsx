@@ -3,6 +3,7 @@ import { Camera, Eye, Move, RotateCw, Split, Trash2, X, ZoomIn, ZoomOut } from "
 import { useTranslation } from "react-i18next";
 import type { Patient, TrichoscopyImage } from "../../data/dashboard-types";
 import { faNum, formatDate } from "../../i18n";
+import DialogPrimitive from "./DialogPrimitive";
 
 export interface PhotoLightboxProps {
   previewPhotoModal: TrichoscopyImage | null; selectedPatient: Patient; photosByPatient: Record<string, readonly TrichoscopyImage[]>;
@@ -15,7 +16,6 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
   const resetLightboxZoom=()=>{setLightboxZoom(1);setLightboxPan({x:0,y:0});setLightboxRotation(0);};
   useEffect(()=>{ if(previewPhotoModal){returnFocus.current=document.activeElement as HTMLElement|null; firstRef.current?.focus();} else returnFocus.current?.focus(); },[previewPhotoModal]);
   useEffect(()=>{const f=(e:KeyboardEvent)=>{if(previewPhotoModal&&e.key==='Escape')onClose();};window.addEventListener('keydown',f);return()=>window.removeEventListener('keydown',f);},[previewPhotoModal,onClose]);
-  if (!previewPhotoModal) return null;
   const handleLightboxWheel=(e:React.WheelEvent)=>{e.preventDefault();const factor=-e.deltaY>0?1.2:0.83;setLightboxZoom(prev=>{const next=Math.min(Math.max(1,+(prev*factor).toFixed(2)),6);if(next===1)setLightboxPan({x:0,y:0});return next;});};
   const handleLightboxMouseDown=(e:React.MouseEvent)=>{if(lightboxZoom<=1)return;e.preventDefault();setIsLightboxPanning(true);lightboxPanStart.current={x:e.clientX-lightboxPan.x,y:e.clientY-lightboxPan.y};};
   const handleLightboxMouseMove=(e:React.MouseEvent)=>{if(!isLightboxPanning||lightboxZoom<=1)return;e.preventDefault();const maxPan=(lightboxZoom-1)*450;setLightboxPan({x:Math.max(-maxPan,Math.min(maxPan,e.clientX-lightboxPanStart.current.x)),y:Math.max(-maxPan,Math.min(maxPan,e.clientY-lightboxPanStart.current.y))});};
@@ -24,31 +24,16 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
   const handleLightboxTouchStart=(e:React.TouchEvent)=>{const touch=e.touches[0];if(!touch)return;if(e.touches.length===1&&lightboxZoom>1){setIsLightboxPanning(true);lightboxTouchStart.current={x:touch.clientX-lightboxPan.x,y:touch.clientY-lightboxPan.y};}};
   const handleLightboxTouchMove=(e:React.TouchEvent)=>{const touch=e.touches[0];if(!touch||!isLightboxPanning||lightboxZoom<=1||e.touches.length!==1)return;const maxPan=(lightboxZoom-1)*450;setLightboxPan({x:Math.max(-maxPan,Math.min(maxPan,touch.clientX-lightboxTouchStart.current.x)),y:Math.max(-maxPan,Math.min(maxPan,touch.clientY-lightboxTouchStart.current.y))});};
   const handleLightboxTouchEnd=()=>setIsLightboxPanning(false);
+  if (!previewPhotoModal) return null;
   return (
 
-        <div
-          id="photo-lightbox-backdrop"
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/92 p-2 sm:p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
-            resetLightboxZoom();
-            onClose();
-          }}
-          role="button"
-          tabIndex={0}
+        <DialogPrimitive
+          isOpen={!!previewPhotoModal}
+          onClose={() => { resetLightboxZoom(); onClose(); }}
           aria-label={t("dashboard.lightbox.close")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              resetLightboxZoom();
-              onClose();
-            }
-          }}
+          className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
+          backdropClassName="fixed inset-0 z-[80] flex items-center justify-center bg-black/92 p-2 sm:p-4 md:p-8 backdrop-blur-md animate-in fade-in duration-200"
         >
-          <div
-            className="relative w-full max-w-5xl bg-stone-950 border border-stone-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]"
-            role="dialog"
-            aria-modal="true"
-          >
             {/* Header with Title & Quick Zoom Controls */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 bg-stone-900 border-b border-stone-800 text-stone-100 flex-wrap gap-2">
               <div className="flex items-center gap-3">
@@ -298,7 +283,6 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </DialogPrimitive>
   );
 }

@@ -5,6 +5,7 @@ import { useSync } from "../../offline/SyncProvider.js";
 import { listOutbox } from "../../offline/sync.js";
 import type { OutboxRecord } from "../../offline/db.js";
 import { formatDate } from "@scalpai/shared";
+import DialogPrimitive from "./DialogPrimitive";
 
 interface SyncInspectorModalProps {
   isOpen: boolean;
@@ -54,8 +55,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
     }
   }, [isOpen, pendingCount, loadOutbox]);
 
-  if (!isOpen) return null;
-
   const handleManualSync = async () => {
     setIsFlushing(true);
     setFlushResult(null);
@@ -71,13 +70,15 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
   };
 
   return (
-    <div
-      id="sync-inspector-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
+      aria-label={t("dashboard.syncInspector.title")}
+      className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+      backdropClassName="bg-stone-900/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
         id="sync-inspector-container"
-        className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
         dir={i18n.language === "fa" ? "rtl" : "ltr"}
       >
         <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200">
@@ -221,6 +222,6 @@ export default function SyncInspectorModal({ isOpen, onClose }: SyncInspectorMod
           </button>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

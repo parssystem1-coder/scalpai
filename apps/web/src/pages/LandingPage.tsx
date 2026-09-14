@@ -236,7 +236,7 @@ export const LandingPage: React.FC<LandingProps> = ({ showToast }) => {
             )}
           </div>
         </section>
-        <section className="lg:col-span-7 flex flex-col justify-center items-start lg:pl-8 pointer-events-auto" dir="rtl">
+        <section className="lg:col-span-7 flex flex-col justify-center items-start lg:pl-8 pointer-events-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/50 border border-white/80 shadow-xs mb-4">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[0.65rem] font-bold tracking-widest uppercase text-[oklch(50%_0.095_12)]">

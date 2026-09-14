@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowUp } from "lucide-react";
 import { clearAccessToken } from "../api/client";
+import AutoLock from "./AutoLock.js";
 import { useSync } from "../offline/SyncProvider";
 import DigitalConsentModal from "./modals/DigitalConsentModal.js";
 import LicenseDiagnosticsModal from "./modals/LicenseDiagnosticsModal.js";
@@ -136,7 +137,12 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   );
 
   if (!selectedPatient) {
-    return <EmptyRosterSection dataProvider={dataProvider} userEmail={userEmail} isOnline={isOnline} pendingCount={pendingCount} activeSection={activeSection} scrollToSection={scrollToSection} openSync={openSync} openLicense={openLicense} openAddPatient={openAddPatient} onLogout={() => { clearAccessToken(); onLogout(); }} t={t} addPatientModal={addPatientModal} isLicenseOpen={isLicenseOpen} closeLicense={closeLicense} isSyncOpen={isSyncOpen} closeSync={closeSync} />;
+    return (
+      <>
+        <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLogout(); }} />
+        <EmptyRosterSection dataProvider={dataProvider} userEmail={userEmail} isOnline={isOnline} pendingCount={pendingCount} activeSection={activeSection} scrollToSection={scrollToSection} openSync={openSync} openLicense={openLicense} openAddPatient={openAddPatient} onLogout={() => { clearAccessToken(); onLogout(); }} t={t} addPatientModal={addPatientModal} isLicenseOpen={isLicenseOpen} closeLicense={closeLicense} isSyncOpen={isSyncOpen} closeSync={closeSync} />
+      </>
+    );
   }
 
   return (
@@ -155,6 +161,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
       onOpenConsent={openConsent}
       onLogout={() => { clearAccessToken(); onLogout(); }}
     >
+      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLogout(); }} />
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 relative z-10 space-y-12">
         <PatientListSection
           patients={patientList}

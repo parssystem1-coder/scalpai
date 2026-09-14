@@ -14,7 +14,7 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({ onUpgrade, onExit }) => 
       aria-label="Demo Mode Notification"
       className="fixed top-0 inset-x-0 z-[1000] bg-gradient-to-r from-[oklch(30%_0.04_15/0.95)] to-[oklch(24%_0.05_18/0.98)] text-white px-8 py-3.5 flex flex-col md:flex-row items-center justify-between border-b border-[oklch(85%_0.12_55/0.5)] shadow-2xl backdrop-blur-md"
     >
-      <div className="flex items-center gap-3.5 text-right font-sans mb-2 md:mb-0" dir="rtl">
+      <div className="flex items-center gap-3.5 text-right font-sans mb-2 md:mb-0">
         <span className="bg-[oklch(82%_0.14_58)] text-[oklch(20%_0.02_20)] text-[0.7rem] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap">
           {t("dashboard.demoBanner.proLabel")}
         </span>

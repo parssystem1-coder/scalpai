@@ -19,7 +19,7 @@ export const ProPlansView: React.FC<ProPlansViewProps> = ({ onSelectPlan }) => {
         <span className="font-serif text-xl font-bold text-[oklch(62%_0.09_16)]">$39 / month</span>
       </div>
 
-      <div className="space-y-2.5 mb-5" dir="rtl">
+      <div className="space-y-2.5 mb-5">
         <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/40 border border-white/60">
           <div className="w-6 h-6 rounded-full bg-[oklch(62%_0.09_16/0.15)] text-[oklch(62%_0.09_16)] grid place-items-center font-bold text-xs shrink-0">
             ۱

@@ -18,6 +18,7 @@ import {
   Activity,
   Keyboard,
 } from "lucide-react";
+import DialogPrimitive from "./DialogPrimitive";
 
 export interface CaptureAngleStep {
   id: string;
@@ -505,19 +506,19 @@ export default function GuidedCaptureModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      id="guided-capture-backdrop"
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-stone-950/85 p-3 md:p-6 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
+      aria-label={t("dashboard.guidedCapture.title")}
+      className="relative my-auto w-full max-w-4xl rounded-3xl bg-[#0e1318] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[94vh]"
+      backdropClassName="bg-stone-950/85 p-3 md:p-6 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
     >
       {/* Hidden canvas for capturing video frames */}
       <canvas ref={canvasRef} className="hidden" />
 
 <div
           id="guided-capture-container"
-          className="relative my-auto w-full max-w-4xl rounded-3xl bg-[#0e1318] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[94vh]"
           dir={i18n.language === "fa" ? "rtl" : "ltr"}
         >
         {/* Header */}
@@ -1126,6 +1127,6 @@ export default function GuidedCaptureModal({
           </div>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

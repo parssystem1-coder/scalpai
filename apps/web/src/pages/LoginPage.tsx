@@ -76,7 +76,6 @@ export default function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div
-      dir="ltr"
       style={{
         minHeight: "100vh",
         position: "relative",

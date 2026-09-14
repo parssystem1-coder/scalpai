@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ShieldCheck, ShieldAlert, Clock, CheckCircle2, AlertTriangle, Key, Cpu, RefreshCw, X, Database, Users, Laptop } from "lucide-react";
 import { formatDate, formatRelativeTime, CLINIC_DEFAULT_TIMEZONE, type LicenseStatusDto } from "@scalpai/shared";
 import { apiFetch, ApiError } from "../../api/client.js";
+import DialogPrimitive from "./DialogPrimitive";
 
 interface LicenseDiagnosticsModalProps {
   isOpen: boolean;
@@ -86,20 +87,20 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
     if (isOpen) void refresh();
   }, [isOpen, refresh]);
 
-  if (!isOpen) return null;
-
   const tone: PanelTone = status ? TONE_BY_STATE[status.state] : "neutral";
   const bad = tone === "bad";
   const claims = status?.claims;
 
   return (
-    <div
-      id="license-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
+      aria-label={t("dashboard.licenseDiagnostics.title")}
+      className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+      backdropClassName="bg-stone-900/50 p-4 backdrop-blur-md animate-in fade-in duration-200"
     >
-<div
+      <div
           id="license-modal-container"
-          className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
           dir={i18n.language === "fa" ? "rtl" : "ltr"}
         >
         {/* Header */}
@@ -293,6 +294,6 @@ export default function LicenseDiagnosticsModal({ isOpen, onClose }: LicenseDiag
           </button>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

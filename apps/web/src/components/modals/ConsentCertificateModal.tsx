@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Printer, Download, X, ShieldCheck, Award, CheckCircle2 } from "lucide-react";
 import { formatDate } from "@scalpai/shared";
 import type { ConsentRecord } from "./DigitalConsentModal.js";
+import DialogPrimitive from "./DialogPrimitive";
 
 interface ConsentCertificateModalProps {
   consent: ConsentRecord;
@@ -21,8 +22,6 @@ export default function ConsentCertificateModal({
 }: ConsentCertificateModalProps) {
   const { t, i18n } = useTranslation();
   const certRef = useRef<HTMLDivElement>(null);
-
-  if (!isOpen) return null;
 
   const certId = `CERT-${consent.id.replace(/[^a-zA-Z0-9]/g, "").slice(-8).toUpperCase() || "CLINIC-01"}`;
   const signedDateFa = formatDate(consent.signedAt, { locale: "fa", format: "full", includeTime: true });
@@ -74,14 +73,15 @@ export default function ConsentCertificateModal({
   };
 
   return (
-    <div
-      id="consent-cert-backdrop"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
       aria-label={t("dashboard.consentCertificate.backdropLabel")}
+      className="relative my-8 w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
+      backdropClassName="bg-stone-900/60 p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
     >
-<div
+      <div
             id="consent-cert-container"
-            className="relative my-8 w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
             dir={i18n.language === "fa" ? "rtl" : "ltr"}
           >
         {/* Modal Action Bar (Hidden on Print) */}
@@ -240,6 +240,6 @@ export default function ConsentCertificateModal({
           </div>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

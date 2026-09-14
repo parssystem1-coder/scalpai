@@ -21,6 +21,7 @@ import {
   type MappedStoryboard,
   getStoryboardWithSeverity,
 } from "@scalpai/education";
+import DialogPrimitive from "./DialogPrimitive";
 
 interface EducationModalProps {
   isOpen: boolean;
@@ -87,20 +88,20 @@ export default function EducationModal({
     else setActiveCameraStep(2);
   }, [progress]);
 
-  if (!isOpen) return null;
-
   const currentStoryboard: MappedStoryboard = getStoryboardWithSeverity(selectedCondition, severity);
   const def = currentStoryboard.definition;
   const conditionList = Object.keys(CLINICAL_STORYBOARDS) as ConditionKey[];
 
   return (
-    <div
-      id="education-modal-backdrop"
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-stone-950/75 p-3 md:p-6 backdrop-blur-lg animate-in fade-in duration-200 overflow-y-auto"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
+      aria-label={t("dashboard.education.title")}
+      className="relative my-auto w-full max-w-5xl rounded-3xl bg-[#0d1217] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[92vh]"
+      backdropClassName="bg-stone-950/75 p-3 md:p-6 backdrop-blur-lg animate-in fade-in duration-200 overflow-y-auto"
     >
       <div
         id="education-modal-container"
-        className="relative my-auto w-full max-w-5xl rounded-3xl bg-[#0d1217] text-stone-100 shadow-2xl border border-stone-800 overflow-hidden flex flex-col max-h-[92vh]"
         dir={i18n.language === "fa" ? "rtl" : "ltr"}
       >
         {/* Top Clinical Header & §11 Always Skippable Controls */}
@@ -559,6 +560,6 @@ export default function EducationModal({
           </button>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }
