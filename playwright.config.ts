@@ -36,7 +36,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "npm exec -- turbo run build --filter=@scalpai/app-api... && npm run start --workspace=@scalpai/app-api",
+        "npm exec -- turbo run build --filter=@scalpai/app-api... && node apps/api/dist/main.js",
       url: `${API_URL}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

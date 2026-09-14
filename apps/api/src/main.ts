@@ -118,4 +118,7 @@ async function bootstrap(): Promise<void> {
   logEvent("info", { event: "api.ready", count: port });
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  console.error("API bootstrap failed", error);
+  process.exitCode = 1;
+});
