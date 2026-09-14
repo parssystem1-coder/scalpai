@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { formatToJalali } from "@scalpai/shared";
+import DialogPrimitive from "./DialogPrimitive";
 
 interface ClinicalPdfReportModalProps {
   isOpen: boolean;
@@ -45,8 +46,6 @@ export default function ClinicalPdfReportModal({
   const { t, i18n } = useTranslation();
   const reportRef = useRef<HTMLDivElement>(null);
 
-  if (!isOpen) return null;
-
   const now = new Date();
   const jalaliDate = formatToJalali(now);
   const gregorianDate = now.toISOString().split("T")[0];
@@ -63,13 +62,15 @@ export default function ClinicalPdfReportModal({
   };
 
   return (
-    <div
-      id="pdf-report-backdrop"
-      className="fixed inset-0 z-[75] flex items-center justify-center bg-stone-950/80 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+    <DialogPrimitive
+      isOpen={isOpen}
+      onClose={onClose}
+      aria-label={t("dashboard.pdfReport.previewTitle")}
+      className="relative my-auto w-full max-w-4xl rounded-3xl bg-white text-stone-900 shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[94vh]"
+      backdropClassName="bg-stone-950/80 p-2 md:p-6 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
     >
       <div
         id="pdf-report-modal"
-        className="relative my-auto w-full max-w-4xl rounded-3xl bg-white text-stone-900 shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[94vh]"
         dir={i18n.language === "fa" ? "rtl" : "ltr"}
       >
         {/* Top Floating Action Bar (Hidden on Print) */}
@@ -277,6 +278,6 @@ export default function ClinicalPdfReportModal({
           </div>
         </div>
       </div>
-    </div>
+    </DialogPrimitive>
   );
 }

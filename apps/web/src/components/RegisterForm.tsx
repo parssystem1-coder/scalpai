@@ -34,7 +34,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
       {/* Subscription Callout */}
       <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[oklch(85%_0.1_50/0.15)] border border-[oklch(85%_0.12_55/0.4)] mb-4 text-xs">
         <Sparkles className="w-4 h-4 text-[oklch(62%_0.09_16)] shrink-0" />
-<p className="text-[0.72rem] text-right font-sans leading-relaxed" dir="rtl">
+<p className="text-[0.72rem] text-right font-sans leading-relaxed">
            <strong>{t("dashboard.registerForm.transparencyTitle")}</strong> {t("dashboard.registerForm.transparencyText")}
          </p>
       </div>

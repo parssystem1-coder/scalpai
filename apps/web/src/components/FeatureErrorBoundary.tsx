@@ -41,7 +41,6 @@ export class FeatureErrorBoundary extends React.Component<
     return (
       <section
         role="alert"
-        dir="rtl"
         className="min-h-[180px] grid place-items-center rounded-3xl border border-rose-200 bg-rose-50/80 p-8 text-center"
       >
         <div className="max-w-md space-y-3">

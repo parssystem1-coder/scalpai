@@ -45,7 +45,6 @@ const RouteFallback: React.FC = () => (
   <div
     role="status"
     aria-label="در حال بارگذاری"
-    dir="rtl"
     className="min-h-screen grid place-items-center bg-[oklch(85%_0.03_28)]"
   >
     <div className="flex flex-col items-center gap-3">
@@ -138,7 +137,7 @@ function AppRoutes() {
           <Route
             path="/plans"
             element={
-              <div className="min-h-screen bg-[oklch(85%_0.03_28)] p-6" dir="rtl">
+              <div className="min-h-screen bg-[oklch(85%_0.03_28)] p-6">
                 <div className="max-w-5xl mx-auto">
                   <button
                     type="button"
@@ -170,7 +169,7 @@ function AppRoutes() {
           <div className="w-5 h-5 rounded-full bg-emerald-500 text-white grid place-items-center text-xs font-bold">
             <Check className="w-3.5 h-3.5" />
           </div>
-          <div className="text-right font-sans" dir="rtl">
+          <div className="text-right font-sans">
             <strong className="block text-xs text-[oklch(20%_0.02_20)]">{toast.title}</strong>
             <span className="text-[0.7rem] text-[oklch(50%_0.015_20)]">{toast.desc}</span>
           </div>
