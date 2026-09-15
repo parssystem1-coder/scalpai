@@ -348,3 +348,256 @@ export const treatmentPlans = pgTable("treatment_plans", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * Phase 5a — aftercare engine, messaging gateway, billing (0017 / ADR-0046)
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A follow-up TEMPLATE. `steps` is a bounded jsonb array of
+ * `{ offsetHours, channel, templateKey }`, shape-checked by a CHECK in 0017 so
+ * jsonb does not mean "anything goes".
+ *
+ * It is one unit of editing (staff build the whole sequence and move the whole
+ * sequence), which is why the steps are not a child table.
+ */
+export const aftercareSequences = pgTable("aftercare_sequences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  /** manual | session_completed | analysis_created | invoice_paid */
+  trigger: text("trigger").notNull().default("manual"),
+  serviceId: uuid("service_id"),
+  locale: text("locale").notNull().default("fa"),
+  steps: jsonb("steps").notNull().default([]),
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  // Partial, like patients: a soft-deleted sequence must not hold its name forever.
+  uniqueIndex("aftercare_sequences_clinic_name_live_uq")
+    .on(t.clinicId, sql`lower(btrim(${t.name}))`)
+    .where(sql`deleted_at IS NULL`),
+]);
+
+/**
+ * One patient inside one sequence.
+ *
+ * `stepsSnapshot` freezes the plan at enrollment time — editing a sequence must
+ * not move the schedule of a patient already inside it. `nextRunAt` is the ONLY
+ * queue input: the worker claims by that column and never recomputes a due time
+ * from its own clock, which is what stops a redeploy from resending day 3 to
+ * everybody.
+ */
+export const aftercareEnrollments = pgTable("aftercare_enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  sequenceId: uuid("sequence_id").notNull(),
+  patientId: uuid("patient_id").notNull(),
+  sessionId: uuid("session_id"),
+  /** active | paused | completed | cancelled */
+  state: text("state").notNull().default("active"),
+  currentStep: integer("current_step").notNull().default(0),
+  stepsSnapshot: jsonb("steps_snapshot").notNull().default([]),
+  locale: text("locale").notNull().default("fa"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(0),
+  enrolledBy: uuid("enrolled_by"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancelReason: text("cancel_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // Re-enrolling after completion is fine; being active twice is a double send.
+  uniqueIndex("aftercare_enrollments_active_uq")
+    .on(t.clinicId, t.sequenceId, t.patientId)
+    .where(sql`state = 'active'`),
+]);
+
+/**
+ * Outbound ledger. There is NO phone column and NO body column, on purpose:
+ *
+ *  - `recipientHash` is sha256 of the phone. Enough for dedup, per-recipient
+ *    rate limiting and "did we contact this person", useless as a contact export.
+ *  - `bodySha256` + `bodyChars` prove what was sent without keeping it. The text
+ *    is `templateKey` + variables, and the variables ARE the PHI.
+ *  - `varsRedacted` passes through `redactPhiPayload`, and a CHECK in 0017
+ *    refuses the known PHI key names outright — the same guard 0012 put on
+ *    `mutations.payload`.
+ *  - `idempotencyKey` is unique per clinic. Without it a network retry sends the
+ *    patient the same message twice.
+ */
+export const messageLog = pgTable("message_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  enrollmentId: uuid("enrollment_id"),
+  patientId: uuid("patient_id"),
+  stepIndex: integer("step_index"),
+  /** kavenegar | bale | eitaa | telegram | whatsapp */
+  channel: text("channel").notNull(),
+  templateKey: text("template_key").notNull(),
+  locale: text("locale").notNull().default("fa"),
+  recipientHash: text("recipient_hash").notNull(),
+  bodySha256: text("body_sha256").notNull(),
+  bodyChars: integer("body_chars").notNull(),
+  varsRedacted: jsonb("vars_redacted").notNull().default({}),
+  /** queued | sent | delivered | failed | suppressed */
+  state: text("state").notNull().default("queued"),
+  provider: text("provider"),
+  providerMessageId: text("provider_message_id"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  idempotencyKey: text("idempotency_key").notNull(),
+  queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("message_log_idempotency_uq").on(t.clinicId, t.idempotencyKey),
+]);
+
+/**
+ * Patient replies. Unlike an outbound message the body cannot be regenerated and
+ * an inbox without it is useless, so it IS stored — as a `phi.v1.` AES-256-GCM
+ * envelope bound to this row by AAD, exactly like `patients.notesEncrypted`, with
+ * a CHECK in 0017 refusing anything that is not an envelope.
+ *
+ * `bodyPreview` is the scrubbed projection (`scrubText`) the list view reads:
+ * no emails, no phone numbers, bounded length.
+ */
+export const inboundMessages = pgTable("inbound_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  channel: text("channel").notNull(),
+  provider: text("provider"),
+  providerMessageId: text("provider_message_id"),
+  senderHash: text("sender_hash").notNull(),
+  patientId: uuid("patient_id"),
+  enrollmentId: uuid("enrollment_id"),
+  replyToMessageId: uuid("reply_to_message_id"),
+  bodyEncrypted: text("body_encrypted"),
+  bodyKeyId: text("body_key_id"),
+  bodySha256: text("body_sha256"),
+  bodyPreview: text("body_preview"),
+  /** new | read | replied | archived */
+  state: text("state").notNull().default("new"),
+  /** unknown | question | reschedule | stop | confirm */
+  intent: text("intent"),
+  handledBy: uuid("handled_by"),
+  handledAt: timestamp("handled_at", { withTimezone: true }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  // A webhook that is delivered twice must not become two inbox rows.
+  uniqueIndex("inbound_messages_provider_uq")
+    .on(t.clinicId, t.channel, t.providerMessageId)
+    .where(sql`provider_message_id IS NOT NULL`),
+]);
+
+/**
+ * Sellable catalog. Money is `numeric(12,0)` like `services.price` and
+ * `plans.price`: rial has no fraction, and a float total drifts by a rial per
+ * line until the printed invoice and the sum of its rows disagree.
+ *
+ * Soft-deleted, and the sku uniqueness is PARTIAL — a full unique index lets one
+ * deleted row hold its sku hostage forever.
+ */
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  sku: text("sku").notNull(),
+  name: text("name").notNull(),
+  /** goods | service | package */
+  kind: text("kind").notNull().default("goods"),
+  serviceId: uuid("service_id"),
+  unit: text("unit").notNull().default("unit"),
+  price: numeric("price", { precision: 12, scale: 0 }).notNull().default("0"),
+  currency: text("currency").notNull().default("IRR"),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("products_clinic_sku_live_uq")
+    .on(t.clinicId, sql`upper(${t.sku})`)
+    .where(sql`deleted_at IS NULL`),
+]);
+
+/**
+ * Soft-deleted invoice.
+ *
+ * `subtotal` / `discount` / `tax` / `total` are STORED but never written by
+ * application code: `fn_invoice_recalc` derives them from the live items, and it
+ * refuses to touch a paid, void or refunded invoice because recomputing a
+ * settled document rewrites history. `number` comes from
+ * `fn_invoice_next_number`, which is gapless under a per-clinic advisory lock.
+ */
+export const invoices = pgTable("invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  patientId: uuid("patient_id").notNull(),
+  sessionId: uuid("session_id"),
+  number: text("number").notNull(),
+  /** draft | issued | paid | partially_paid | void | refunded */
+  state: text("state").notNull().default("draft"),
+  currency: text("currency").notNull().default("IRR"),
+  subtotal: numeric("subtotal", { precision: 12, scale: 0 }).notNull().default("0"),
+  discount: numeric("discount", { precision: 12, scale: 0 }).notNull().default("0"),
+  tax: numeric("tax", { precision: 12, scale: 0 }).notNull().default("0"),
+  total: numeric("total", { precision: 12, scale: 0 }).notNull().default("0"),
+  paidAmount: numeric("paid_amount", { precision: 12, scale: 0 }).notNull().default("0"),
+  /** cash | card | transfer | gateway | credit */
+  paymentMethod: text("payment_method"),
+  paymentRef: text("payment_ref"),
+  issuedAt: timestamp("issued_at", { withTimezone: true }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidReason: text("void_reason"),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("invoices_clinic_number_live_uq")
+    .on(t.clinicId, t.number)
+    .where(sql`deleted_at IS NULL`),
+]);
+
+/**
+ * Invoice lines. `description` and `unitPrice` are COPIED from the product when
+ * the line is added: an invoice issued last month must not change because the
+ * catalog changed today. `productId` is a reference for reporting, not the price
+ * source. `lineTotal` is derived by a BEFORE trigger, so a client cannot post a
+ * line whose total disagrees with quantity x price.
+ */
+export const invoiceItems = pgTable("invoice_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull(),
+  invoiceId: uuid("invoice_id").notNull(),
+  productId: uuid("product_id"),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 0 }).notNull(),
+  discount: numeric("discount", { precision: 12, scale: 0 }).notNull().default("0"),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  lineTotal: numeric("line_total", { precision: 12, scale: 0 }).notNull().default("0"),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("invoice_items_position_live_uq")
+    .on(t.invoiceId, t.position)
+    .where(sql`deleted_at IS NULL`),
+]);
