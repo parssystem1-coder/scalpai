@@ -96,6 +96,10 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
   installShutdownHandlers(app);
 
+  // Nest registers Fastify's built-in body parsers during app.init(). Install
+  // the webhook raw-body parser afterwards so replacing application/json does
+  // not trigger FST_ERR_CTP_ALREADY_PRESENT during bootstrap.
+  await app.init();
   const fastify = app.getHttpAdapter().getInstance() as unknown as FastifyInstance;
   // فاز ۵b: بدون بایت‌های اصلی، تأیید امضای وبهوک بی‌معنی است.
   registerRawBodyCapture(fastify);
