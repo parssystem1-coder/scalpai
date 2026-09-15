@@ -9,7 +9,8 @@ interface PendingPayment { readonly invoiceId: string; readonly amount: number; 
 @Injectable()
 export class PaymentService {
   private readonly pending = new Map<string, PendingPayment>();
-  constructor(private readonly billing: BillingService, private readonly gateway = new ZarinpalAdapter()) {}
+  private readonly gateway = new ZarinpalAdapter();
+  constructor(private readonly billing: BillingService) {}
 
   async start(invoiceId: string, callbackUrl = process.env.ZARINPAL_CALLBACK_URL ?? "") {
     const invoice = await this.billing.getInvoice(invoiceId);
