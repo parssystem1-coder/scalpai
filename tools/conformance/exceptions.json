@@ -70,6 +70,20 @@
     "adr": "ADR-0003",
     "reason": "dev/demo seed for two clinics (phase 1 cross-tenant tests); runs once during setup with platform role, not tenant-scoped request",
     "since": "2026-09-12"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "apps/api/src/aftercare/aftercare.repository.ts",
+    "adr": "ADR-0003",
+    "reason": "aftercare repo imports TenantScope to open clinic-scoped transactions; the repo is the only place that opens tx in this module (ADR-0046)",
+    "since": "2026-09-15"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "apps/api/src/billing/billing.repository.ts",
+    "adr": "ADR-0003",
+    "reason": "billing repo imports TenantScope to open clinic-scoped transactions; the repo is the only place that opens tx in this module (ADR-0046)",
+    "since": "2026-09-15"
   }
 ]
 }
