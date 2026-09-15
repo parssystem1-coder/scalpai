@@ -16,6 +16,30 @@ function isForbiddenVarName(name: string): boolean {
 }
 
 /**
+ * نام متغیر کافی نیست، مقدارش هم کنترل می‌شود.
+ *
+ * یک متغیر مجاز مثل `when` یا `clinicName` هنوز متن آزاد است، و §13 طرح فقط
+ * «متن عمومی + لینک توکن‌دارِ ساخته‌شده در سرور» را در پیام خروجی مجاز می‌داند.
+ * پس کاراکتر کنترلی، ایمیل، لینک خام و رشته‌ی رقمی بلند (کد ملی، کارت، شماره
+ * پرونده) اینجا رد می‌شوند نه اینکه ارسال شوند.
+ *
+ * وقتی متغیر لینکِ منقضی‌شدنی اضافه شد، همان‌جا یک allow-list صریح کنارش بگذارید
+ * — قاعده‌ی لینک را شل نکنید.
+ */
+const CONTROL_CHARS = /[-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const EMAIL_LIKE = /[^\s@]+@[^\s@]+\.[^\s@]{2,}/;
+const LINK_LIKE = /(https?:\/\/|www\.)/i;
+const LONG_DIGIT_RUN = /[0-9\u06F0-\u06F9\u0660-\u0669]{8,}/;
+
+function unsafeValueReason(value: string): string | null {
+  if (CONTROL_CHARS.test(value)) return "control characters";
+  if (EMAIL_LIKE.test(value)) return "an email address";
+  if (LINK_LIKE.test(value)) return "a raw link";
+  if (LONG_DIGIT_RUN.test(value)) return "a long digit run";
+  return null;
+}
+
+/**
  * قالب‌ها عمداً ثابت و scalar-only هستند. فیلدهای هویتی بیمار حتی در قالب‌های
  * آینده هم ممنوع‌اند، و مقداری که شکل شماره‌ی ایرانی دارد رد می‌شود نه اینکه
  * ارسال یا ذخیره شود.
@@ -25,7 +49,7 @@ export const MESSAGE_TEMPLATES: Readonly<Record<string, MessageTemplate>> = {
     key: "aftercare.day1",
     vars: ["clinicName"],
     body: {
-      fa: "سلام! ۲۴ ساعت از جلسه شما گذشته. تا فردا محل درمان را نشویید و دست نزنید. پرسشی دارید؟ همینجا پاسخ دهید. — {{clinicName}}",
+      fa: "سلام! ۲۴ ساعت از جلسه شما گذشته. تا فردا محل درمان را نشویید و دست نزنید. پرسشی دارید? همینجا پاسخ دهید. — {{clinicName}}",
       en: "Hello! It has been 24 hours since your session. Please keep the treated area dry and untouched until tomorrow. Questions? Just reply here. — {{clinicName}}",
     },
   },
@@ -119,8 +143,14 @@ export function renderTemplate(
     if (!allowed.has(name)) throw new NotifyError(`template '${key}' does not declare a variable named '${name}'`);
     if (isForbiddenVarName(name)) throw new NotifyError(`template '${key}' cannot interpolate patient identity data`);
     const value = vars[name];
-    if (typeof value === "string" && containsSensitivePhone(value)) {
-      throw new NotifyError(`template '${key}' contains a phone number in variable '${name}'`);
+    if (typeof value === "string") {
+      if (containsSensitivePhone(value)) {
+        throw new NotifyError(`template '${key}' contains a phone number in variable '${name}'`);
+      }
+      const unsafe = unsafeValueReason(value);
+      if (unsafe) {
+        throw new NotifyError(`template '${key}' variable '${name}' contains ${unsafe}`);
+      }
     }
   }
 
