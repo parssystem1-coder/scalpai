@@ -41,6 +41,8 @@
 --   DROP FUNCTION IF EXISTS fn_invoice_recalc(uuid, uuid);
 --   DROP FUNCTION IF EXISTS fn_invoice_next_number(uuid);
 --   DROP FUNCTION IF EXISTS fn_aftercare_claim_due(uuid, integer);
+--   DROP TRIGGER IF EXISTS trg_aftercare_sequences_steps_validate ON aftercare_sequences;
+--   DROP FUNCTION IF EXISTS fn_aftercare_steps_validate();
 --   DROP TRIGGER IF EXISTS trg_aftercare_sequences_updated_at ON aftercare_sequences;
 --   DROP TRIGGER IF EXISTS trg_aftercare_enrollments_updated_at ON aftercare_enrollments;
 --   DROP TRIGGER IF EXISTS trg_message_log_updated_at ON message_log;
@@ -79,19 +81,9 @@ CREATE TABLE IF NOT EXISTS aftercare_sequences (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
-  -- یک دنباله بدون step فقط یک ردیف است که هیچ‌وقت پیامی نمی‌فرستد
   CONSTRAINT aftercare_sequences_steps_shape_chk CHECK (
     jsonb_typeof(steps) = 'array'
     AND jsonb_array_length(steps) BETWEEN 0 AND 40
-    AND NOT EXISTS (
-      SELECT 1 FROM jsonb_array_elements(steps) AS s
-       WHERE jsonb_typeof(s.value) <> 'object'
-          OR s.value->>'templateKey' IS NULL
-          OR s.value->>'channel' IS NULL
-          OR (s.value->>'channel') NOT IN ('kavenegar', 'bale', 'eitaa', 'telegram', 'whatsapp')
-          OR (s.value->>'offsetHours') IS NULL
-          OR (s.value->>'offsetHours') !~ '^[0-9]{1,5}$'
-    )
   ),
   CONSTRAINT aftercare_sequences_active_needs_steps_chk
     CHECK (active = false OR jsonb_array_length(steps) > 0)
@@ -116,6 +108,38 @@ DROP TRIGGER IF EXISTS trg_aftercare_sequences_updated_at ON aftercare_sequences
 CREATE TRIGGER trg_aftercare_sequences_updated_at
   BEFORE UPDATE ON aftercare_sequences
   FOR EACH ROW EXECUTE FUNCTION fn_touch_updated_at();
+
+-- اعتبارسنجی جزئیات steps (جایگزین CHECK constraint با subquery)
+CREATE OR REPLACE FUNCTION fn_aftercare_steps_validate() RETURNS trigger AS $$
+DECLARE
+  s jsonb;
+BEGIN
+  IF jsonb_typeof(NEW.steps) <> 'array' THEN
+    RAISE EXCEPTION 'steps must be a jsonb array';
+  END IF;
+  FOR s IN SELECT jsonb_array_elements(NEW.steps)
+  LOOP
+    IF jsonb_typeof(s) <> 'object' THEN
+      RAISE EXCEPTION 'each step must be a jsonb object';
+    END IF;
+    IF s->>'templateKey' IS NULL OR s->>'channel' IS NULL THEN
+      RAISE EXCEPTION 'each step must have templateKey and channel';
+    END IF;
+    IF (s->>'channel') NOT IN ('kavenegar', 'bale', 'eitaa', 'telegram', 'whatsapp') THEN
+      RAISE EXCEPTION 'step channel must be one of kavenegar, bale, eitaa, telegram, whatsapp';
+    END IF;
+    IF (s->>'offsetHours') IS NULL OR (s->>'offsetHours') !~ '^[0-9]{1,5}$' THEN
+      RAISE EXCEPTION 'step offsetHours must be a numeric string (1-5 digits)';
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_aftercare_sequences_steps_validate ON aftercare_sequences;
+CREATE TRIGGER trg_aftercare_sequences_steps_validate
+  BEFORE INSERT OR UPDATE ON aftercare_sequences
+  FOR EACH ROW EXECUTE FUNCTION fn_aftercare_steps_validate();
 
 -- ============================================================
 -- EXPAND 2) aftercare_enrollments — یک بیمار داخل یک دنباله

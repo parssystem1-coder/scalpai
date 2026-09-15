@@ -27,11 +27,13 @@ DROP TRIGGER IF EXISTS trg_inbound_messages_updated_at ON inbound_messages;
 DROP TRIGGER IF EXISTS trg_message_log_updated_at ON message_log;
 DROP TRIGGER IF EXISTS trg_aftercare_enrollments_updated_at ON aftercare_enrollments;
 DROP TRIGGER IF EXISTS trg_aftercare_sequences_updated_at ON aftercare_sequences;
+DROP TRIGGER IF EXISTS trg_aftercare_sequences_steps_validate ON aftercare_sequences;
 
 DROP FUNCTION IF EXISTS fn_invoice_items_recalc();
 DROP FUNCTION IF EXISTS fn_invoice_recalc(uuid, uuid);
 DROP FUNCTION IF EXISTS fn_invoice_next_number(uuid);
 DROP FUNCTION IF EXISTS fn_aftercare_claim_due(uuid, integer);
+DROP FUNCTION IF EXISTS fn_aftercare_steps_validate();
 
 -- fn_touch_updated_at عمداً DROP نمی‌شود: مال 0004 است و patients/sessions هنوز
 -- به آن تریگر دارند. حذفش این rollback را به یک regression فاز ۳ تبدیل می‌کند.
