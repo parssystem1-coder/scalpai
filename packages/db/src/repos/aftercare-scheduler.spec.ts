@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from "vitest";
 import { DUE_CLINIC_LIMIT_MAX, listDueClinics } from "./aftercare-scheduler.repo.js";
 
