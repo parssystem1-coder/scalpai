@@ -1,4 +1,4 @@
-name: gate
+name: gate.yml
 
 on:
   pull_request:
