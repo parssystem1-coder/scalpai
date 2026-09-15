@@ -1,3 +1,4 @@
+import { logEvent } from "../logging.js";
 import { isProduction } from "../security.config.js";
 import { RedisClient } from "./redis.client.js";
 
@@ -188,7 +189,10 @@ export class RedisKvStore implements KvStore {
   private degrade(err: unknown): void {
     this.degradedUntil = Date.now() + DEGRADE_WINDOW_MS;
     const reason = err instanceof Error ? err.message : String(err);
-    console.error(`[state] redis unavailable, using per-process limits for ${DEGRADE_WINDOW_MS}ms: ${reason}`);
+    logEvent("warn", {
+      event: "redis_degradation",
+      reason: reason.slice(0, 200),
+    });
   }
 }
 

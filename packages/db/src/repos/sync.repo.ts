@@ -338,7 +338,8 @@ export async function processPushBatch(ctx: PushCtx, envelopes: MutationEnvelope
   const results: PushItemResult[] = [];
 
   for (let index = 0; index < envelopes.length; index++) {
-    const env = envelopes[index]!;
+    const env = envelopes[index];
+    if (!env) throw new Error(`Failed to process envelope at index ${index}: no envelope`);
     const id = env.clientMutationId;
 
     if (seen.has(id)) {

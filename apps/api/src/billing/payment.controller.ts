@@ -18,6 +18,8 @@ export class PaymentController {
   @Public()
   @Post("callback")
   callback(@Query("invoiceId") invoiceId: string, @Query("Authority") authority: string, @Query("Status") status?: string) {
+    // Authority is validated in payment.service.callback() against pending set.
+    // Invalid or replayed authorities are rejected there.
     return this.payments.callback(invoiceId, authority, status);
   }
 }

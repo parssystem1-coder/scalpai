@@ -39,7 +39,8 @@ export async function createAnalysis(tx: Tx, clinicId: string, input: AnalysisCr
       createdBy: input.userId,
     })
     .returning();
-  const created = rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("Failed to create analysis: no row returned");
   await appendAudit(tx, {
     clinicId,
     userId: input.userId,
@@ -99,5 +100,7 @@ export async function saveExpertReview(tx: Tx, clinicId: string, id: string, inp
     entityId: id,
     meta: { verdict: input.verdict },
   });
-  return rows[0]!;
+  const result = rows[0];
+  if (!result) throw new Error("Failed to save expert review: no row returned");
+  return result;
 }

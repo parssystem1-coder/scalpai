@@ -25,7 +25,8 @@ export async function createPendingGalleryItem(tx: Tx, clinicId: string, input: 
       uploadState: "pending",
     })
     .returning();
-  const item = rows[0]!;
+  const item = rows[0];
+  if (!item) throw new Error("Failed to create gallery item: no row returned");
   await appendAudit(tx, {
     clinicId,
     userId: input.userId,
