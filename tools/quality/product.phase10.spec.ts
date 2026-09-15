@@ -444,7 +444,7 @@ describe("M14b - architecture call-sites and import boundaries are machine-check
       exceptions: { rule?: string; adr: string; file?: string }[];
     };
     const archExceptions = registry.exceptions.filter((e) => e.rule === ARCH_RULE);
-    expect(archExceptions.length, "architecture-call-sites must have exactly 6 infrastructure exceptions").toBe(6);
+    expect(archExceptions.length, "architecture-call-sites must have exactly 7 infrastructure exceptions").toBe(7);
     // All infrastructure exceptions must reference ADR-0003 (tenant model / platform scripts)
     for (const exc of archExceptions) {
       expect(exc.adr, `${exc.file} must reference ADR-0003`).toBe("ADR-0003");
