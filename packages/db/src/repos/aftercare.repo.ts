@@ -425,7 +425,7 @@ export async function claimDueEnrollments(tx: Tx, clinicId: string, limit: numbe
       FROM fn_aftercare_claim_due(${clinicId}::uuid, ${limit}::integer)
   `);
   const rows =
-    (res as {
+    (res as unknown as {
       rows?: Array<{
         enrollment_id: string;
         sequence_id: string;

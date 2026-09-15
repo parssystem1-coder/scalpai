@@ -31,7 +31,7 @@ export async function listDueClinics(tx: Tx, limit = 200): Promise<DueClinic[]> 
       FROM fn_aftercare_due_clinics(${limit}::integer)
   `);
   const rows =
-    (res as { rows?: Array<{ clinic_id: string; clinic_name: string; clinic_timezone: string }> }).rows ?? [];
+    (res as unknown as { rows?: Array<{ clinic_id: string; clinic_name: string; clinic_timezone: string }> }).rows ?? [];
   return rows.map((row) => ({
     clinicId: row.clinic_id,
     name: row.clinic_name,

@@ -9,7 +9,6 @@ import {
 } from "@scalpai/shared";
 import {
   AftercareError,
-  type AftercareStepRow,
   type ClaimedEnrollment,
   type EnrollmentRow,
   type SequenceRow,
@@ -22,7 +21,6 @@ import {
   redactVars,
   renderTemplate,
   routeChannel,
-  type SendResult,
 } from "@scalpai/notify";
 import { metrics } from "../common/metrics.js";
 import { MeteringService } from "../metering/metering.service.js";
@@ -101,7 +99,7 @@ export class AftercareService {
       trigger: dto.trigger,
       serviceId: dto.serviceId,
       locale: dto.locale,
-      steps: dto.steps as AftercareStepRow[],
+      steps: dto.steps,
       active: dto.active,
     });
   }
@@ -113,7 +111,7 @@ export class AftercareService {
       trigger: dto.trigger,
       serviceId: dto.serviceId,
       locale: dto.locale,
-      steps: dto.steps as AftercareStepRow[] | undefined,
+      steps: dto.steps,
       active: dto.active,
     });
     if (!updated) throw errors.notFound();
@@ -275,7 +273,7 @@ export class AftercareService {
           return { job, result } as const;
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          return { job, result: { outcome: "rejected", provider: job.channel, reason: message, retryable: false } as SendResult } as const;
+          return { job, result: { outcome: "rejected", provider: job.channel, reason: message, retryable: false } } as const;
         }
       }),
     );

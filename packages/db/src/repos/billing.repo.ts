@@ -297,7 +297,7 @@ export async function createInvoice(
   const resolvedItems = await resolveItems(tx, clinicId, input.items);
 
   const numberRes = await tx.execute(sql`SELECT fn_invoice_next_number(${clinicId}::uuid) AS number`);
-  const number = ((numberRes as { rows?: Array<{ number: string }> }).rows ?? [])[0]?.number;
+  const number = ((numberRes as unknown as { rows?: Array<{ number: string }> }).rows ?? [])[0]?.number;
   if (!number) throw new BillingError("invoice number could not be allocated");
 
   const rows = await tx
@@ -442,7 +442,7 @@ export async function payInvoice(tx: Tx, clinicId: string, id: string, payment: 
      WHERE clinic_id = ${clinicId}::uuid AND id = ${id}::uuid AND deleted_at IS NULL
        FOR UPDATE
   `);
-  const row = ((locked as {
+  const row = ((locked as unknown as {
     rows?: Array<{ number: string; state: string; total: string; paid_amount: string }>;
   }).rows ?? [])[0];
   if (!row) return null;

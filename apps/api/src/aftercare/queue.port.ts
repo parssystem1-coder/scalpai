@@ -63,7 +63,7 @@ export class IntervalQueueDriver implements AftercareQueuePort {
     private readonly onError: (err: Error) => void = () => {},
   ) {}
 
-  async start(tick: AftercareTick): Promise<void> {
+  start(tick: AftercareTick): void {
     if (this.timer) return;
     this.timer = setInterval(() => {
       if (this.running) return;
@@ -77,7 +77,7 @@ export class IntervalQueueDriver implements AftercareQueuePort {
     this.timer.unref?.();
   }
 
-  async stop(): Promise<void> {
+  stop(): void {
     if (!this.timer) return;
     clearInterval(this.timer);
     this.timer = null;
@@ -117,7 +117,7 @@ export class BullQueueDriver implements AftercareQueuePort {
     const specifier = "bullmq";
     let mod: BullModuleLike;
     try {
-      mod = (await import(specifier)) as unknown as BullModuleLike;
+      mod = await import(specifier) as BullModuleLike;
     } catch {
       throw new QueuePortError(
         "AFTERCARE_QUEUE_DRIVER=bullmq but the 'bullmq' package is not installed. " +

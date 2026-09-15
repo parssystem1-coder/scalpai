@@ -53,7 +53,7 @@ export function createStubAdapter(config: StubAdapterConfig): MessagingAdapter {
       return config.requiredEnv.every((name) => (env[name] ?? "").trim().length > 0);
     },
 
-    async send(message: OutboundMessage, env = process.env): Promise<SendResult> {
+    send(message: OutboundMessage, env = process.env): SendResult {
       if (isProduction(env)) {
         throw new AdapterNotImplementedError(config.channel);
       }
