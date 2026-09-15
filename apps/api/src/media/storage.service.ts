@@ -304,6 +304,13 @@ export class StorageService implements OnModuleInit {
     if (body.length > MOCK_MAX_BODY_BYTES) {
       throw new Error("mock storage object exceeds the maximum allowed size");
     }
+    // Explicit key allow-list check before filesystem write: CodeQL traces
+    // taint from HTTP body → writeFile and requires a visible sanitizer at
+    // the call-site. localPath() already calls isAllowedStorageKey(), but
+    // the static analyzer cannot follow the method chain.
+    if (!isAllowedStorageKey(key)) {
+      throw new Error("storage key is not an allowed tenant key");
+    }
     const filePath = this.localPath(key);
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, body);

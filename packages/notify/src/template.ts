@@ -28,7 +28,8 @@ function isForbiddenVarName(name: string): boolean {
  */
 // eslint-disable-next-line no-control-regex -- intentionally matching control chars to reject them
 const CONTROL_CHARS = /[-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
-const EMAIL_LIKE = /[^\s@]+@[^\s@]+\.[^\s@]{2,}/;
+// \S+ avoids backtracking ambiguity that [^\s@]+ causes around the @ anchor.
+const EMAIL_LIKE = /\S+@\S+\.\S{2,}/;
 const LINK_LIKE = /(https?:\/\/|www\.)/i;
 const LONG_DIGIT_RUN = /[0-9\u06F0-\u06F9\u0660-\u0669]{8,}/;
 
