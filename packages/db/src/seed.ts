@@ -2,7 +2,7 @@ import { loadEnv } from "./load-env.js";
 loadEnv();
 import { randomUUID, createHash } from "node:crypto";
 import { hash } from "@node-rs/argon2";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 /**
  * Dev/demo seed (phase 1): two clinics for cross-tenant negative tests,
@@ -12,6 +12,16 @@ import { Pool } from "pg";
  * Clinic IDs are DETERMINISTIC (derived from the clinic name) so that tests
  * and documentation can reference them reliably. This is safe for non-production
  * only: production must never hash identifiers.
+ *
+ * Phase 5a (ADR-0046) adds `seedPhase5a`, which has its OWN marker
+ * (`settings->>'seed5a'`) rather than bumping the v1 one. Two reasons, both
+ * practical:
+ *
+ *   1. Bumping v1 would re-run the block above on an existing database and die
+ *      on the clinics primary key — the ids are deterministic.
+ *   2. A dev database seeded before this phase would otherwise never get the new
+ *      fixtures, which is exactly the situation where somebody concludes the
+ *      feature is broken.
  */
 function deterministicUUID(input: string): string {
   const h = createHash("md5").update(input).digest();
@@ -36,6 +46,107 @@ interface SeedResult {
   skipped?: boolean;
   clinicA?: string;
   clinicB?: string;
+  phase5a?: "created" | "present";
+}
+
+/**
+ * فاز ۵a — داده نمونه: یک دنباله پیگیری، دو محصول، یک ثبت‌نام سررسیده و یک
+ * پیش‌فاکتور.
+ *
+ * گام اول ثبت‌نام عمداً الان سررسید است (مبدأ ۲۵ ساعت قبل و گام روز ۱):
+ * یک tick ورکر باید واقعاً کاری انجام دهد، وگرنه توسعه‌دهنده باید ردیف را
+ * دستی دستکاری کند تا مسیر را ببیند.
+ *
+ * مبلغ فاکتور از `fn_invoice_recalc` می‌آید نه از یک عدد دستی: یک seed با مبلغِ
+ * دستی، seed ای است که می‌تواند با کدی که قرار بود نشان دهد اختلاف داشته باشد.
+ */
+async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean> {
+  const done = await client.query(
+    "SELECT 1 FROM clinics WHERE id = $1 AND settings->>'seed5a' = 'v1' LIMIT 1",
+    [clinicA],
+  );
+  if ((done.rowCount ?? 0) > 0) return false;
+
+  const patient = await client.query<{ id: string }>(
+    "SELECT id FROM patients WHERE clinic_id = $1 AND deleted_at IS NULL ORDER BY created_at LIMIT 1",
+    [clinicA],
+  );
+  const patientId = patient.rows[0]?.id;
+
+  try {
+    await client.query("BEGIN");
+
+    // ۱) کاتالوگ — یک کالا و یک بسته خدمتی
+    const shampooId = randomUUID();
+    const packageId = randomUUID();
+    await client.query(
+      `INSERT INTO products (id, clinic_id, sku, name, kind, unit, price, tax_rate) VALUES
+       ($1, $3, 'SHMP-500', 'شامپوی تخصصی ۵۰۰ میلی',   'goods',   'bottle', '1850000', 9),
+       ($2, $3, 'PRP-PKG-4', 'بسته ۴ جلسه‌ای PRP',      'package', 'package','16000000', 0)`,
+      [shampooId, packageId, clinicA],
+    );
+
+    // ۲) یک دنباله پیگیری واقعی — روز ۱، روز ۳، هفته ۲، ماه ۱
+    const steps = [
+      { offsetHours: 24, channel: "kavenegar", templateKey: "aftercare.day1" },
+      { offsetHours: 72, channel: "kavenegar", templateKey: "aftercare.day3" },
+      { offsetHours: 336, channel: "kavenegar", templateKey: "aftercare.week2" },
+      { offsetHours: 720, channel: "kavenegar", templateKey: "aftercare.month1" },
+    ];
+    const sequenceId = randomUUID();
+    await client.query(
+      `INSERT INTO aftercare_sequences (id, clinic_id, name, description, trigger, locale, steps, active)
+       VALUES ($1, $2, 'پیگیری پس از PRP', 'چهار پیام در یک ماه پس از جلسه', 'manual', 'fa', $3::jsonb, true)`,
+      [sequenceId, clinicA, JSON.stringify(steps)],
+    );
+
+    // ۳) یک ثبت‌نام که گام اولش همین الان سررسید است
+    if (patientId) {
+      await client.query(
+        `INSERT INTO aftercare_enrollments
+           (clinic_id, sequence_id, patient_id, state, current_step, steps_snapshot, locale,
+            started_at, next_run_at)
+         VALUES ($1, $2, $3, 'active', 0, $4::jsonb, 'fa',
+                 now() - interval '25 hours', now() - interval '1 hour')`,
+        [clinicA, sequenceId, patientId, JSON.stringify(steps)],
+      );
+
+      // ۴) یک پیش‌فاکتور با دو سطر. شماره و مبالغ از خودِ توابع می‌آیند.
+      const numberRes = await client.query<{ number: string }>(
+        "SELECT fn_invoice_next_number($1::uuid) AS number",
+        [clinicA],
+      );
+      const invoiceNumber = numberRes.rows[0]?.number;
+      if (invoiceNumber) {
+        const invoiceId = randomUUID();
+        await client.query(
+          `INSERT INTO invoices (id, clinic_id, patient_id, number, state, currency, due_at)
+           VALUES ($1, $2, $3, $4, 'draft', 'IRR', now() + interval '14 days')`,
+          [invoiceId, clinicA, patientId, invoiceNumber],
+        );
+        await client.query(
+          `INSERT INTO invoice_items
+             (clinic_id, invoice_id, product_id, description, quantity, unit_price, tax_rate, position)
+           VALUES
+             ($1, $2, $3, 'بسته ۴ جلسه‌ای PRP',        1,  '16000000', 0, 0),
+             ($1, $2, $4, 'شامپوی تخصصی ۵۰۰ میلی', 2,  '1850000',  9, 1)`,
+          [clinicA, invoiceId, packageId, shampooId],
+        );
+        await client.query("SELECT fn_invoice_recalc($1::uuid, $2::uuid)", [clinicA, invoiceId]);
+      }
+    }
+
+    await client.query(
+      `UPDATE clinics SET settings = settings || '{"seed5a":"v1"}'::jsonb WHERE id = $1`,
+      [clinicA],
+    );
+
+    await client.query("COMMIT");
+    return true;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  }
 }
 
 export async function seed(config: string | import("pg").PoolConfig): Promise<SeedResult> {
@@ -43,8 +154,16 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
   const pool = new Pool(poolConfig);
   const client = await pool.connect();
   try {
-    const marker = await client.query("SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1");
-    if ((marker.rowCount ?? 0) > 0) return { skipped: true };
+    const marker = await client.query<{ id: string }>(
+      "SELECT id FROM clinics WHERE settings->>'seed' = 'v1' LIMIT 1",
+    );
+    if ((marker.rowCount ?? 0) > 0) {
+      // دیتابیس از قبل seed شده — فقط داده‌ی فاز ۵a را تکمیل می‌کنیم
+      const clinicA = marker.rows[0]?.id;
+      if (!clinicA) return { skipped: true };
+      const created = await seedPhase5a(client, clinicA);
+      return { skipped: !created, clinicA, phase5a: created ? "created" : "present" };
+    }
 
     const password = process.env.SEED_PASSWORD ?? "Dev12345!";
     const argon = await hash(password);
@@ -56,8 +175,8 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
 
       await client.query(
         `INSERT INTO plans (code, name, price, interval, limits) VALUES
-         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1,"monthly_sessions":5}'),
-         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3,"monthly_sessions":3}')
+         ('starter', '{"fa":"پایه","en":"Starter"}', '4900000', 'month', '{"max_users":3,"storage_mb":5120,"analyses_per_month":200,"branches":1,"monthly_sessions":5,"messages_per_month":500,"upload_mb_per_month":5120}'),
+         ('growth',  '{"fa":"رشد","en":"Growth"}',   '12900000','month', '{"max_users":10,"storage_mb":51200,"analyses_per_month":1500,"branches":3,"monthly_sessions":3,"messages_per_month":5000,"upload_mb_per_month":51200}')
          ON CONFLICT (code) DO NOTHING`,
       );
       await client.query(
@@ -70,7 +189,7 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
       await client.query(
         `INSERT INTO clinics (id, name, settings) VALUES
          ($1, 'کلینیک دمو الف', '{"seed":"v1"}'),
-         ($2, 'کلینیک دمو ب',   '{"seed":"other"}')`,
+         ($2, 'کلینیک دمو ب",   '{"seed":"other"}')`.replace('ب"', 'ب\''),
         [clinicA, clinicB],
       );
       await client.query(
@@ -114,11 +233,14 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
       );
 
       await client.query("COMMIT");
-      return { clinicA, clinicB };
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
     }
+
+    // داده‌ی فاز ۵a در تراکنش خودش — تا یک خطای اینجا، seed پایه را عقب نزند
+    const created = await seedPhase5a(client, clinicA);
+    return { clinicA, clinicB, phase5a: created ? "created" : "present" };
   } finally {
     client.release();
     await pool.end();
@@ -148,7 +270,8 @@ if (isCli) {
 
   seed(config)
     .then((r) => {
-      console.log(r.skipped ? "seed: already seeded" : `seed: done (2 clinics: A=${r.clinicA}, B=${r.clinicB})`);
+      const base = r.skipped ? "seed: already seeded" : `seed: done (2 clinics: A=${r.clinicA}, B=${r.clinicB})`;
+      console.log(r.phase5a ? `${base} — phase 5a: ${r.phase5a}` : base);
       process.exit(0);
     })
     .catch((e: Error) => {
