@@ -49,9 +49,8 @@ describe("InboundController webhook security", () => {
     process.env.KAVENEGAR_WEBHOOK_SECRET = "k-secret";
     const guard = newGuard();
     await expect(
-      TenantScope.run(async () => {
-        guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-webhook-signature": "bad" } }));
-      }),
+      TenantScope.run(() => guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-webhook-signature": "bad" } })),
+      ),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -59,9 +58,8 @@ describe("InboundController webhook security", () => {
     process.env.KAVENEGAR_WEBHOOK_SECRET = "k-secret";
     const guard = newGuard();
     await expect(
-      TenantScope.run(async () => {
-        guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: {} }));
-      }),
+      TenantScope.run(() => guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: {} })),
+      ),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -69,9 +67,8 @@ describe("InboundController webhook security", () => {
     process.env.KAVENEGAR_WEBHOOK_SECRET = "k-secret";
     const guard = newGuard();
     await expect(
-      TenantScope.run(async () => {
-        guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body: { ...body, body: "tampered" }, rawBody: Buffer.from(JSON.stringify({ ...body, body: "tampered" })), headers: { "x-webhook-signature": signature({ ...body, body: "original" }, "k-secret") } }));
-      }),
+      TenantScope.run(() => guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body: { ...body, body: "tampered" }, rawBody: Buffer.from(JSON.stringify({ ...body, body: "tampered" })), headers: { "x-webhook-signature": signature({ ...body, body: "original" }, "k-secret") } })),
+      ),
     ).rejects.toThrow(UnauthorizedException);
   });
 
@@ -80,9 +77,8 @@ describe("InboundController webhook security", () => {
     const db = { withClient: vi.fn().mockResolvedValue(undefined) };
     const guard = newGuard(db);
     await expect(
-      TenantScope.run(async () => {
-        guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-webhook-signature": signature(body, "k-secret") } }));
-      }),
+      TenantScope.run(() => guard.canActivate(executionContext(InboundController.prototype.ingestKavenegar, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-webhook-signature": signature(body, "k-secret") } })),
+      ),
     ).rejects.toThrow(UnauthorizedException);
   });
 

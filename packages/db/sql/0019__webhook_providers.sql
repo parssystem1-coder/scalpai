@@ -72,7 +72,8 @@ DO $$
 DECLARE
   clinic RECORD;
 BEGIN
-  FOR clinic IN SELECT id FROM clinics WHERE deleted_at IS NULL
+  -- clinics is not a soft-delete table; its current schema has no deleted_at.
+  FOR clinic IN SELECT id FROM clinics
   LOOP
     INSERT INTO webhook_providers (provider, clinic_id, webhook_secret, signature_header)
     VALUES
