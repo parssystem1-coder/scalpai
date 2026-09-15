@@ -92,6 +92,7 @@ describe("aftercare DB functions (smoke)", () => {
       trigger: "manual",
       steps: [],
       locale: "fa",
+      active: true,
     });
     expect(tx.insert).toHaveBeenCalled();
     expect(result).toBeDefined();
