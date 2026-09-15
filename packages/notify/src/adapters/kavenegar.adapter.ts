@@ -48,7 +48,20 @@ export class KavenegarAdapter implements MessagingAdapter {
       );
       const payload = await response.json();
       const status = payload.return?.status;
-      if (response.ok && status === 200) {
+      // The transport status decides retryability, not the body. A 500 (or a
+      // proxy error page) that happens to carry `return.status: 200` used to
+      // fall through to `mapKavenegarError(200)` and be classified as a
+      // permanent provider rejection, so a transient outage silently dropped
+      // the message instead of being retried.
+      if (!response.ok) {
+        return {
+          outcome: "rejected",
+          provider: this.provider,
+          reason: mapKavenegarError(response.status),
+          retryable: response.status === 429 || response.status >= 500,
+        };
+      }
+      if (status === 200) {
         const providerMessageId = payload.entries?.[0]?.messageid;
         return {
           outcome: "accepted",

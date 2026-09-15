@@ -22,6 +22,21 @@ describe("ZarinpalAdapter", () => {
     await expect(new ZarinpalAdapter(client({ data: { code: -9 } }), env).requestPayment("i-1", 1000, "cb")).rejects.toThrow("request failed");
   });
 
+  it("rejects a non-rial amount before any provider call", async () => {
+    const http = client({ data: { code: 100, authority: "A-1" } });
+    const adapter = new ZarinpalAdapter(http, env);
+    await expect(adapter.requestPayment("i-1", 0, "cb")).rejects.toThrow("positive integer in rials");
+    await expect(adapter.requestPayment("i-1", -1000, "cb")).rejects.toThrow("positive integer in rials");
+    await expect(adapter.requestPayment("i-1", 1000.5, "cb")).rejects.toThrow("positive integer in rials");
+    await expect(adapter.verifyPayment("A-1", Number.NaN)).rejects.toThrow("positive integer in rials");
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a non-2xx verify response as verified", async () => {
+    const result = await new ZarinpalAdapter(client({ data: { code: 100, ref_id: 55 } }, 502, false), env).verifyPayment("A-1", 1000);
+    expect(result.verified).toBe(false);
+  });
+
   it("verifies a payment", async () => {
     const result = await new ZarinpalAdapter(client({ data: { code: 100, ref_id: 55 } }), env).verifyPayment("A-1", 1000);
     expect(result).toMatchObject({ verified: true, refId: "55" });
