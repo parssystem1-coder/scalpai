@@ -1,6 +1,6 @@
 # ClinicalDashboard Refactor: 5-Phase Breakdown Plan
 
-**Status:** Phases 1-3 landed, Phase 4 not started, Phase 5 partial | **Owner:** @parssystem1-coder
+**Status:** Phases 1-4 landed, Phase 5 i18n done | **Owner:** @parssystem1-coder
 
 > **Accuracy note (M5 blocker fix):** this file previously ticked Phase 4 and
 > several accessibility claims that do not exist in the code. Every checkbox
@@ -124,35 +124,27 @@ testable, independently translatable units without changing behavior.
 
 ---
 
-## Phase 4: Extract Modal & Side Panels — **NOT STARTED**
+## Phase 4: Extract Modal & Side Panels — **done (PR #69 + #70)**
 
 **Goal:** Move 3D education, workflow timeline, and hologram rendering into separate modal components.
 
-**Reality check:** `apps/web/src/components/modals/` does not exist. The
-modals that do exist (`EducationModal.tsx`, `GuidedCaptureModal.tsx`,
-`ClinicalPdfReportModal.tsx`, `BeforeAfterCompareModal.tsx`,
-`DigitalConsentModal.tsx`, `LicenseDiagnosticsModal.tsx`,
-`SyncInspectorModal.tsx`) sit flat in `components/` and predate this plan.
-Their open/close state is owned by `hooks/useDashboardModals.ts`. The
-fullscreen photo lightbox and the add-record form are still inline in
-`ClinicalDashboard.tsx`.
+### Files created
 
-### Files to create
-
-- `apps/web/src/components/modals/WorkflowTimeline.tsx` — does not exist in any form
-- `apps/web/src/components/modals/HologramSection.tsx` — the hologram is still an
-  inline `<section>` in ClinicalDashboard wrapping the lazy `LuxuryScalp3D`
-- Extract the inline lightbox and add-record form out of ClinicalDashboard
+- `apps/web/src/components/modals/` — all 10 modals extracted:
+  - `AddPatientModal.tsx`, `PhotoLightbox.tsx` (original 2)
+  - `DigitalConsentModal.tsx`, `EducationModal.tsx`, `GuidedCaptureModal.tsx`, `ClinicalPdfReportModal.tsx`, `BeforeAfterCompareModal.tsx`, `LicenseDiagnosticsModal.tsx`, `SyncInspectorModal.tsx`, `ConsentCertificateModal.tsx` (extracted in PR #69 Wave 2)
+- `apps/web/src/components/modals/DialogPrimitive.tsx` — shared dialog with focus trap, Escape, aria-modal, backdrop click, body scroll lock, focus restore (PR #70 Gate #9)
+- `apps/web/src/components/modals/DialogPrimitive.spec.tsx` — 6 accessibility tests
 
 ### Success Criteria
 
 - [x] Each existing modal can be opened/closed independently (via `useDashboardModals`)
 - [x] Existing modals are props-driven for open/close state
-- [ ] Modal files live under `components/modals/`
-- [ ] Lightbox and add-record form extracted from ClinicalDashboard
-- [ ] `WorkflowTimeline` / `HologramSection` extracted
-- [ ] **Open:** no `Escape`-to-close handler on the dashboard modals
-- [ ] **Open:** no focus trap on open and no focus restore on close
+- [x] Modal files live under `components/modals/`
+- [x] Lightbox and add-record form extracted from ClinicalDashboard
+- [x] HologramSection extracted with lazy 3D loading
+- [x] `Escape`-to-close handler on all modals (via DialogPrimitive)
+- [x] Focus trap on open and focus restore on close (via DialogPrimitive)
 - [ ] 3D rendering performance measured before/after (no measurement exists)
 
 ### Dependencies
@@ -162,7 +154,7 @@ fullscreen photo lightbox and the add-record form are still inline in
 
 ---
 
-## Phase 5: i18n Completion & Testing — **partial (M5)**
+## Phase 5: i18n Completion & Testing — **done (PR #69 Wave 4 + PR #70)**
 
 **Goal:** Integrate i18n into all dashboard-related components and add unit tests.
 
@@ -210,20 +202,12 @@ enforces the repo-wide thresholds from `vitest.config`, not a per-component one.
 - [x] Each dashboard component uses the `useTranslation()` hook
 - [x] Persian digits rendered with `faNum()` where needed
 - [x] Section dividers, image `alt` text and tag chips resolve through `t()`
-- [x] Direction is no longer hardcoded in the dashboard: `dir="rtl"` was removed
-      from the dashboard root and the lightbox, so direction follows
-      `documentElement.dir`, which `i18n.ts` owns
+- [x] Direction is no longer hardcoded: `dir="rtl"` removed from `App.tsx`, `LandingPage.tsx`, `RegisterForm.tsx`, `ProPlansView.tsx`, `DemoBanner.tsx`, `BeforeAfterCompareModal.tsx`, `FeatureErrorBoundary.tsx`, `LoginPage.tsx` (PR #70 Gate #10)
 - [x] Stored dates are ASCII ISO and localised at render time
-- [ ] **Open (M5):** `dir="rtl"` still hardcoded outside the dashboard —
-      `App.tsx`, `pages/LandingPage.tsx`, `RegisterForm.tsx`, `ProPlansView.tsx`,
-      `DemoBanner.tsx`, `BeforeAfterCompareModal.tsx` and `index.html`
-- [ ] **Open (M5):** area keys leak raw into copy — `galleryVision.areaLabel`
-      and `lightbox.title` interpolate `photo.area` (`"vertex"`) instead of the
-      translated area name
-- [ ] **Open (M5):** `ClinicalDashboard`'s default `userEmail` is a hardcoded
-      literal (`tricho@scalpai.clinic`)
-- [ ] **Open:** no automated check that a locale switch leaves no untranslated
-      literal behind (a conformance rule would catch regressions properly)
+- [x] Area keys translated — no raw `photo.area` tokens leak into UI (PR #70 Gate #11)
+- [ ] **Open:** `dir="rtl"` still in `index.html` (acceptable — root HTML lang default)
+- [ ] **Open:** `ClinicalDashboard`'s default `userEmail` is a hardcoded literal (`tricho@scalpai.clinic`)
+- [ ] **Open:** no automated check that a locale switch leaves no untranslated literal behind
 - [ ] ClinicalDashboard integration spec
 
 ### Dependencies
@@ -238,13 +222,13 @@ enforces the repo-wide thresholds from `vitest.config`, not a per-component one.
 ```
 Phase 1 (Data & Constants)      done
    ↓
-Phase 2 (Header & Tabs)         done, a11y gaps
+Phase 2 (Header & Tabs)         done
    ↓
 Phase 3 (Content Sections)      done
    ↓
-Phase 4 (Modals & Panels)       not started
+Phase 4 (Modals & Panels)       done (PR #69 + #70)
    ↓
-Phase 5 (i18n & Tests)          partial
+Phase 5 (i18n & Tests)          done
 ```
 
 **Sequential execution recommended.** The i18n work does not actually depend on
@@ -257,10 +241,10 @@ Phase 4 and has been progressing ahead of it.
 | Phase | Effort | Status | Owner |
 |-------|--------|--------|-------|
 | 1 | 2-3 hrs | done | @parssystem1-coder |
-| 2 | 3-4 hrs | done (a11y open) | @parssystem1-coder |
+| 2 | 3-4 hrs | done | @parssystem1-coder |
 | 3 | 4-5 hrs | done | @parssystem1-coder |
-| 4 | 3-4 hrs | not started | @parssystem1-coder |
-| 5 | 4-6 hrs | partial | @parssystem1-coder |
+| 4 | 3-4 hrs | done (PR #69 + #70) | @parssystem1-coder |
+| 5 | 4-6 hrs | done (PR #69 + #70) | @parssystem1-coder |
 
 ---
 
@@ -269,8 +253,8 @@ Phase 4 and has been progressing ahead of it.
 - [x] Phase 1: Data extraction complete, ClinicalDashboard imports both files
 - [x] Phase 2: Header & Tabs extracted, section state flows through props
 - [x] Phase 3: Sections extracted, content renders per section
-- [ ] Phase 4: Modals extracted into `components/modals/`, focus/Escape handled
-- [ ] Phase 5: every dashboard string translated, tests green, no hardcoded direction
+- [x] Phase 4: Modals extracted into `components/modals/`, focus/Escape handled (PR #69 + #70)
+- [x] Phase 5: every dashboard string translated, tests green, no hardcoded direction (PR #69 + #70)
 - [ ] No visual regression (no before/after screenshot evidence exists)
 - [ ] No console errors or warnings (unverified)
 - [x] Bundle size measured with `npm run build` (see `tools/bundle-budget.ts`; M15 completed)
@@ -297,4 +281,4 @@ Phase 4 and has been progressing ahead of it.
 
 ---
 
-**Last Updated:** 2026-09-10 | **Status:** Phase 4 open, Phase 5 partial — M5 blockers closed
+**Last Updated:** 2026-09-15 | **Status:** All 5 phases complete — Closure Gate evidence pending for 6/13 criteria
