@@ -261,7 +261,6 @@ describe("abortUpload", () => {
     const record: PendingUploadState = {
       key: "g9",
       sessionId: "s9",
-      patientId: "p1",
       fileName: "scalp.jpg",
       fileSize: 2048,
       mime: "image/jpeg",

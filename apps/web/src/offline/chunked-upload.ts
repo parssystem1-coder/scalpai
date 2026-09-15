@@ -82,11 +82,11 @@ export async function getPendingUploads(): Promise<PendingUpload[]> {
   }
 }
 
-async function findResumable(file: File, patientId: string): Promise<PendingUpload | null> {
+async function findResumable(file: File): Promise<PendingUpload | null> {
   const db = getOfflineDb();
   if (!db) return null;
   try {
-    const rows = await db.pendingUploads.where("patientId").equals(patientId).toArray();
+    const rows = await db.pendingUploads.toArray();
     return rows.find((r) => r.fileName === file.name && r.fileSize === file.size) ?? null;
   } catch {
     return null;
@@ -100,7 +100,7 @@ export async function uploadChunked(
   patientId: string,
   onProgress?: (pct: number) => void,
 ): Promise<void> {
-  const existing = await findResumable(file, patientId);
+  const existing = await findResumable(file);
   if (existing && (await resume(existing, file, onProgress))) return;
   if (existing) await drop(existing.key);
   await start(file, patientId, onProgress);
@@ -116,7 +116,6 @@ async function start(file: File, patientId: string, onProgress?: (pct: number) =
   const record: PendingUpload = {
     key: opened.id,
     sessionId: opened.sessionId,
-    patientId,
     fileName: file.name,
     fileSize: file.size,
     mime,
