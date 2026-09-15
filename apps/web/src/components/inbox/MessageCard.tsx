@@ -1,12 +1,28 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { CLINIC_DEFAULT_TIMEZONE, formatDate } from "@scalpai/shared";
 
 export interface InboxMessage { id: string; channel: string; senderHash: string; bodyPreview: string | null; receivedAt: string; state?: string; }
 interface Props { message: InboxMessage; selected?: boolean; onSelect: (id: string) => void; }
 
+/**
+ * زمان با ابزار واحد تاریخِ packages/shared نمایش داده می‌شود، نه با
+ * `toLocaleString()`: قاعده ۹ فرمت ad-hoc در کامپوننت را ممنوع کرده و منطقه
+ * زمانی مرجع کلینیک است نه لپ‌تاپ کاربر. تاریخ نامعتبر هم رشته خالی می‌دهد
+ * نه «Invalid Date».
+ */
+function receivedAtLabel(iso: string, locale: "fa" | "en"): string {
+  try {
+    return formatDate(iso, { locale, format: "short", includeTime: true, timeZone: CLINIC_DEFAULT_TIMEZONE });
+  } catch {
+    return "";
+  }
+}
+
 /** Accessible compact message preview used by the inbox conversation list. */
 export const MessageCard: React.FC<Props> = ({ message, selected = false, onSelect }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language?.startsWith("en") ? "en" : "fa";
   return (
     <button
       type="button"
@@ -25,7 +41,7 @@ export const MessageCard: React.FC<Props> = ({ message, selected = false, onSele
           className="text-xs opacity-60"
           dateTime={message.receivedAt}
         >
-          {new Date(message.receivedAt).toLocaleString()}
+          {receivedAtLabel(message.receivedAt, locale)}
         </time>
       </span>
       <span className="mt-2 block truncate text-xs opacity-70">

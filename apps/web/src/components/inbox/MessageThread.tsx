@@ -2,9 +2,12 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import type { InboxMessage } from "./MessageCard.js";
 
-interface Props { message: InboxMessage | null; body: string | null; reply: string; onReplyChange: (value: string) => void; onReply: () => void; sending?: boolean; }
+/** وضعیت دریافت متن پیام. `null` بودن body دو معنی داشت: «در حال بارگذاری» و «نشد». */
+export type BodyStatus = "idle" | "loading" | "loaded" | "error";
+
+interface Props { message: InboxMessage | null; body: string | null; bodyStatus?: BodyStatus; reply: string; onReplyChange: (value: string) => void; onReply: () => void; sending?: boolean; }
 /** Conversation detail panel. The full inbound body is supplied only after explicit selection. */
-export const MessageThread: React.FC<Props> = ({ message, body, reply, onReplyChange, onReply, sending = false }) => {
+export const MessageThread: React.FC<Props> = ({ message, body, bodyStatus = "idle", reply, onReplyChange, onReply, sending = false }) => {
   const { t } = useTranslation();
   if (!message) return <section className="grid min-h-[420px] place-items-center p-8 text-sm opacity-60" aria-label={t("inbox.emptySelection")}>{t("inbox.selectConversation")}</section>;
   return (
@@ -15,14 +18,21 @@ export const MessageThread: React.FC<Props> = ({ message, body, reply, onReplyCh
       </header>
 
       <div className="flex-1 py-6">
-        {body === null ? (
+        {bodyStatus === "loading" ? (
           <p className="text-xs opacity-60 text-center">
             {t("inbox.loadingBody")}
           </p>
         ) : (
-          <p className="rounded-2xl bg-white p-4 text-sm leading-7 shadow-sm">
-            {body ?? message.bodyPreview ?? t("inbox.redacted")}
-          </p>
+          <>
+            {bodyStatus === "error" && (
+              <p role="alert" className="mb-2 text-xs text-red-700">
+                {t("inbox.bodyFailed")}
+              </p>
+            )}
+            <p className="rounded-2xl bg-white p-4 text-sm leading-7 shadow-sm">
+              {body ?? message.bodyPreview ?? t("inbox.redacted")}
+            </p>
+          </>
         )}
       </div>
 
