@@ -1,7 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { errors } from "@scalpai/shared";
 import { ZarinpalAdapter, type PaymentResult } from "@scalpai/notify";
 import { BillingService } from "./billing.service.js";
+
+export const ZARINPAL_GATEWAY = "ZARINPAL_GATEWAY";
 
 interface PendingPayment { readonly invoiceId: string; readonly amount: number; readonly authority: string; readonly expiresAt: number; readonly redirectUrl: string }
 
@@ -9,8 +11,10 @@ interface PendingPayment { readonly invoiceId: string; readonly amount: number; 
 @Injectable()
 export class PaymentService {
   private readonly pending = new Map<string, PendingPayment>();
-  private readonly gateway = new ZarinpalAdapter();
-  constructor(private readonly billing: BillingService) {}
+  constructor(
+    private readonly billing: BillingService,
+    @Optional() @Inject(ZARINPAL_GATEWAY) private readonly gateway: ZarinpalAdapter = new ZarinpalAdapter(),
+  ) {}
 
   async start(invoiceId: string, callbackUrl = process.env.ZARINPAL_CALLBACK_URL ?? "") {
     const invoice = await this.billing.getInvoice(invoiceId);

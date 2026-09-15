@@ -7,7 +7,7 @@ const invoice = { id: "invoice-1", state: "issued", total: "125000" };
 function setup() {
   const billing = { getInvoice: vi.fn().mockResolvedValue(invoice), pay: vi.fn().mockResolvedValue({ ...invoice, state: "paid" }) } as unknown as BillingService;
   const gateway = { requestPayment: vi.fn().mockResolvedValue("https://sandbox.zarinpal.com/pg/StartPay/AUTH-1"), verifyPayment: vi.fn().mockResolvedValue({ verified: true, authority: "AUTH-1", refId: "REF-1" }) } as unknown as ZarinpalAdapter;
-  return { billing, gateway, service: new PaymentService(billing) };
+  return { billing, gateway, service: new PaymentService(billing, gateway) };
 }
 
 describe("PaymentService", () => {
