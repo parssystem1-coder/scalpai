@@ -53,7 +53,8 @@ export function createStubAdapter(config: StubAdapterConfig): MessagingAdapter {
       return config.requiredEnv.every((name) => (env[name] ?? "").trim().length > 0);
     },
 
-    send(message: OutboundMessage, env = process.env): SendResult {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async send(message: OutboundMessage, env = process.env): Promise<SendResult> {
       if (isProduction(env)) {
         throw new AdapterNotImplementedError(config.channel);
       }

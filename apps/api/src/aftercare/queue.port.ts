@@ -63,7 +63,8 @@ export class IntervalQueueDriver implements AftercareQueuePort {
     private readonly onError: (err: Error) => void = () => {},
   ) {}
 
-  start(tick: AftercareTick): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async start(tick: AftercareTick): Promise<void> {
     if (this.timer) return;
     this.timer = setInterval(() => {
       if (this.running) return;
@@ -77,7 +78,8 @@ export class IntervalQueueDriver implements AftercareQueuePort {
     this.timer.unref?.();
   }
 
-  stop(): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async stop(): Promise<void> {
     if (!this.timer) return;
     clearInterval(this.timer);
     this.timer = null;
