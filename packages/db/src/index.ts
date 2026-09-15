@@ -339,6 +339,11 @@ export {
   type ProductFilter,
   type ProductPatch,
 } from "./repos/billing.repo.js";
+export {
+  findActiveProvider,
+  findActiveProviderForClinic,
+  WebhookProviderError,
+} from "./repos/webhook-providers.repo.js";
 /**
  * WEAKNESSES H18: destructive test helpers (resetAll, …) are NOT part of this
  * public surface. Import them from `@scalpai/db/testing` instead.

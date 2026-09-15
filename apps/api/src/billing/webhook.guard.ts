@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { CanActivate, ExecutionContext, Injectable, SetMetadata, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { DbService, findActiveProvider } from "@scalpai/db";
 import type { FastifyRequest } from "fastify";
+import { TenantScope } from "../tenancy/tenant.scope.js";
 
 const WEBHOOK_PROVIDER = "webhook-provider";
 export const WebhookSignature = (provider: string): MethodDecorator & ClassDecorator => SetMetadata(WEBHOOK_PROVIDER, provider);
@@ -17,12 +19,24 @@ const PROVIDER_SIGNATURE_HEADERS: Readonly<Record<string, string>> = {
   zarinpal: "x-zarinpal-signature",
 };
 
+/**
+ * شناسه سیستمی برای درخواست‌های وبهوک.
+ *
+ * وبهوک کاربر واقعی ندارد (Public route است)، ولی TenantScope نیاز به
+ * userId دارد. از یک UUID ثابت استفاده می‌شود تا در audit log قابل
+ * شناسایی باشد.
+ */
+const WEBHOOK_SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 /** Verifies provider HMAC signatures before any webhook payload reaches business logic. */
 @Injectable()
 export class WebhookGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly db: DbService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const provider = this.reflector.getAllAndOverride<string | undefined>(WEBHOOK_PROVIDER, [
       context.getHandler(),
       context.getClass(),
@@ -41,6 +55,23 @@ export class WebhookGuard implements CanActivate {
     if (!secret || typeof supplied !== "string" || !rawBody || !verifySignature(rawBody, supplied, secret)) {
       throw new UnauthorizedException("Invalid webhook signature");
     }
+
+    // B1: tenant context binding — lookup provider → clinicId
+    const record = await this.db.withClient((tx) =>
+      findActiveProvider(tx, provider),
+    );
+    if (!record) {
+      throw new UnauthorizedException("Webhook provider not registered");
+    }
+
+    // Pin clinicId onto the AsyncLocalStorage store so downstream
+    // TenantScope.tx() / requireCtx() can access it.
+    TenantScope.enter({
+      clinicId: record.clinicId,
+      userId: WEBHOOK_SYSTEM_USER_ID,
+      role: "system",
+    });
+
     return true;
   }
 }

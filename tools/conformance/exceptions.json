@@ -84,6 +84,20 @@
     "adr": "ADR-0003",
     "reason": "billing repo imports TenantScope to open clinic-scoped transactions; the repo is the only place that opens tx in this module (ADR-0046)",
     "since": "2026-09-15"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "apps/api/src/billing/webhook.guard.ts",
+    "adr": "ADR-0003",
+    "reason": "webhook guard imports findActiveProvider from @scalpai/db to lookup provider→clinic binding before tenant context is set; this is the B1 fix (ADR-0046)",
+    "since": "2026-09-16"
+  },
+  {
+    "rule": "tenant-safety",
+    "file": "packages/db/sql/0019__webhook_providers.sql:webhook_providers",
+    "adr": "ADR-0028",
+    "reason": "webhook_providers is a platform registry (provider→clinic binding) without RLS; WebhookGuard must query it BEFORE tenant context is set",
+    "since": "2026-09-16"
   }
 ]
 }

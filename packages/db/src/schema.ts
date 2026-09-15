@@ -601,3 +601,29 @@ export const invoiceItems = pgTable("invoice_items", {
     .on(t.invoiceId, t.position)
     .where(sql`deleted_at IS NULL`),
 ]);
+
+/**
+ * webhook_providers — ارائه‌دهندگان وبهوک را به کلینیک متصل می‌کند.
+ *
+ * B1: مسیرهای وبهوک @Public() هستند و JwtAccessGuard رد می‌شود. این جدول
+ * به WebhookGuard اجازه می‌دهد بعد از تأیید HMAC، clinicId را پیدا کند
+ * و از طریق TenantScope.enter() context را روی store بنویسد.
+ *
+ * provider + clinic_id یکتایی دارند. provider_active_uq روی active=true
+ * برای lookup سریع در WebhookGuard ایجاد شده.
+ */
+export const webhookProviders = pgTable("webhook_providers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull(),
+  clinicId: uuid("clinic_id").notNull().references(() => clinics.id),
+  webhookSecret: text("webhook_secret").notNull(),
+  signatureHeader: text("signature_header").notNull().default("x-webhook-signature"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("webhook_providers_provider_clinic_uq").on(t.provider, t.clinicId),
+  uniqueIndex("webhook_providers_provider_active_uq")
+    .on(t.provider)
+    .where(sql`active = true`),
+]);
