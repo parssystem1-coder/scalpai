@@ -52,8 +52,11 @@ export {
   INBOX_PREVIEW_MAX,
   RECIPIENT_MASK_VISIBLE,
   assertVarsRedacted,
+  containsSensitivePhone,
+  containsLongNumericIdentifier,
   previewBody,
   redactRecipient,
   redactVars,
+  scrubNotificationText,
   type VarValue,
 } from "./redact.js";
