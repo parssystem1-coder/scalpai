@@ -17,7 +17,7 @@ import { Pool, type PoolClient } from "pg";
  * (`settings->>'seed5a'`) rather than bumping the v1 one. Two reasons, both
  * practical:
  *
- *   1. Bumping v1 would re-run the block above on an existing database and die
+ *   1. Bumping v1 would re-run the block below on an existing database and die
  *      on the clinics primary key — the ids are deterministic.
  *   2. A dev database seeded before this phase would otherwise never get the new
  *      fixtures, which is exactly the situation where somebody concludes the
@@ -73,6 +73,13 @@ async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean
   );
   const patientId = patient.rows[0]?.id;
 
+  const steps = [
+    { offsetHours: 24, channel: "kavenegar", templateKey: "aftercare.day1" },
+    { offsetHours: 72, channel: "kavenegar", templateKey: "aftercare.day3" },
+    { offsetHours: 336, channel: "kavenegar", templateKey: "aftercare.week2" },
+    { offsetHours: 720, channel: "kavenegar", templateKey: "aftercare.month1" },
+  ];
+
   try {
     await client.query("BEGIN");
 
@@ -81,23 +88,23 @@ async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean
     const packageId = randomUUID();
     await client.query(
       `INSERT INTO products (id, clinic_id, sku, name, kind, unit, price, tax_rate) VALUES
-       ($1, $3, 'SHMP-500', 'شامپوی تخصصی ۵۰۰ میلی',   'goods',   'bottle', '1850000', 9),
-       ($2, $3, 'PRP-PKG-4', 'بسته ۴ جلسه‌ای PRP',      'package', 'package','16000000', 0)`,
-      [shampooId, packageId, clinicA],
+       ($1, $3, 'SHMP-500',  $5, 'goods',   'bottle',  '1850000', 9),
+       ($2, $3, 'PRP-PKG-4', $4, 'package', 'package', '16000000', 0)`,
+      [shampooId, packageId, clinicA, "بسته ۴ جلسه‌ای PRP", "شامپوی تخصصی ۵۰۰ میلی"],
     );
 
     // ۲) یک دنباله پیگیری واقعی — روز ۱، روز ۳، هفته ۲، ماه ۱
-    const steps = [
-      { offsetHours: 24, channel: "kavenegar", templateKey: "aftercare.day1" },
-      { offsetHours: 72, channel: "kavenegar", templateKey: "aftercare.day3" },
-      { offsetHours: 336, channel: "kavenegar", templateKey: "aftercare.week2" },
-      { offsetHours: 720, channel: "kavenegar", templateKey: "aftercare.month1" },
-    ];
     const sequenceId = randomUUID();
     await client.query(
       `INSERT INTO aftercare_sequences (id, clinic_id, name, description, trigger, locale, steps, active)
-       VALUES ($1, $2, 'پیگیری پس از PRP', 'چهار پیام در یک ماه پس از جلسه', 'manual', 'fa', $3::jsonb, true)`,
-      [sequenceId, clinicA, JSON.stringify(steps)],
+       VALUES ($1, $2, $4, $5, 'manual', 'fa', $3::jsonb, true)`,
+      [
+        sequenceId,
+        clinicA,
+        JSON.stringify(steps),
+        "پیگیری پس از PRP",
+        "چهار پیام در یک ماه پس از جلسه",
+      ],
     );
 
     // ۳) یک ثبت‌نام که گام اولش همین الان سررسید است
@@ -128,9 +135,16 @@ async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean
           `INSERT INTO invoice_items
              (clinic_id, invoice_id, product_id, description, quantity, unit_price, tax_rate, position)
            VALUES
-             ($1, $2, $3, 'بسته ۴ جلسه‌ای PRP',        1,  '16000000', 0, 0),
-             ($1, $2, $4, 'شامپوی تخصصی ۵۰۰ میلی', 2,  '1850000',  9, 1)`,
-          [clinicA, invoiceId, packageId, shampooId],
+             ($1, $2, $3, $5, 1, '16000000', 0, 0),
+             ($1, $2, $4, $6, 2, '1850000',  9, 1)`,
+          [
+            clinicA,
+            invoiceId,
+            packageId,
+            shampooId,
+            "بسته ۴ جلسه‌ای PRP",
+            "شامپوی تخصصی ۵۰۰ میلی",
+          ],
         );
         await client.query("SELECT fn_invoice_recalc($1::uuid, $2::uuid)", [clinicA, invoiceId]);
       }
@@ -188,9 +202,9 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
 
       await client.query(
         `INSERT INTO clinics (id, name, settings) VALUES
-         ($1, 'کلینیک دمو الف', '{"seed":"v1"}'),
-         ($2, 'کلینیک دمو ب",   '{"seed":"other"}')`.replace('ب"', 'ب\''),
-        [clinicA, clinicB],
+         ($1, $3, '{"seed":"v1"}'),
+         ($2, $4, '{"seed":"other"}')`,
+        [clinicA, clinicB, "کلینیک دمو الف", "کلینیک دمو ب"],
       );
       await client.query(
         `INSERT INTO entitlements (clinic_id, plan_code, current_period_end)
@@ -216,20 +230,20 @@ export async function seed(config: string | import("pg").PoolConfig): Promise<Se
       const serviceB = randomUUID();
       await client.query(
         `INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES
-         ($1, $3, 'مشاوره تریکولوژی', 30, '800000'),
-         ($2, $3, 'جلسه PRP',         60, '4500000')`,
-        [serviceA, serviceB, clinicA],
+         ($1, $3, $4, 30, '800000'),
+         ($2, $3, $5, 60, '4500000')`,
+        [serviceA, serviceB, clinicA, "مشاوره تریکولوژی", "جلسه PRP"],
       );
-      await client.query(`INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES ($1, $2, 'مشاوره', 30, '500000')`, [
-        randomUUID(),
-        clinicB,
-      ]);
+      await client.query(
+        `INSERT INTO services (id, clinic_id, name, duration_min, price) VALUES ($1, $2, $3, 30, '500000')`,
+        [randomUUID(), clinicB, "مشاوره"],
+      );
 
       await client.query(
         `INSERT INTO patients (id, clinic_id, first_name, last_name, phone) VALUES
-         ($1, $3, 'زهرا', 'محمدی',  '09121234567'),
-         ($2, $3, 'علی',  'رضایی',  '09359876543')`,
-        [randomUUID(), randomUUID(), clinicA],
+         ($1, $3, $4, $5, '09121234567'),
+         ($2, $3, $6, $7, '09359876543')`,
+        [randomUUID(), randomUUID(), clinicA, "زهرا", "محمدی", "علی", "رضایی"],
       );
 
       await client.query("COMMIT");
