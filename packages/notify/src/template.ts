@@ -26,6 +26,7 @@ function isForbiddenVarName(name: string): boolean {
  * وقتی متغیر لینکِ منقضی‌شدنی اضافه شد، همان‌جا یک allow-list صریح کنارش بگذارید
  * — قاعده‌ی لینک را شل نکنید.
  */
+// eslint-disable-next-line no-control-regex -- intentionally matching control chars to reject them
 const CONTROL_CHARS = /[-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const EMAIL_LIKE = /[^\s@]+@[^\s@]+\.[^\s@]{2,}/;
 const LINK_LIKE = /(https?:\/\/|www\.)/i;
