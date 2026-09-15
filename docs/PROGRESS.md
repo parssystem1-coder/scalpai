@@ -77,13 +77,15 @@
 - [x] پوسته Electron نازک: درایورهای ارتباط با سخت‌افزارهای تریکوسکوپی UVC و لایه کش محلی در `apps/desktop`
 - [x] Router وب + i18n کامل PatientsPage (W18/W19)
 
-## فاز 5 — رشد تجاری (Aftercare-first) — در اولویت اقدام بعدی
-- [ ] Aftercare Engine (توالی JSON) + Messaging Gateway adapter (SMS/Bale/Eitaa ← Telegram ← WhatsApp) + ماتریس کانال‌های ایران
-- [ ] یادآور no-show + inbound inbox
-- [ ] فاکتور/POS پایه (invoice_items رابطه‌ای) + درگاه ایرانی adapter
-- [ ] Metering کامل usage_counters
-- [ ] Patient Portal PWA: OTP auth + رزرو آنلاین + فرم پیش‌ازمراجعه (بعد از بازخورد واقعی Aftercare)
-- [ ] Before/After نمای بیمار
+## فاز 5 — رشد تجاری (Aftercare-first) — ✅ Phase 5a Done (PR #73 merged)
+> Gate: ✅ Phase 5a PASS (PR #73 — all CI checks green)
+- [x] Aftercare Engine: sequences + enrollments + delivery worker (packages/db + apps/api)
+- [x] Messaging Gateway: 5 stub adapters (Kavenegar/Bale/Eitaa/Telegram/WhatsApp) + channel router (packages/notify)
+- [x] Billing: products, invoices, invoice_items, payment with state machines
+- [x] Metering: usage_counters + MeteringService
+- [x] Phase 5a seed data (1 sequence, 2 products, 1 enrollment, 1 draft invoice)
+- [x] Conformance exceptions updated (6 architecture-call-sites)
+- [x] 120+ unit tests (aftercare, billing, messaging, metering, scheduler repos)
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
