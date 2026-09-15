@@ -10,9 +10,9 @@
 --              backfill. چیزی برای backfill نیست چون جدول‌ها تازه‌اند، اما شمارنده
 --              متر کردن messages_sent برای کلینیک‌های موجود باز می‌شود تا اولین
 --              پیام با یک ردیف نیم‌ساخته روبه‌رو نشود.
---   CONTRACT — VALIDATE کردن قیدهای NOT VALID و بستن مرزهای دسترسی. اینجا هیچ
---              DROP ی نیست: contract واقعی (حذف ستون‌های قدیمی) در این فاز
---              موضوعی ندارد و ساختن یک گام تشریفاتی، گام را بی‌معنا می‌کند.
+--   CONTRACT — بستن مرزهای دسترسی. اینجا هیچ DROP ی نیست: contract واقعی (حذف
+--              ستون‌های قدیمی) در این فاز موضوعی ندارد و ساختن یک گام
+--              تشریفاتی، گام را بی‌معنا می‌کند.
 --
 -- سه قاعده‌ای که در تمام فایل رعایت شده و دلیلشان:
 --
@@ -30,6 +30,10 @@
 --   ۳) soft-delete روی products / invoices / invoice_items، و هر یکتایی روی آن‌ها
 --      partial است: `WHERE deleted_at IS NULL`. یکتایی کامل روی sku یا شماره
 --      صورتحساب یعنی یک ردیف حذف‌شده تا ابد نام خودش را گرو می‌گیرد.
+--
+-- نکته درباره regex ها: همه‌جا `[.]` نوشته شده نه `\.` — با standard_conforming_strings
+-- روشن (پیش‌فرض)، backslash درون رشته تک‌کوتیشن خودِ backslash است و escape نیست؛
+-- 0014 هم برای همین از همین روش استفاده کرد.
 --
 -- Rollback (فایل اجراییِ همین محتوا: packages/db/sql/rollback/0017__phase5a_aftercare_billing.down.sql):
 --   DROP TRIGGER IF EXISTS trg_invoice_items_recalc ON invoice_items;
@@ -50,7 +54,7 @@
 --   DROP TABLE IF EXISTS message_log;
 --   DROP TABLE IF EXISTS aftercare_enrollments;
 --   DROP TABLE IF EXISTS aftercare_sequences;
---   DELETE FROM usage_counters WHERE metric IN ('messages_sent', 'upload_mb');
+--   DELETE FROM usage_counters WHERE metric IN ('messages_sent', 'upload_mb') AND value = 0;
 
 -- ============================================================
 -- EXPAND 1) aftercare_sequences — قالبِ یک دنباله پیگیری
@@ -159,7 +163,7 @@ CREATE TABLE IF NOT EXISTS aftercare_enrollments (
 );
 
 COMMENT ON TABLE aftercare_enrollments IS
-  'One patient inside one sequence. steps_snapshot freezes the plan at enrollment time and next_run_at is the ONLY queue input — the worker never recomputes a due time from its own clock (that is how a redeploy used to resend day-3 to everyone).';
+  'One patient inside one sequence. steps_snapshot freezes the plan at enrollment time and next_run_at is the ONLY queue input — the worker never recomputes a due time from its own clock.';
 
 -- همان بیمار دو بار در یک دنباله فعال نباشد؛ ولی بعد از اتمام، ثبت‌نام مجدد آزاد است
 CREATE UNIQUE INDEX IF NOT EXISTS aftercare_enrollments_active_uq
@@ -241,7 +245,7 @@ CREATE TABLE IF NOT EXISTS message_log (
 );
 
 COMMENT ON TABLE message_log IS
-  'Outbound message ledger. Deliberately holds NO phone number and NO message body: recipient_hash + body_sha256 answer every audit question ("did we send it, to whom, what exactly") while making the table useless as a contact export. §13.';
+  'Outbound message ledger. Deliberately holds NO phone number and NO message body: recipient_hash + body_sha256 answer every audit question (did we send it, to whom, what exactly) while making the table useless as a contact export. §13.';
 
 CREATE UNIQUE INDEX IF NOT EXISTS message_log_idempotency_uq
   ON message_log (clinic_id, idempotency_key);
@@ -296,15 +300,17 @@ CREATE TABLE IF NOT EXISTS inbound_messages (
   received_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  -- ستون encrypted باید واقعاً ciphertext باشد (همان قید 0012)
+  -- ستون encrypted باید واقعاً ciphertext باشد (همان قید 0012).
+  -- [.] و نه \. — با standard_conforming_strings روشن، backslash در رشته
+  -- خودِ backslash است و regex را می‌شکند.
   CONSTRAINT inbound_messages_body_envelope_chk CHECK (
     body_encrypted IS NULL
-    OR body_encrypted ~ '^phi\\.v1\\.[a-z0-9][a-z0-9._-]{1,31}\\.[A-Za-z0-9_-]{16}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{22}$'
+    OR body_encrypted ~ '^phi[.]v1[.][a-z0-9][a-z0-9._-]{1,31}[.][A-Za-z0-9_-]{16}[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]{22}$'
   ),
   CONSTRAINT inbound_messages_key_pairing_chk
     CHECK ((body_encrypted IS NULL) = (body_key_id IS NULL)),
   CONSTRAINT inbound_messages_handled_chk
-    CHECK (state IN ('new') OR handled_at IS NOT NULL OR state = 'archived')
+    CHECK (state = 'new' OR state = 'archived' OR handled_at IS NOT NULL)
 );
 
 COMMENT ON TABLE inbound_messages IS
@@ -382,10 +388,10 @@ CREATE TRIGGER trg_products_updated_at
 -- ============================================================
 -- EXPAND 6) invoices
 -- ============================================================
--- مبالغ روی خودِ صورتحساب ذخیره می‌شوند، اما با تریگر از سطرها بازمحاسبه
--- می‌شوند (بخش MIGRATE). دلیل: یک صورتحساب صادرشده باید بعد از تغییر قیمت
--- کاتالوگ همان مبلغ را نشان دهد، و در همان حال جمعِ سطرها هیچ‌وقت با total
--- اختلاف پیدا نکند.
+-- مبالغ روی خودِ صورتحساب ذخیره می‌شوند، اما با fn_invoice_recalc از سطرها
+-- بازمحاسبه می‌شوند (بخش MIGRATE). دلیل: یک صورتحساب صادرشده باید بعد از
+-- تغییر قیمت کاتالوگ همان مبلغ را نشان دهد، و در عین حال جمعِ سطرها هیچ‌وقت
+-- با total اختلاف پیدا نکند.
 
 CREATE TABLE IF NOT EXISTS invoices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -495,13 +501,15 @@ CREATE POLICY invoice_items_clinic_isolation ON invoice_items FOR ALL TO scalpai
 
 CREATE OR REPLACE FUNCTION fn_invoice_next_number(p_clinic uuid) RETURNS text AS $$
 DECLARE
+  v_tz text;
   v_year text;
   v_seq integer;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM clinics WHERE id = p_clinic) THEN
+  SELECT timezone INTO v_tz FROM clinics WHERE id = p_clinic;
+  IF v_tz IS NULL THEN
     RAISE EXCEPTION 'clinic % is not visible in this transaction', p_clinic USING ERRCODE = '42501';
   END IF;
-  v_year := to_char(now() AT TIME ZONE (SELECT timezone FROM clinics WHERE id = p_clinic), 'YYYY');
+  v_year := to_char(now() AT TIME ZONE v_tz, 'YYYY');
   -- قفل تا COMMIT نگه داشته می‌شود؛ همان چیزی که دو ثبت همزمان را سری می‌کند
   PERFORM pg_advisory_xact_lock(hashtextextended(p_clinic::text || ':invoice:' || v_year, 0));
   SELECT COALESCE(MAX(split_part(number, '-', 2)::integer), 0) + 1
@@ -559,18 +567,12 @@ COMMENT ON FUNCTION fn_invoice_recalc(uuid, uuid) IS
 
 CREATE OR REPLACE FUNCTION fn_invoice_items_recalc() RETURNS trigger AS $$
 DECLARE
-  v_row invoice_items;
+  v_gross numeric(12, 0);
 BEGIN
-  v_row := COALESCE(NEW, OLD);
-  IF TG_OP <> 'DELETE' THEN
-    -- line_total ادعای کلاینت نیست، تابع مقدار و قیمت است
-    NEW.line_total := GREATEST(
-      0,
-      round(NEW.quantity * NEW.unit_price) - NEW.discount
-        + round((round(NEW.quantity * NEW.unit_price) - NEW.discount) * NEW.tax_rate / 100)
-    );
-  END IF;
-  RETURN COALESCE(NEW, OLD);
+  -- line_total ادعای کلاینت نیست، تابع مقدار و قیمت است
+  v_gross := round(NEW.quantity * NEW.unit_price) - NEW.discount;
+  NEW.line_total := GREATEST(0, v_gross + round(v_gross * NEW.tax_rate / 100));
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -591,7 +593,7 @@ CREATE TRIGGER trg_invoice_items_recalc
 
 CREATE OR REPLACE FUNCTION fn_aftercare_claim_due(p_clinic uuid, p_limit integer)
 RETURNS TABLE (
-  id uuid,
+  enrollment_id uuid,
   sequence_id uuid,
   patient_id uuid,
   session_id uuid,
@@ -645,21 +647,13 @@ ON CONFLICT (clinic_id, metric, period_start) DO NOTHING;
 -- ============================================================
 -- CONTRACT) بستن مرزها
 -- ============================================================
--- 1) قیدهای NOT VALID نداریم، پس VALIDATE ای هم لازم نیست — و یک VALIDATE تشریفاتی
---    ننوشتیم تا کسی فکر نکند قید تاریخی‌ای وجود دارد.
---
--- 2) پیام‌ها یک دفتر شبه-audit اند: پیامِ رفته را نمی‌توان «نفرستاده» کرد. حذف
---    ردیف از نقش اپلیکیشن گرفته می‌شود. باطل کردن یک ارسال از مسیر state انجام
---    می‌شود، نه با DELETE.
+-- پیام‌ها یک دفتر شبه-audit اند: پیامِ رفته را نمی‌توان «نفرستاده» کرد، پس DELETE
+-- از نقش اپلیکیشن گرفته می‌شود. باطل کردن یک ارسال از مسیر state انجام می‌شود.
 REVOKE DELETE ON message_log FROM scalpai_app;
 REVOKE DELETE ON inbound_messages FROM scalpai_app;
 
--- 3) products / invoices / invoice_items soft-delete اند. DELETE سخت روی آن‌ها
---    یعنی گم شدن یک سند مالی، پس بسته می‌شود؛ حذف از مسیر deleted_at است.
+-- products / invoices / invoice_items soft-delete اند. DELETE سخت روی آن‌ها یعنی
+-- گم شدن یک سند مالی، پس بسته می‌شود؛ حذف از مسیر deleted_at است.
 REVOKE DELETE ON products FROM scalpai_app;
 REVOKE DELETE ON invoices FROM scalpai_app;
 REVOKE DELETE ON invoice_items FROM scalpai_app;
-
--- 4) line_total و مبالغ صورتحساب مشتق‌اند، ولی GRANT سطح ستون در PostgreSQL با
---    RLS ترکیب تمیزی ندارد؛ نگهبانشان تریگر و fn_invoice_recalc است، که در همان
---    تراکنش نوشتن اجرا می‌شوند و ادعای کلاینت را بازنویسی می‌کنند.
