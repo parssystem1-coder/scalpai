@@ -60,7 +60,6 @@ export interface PendingUpload {
   /** Gallery item id — stable across a resume, so it is the primary key. */
   key: string;
   sessionId: string;
-  patientId: string;
   fileName: string;
   fileSize: number;
   mime: string;
@@ -127,6 +126,16 @@ function openScoped(scope: OfflineScope): OfflineDb {
     })
     .upgrade(async (tx) => {
       await tx.table("pendingUploads").clear();
+    });
+  db.version(3)
+    .stores({
+      outbox: "id, createdAt, nextAttemptAt",
+      deadLetter: "id, failedAt",
+      syncState: "key",
+      pendingUploads: "key, createdAt",
+    })
+    .upgrade(async () => {
+      // patientId was removed from PendingUpload; existing rows remain usable.
     });
   return db;
 }

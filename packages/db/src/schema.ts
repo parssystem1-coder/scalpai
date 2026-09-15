@@ -621,9 +621,10 @@ export const webhookProviders = pgTable("webhook_providers", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (t) => [
   uniqueIndex("webhook_providers_provider_clinic_uq").on(t.provider, t.clinicId),
   uniqueIndex("webhook_providers_provider_active_uq")
     .on(t.provider)
-    .where(sql`active = true`),
+    .where(sql`active = true AND deleted_at IS NULL`),
 ]);

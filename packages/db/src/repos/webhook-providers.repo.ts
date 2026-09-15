@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { webhookProviders } from "../schema.js";
 import type { Tx } from "../tenant.js";
 
@@ -26,6 +26,7 @@ const providerColumns = {
   active: webhookProviders.active,
   createdAt: webhookProviders.createdAt,
   updatedAt: webhookProviders.updatedAt,
+  deletedAt: webhookProviders.deletedAt,
 } as const;
 
 /**
@@ -41,11 +42,12 @@ export async function findActiveProvider(tx: Tx, provider: string): Promise<{
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
 } | undefined> {
   const rows = await tx
     .select(providerColumns)
     .from(webhookProviders)
-    .where(eq(webhookProviders.provider, provider.trim().toLowerCase()))
+    .where(and(eq(webhookProviders.provider, provider.trim().toLowerCase()), isNull(webhookProviders.deletedAt)))
     .limit(1);
   const row = rows[0];
   if (!row || !row.active) return undefined;
@@ -69,13 +71,17 @@ export async function findActiveProviderForClinic(
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
 } | undefined> {
   const rows = await tx
     .select(providerColumns)
     .from(webhookProviders)
     .where(
-      eq(webhookProviders.provider, provider.trim().toLowerCase()) &&
+      and(
+        eq(webhookProviders.provider, provider.trim().toLowerCase()),
         eq(webhookProviders.clinicId, clinicId),
+        isNull(webhookProviders.deletedAt),
+      ),
     )
     .limit(1);
   const row = rows[0];
