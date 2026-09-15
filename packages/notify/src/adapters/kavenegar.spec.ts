@@ -29,6 +29,16 @@ describe("KavenegarAdapter", () => {
     await expect(new KavenegarAdapter(http).send(message, env)).resolves.toMatchObject({ reason: "rate-limited", retryable: true });
   });
 
+  it("trusts the HTTP status over a contradictory provider body", async () => {
+    const http = { post: vi.fn().mockResolvedValue({ status: 500, ok: false, json: async () => ({ return: { status: 200 }, entries: [{ messageid: 42 }] }) }) } as HttpClientPort;
+    await expect(new KavenegarAdapter(http).send(message, env)).resolves.toMatchObject({ outcome: "rejected", reason: "provider-error", retryable: true });
+  });
+
+  it("does not accept a 502 gateway page that carries no provider body", async () => {
+    const http = { post: vi.fn().mockResolvedValue({ status: 502, ok: false, json: async () => ({}) }) } as HttpClientPort;
+    await expect(new KavenegarAdapter(http).send(message, env)).resolves.toMatchObject({ outcome: "rejected", reason: "provider-error", retryable: true });
+  });
+
   it("rejects malformed provider responses without exposing provider text", async () => {
     const http = { post: vi.fn().mockResolvedValue({ status: 200, ok: true, json: async () => ({}) }) } as HttpClientPort;
     await expect(new KavenegarAdapter(http).send(message, env)).resolves.toMatchObject({ reason: "invalid-provider-response", retryable: true });

@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "../api/client.js";
 import { MessageCard, type InboxMessage } from "../components/inbox/MessageCard.js";
-import { MessageThread } from "../components/inbox/MessageThread.js";
+import { MessageThread, type BodyStatus } from "../components/inbox/MessageThread.js";
+import "./inbox.i18n.js";
 
 interface InboxResponse { items?: InboxMessage[]; data?: InboxMessage[]; }
+
+const PAGE_SIZE = 20;
 
 /** Clinic-facing inbound inbox. PHI body is fetched separately from the redacted list. */
 export const InboxPage: React.FC = () => {
@@ -12,6 +15,7 @@ export const InboxPage: React.FC = () => {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
+  const [bodyStatus, setBodyStatus] = useState<BodyStatus>("idle");
   const [query, setQuery] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -19,44 +23,58 @@ export const InboxPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // فقط جدیدترین درخواستِ متن اجازه نوشتن در state را دارد: انتخاب A و بعد B
+  // نباید پاسخ کندترِ A را زیر هدر B نشان بدهد.
+  const bodyRequestId = useRef(0);
 
-  const load = useCallback(async (nextOffset: number) => {
-    setLoading(true);
-    try {
-      const result = await apiFetch<InboxResponse>(
-        `/aftercare/inbox?limit=20&offset=${nextOffset}`,
-      );
-      const incoming = result.items ?? result.data ?? [];
-      setMessages((current) =>
-        nextOffset === 0 ? incoming : [...current, ...incoming],
-      );
-      setHasMore(incoming.length === 20);
-      setOffset(nextOffset);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (nextOffset: number) => {
+      setLoading(true);
+      try {
+        const result = await apiFetch<InboxResponse>(
+          `/aftercare/inbox?limit=${PAGE_SIZE}&offset=${nextOffset}`,
+        );
+        const incoming = result.items ?? result.data ?? [];
+        setMessages((current) =>
+          nextOffset === 0 ? incoming : [...current, ...incoming],
+        );
+        setHasMore(incoming.length === PAGE_SIZE);
+        setOffset(nextOffset);
+      } catch {
+        // خطای خام ممکن است متن پروایدر یا PHI داشته باشد: نه لاگ می‌شود نه
+        // نمایش داده می‌شود. قبلاً این promise بدون catch رد می‌شد و کاربر
+        // «پیامی پیدا نشد» می‌دید، یعنی خطا شبیه صندوق خالی بود.
+        setError(t("inbox.loadFailed"));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     void load(0);
   }, [load]);
 
-  const select = useCallback(
-    async (id: string) => {
-      setSelectedId(id);
+  const select = useCallback(async (id: string) => {
+    const requestId = bodyRequestId.current + 1;
+    bodyRequestId.current = requestId;
+    setSelectedId(id);
+    setBody(null);
+    setBodyStatus("loading");
+    try {
+      const result = await apiFetch<{ body?: string }>(
+        `/aftercare/inbox/${id}/body`,
+      );
+      if (requestId !== bodyRequestId.current) return;
+      setBody(result.body ?? null);
+      setBodyStatus("loaded");
+    } catch {
+      if (requestId !== bodyRequestId.current) return;
       setBody(null);
-      try {
-        const result = await apiFetch<{ body?: string }>(
-          `/aftercare/inbox/${id}/body`,
-        );
-        setBody(result.body ?? null);
-      } catch (err) {
-        console.error("Failed to load message body:", err);
-        setBody(null); // Show redacted on error
-      }
-    },
-    [],
-  );
+      setBodyStatus("error");
+    }
+  }, []);
 
   const selected = messages.find((item) => item.id === selectedId) ?? null;
   const filtered = useMemo(
@@ -71,6 +89,9 @@ export const InboxPage: React.FC = () => {
 
   const sendReply = async () => {
     if (!selected || !reply.trim()) return;
+    // بازگردانی باید به حالت قبلی برگردد، نه به "new": یک پیام خوانده‌شده که
+    // ارسال پاسخش شکست خورده، دوباره خوانده‌نشده نمی‌شود.
+    const previousState = selected.state;
     setSending(true);
     setError(null);
 
@@ -82,20 +103,24 @@ export const InboxPage: React.FC = () => {
     );
 
     try {
+      // TODO(phase-5b): این درخواست فقط حالت پیام را عوض می‌کند و متن `reply`
+      // را هیچ‌جا نمی‌فرستد — قرارداد InboundMessageUpdate فقط {state,intent}
+      // را می‌پذیرد و endpoint ارسال پاسخ وجود ندارد. تا روشن شدن قرارداد،
+      // این دکمه «ثبت پاسخ» است نه «ارسال پیام».
+      // docs/reviews/PHASE-5AB-REVIEW.md — پرسش باز ۱.
       await apiFetch(`/aftercare/inbox/${selected.id}`, {
         method: "PATCH",
         body: JSON.stringify({ state: "replied" }),
       });
       setReply(""); // Clear reply field on success
-    } catch (err) {
+    } catch {
       // Rollback on error
       setMessages((current) =>
         current.map((msg) =>
-          msg.id === selected.id ? { ...msg, state: "new" } : msg,
+          msg.id === selected.id ? { ...msg, state: previousState } : msg,
         ),
       );
-      console.error("Failed to send reply:", err);
-      setError(t("inbox.replyFailed") || "Failed to send reply");
+      setError(t("inbox.replyFailed"));
     } finally {
       setSending(false);
     }
@@ -129,7 +154,7 @@ export const InboxPage: React.FC = () => {
             className="max-h-[70vh] overflow-y-auto"
             aria-label={t("inbox.conversations")}
           >
-            {filtered.length === 0 && !loading && (
+            {filtered.length === 0 && !loading && !error && (
               <p className="p-8 text-center text-sm opacity-60">
                 {t("inbox.noMessages")}
               </p>
@@ -145,7 +170,7 @@ export const InboxPage: React.FC = () => {
             {hasMore && (
               <button
                 type="button"
-                onClick={() => void load(offset + 20)}
+                onClick={() => void load(offset + PAGE_SIZE)}
                 disabled={loading}
                 className="w-full p-4 text-sm font-bold"
               >
@@ -156,23 +181,36 @@ export const InboxPage: React.FC = () => {
 
           <div className="flex flex-col">
             {error && (
-              <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <div className="flex items-center justify-between">
+              <div
+                role="alert"
+                className="m-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              >
+                <div className="flex items-center justify-between gap-3">
                   <span>{error}</span>
-                  <button
-                    type="button"
-                    onClick={() => setError(null)}
-                    className="text-red-500 hover:text-red-700"
-                    aria-label={t("inbox.dismissError") || "Dismiss"}
-                  >
-                    ✕
-                  </button>
+                  <span className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void load(0)}
+                      className="font-bold text-red-700 underline"
+                    >
+                      {t("inbox.retry")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setError(null)}
+                      className="text-red-500 hover:text-red-700"
+                      aria-label={t("inbox.dismissError")}
+                    >
+                      ✕
+                    </button>
+                  </span>
                 </div>
               </div>
             )}
             <MessageThread
               message={selected}
               body={body}
+              bodyStatus={bodyStatus}
               reply={reply}
               onReplyChange={setReply}
               onReply={() => void sendReply()}

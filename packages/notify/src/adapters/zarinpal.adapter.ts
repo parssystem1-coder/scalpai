@@ -15,6 +15,19 @@ function timeoutMs(env: Record<string, string | undefined>): number {
   return Number.isFinite(value) && value >= 1_000 && value <= 60_000 ? Math.floor(value) : DEFAULT_TIMEOUT_MS;
 }
 
+/**
+ * The gateway is charged in rials and rials have no fraction, so anything that
+ * is not a positive safe integer is a caller bug - most likely a toman amount
+ * or a float from a discount calculation. Rejecting before the request keeps a
+ * 10x mischarge from reaching the provider, where it would need a refund
+ * instead of a 400.
+ */
+function assertRialAmount(amount: number): void {
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    throw new NotifyError("payment amount must be a positive integer in rials");
+  }
+}
+
 /** Zarinpal sandbox/production adapter. Amounts are sent in rials. */
 export class ZarinpalAdapter {
   readonly requestUrl: string;
@@ -31,6 +44,7 @@ export class ZarinpalAdapter {
   }
 
   async requestPayment(invoiceId: string, amount: number, callbackUrl: string): Promise<string> {
+    assertRialAmount(amount);
     const merchant = this.env.ZARINPAL_MERCHANT_ID?.trim();
     if (!merchant) throw new NotifyError("payment provider is not configured");
     const controller = new AbortController();
@@ -55,6 +69,7 @@ export class ZarinpalAdapter {
   }
 
   async verifyPayment(authority: string, amount: number): Promise<PaymentResult> {
+    assertRialAmount(amount);
     const merchant = this.env.ZARINPAL_MERCHANT_ID?.trim();
     if (!merchant) throw new NotifyError("payment provider is not configured");
     const controller = new AbortController();
@@ -74,6 +89,7 @@ export class ZarinpalAdapter {
         reason: code === 101 ? "already-verified" : code === 100 ? undefined : "verification-failed",
       };
     } catch (error) {
+      if (error instanceof NotifyError) throw error;
       throw new NotifyError(error instanceof Error && error.name === "AbortError" ? "payment provider timeout" : "payment provider unreachable");
     } finally {
       clearTimeout(timer);
