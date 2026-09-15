@@ -1,6 +1,6 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `837373a`. **Do not hand-edit** - every row is parsed from source.
+**Generated** by `npm run graph` from commit `81c8a2d` (working tree dirty). **Do not hand-edit** - every row is parsed from source.
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 

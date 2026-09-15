@@ -29,10 +29,40 @@ export const InboxPage: React.FC = () => {
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(0); }, [load]);
-  const select = useCallback(async (id: string) => { setSelectedId(id); setBody(null); const result = await apiFetch<{ body?: string }>(`/aftercare/inbox/${id}/body`); setBody(result.body ?? null); }, []);
+  const select = useCallback(
+    async (id: string) => {
+      setSelectedId(id);
+      setBody(null);
+      try {
+        const result = await apiFetch<{ body?: string }>(
+          `/aftercare/inbox/${id}/body`,
+        );
+        setBody(result.body ?? null);
+      } catch (error) {
+        console.error("Failed to load message body:", error);
+        setBody(null); // Show redacted on error
+      }
+    },
+    [],
+  );
   const selected = messages.find((item) => item.id === selectedId) ?? null;
   const filtered = useMemo(() => messages.filter((item) => `${item.senderHash} ${item.bodyPreview ?? ""}`.toLowerCase().includes(query.toLowerCase())), [messages, query]);
-  const sendReply = async () => { if (!selected || !reply.trim()) return; setSending(true); try { await apiFetch(`/aftercare/inbox/${selected.id}`, { method: "PATCH", body: JSON.stringify({ state: "replied" }) }); setReply(""); } finally { setSending(false); } };
+  const sendReply = async () => {
+    if (!selected || !reply.trim()) return;
+    setSending(true);
+    try {
+      await apiFetch(`/aftercare/inbox/${selected.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ state: "replied" }),
+      });
+      setReply(""); // Clear reply field on success
+    } catch (error) {
+      console.error("Failed to send reply:", error);
+      alert(t("inbox.replyFailed") || "Failed to send reply");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return <main dir="rtl" className="min-h-screen bg-[oklch(85%_0.03_28)] p-4 md:p-8" aria-labelledby="inbox-title">
     <div className="mx-auto max-w-7xl"><header className="mb-6 flex flex-wrap items-center justify-between gap-4"><div><h1 id="inbox-title" className="text-2xl font-black">{t("inbox.title")}</h1><p className="mt-1 text-sm opacity-65">{t("inbox.subtitle")}</p></div><input aria-label={t("inbox.searchLabel")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("inbox.searchPlaceholder")} className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm" /></header>
