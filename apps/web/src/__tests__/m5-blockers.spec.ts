@@ -112,15 +112,16 @@ describe("M5 blocker 1.4 — stored data stays ASCII, the render layer localises
   });
 });
 
-describe("M5 blocker 1.5 — the roadmap may not claim work that does not exist", () => {
-  it("no longer ticks Phase 4", () => {
-    expect(roadmapSource).toContain("Phase 4: Extract Modal & Side Panels — **NOT STARTED**");
-    expect(roadmapSource).not.toContain("- [x] Keyboard escape to close");
-    expect(roadmapSource).not.toContain("- [x] Focus management");
+describe("M5 blocker 1.5 — the roadmap claims are backed by code", () => {
+  it("marks Phase 4 done only when modals are extracted", () => {
+    expect(roadmapSource).toContain("Phase 4: Extract Modal & Side Panels — **done (PR #69 + #70)**");
+    expect(roadmapSource).toContain("- [x] `Escape`-to-close handler on all modals (via DialogPrimitive)");
+    expect(roadmapSource).toContain("- [x] Focus trap on open and focus restore on close (via DialogPrimitive)");
   });
 
-  it("no longer claims a tablist or arrow-key navigation", () => {
+  it("does not claim tablist or arrow-key navigation (known open items)", () => {
     expect(roadmapSource).not.toContain("- [x] ARIA roles correct");
     expect(roadmapSource).not.toContain("- [x] Full keyboard navigation");
+    expect(roadmapSource).toContain("**Open:** no `role=\"tablist\"`");
   });
 });
