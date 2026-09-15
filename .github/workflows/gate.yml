@@ -1,0 +1,37 @@
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies from the committed lockfile
+        run: npm ci --legacy-peer-deps
+
+      - name: Validate repository type contracts
+        run: npm run typecheck
+
+      - name: Validate migration SQL contract
+        run: |
+          test -f packages/db/sql/0019__webhook_providers.sql
+          ! grep -q 'clinics WHERE deleted_at' packages/db/sql/0019__webhook_providers.sql
+          grep -q 'FOR clinic IN SELECT id FROM clinics' packages/db/sql/0019__webhook_providers.sql
