@@ -220,8 +220,8 @@ describe("aftercare DB functions (smoke)", () => {
     const { claimDueEnrollments } = await import("./aftercare.repo.js");
     const result = await claimDueEnrollments(tx as any, "c1", 10);
     expect(result).toHaveLength(1);
-    expect(result[0].enrollmentId).toBe("e1");
-    expect(result[0].stepsSnapshot).toHaveLength(1);
+    expect(result[0]!.enrollmentId).toBe("e1");
+    expect(result[0]!.stepsSnapshot).toHaveLength(1);
   });
 
   it("listEnrollments with patientId filter", async () => {
