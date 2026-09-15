@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { AnalysisSubmit, ExpertReview, type AnalysisSubmitDto, type ExpertReviewDto, errors } from "@scalpai/shared";
 import {
   consumeQuota,
@@ -82,6 +82,10 @@ export class AnalysesController {
   @Get()
   @Roles("owner", "trichologist", "receptionist")
   list(@Query("patientId") patientId: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(patientId)) {
+      throw new BadRequestException("patientId must be a valid UUID");
+    }
     return this.scope.tx(async (tx, ctx) => listAnalysesByPatient(tx, ctx.clinicId, patientId));
   }
 

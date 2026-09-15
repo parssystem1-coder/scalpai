@@ -91,7 +91,8 @@ export async function createUploadSession(
       createdBy: input.userId,
     })
     .returning(COLUMNS);
-  const row = rows[0]!;
+  const row = rows[0];
+  if (!row) throw new Error("Failed to open upload session: no row returned");
   await appendAudit(tx, {
     clinicId,
     userId: input.userId,

@@ -3,11 +3,18 @@ import { fetchHttpClient, type HttpClientPort } from "./http-client.port.js";
 import { readString } from "./stub-base.js";
 
 interface KavenegarResponse {
-  readonly return?: { readonly status?: number; readonly message?: string };
+  readonly return?: { readonly status?: number };
   readonly entries?: readonly { readonly messageid?: number | string }[];
 }
 
-/** Kavenegar REST adapter; provider translation is isolated and PHI is not returned in results. */
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+function timeoutMs(env: Record<string, string | undefined>): number {
+  const value = Number(env.NOTIFY_HTTP_TIMEOUT_MS);
+  return Number.isFinite(value) && value >= 1_000 && value <= 60_000 ? Math.floor(value) : DEFAULT_TIMEOUT_MS;
+}
+
+/** Kavenegar REST adapter. Provider payloads and exceptions never escape. */
 export class KavenegarAdapter implements MessagingAdapter {
   readonly channel = "kavenegar" as const;
   readonly provider = "kavenegar";
@@ -25,20 +32,42 @@ export class KavenegarAdapter implements MessagingAdapter {
     const sender = env.KAVENEGAR_SENDER?.trim();
     if (!apiKey || !sender) return { outcome: "rejected", provider: this.provider, reason: "not-configured", retryable: false };
     if (message.body.length > this.capabilities.maxBodyChars) return { outcome: "rejected", provider: this.provider, reason: "body-too-long", retryable: false };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs(env));
     try {
       const response = await this.http.post<KavenegarResponse>(
         `https://api.kavenegar.com/v1/${encodeURIComponent(apiKey)}/sms/send.json`,
-        new URLSearchParams({ receptor: message.to, message: message.body, sender }),
+        new URLSearchParams({
+          receptor: message.to,
+          message: message.body,
+          sender,
+          localid: message.idempotencyKey,
+        }),
+        controller.signal,
       );
       const payload = await response.json();
-      const status = payload.return?.status ?? response.status;
-      if (response.ok && status >= 200 && status < 300) {
+      const status = payload.return?.status;
+      if (response.ok && status === 200) {
         const providerMessageId = payload.entries?.[0]?.messageid;
-        return { outcome: "accepted", provider: this.provider, providerMessageId: providerMessageId === undefined ? undefined : String(providerMessageId), reason: "provider-accepted" };
+        return {
+          outcome: "accepted",
+          provider: this.provider,
+          providerMessageId: providerMessageId === undefined ? undefined : String(providerMessageId),
+          reason: "provider-accepted",
+        };
       }
+      if (typeof status !== "number") return { outcome: "rejected", provider: this.provider, reason: "invalid-provider-response", retryable: true };
       return { outcome: "rejected", provider: this.provider, reason: mapKavenegarError(status), retryable: status === 429 || status >= 500 };
-    } catch {
-      return { outcome: "rejected", provider: this.provider, reason: "provider-unreachable", retryable: true };
+    } catch (error) {
+      return {
+        outcome: "rejected",
+        provider: this.provider,
+        reason: error instanceof Error && error.name === "AbortError" ? "provider-timeout" : "provider-unreachable",
+        retryable: true,
+      };
+    } finally {
+      clearTimeout(timer);
     }
   }
 

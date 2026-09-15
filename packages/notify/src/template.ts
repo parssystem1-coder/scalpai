@@ -1,41 +1,24 @@
 import type { MessageLocale, MessagingChannel } from "@scalpai/shared";
+import { containsSensitivePhone } from "./redact.js";
 import { NotifyError } from "./types.js";
-
-/**
- * رندرر قالب (فاز ۵a).
- *
- * سه تصمیم که عمدی اند:
- *
- *   ۱) متغیر غایب خطاست، نه رشته خالی. پیامک «سلام ، نتیجه آماده است» به
- *      بیمار رفتن، بدتر از نرفتن است. متغیر ناشناس هم خطاست: یعنی قالب و
- *      فراخوان دو چیز متفاوت می‌فهمند.
- *
- *   ۲) هیچ منطقی در قالب نیست — نه شرط، نه حلقه، نه فراخوانی. `{{name}}` و
- *      تمام. یک قالب که قابل اجرا باشد، یک موتور template injection است.
- *
- *   ۳) متن به سقف کانال پابند است و بریدن خطاست نه بریدن خودکار: یک پیامک
- *      نیمه‌کاره درمانی بدتر از یک خطای قابل دیدن است.
- *
- * متن‌ها موقتاً در کد اند. فاز بعد قالب قابل ویرایش کلینیک می‌شود، و همین
- * رندرر می‌ماند — فقط منبع رجیستری عوض می‌شود.
- */
 
 export interface MessageTemplate {
   readonly key: string;
-  /** متن به ازای هر زبان. هر دو زبان اجباری‌اند. */
   readonly body: Readonly<Record<MessageLocale, string>>;
-  /** متغیرهای مجاز. مجموعه بسته — هرچه در متن باشد باید اینجا باشد. */
   readonly vars: readonly string[];
-  /** کانال‌هایی که این قالب رویشان معنا دارد. خالی = همه. */
   readonly channels?: readonly MessagingChannel[];
 }
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z][a-zA-Z0-9_]{0,39})\s*\}\}/g;
+function isForbiddenVarName(name: string): boolean {
+  const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return ["firstname", "lastname", "fullname", "patientname", "patient", "mobile", "phone", "email", "address", "nationalid"].includes(normalized);
+}
 
 /**
- * متغیرهای قالب عمداً بی‌نام اند: `firstName` نداریم، چون فرستادن نام بیمار
- * درون پیام یک تصمیم محصولی است نه پیش‌فرض، و هر متغیری که اینجا باشد سر
- * از message_log درمی‌آورد. قالب‌ها با «شما» و نام کلینیک کار می‌کنند.
+ * قالب‌ها عمداً ثابت و scalar-only هستند. فیلدهای هویتی بیمار حتی در قالب‌های
+ * آینده هم ممنوع‌اند، و مقداری که شکل شماره‌ی ایرانی دارد رد می‌شود نه اینکه
+ * ارسال یا ذخیره شود.
  */
 export const MESSAGE_TEMPLATES: Readonly<Record<string, MessageTemplate>> = {
   "aftercare.day1": {
@@ -67,7 +50,7 @@ export const MESSAGE_TEMPLATES: Readonly<Record<string, MessageTemplate>> = {
     vars: ["clinicName"],
     body: {
       fa: "یک ماه از شروع درمان گذشت. تغییرات معمولاً از این مرحله قابل اندازه‌گیری می‌شوند. — {{clinicName}}",
-      en: "One month into treatment. Changes usually become measurable from this point on. — {{clinicName}}",
+      en: "One month into treatment. Changes usually become measurable from this point. — {{clinicName}}",
     },
   },
   "session.reminder": {
@@ -80,18 +63,18 @@ export const MESSAGE_TEMPLATES: Readonly<Record<string, MessageTemplate>> = {
   },
   "invoice.issued": {
     key: "invoice.issued",
-    vars: ["clinicName", "invoiceNumber", "amount"],
+    vars: ["clinicName"],
     body: {
-      fa: "صورتحساب {{invoiceNumber}} به مبلغ {{amount}} ریال صادر شد. — {{clinicName}}",
-      en: "Invoice {{invoiceNumber}} for {{amount}} IRR has been issued. — {{clinicName}}",
+      fa: "صورتحساب شما آماده است. جزئیات در حساب کاربری شما در دسترس است. — {{clinicName}}",
+      en: "Your invoice is ready. Details are available in your account. — {{clinicName}}",
     },
   },
   "invoice.paid": {
     key: "invoice.paid",
-    vars: ["clinicName", "invoiceNumber"],
+    vars: ["clinicName"],
     body: {
-      fa: "پرداخت صورتحساب {{invoiceNumber}} ثبت شد. متشکریم. — {{clinicName}}",
-      en: "Payment for invoice {{invoiceNumber}} has been recorded. Thank you. — {{clinicName}}",
+      fa: "پرداخت شما ثبت شد. جزئیات در حساب کاربری شما در دسترس است. — {{clinicName}}",
+      en: "Your payment has been recorded. Details are available in your account. — {{clinicName}}",
     },
   },
 };
@@ -109,7 +92,6 @@ export function getTemplate(key: string): MessageTemplate {
 export interface RenderOptions {
   readonly locale: MessageLocale;
   readonly channel: MessagingChannel;
-  /** سقف طول متن کانال (از capabilities). */
   readonly maxChars: number;
 }
 
@@ -120,29 +102,25 @@ export interface RenderedMessage {
   readonly locale: MessageLocale;
 }
 
-/**
- * جایگزینی متغیرها. مقدار به رشته تبدیل می‌شود و هیچ تفسیری روی متنِ
- * جایگزین‌شده انجام نمی‌شود — مقداری که خودش `{{x}}` باشد دوباره رندر نمی‌شود
- * (این همان جایی است که رندررها به injection تبدیل می‌شوند).
- */
 export function renderTemplate(
   key: string,
   vars: Readonly<Record<string, string | number | boolean>>,
   options: RenderOptions,
 ): RenderedMessage {
   const template = getTemplate(key);
-
   if (template.channels && !template.channels.includes(options.channel)) {
     throw new NotifyError(`template '${key}' is not available on channel '${options.channel}'`);
   }
-
   const source = template.body[options.locale];
   if (!source) throw new NotifyError(`template '${key}' has no '${options.locale}' body`);
 
   const allowed = new Set(template.vars);
   for (const name of Object.keys(vars)) {
-    if (!allowed.has(name)) {
-      throw new NotifyError(`template '${key}' does not declare a variable named '${name}'`);
+    if (!allowed.has(name)) throw new NotifyError(`template '${key}' does not declare a variable named '${name}'`);
+    if (isForbiddenVarName(name)) throw new NotifyError(`template '${key}' cannot interpolate patient identity data`);
+    const value = vars[name];
+    if (typeof value === "string" && containsSensitivePhone(value)) {
+      throw new NotifyError(`template '${key}' contains a phone number in variable '${name}'`);
     }
   }
 
@@ -155,19 +133,12 @@ export function renderTemplate(
     }
     return String(value);
   });
-
-  if (missing.length > 0) {
-    // رشته خالی نمی‌دهیم: پیامک با جای خالی به بیمار رفتن، بدتر از نرفتن است
-    throw new NotifyError(`template '${key}' is missing variables: ${[...new Set(missing)].sort().join(", ")}`);
-  }
+  if (missing.length > 0) throw new NotifyError(`template '${key}' is missing variables: ${[...new Set(missing)].sort().join(", ")}`);
 
   const trimmed = body.trim();
   if (trimmed.length === 0) throw new NotifyError(`template '${key}' rendered to an empty message`);
   if (trimmed.length > options.maxChars) {
-    throw new NotifyError(
-      `template '${key}' rendered ${trimmed.length} chars, over the ${options.channel} limit of ${options.maxChars}`,
-    );
+    throw new NotifyError(`template '${key}' rendered ${trimmed.length} chars, over the ${options.channel} limit of ${options.maxChars}`);
   }
-
   return { body: trimmed, chars: trimmed.length, templateKey: key, locale: options.locale };
 }

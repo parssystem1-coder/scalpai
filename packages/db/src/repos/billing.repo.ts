@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { invoiceItems, invoices, products } from "../schema.js";
 import type { Tx } from "../tenant.js";
 
@@ -224,10 +224,40 @@ async function resolveItems(
   items: readonly InvoiceItemRecord[],
 ): Promise<ResolvedItem[]> {
   const resolved: ResolvedItem[] = [];
+
+  // Collect all product IDs that need resolution
+  const productIds = items
+    .filter((item) => item.productId)
+    .map((item) => item.productId!);
+
+  // Batch-fetch all products at once (1 query instead of N)
+  const productsMap = new Map<string, { id: string; name: string; price: string; taxRate: string }>();
+  if (productIds.length > 0) {
+    const rows = await tx
+      .select(productColumns)
+      .from(products)
+      .where(
+        and(
+          eq(products.clinicId, clinicId),
+          inArray(products.id, productIds),
+          isNull(products.deletedAt),
+        ),
+      );
+
+    for (const row of rows) {
+      productsMap.set(row.id, row);
+    }
+  }
+
+  // Resolve items using the map lookup (no N+1)
   for (const item of items) {
     if (item.productId) {
-      const product = await getProduct(tx, clinicId, item.productId);
-      if (!product) throw new BillingError(`product ${item.productId} not found in this clinic`);
+      const product = productsMap.get(item.productId);
+      if (!product)
+        throw new BillingError(
+          `product ${item.productId} not found in this clinic`,
+        );
+
       resolved.push({
         productId: product.id,
         description: product.name,
@@ -238,9 +268,13 @@ async function resolveItems(
       });
       continue;
     }
+
     if (!item.description || item.unitPrice === undefined) {
-      throw new BillingError("a free line needs both a description and a unitPrice");
+      throw new BillingError(
+        "a free line needs both a description and a unitPrice",
+      );
     }
+
     resolved.push({
       productId: null,
       description: item.description,
@@ -250,6 +284,7 @@ async function resolveItems(
       taxRate: item.taxRate ?? 0,
     });
   }
+
   return resolved;
 }
 

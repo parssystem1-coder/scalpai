@@ -7,12 +7,49 @@ interface Props { message: InboxMessage | null; body: string | null; reply: stri
 export const MessageThread: React.FC<Props> = ({ message, body, reply, onReplyChange, onReply, sending = false }) => {
   const { t } = useTranslation();
   if (!message) return <section className="grid min-h-[420px] place-items-center p-8 text-sm opacity-60" aria-label={t("inbox.emptySelection")}>{t("inbox.selectConversation")}</section>;
-  return <section className="flex min-h-[420px] flex-col p-6" aria-label={t("inbox.thread")}>
-    <header className="border-b border-black/10 pb-4"><h2 className="font-bold">{message.senderHash}</h2><p className="text-xs opacity-60">{message.channel}</p></header>
-    <div className="flex-1 py-6"><p className="rounded-2xl bg-white p-4 text-sm leading-7 shadow-sm">{body ?? message.bodyPreview ?? t("inbox.redacted")}</p></div>
-    <form onSubmit={(event) => { event.preventDefault(); onReply(); }} className="flex gap-3 border-t border-black/10 pt-4">
-      <textarea aria-label={t("inbox.replyLabel")} value={reply} onChange={(event) => onReplyChange(event.target.value)} rows={2} className="min-h-12 flex-1 rounded-xl border border-black/10 bg-white p-3 text-sm" placeholder={t("inbox.replyPlaceholder")} />
-      <button type="submit" disabled={sending || reply.trim().length === 0} className="self-end rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{sending ? t("inbox.sending") : t("inbox.send")}</button>
-    </form>
-  </section>;
+  return (
+    <section className="flex min-h-[420px] flex-col p-6" aria-label={t("inbox.thread")}>
+      <header className="border-b border-black/10 pb-4">
+        <h2 className="font-bold">{message.senderHash}</h2>
+        <p className="text-xs opacity-60">{message.channel}</p>
+      </header>
+
+      <div className="flex-1 py-6">
+        {body === null ? (
+          <p className="text-xs opacity-60 text-center">
+            {t("inbox.loadingBody")}
+          </p>
+        ) : (
+          <p className="rounded-2xl bg-white p-4 text-sm leading-7 shadow-sm">
+            {body ?? message.bodyPreview ?? t("inbox.redacted")}
+          </p>
+        )}
+      </div>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onReply();
+        }}
+        className="flex gap-3 border-t border-black/10 pt-4"
+      >
+        <textarea
+          aria-label={t("inbox.replyLabel")}
+          value={reply}
+          onChange={(event) => onReplyChange(event.target.value)}
+          disabled={sending}
+          rows={2}
+          className="min-h-12 flex-1 rounded-xl border border-black/10 bg-white p-3 text-sm disabled:opacity-50"
+          placeholder={t("inbox.replyPlaceholder")}
+        />
+        <button
+          type="submit"
+          disabled={sending || reply.trim().length === 0}
+          className="self-end rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-40"
+        >
+          {sending ? t("inbox.sending") : t("inbox.send")}
+        </button>
+      </form>
+    </section>
+  );
 };

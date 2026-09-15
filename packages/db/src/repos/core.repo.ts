@@ -206,7 +206,8 @@ export async function createPatient(tx: Tx, clinicId: string, userId: string, in
       createdBy: userId,
     })
     .returning(PATIENT_COLUMNS);
-  const patient = rows[0]!;
+  const patient = rows[0];
+  if (!patient) throw new Error("Failed to create patient: no row returned");
   await appendAudit(tx, {
     clinicId,
     userId,
@@ -369,7 +370,8 @@ export async function createSession(
       startAt: input.startAt,
     })
     .returning();
-  const created = rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("Failed to create session: no row returned");
   await appendAudit(tx, {
     clinicId: input.clinicId,
     userId: input.userId,
@@ -452,7 +454,8 @@ export async function createConsent(tx: Tx, input: CreateConsentInput) {
       signedUserAgent: input.userAgent?.slice(0, 300) ?? null,
     })
     .returning();
-  const created = rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("Failed to create signature: no row returned");
 
   await input.storeSignature(key, body, input.signature.mime);
 
