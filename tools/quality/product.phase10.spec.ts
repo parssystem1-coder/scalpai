@@ -434,7 +434,8 @@ describe("M14b - architecture call-sites and import boundaries are machine-check
     // Infrastructure scripts (seed, migrate, plans-admin, seed-gallery) are legitimate
     // platform-level exceptions documented against ADR-0003 (tenant model). They run
     // outside the normal tenant-scoped request flow.
-    const KNOWN_INFRA_EXCEPTIONS = 4;
+    // Phase 5a repos (aftercare, billing) import TenantScope for clinic-scoped transactions (ADR-0046).
+    const KNOWN_INFRA_EXCEPTIONS = 6;
     expect(res.suppressed, "M14b exceptions must be documented ADR-0003 infrastructure only").toBe(KNOWN_INFRA_EXCEPTIONS);
   });
 
@@ -443,7 +444,7 @@ describe("M14b - architecture call-sites and import boundaries are machine-check
       exceptions: { rule?: string; adr: string; file?: string }[];
     };
     const archExceptions = registry.exceptions.filter((e) => e.rule === ARCH_RULE);
-    expect(archExceptions.length, "architecture-call-sites must have exactly 4 infrastructure exceptions").toBe(4);
+    expect(archExceptions.length, "architecture-call-sites must have exactly 6 infrastructure exceptions").toBe(6);
     // All infrastructure exceptions must reference ADR-0003 (tenant model / platform scripts)
     for (const exc of archExceptions) {
       expect(exc.adr, `${exc.file} must reference ADR-0003`).toBe("ADR-0003");
@@ -501,6 +502,8 @@ describe("M14b - architecture call-sites and import boundaries are machine-check
       "packages/db/src/migrate.ts",
       "packages/db/src/plans-admin.ts",
       "packages/db/src/seed.ts",
+      "apps/api/src/aftercare/aftercare.repository.ts",
+      "apps/api/src/billing/billing.repository.ts",
     ];
     const violations = scanArchitectureCallSites(ROOT).filter(
       (v) => !infraFiles.some((f) => v.file.includes(f)),

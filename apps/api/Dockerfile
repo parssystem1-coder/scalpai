@@ -67,6 +67,7 @@ COPY --from=builder /app/packages/analysis-core/dist ./packages/analysis-core/di
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/sync-client/dist ./packages/sync-client/dist
+COPY --from=builder /app/packages/notify/dist ./packages/notify/dist
 
 # The lockfile is a BUILD-time contract (H16) and nothing in this image installs
 # anything. Keeping it here would only hand a scanner a second inventory, listing

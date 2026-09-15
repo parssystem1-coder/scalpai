@@ -1,10 +1,10 @@
 # Project Graph
 
-**Generated** by `npm run graph` from commit `41889db` (working tree dirty). **Do not hand-edit** - every row is parsed from source.
+**Generated** by `npm run graph` from commit `837373a`. **Do not hand-edit** - every row is parsed from source.
 
 Descriptive only: answers *what exists*. Correctness is the conformance harness's job (ADR-21).
 
-**At a glance:** 5 apps · 7 packages · 14 internal dependency edges
+**At a glance:** 5 apps · 8 packages · 16 internal dependency edges
 
 ## Modules
 
@@ -13,12 +13,13 @@ Descriptive only: answers *what exists*. Correctness is the conformance harness'
 | `@scalpai/analysis-core` | package | `packages/analysis-core` | — |
 | `@scalpai/analysis-engine` | package | `packages/analysis-engine` | `@scalpai/analysis-core`, `@scalpai/shared` |
 | `@scalpai/app-admin` | app | `apps/admin` | — |
-| `@scalpai/app-api` | app | `apps/api` | `@scalpai/analysis-core`, `@scalpai/db`, `@scalpai/licensing`, `@scalpai/shared`, `@scalpai/sync-client` |
+| `@scalpai/app-api` | app | `apps/api` | `@scalpai/analysis-core`, `@scalpai/db`, `@scalpai/licensing`, `@scalpai/notify`, `@scalpai/shared`, `@scalpai/sync-client` |
 | `@scalpai/app-desktop` | app | `apps/desktop` | — |
 | `@scalpai/app-portal` | app | `apps/portal` | — |
 | `@scalpai/app-web` | app | `apps/web` | `@scalpai/analysis-engine`, `@scalpai/education`, `@scalpai/shared`, `@scalpai/sync-client` |
 | `@scalpai/db` | package | `packages/db` | `@scalpai/sync-client` |
 | `@scalpai/education` | package | `packages/education` | `@scalpai/shared` |
 | `@scalpai/licensing` | package | `packages/licensing` | — |
+| `@scalpai/notify` | package | `packages/notify` | `@scalpai/shared` |
 | `@scalpai/shared` | package | `packages/shared` | — |
 | `@scalpai/sync-client` | package | `packages/sync-client` | `@scalpai/shared` |

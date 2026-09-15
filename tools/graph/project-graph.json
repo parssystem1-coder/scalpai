@@ -1,7 +1,7 @@
 {
   "generatedFrom": {
-    "commit": "41889db",
-    "dirty": true
+    "commit": "837373a",
+    "dirty": false
   },
   "modules": [
     {
@@ -33,6 +33,7 @@
         "@scalpai/analysis-core",
         "@scalpai/db",
         "@scalpai/licensing",
+        "@scalpai/notify",
         "@scalpai/shared",
         "@scalpai/sync-client"
       ]
@@ -83,6 +84,14 @@
       "dependsOn": []
     },
     {
+      "name": "@scalpai/notify",
+      "kind": "package",
+      "dir": "packages/notify",
+      "dependsOn": [
+        "@scalpai/shared"
+      ]
+    },
+    {
       "name": "@scalpai/shared",
       "kind": "package",
       "dir": "packages/shared",
@@ -99,7 +108,7 @@
   ],
   "counts": {
     "apps": 5,
-    "packages": 7,
-    "dependencyEdges": 14
+    "packages": 8,
+    "dependencyEdges": 16
   }
 }
