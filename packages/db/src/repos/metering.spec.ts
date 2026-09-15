@@ -115,19 +115,19 @@ function mockTx(rows: unknown[] = []) {
         }),
       }),
     }),
-  } as never;
+  } as any;
 }
 
 describe("meterUsage", () => {
   it("throws on negative amount", async () => {
-    await expect(meterUsage(mockTx() as never, "c1", "upload_mb", -1, 100)).rejects.toThrow(MeteringError);
+    await expect(meterUsage(mockTx() as any, "c1", "upload_mb", -1, 100)).rejects.toThrow(MeteringError);
   });
   it("throws on fractional amount", async () => {
-    await expect(meterUsage(mockTx() as never, "c1", "upload_mb", 1.5, 100)).rejects.toThrow(MeteringError);
+    await expect(meterUsage(mockTx() as any, "c1", "upload_mb", 1.5, 100)).rejects.toThrow(MeteringError);
   });
   it("returns verdict from DB", async () => {
     const tx = mockTx([{ allowed: true, used: "10", period_start: "2026-09-01" }]);
-    const result = await meterUsage(tx as never, "c1", "upload_mb", 5, 100);
+    const result = await meterUsage(tx as any, "c1", "upload_mb", 5, 100);
     expect(result).toEqual({
       allowed: true,
       metric: "upload_mb",
@@ -138,17 +138,17 @@ describe("meterUsage", () => {
   });
   it("throws on empty result", async () => {
     const tx = mockTx([]);
-    await expect(meterUsage(tx as never, "c1", "upload_mb", 5, 100)).rejects.toThrow(MeteringError);
+    await expect(meterUsage(tx as any, "c1", "upload_mb", 5, 100)).rejects.toThrow(MeteringError);
   });
 });
 
 describe("releaseUsage", () => {
   it("throws on negative amount", async () => {
-    await expect(releaseUsage(mockTx() as never, "c1", "upload_mb", -1)).rejects.toThrow(MeteringError);
+    await expect(releaseUsage(mockTx() as any, "c1", "upload_mb", -1)).rejects.toThrow(MeteringError);
   });
   it("returns new counter value", async () => {
     const tx = mockTx([{ value: "8" }]);
-    const result = await releaseUsage(tx as never, "c1", "upload_mb", 2);
+    const result = await releaseUsage(tx as any, "c1", "upload_mb", 2);
     expect(result).toBe(8);
   });
 });
@@ -164,8 +164,8 @@ describe("peekUsage", () => {
           }),
         }),
       }),
-    } as never;
-    const result = await peekUsage(tx as never, "c1", "upload_mb");
+    } as any;
+    const result = await peekUsage(tx as any, "c1", "upload_mb");
     expect(result).toBe(0);
   });
   it("returns counter value when row exists", async () => {
@@ -178,14 +178,14 @@ describe("peekUsage", () => {
           }),
         }),
       }),
-    } as never;
-    const result = await peekUsage(tx as never, "c1", "upload_mb");
+    } as any;
+    const result = await peekUsage(tx as any, "c1", "upload_mb");
     expect(result).toBe(42);
   });
   it("throws when period cannot be resolved", async () => {
     const tx = {
       execute: vi.fn().mockResolvedValue({ rows: [] }),
-    } as never;
-    await expect(peekUsage(tx as never, "c1", "upload_mb")).rejects.toThrow(MeteringError);
+    } as any;
+    await expect(peekUsage(tx as any, "c1", "upload_mb")).rejects.toThrow(MeteringError);
   });
 });

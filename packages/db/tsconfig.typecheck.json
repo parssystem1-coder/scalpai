@@ -4,5 +4,5 @@
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.spec.tsx"]
+  "exclude": []
 }

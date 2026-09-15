@@ -88,7 +88,7 @@ function mockTx(rows: unknown[] = []) {
         }),
       }),
     }),
-  } as never;
+  } as any;
 }
 
 describe("messaging DB functions (smoke)", () => {
@@ -106,9 +106,9 @@ describe("messaging DB functions (smoke)", () => {
           }),
         }),
       }),
-    } as never;
+    } as any;
     const { enqueueMessage } = await import("./messaging.repo.js");
-    const result = await enqueueMessage(tx as never, "c1", {
+    const result = await enqueueMessage(tx as any, "c1", {
       channel: "kavenegar",
       templateKey: "t1",
       locale: "fa",
@@ -124,49 +124,49 @@ describe("messaging DB functions (smoke)", () => {
   it("listMessages returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listMessages } = await import("./messaging.repo.js");
-    const result = await listMessages(tx as never, "c1", { limit: 10, offset: 0 });
+    const result = await listMessages(tx as any, "c1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("listInbox returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listInbox } = await import("./messaging.repo.js");
-    const result = await listInbox(tx as never, "c1", { limit: 10, offset: 0 });
+    const result = await listInbox(tx as any, "c1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("isOptedOut returns false for no match", async () => {
     const tx = mockTx([]);
     const { isOptedOut } = await import("./messaging.repo.js");
-    const result = await isOptedOut(tx as never, "c1", "09121234567");
+    const result = await isOptedOut(tx as any, "c1", "09121234567");
     expect(result).toBe(false);
   });
 
   it("readInboundBody returns null for no match", async () => {
     const tx = mockTx([]);
     const { readInboundBody } = await import("./messaging.repo.js");
-    const result = await readInboundBody(tx as never, "c1", "nonexistent");
+    const result = await readInboundBody(tx as any, "c1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("markMessageSent returns false for no match", async () => {
     const tx = mockTx([]);
     const { markMessageSent } = await import("./messaging.repo.js");
-    const result = await markMessageSent(tx as never, "c1", "nonexistent", "provider");
+    const result = await markMessageSent(tx as any, "c1", "nonexistent", "provider");
     expect(result).toBe(false);
   });
 
   it("markMessageFailed returns false for no match", async () => {
     const tx = mockTx([]);
     const { markMessageFailed } = await import("./messaging.repo.js");
-    const result = await markMessageFailed(tx as never, "c1", "nonexistent", "reason");
+    const result = await markMessageFailed(tx as any, "c1", "nonexistent", "reason");
     expect(result).toBe(false);
   });
 
   it("markMessageSuppressed returns false for no match", async () => {
     const tx = mockTx([]);
     const { markMessageSuppressed } = await import("./messaging.repo.js");
-    const result = await markMessageSuppressed(tx as never, "c1", "nonexistent", "reason");
+    const result = await markMessageSuppressed(tx as any, "c1", "nonexistent", "reason");
     expect(result).toBe(false);
   });
 });

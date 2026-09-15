@@ -80,14 +80,14 @@ function mockTx(rows: unknown[] = []) {
         }),
       }),
     }),
-  } as never;
+  } as any;
 }
 
 describe("aftercare DB functions (smoke)", () => {
   it("createSequence calls insert with correct table", async () => {
     const tx = mockTx([{ id: "s1", name: "Test", steps: "[]", active: true }]);
     const { createSequence } = await import("./aftercare.repo.js");
-    const result = await createSequence(tx as never, "clinic1", "user1", {
+    const result = await createSequence(tx as any, "clinic1", "user1", {
       name: "Test",
       trigger: "manual",
       steps: [],
@@ -101,49 +101,49 @@ describe("aftercare DB functions (smoke)", () => {
   it("listSequences returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listSequences } = await import("./aftercare.repo.js");
-    const result = await listSequences(tx as never, "clinic1", { limit: 10, offset: 0 });
+    const result = await listSequences(tx as any, "clinic1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("getSequence returns null for no rows", async () => {
     const tx = mockTx([]);
     const { getSequence } = await import("./aftercare.repo.js");
-    const result = await getSequence(tx as never, "clinic1", "nonexistent");
+    const result = await getSequence(tx as any, "clinic1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("listEnrollments returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listEnrollments } = await import("./aftercare.repo.js");
-    const result = await listEnrollments(tx as never, "clinic1", { limit: 10, offset: 0 });
+    const result = await listEnrollments(tx as any, "clinic1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("getEnrollment returns null for no rows", async () => {
     const tx = mockTx([]);
     const { getEnrollment } = await import("./aftercare.repo.js");
-    const result = await getEnrollment(tx as never, "clinic1", "nonexistent");
+    const result = await getEnrollment(tx as any, "clinic1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("claimDueEnrollments validates limit range", async () => {
     const tx = mockTx([]);
     const { claimDueEnrollments } = await import("./aftercare.repo.js");
-    await expect(claimDueEnrollments(tx as never, "c1", 0)).rejects.toThrow();
-    await expect(claimDueEnrollments(tx as never, "c1", 501)).rejects.toThrow();
+    await expect(claimDueEnrollments(tx as any, "c1", 0)).rejects.toThrow();
+    await expect(claimDueEnrollments(tx as any, "c1", 501)).rejects.toThrow();
   });
 
   it("advanceEnrollment returns null when no rows", async () => {
     const tx = mockTx([]);
     const { advanceEnrollment } = await import("./aftercare.repo.js");
-    const result = await advanceEnrollment(tx as never, "clinic1", "nonexistent");
+    const result = await advanceEnrollment(tx as any, "clinic1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("deferEnrollment returns null when no rows", async () => {
     const tx = mockTx([]);
     const { deferEnrollment } = await import("./aftercare.repo.js");
-    const result = await deferEnrollment(tx as never, "clinic1", "nonexistent", 1);
+    const result = await deferEnrollment(tx as any, "clinic1", "nonexistent", 1);
     expect(result).toBeNull();
   });
 });

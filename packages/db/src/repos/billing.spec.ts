@@ -37,42 +37,42 @@ function mockTx(rows: unknown[] = []) {
         }),
       }),
     }),
-  } as never;
+  } as any;
 }
 
 describe("billing DB functions (smoke)", () => {
   it("listProducts returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listProducts } = await import("./billing.repo.js");
-    const result = await listProducts(tx as never, "c1", { limit: 10, offset: 0 });
+    const result = await listProducts(tx as any, "c1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("getProduct returns null for no rows", async () => {
     const tx = mockTx([]);
     const { getProduct } = await import("./billing.repo.js");
-    const result = await getProduct(tx as never, "c1", "nonexistent");
+    const result = await getProduct(tx as any, "c1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("listInvoices returns empty for no rows", async () => {
     const tx = mockTx([]);
     const { listInvoices } = await import("./billing.repo.js");
-    const result = await listInvoices(tx as never, "c1", { limit: 10, offset: 0 });
+    const result = await listInvoices(tx as any, "c1", { limit: 10, offset: 0 });
     expect(result).toEqual([]);
   });
 
   it("getInvoice returns null for no rows", async () => {
     const tx = mockTx([]);
     const { getInvoice } = await import("./billing.repo.js");
-    const result = await getInvoice(tx as never, "c1", "nonexistent");
+    const result = await getInvoice(tx as any, "c1", "nonexistent");
     expect(result).toBeNull();
   });
 
   it("createProduct calls insert", async () => {
     const tx = mockTx([{ id: "p1", sku: "SVC-001" }]);
     const { createProduct } = await import("./billing.repo.js");
-    const result = await createProduct(tx as never, "c1", "user1", {
+    const result = await createProduct(tx as any, "c1", "user1", {
       sku: "SVC-001",
       name: "Consultation",
       kind: "service",
@@ -89,14 +89,14 @@ describe("billing DB functions (smoke)", () => {
   it("softDeleteInvoice returns false for no match", async () => {
     const tx = mockTx([]);
     const { softDeleteInvoice } = await import("./billing.repo.js");
-    const result = await softDeleteInvoice(tx as never, "c1", "nonexistent");
+    const result = await softDeleteInvoice(tx as any, "c1", "nonexistent");
     expect(result).toBe(false);
   });
 
   it("softDeleteProduct returns false for no match", async () => {
     const tx = mockTx([]);
     const { softDeleteProduct } = await import("./billing.repo.js");
-    const result = await softDeleteProduct(tx as never, "c1", "nonexistent");
+    const result = await softDeleteProduct(tx as any, "c1", "nonexistent");
     expect(result).toBe(false);
   });
 });
