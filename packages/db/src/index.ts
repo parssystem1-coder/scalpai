@@ -221,6 +221,114 @@ export {
   deletePlanAsPlatform,
 } from "./plans-admin.js";
 /**
+ * Phase 5a (ADR-0046) — metering for the counters this phase introduced.
+ * Separate from `quota.repo` on purpose: those metrics are a GATE in front of a
+ * request, these are a COUNT after the fact (100MB already uploaded cannot be
+ * taken back, only counted). Both go through `fn_usage_consume`, so check and
+ * increment stay one locked statement.
+ */
+export {
+  METERING_SPECS,
+  MeteringError,
+  bytesToMeteredMb,
+  isMeteredMetricName,
+  meterUsage,
+  peekUsage,
+  releaseUsage,
+  resolveMeteredLimit,
+  type MeterVerdict,
+  type MeteredMetricName,
+  type MeteredSpec,
+} from "./repos/metering.repo.js";
+/**
+ * Phase 5a (ADR-0046) — aftercare engine. `claimDueEnrollments` is the only way
+ * to pick up due work: it goes through `fn_aftercare_claim_due` (FOR UPDATE SKIP
+ * LOCKED), because a read-then-update pair lets two workers claim the same row
+ * and the patient gets the same message twice.
+ */
+export {
+  AFTERCARE_CLAIM_LIMIT_MAX,
+  AFTERCARE_MAX_ATTEMPTS,
+  AftercareError,
+  advanceEnrollment,
+  claimDueEnrollments,
+  createEnrollment,
+  createSequence,
+  deferEnrollment,
+  getEnrollment,
+  getSequence,
+  listEnrollments,
+  listSequences,
+  setEnrollmentState,
+  softDeleteSequence,
+  stepRunAt,
+  updateSequence,
+  type AftercareStepRow,
+  type ClaimedEnrollment,
+  type EnrollmentAction,
+  type EnrollmentCreateInput,
+  type EnrollmentFilter,
+  type EnrollmentRow,
+  type SequenceCreateInput,
+  type SequencePatch,
+  type SequenceRow,
+} from "./repos/aftercare.repo.js";
+/**
+ * Phase 5a (ADR-0046) — messaging gateway. No phone number and no outbound body
+ * ever reaches a column: `recipientDigest` is called before every insert, and an
+ * inbound body is stored only as a `phi.v1` envelope bound to its own row.
+ */
+export {
+  MessagingError,
+  bodyDigest,
+  enqueueMessage,
+  isOptedOut,
+  listInbox,
+  listMessages,
+  markMessageDelivered,
+  markMessageFailed,
+  markMessageSent,
+  markMessageSuppressed,
+  readInboundBody,
+  recipientDigest,
+  recordInbound,
+  setInboundState,
+  type EnqueuedMessage,
+  type InboundRecordInput,
+  type InboxFilter,
+  type MessageEnqueueInput,
+  type MessageLogFilter,
+  type RecordedInbound,
+} from "./repos/messaging.repo.js";
+/**
+ * Phase 5a (ADR-0046) — billing. The repo never computes money: numbers come
+ * from `fn_invoice_next_number` and totals from `fn_invoice_recalc`, so the
+ * printed total and the sum of the lines cannot drift apart.
+ */
+export {
+  BillingError,
+  createInvoice,
+  createProduct,
+  getInvoice,
+  getProduct,
+  issueInvoice,
+  listInvoices,
+  listProducts,
+  payInvoice,
+  replaceInvoiceItems,
+  softDeleteInvoice,
+  softDeleteProduct,
+  updateProduct,
+  voidInvoice,
+  type InvoiceCreateRecord,
+  type InvoiceFilter,
+  type InvoiceItemRecord,
+  type PaymentRecord,
+  type ProductCreateRecord,
+  type ProductFilter,
+  type ProductPatch,
+} from "./repos/billing.repo.js";
+/**
  * WEAKNESSES H18: destructive test helpers (resetAll, …) are NOT part of this
  * public surface. Import them from `@scalpai/db/testing` instead.
  */
