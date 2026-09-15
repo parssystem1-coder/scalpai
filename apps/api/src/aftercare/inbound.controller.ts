@@ -18,7 +18,9 @@ export class InboundController {
   @RateLimit("webhook-kavenegar", 600)
   @HttpCode(HttpStatus.ACCEPTED)
   ingestKavenegar(@Body(new ZodBodyPipe(InboundMessageIngest)) dto: InboundMessageIngestDto) {
-    return this.aftercare.ingestInbound(dto);
+    // The provider is selected by the signed route, not by a client-controlled
+    // `channel`/`provider` field in the payload.
+    return this.aftercare.ingestInbound({ ...dto, channel: "kavenegar", provider: "kavenegar" });
   }
 
   @Public()

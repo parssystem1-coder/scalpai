@@ -50,8 +50,8 @@ export function tickIntervalMs(): number {
  *   ۱) `unref()` — تایمر نباید خروج پروسه را نگه دارد، وگرنه SIGTERM در
  *      کوبرنتیز به kill اجباری تبدیل می‌شود.
  *   ۲) قفل هم‌پوشانی — اگر یک tick طولانی‌تر از فاصله طول بکشد، tick بعدی
- *      رد می‌شود. بدون آن، یک دیتابیس کند به یک توده‌ی tick موازی تبدیل
- *      می‌شود و خودش را بیشتر کند می‌کند.
+ *      رد می‌شود. بدون آن، یک دیتابیس کند به یک توده‌ی tick موازی تبدیل می‌شود
+ *      و خودش را بیشتر کند می‌کند.
  */
 export class IntervalQueueDriver implements AftercareQueuePort {
   readonly driver = "interval";
@@ -93,7 +93,10 @@ interface BullModuleLike {
     close: () => Promise<void>;
   };
   Worker: new (name: string, processor: () => Promise<void>, opts: unknown) => {
-    on: (event: string, listener: (err: Error) => void) => void;
+    // BullMQ فراخوانی `failed` را با (job, error) صدا می‌زند، پس امضای
+    // تک‌آرگومانی قبلی هم نوع را غلط نشان می‌داد و هم شنونده‌ی دوآرگومانی را
+    // رد می‌کرد.
+    on: (event: string, listener: (...args: unknown[]) => void) => void;
     close: () => Promise<void>;
   };
 }
@@ -139,7 +142,12 @@ export class BullQueueDriver implements AftercareQueuePort {
     this.worker = new mod.Worker(AFTERCARE_QUEUE_NAME, async () => {
       await tick();
     }, connection);
-    this.worker.on("failed", (err: Error) => this.onError(err));
+    // BullMQ emits (job, error) for `failed`; the previous one-argument
+    // callback received the job object and reported it as if it were an Error.
+    this.worker.on("failed", (_job: unknown, error?: unknown) => {
+      const failure = error ?? _job;
+      this.onError(failure instanceof Error ? failure : new Error(String(failure)));
+    });
   }
 
   async stop(): Promise<void> {
