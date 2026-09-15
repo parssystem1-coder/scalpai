@@ -14,6 +14,7 @@ import { AllExceptionsFilter } from "./common/error.filter.js";
 import { logEvent } from "./common/logging.js";
 import { assertObservabilityConfig } from "./common/observability.config.js";
 import { assertPhiConfig } from "./common/phi.config.js";
+import { registerRawBodyCapture } from "./common/raw-body.js";
 import { buildCorsOptions, resolveAllowedOrigins } from "./common/security.config.js";
 import { registerSecurityHeaders } from "./common/security-headers.js";
 import { assertSwaggerConfig, registerSwaggerGuard, setupSwagger, shouldExposeSwagger } from "./common/swagger.js";
@@ -96,6 +97,8 @@ async function bootstrap(): Promise<void> {
   installShutdownHandlers(app);
 
   const fastify = app.getHttpAdapter().getInstance() as unknown as FastifyInstance;
+  // فاز ۵b: بدون بایت‌های اصلی، تأیید امضای وبهوک بی‌معنی است.
+  registerRawBodyCapture(fastify);
   registerSwaggerGuard(fastify);
   if (shouldExposeSwagger()) setupSwagger(app);
 
