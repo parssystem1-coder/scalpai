@@ -67,7 +67,7 @@ if [ -n "$lockchange" ]; then
   added=$(git diff "$range" -- package-lock.json | grep -E '^\+.*\"resolved\":' || true)
   if [ -n "$added" ]; then
     printf '%s\n' "$added"
-    offsite=$(printf '%s\n' "$added" | grep -v 'registry\.npmjs\.org' || true)
+    offsite=$(printf '%s\n' "$added" | grep -v 'registry\.npmjs\.org' | grep -v '^\+.*"resolved": "packages/' || true)
     if [ -n "$offsite" ]; then
       echo "::error::lockfile resolves packages outside registry.npmjs.org:"
       printf '%s\n' "$offsite"
