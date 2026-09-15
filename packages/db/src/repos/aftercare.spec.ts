@@ -147,4 +147,101 @@ describe("aftercare DB functions (smoke)", () => {
     const result = await deferEnrollment(tx as any, "clinic1", "nonexistent", 1);
     expect(result).toBeNull();
   });
+
+  it("updateSequence returns null for no match", async () => {
+    const tx = mockTx([]);
+    const { updateSequence } = await import("./aftercare.repo.js");
+    const result = await updateSequence(tx as any, "c1", "nonexistent", { name: "New" });
+    expect(result).toBeNull();
+  });
+
+  it("updateSequence with empty patch returns getSequence result", async () => {
+    const tx = mockTx([]);
+    const { updateSequence } = await import("./aftercare.repo.js");
+    const result = await updateSequence(tx as any, "c1", "s1", {});
+    expect(result).toBeNull();
+  });
+
+  it("softDeleteSequence returns false for no match", async () => {
+    const tx = mockTx([]);
+    const { softDeleteSequence } = await import("./aftercare.repo.js");
+    const result = await softDeleteSequence(tx as any, "c1", "nonexistent");
+    expect(result).toBe(false);
+  });
+
+  it("softDeleteSequence returns true when matched", async () => {
+    const tx = mockTx([{ id: "s1" }]);
+    const { softDeleteSequence } = await import("./aftercare.repo.js");
+    const result = await softDeleteSequence(tx as any, "c1", "s1");
+    expect(result).toBe(true);
+  });
+
+  it("setEnrollmentState returns null for no match", async () => {
+    const tx = mockTx([]);
+    const { setEnrollmentState } = await import("./aftercare.repo.js");
+    const result = await setEnrollmentState(tx as any, "c1", "nonexistent", "pause");
+    expect(result).toBeNull();
+  });
+
+  it("setEnrollmentState pause throws for non-active enrollment", async () => {
+    const tx = mockTx([{ id: "e1", state: "paused", currentStep: 0, stepsSnapshot: "[]", startedAt: new Date(), nextRunAt: null, lastRunAt: null, attempts: 0, completedAt: null, cancelledAt: null, sequenceId: "s1", patientId: "p1", sessionId: null, locale: "fa" }]);
+    const { setEnrollmentState } = await import("./aftercare.repo.js");
+    await expect(setEnrollmentState(tx as any, "c1", "e1", "pause")).rejects.toThrow(AftercareError);
+  });
+
+  it("setEnrollmentState resume throws for non-paused enrollment", async () => {
+    const tx = mockTx([{ id: "e1", state: "active", currentStep: 0, stepsSnapshot: "[]", startedAt: new Date(), nextRunAt: null, lastRunAt: null, attempts: 0, completedAt: null, cancelledAt: null, sequenceId: "s1", patientId: "p1", sessionId: null, locale: "fa" }]);
+    const { setEnrollmentState } = await import("./aftercare.repo.js");
+    await expect(setEnrollmentState(tx as any, "c1", "e1", "resume")).rejects.toThrow(AftercareError);
+  });
+
+  it("setEnrollmentState cancel returns already-completed enrollment", async () => {
+    const completed = { id: "e1", state: "completed", currentStep: 2, stepsSnapshot: "[]", startedAt: new Date(), nextRunAt: null, lastRunAt: null, attempts: 0, completedAt: new Date(), cancelledAt: null, sequenceId: "s1", patientId: "p1", sessionId: null, locale: "fa" };
+    const tx = mockTx([completed]);
+    const { setEnrollmentState } = await import("./aftercare.repo.js");
+    const result = await setEnrollmentState(tx as any, "c1", "e1", "cancel");
+    expect(result).toBeDefined();
+  });
+
+  it("claimDueEnrollments returns mapped rows", async () => {
+    const tx = mockTx([]);
+    tx.execute.mockResolvedValueOnce({
+      rows: [{
+        enrollment_id: "e1",
+        sequence_id: "s1",
+        patient_id: "p1",
+        session_id: null,
+        current_step: 0,
+        steps_snapshot: [{ offsetHours: 24, channel: "kavenegar", templateKey: "t1" }],
+        locale: "fa",
+        attempts: 0,
+      }],
+    });
+    const { claimDueEnrollments } = await import("./aftercare.repo.js");
+    const result = await claimDueEnrollments(tx as any, "c1", 10);
+    expect(result).toHaveLength(1);
+    expect(result[0].enrollmentId).toBe("e1");
+    expect(result[0].stepsSnapshot).toHaveLength(1);
+  });
+
+  it("listEnrollments with patientId filter", async () => {
+    const tx = mockTx([]);
+    const { listEnrollments } = await import("./aftercare.repo.js");
+    const result = await listEnrollments(tx as any, "c1", { patientId: "p1", limit: 5, offset: 0 });
+    expect(result).toEqual([]);
+  });
+
+  it("listEnrollments with state filter", async () => {
+    const tx = mockTx([]);
+    const { listEnrollments } = await import("./aftercare.repo.js");
+    const result = await listEnrollments(tx as any, "c1", { state: "active", limit: 5, offset: 0 });
+    expect(result).toEqual([]);
+  });
+
+  it("listEnrollments with sequenceId filter", async () => {
+    const tx = mockTx([]);
+    const { listEnrollments } = await import("./aftercare.repo.js");
+    const result = await listEnrollments(tx as any, "c1", { sequenceId: "s1", limit: 5, offset: 0 });
+    expect(result).toEqual([]);
+  });
 });
