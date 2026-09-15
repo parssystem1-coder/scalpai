@@ -29,6 +29,11 @@ export class InboundController {
   @RateLimit("webhook-zarinpal", 600)
   @HttpCode(HttpStatus.ACCEPTED)
   ingestZarinpal(@Body(new ZodBodyPipe(InboundMessageIngest)) dto: InboundMessageIngestDto) {
-    return this.aftercare.ingestInbound(dto);
+    // Same rule as the Kavenegar route: the signed route owns the provider, the
+    // payload does not get to claim one. `channel` still comes from the body
+    // because Zarinpal is a payment provider and is not a messaging channel -
+    // see docs/reviews/PHASE-5AB-REVIEW.md, open question 3: this route should
+    // either move to a payment-event contract or be removed.
+    return this.aftercare.ingestInbound({ ...dto, provider: "zarinpal" });
   }
 }

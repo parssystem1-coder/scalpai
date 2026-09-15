@@ -6,6 +6,17 @@ import type { FastifyRequest } from "fastify";
 const WEBHOOK_PROVIDER = "webhook-provider";
 export const WebhookSignature = (provider: string): MethodDecorator & ClassDecorator => SetMetadata(WEBHOOK_PROVIDER, provider);
 
+/**
+ * Registered providers and the header each one signs with. This is an
+ * allow-list on purpose: the previous default sent every unrecognised provider
+ * to `x-webhook-signature`, so a typo in a decorator silently verified the
+ * wrong header instead of failing closed.
+ */
+const PROVIDER_SIGNATURE_HEADERS: Readonly<Record<string, string>> = {
+  kavenegar: "x-webhook-signature",
+  zarinpal: "x-zarinpal-signature",
+};
+
 /** Verifies provider HMAC signatures before any webhook payload reaches business logic. */
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -20,6 +31,7 @@ export class WebhookGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<FastifyRequest & { rawBody?: Buffer }>();
     const signatureHeader = providerHeader(provider);
+    if (!signatureHeader) throw new UnauthorizedException("Unknown webhook provider");
     const signature = request.headers[signatureHeader];
     const supplied = Array.isArray(signature) ? signature[0] : signature;
     const secret = process.env[`${provider.toUpperCase()}_WEBHOOK_SECRET`];
@@ -41,6 +53,6 @@ export function verifySignature(body: Buffer, supplied: string, secret: string):
   return expected.length === right.length && timingSafeEqual(expected, right);
 }
 
-function providerHeader(provider: string): string {
-  return provider.toLowerCase() === "zarinpal" ? "x-zarinpal-signature" : "x-webhook-signature";
+function providerHeader(provider: string): string | undefined {
+  return PROVIDER_SIGNATURE_HEADERS[provider.trim().toLowerCase()];
 }
