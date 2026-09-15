@@ -1498,3 +1498,7 @@ export function toggleLang(): void {
 }
 
 export default i18n;
+
+// Phase 5b inbox strings are registered in both locales to keep the RTL-first UI symmetric.
+i18n.addResourceBundle("fa", "translation", { inbox: { title: "صندوق پیام‌ها", subtitle: "پیام‌های ورودی بیماران را بررسی و پاسخ دهید.", searchLabel: "جست‌وجوی پیام‌ها", searchPlaceholder: "نام یا هش تلفن را جست‌وجو کنید", conversations: "گفت‌وگوها", noMessages: "پیامی پیدا نشد", loading: "در حال بارگذاری…", loadMore: "نمایش پیام‌های بیشتر", openMessage: "باز کردن پیام", redacted: "متن پیام محافظت شده است", unread: "خوانده نشده", emptySelection: "پیامی انتخاب نشده", selectConversation: "برای مشاهده گفت‌وگو یک پیام را انتخاب کنید", thread: "رشته پیام", replyLabel: "متن پاسخ", replyPlaceholder: "پاسخ خود را بنویسید…", sending: "در حال ارسال…", send: "ارسال" } }, true, true);
+i18n.addResourceBundle("en", "translation", { inbox: { title: "Message inbox", subtitle: "Review and respond to inbound patient messages.", searchLabel: "Search messages", searchPlaceholder: "Search by name or phone hash", conversations: "Conversations", noMessages: "No messages found", loading: "Loading…", loadMore: "Load more messages", openMessage: "Open message", redacted: "Message body is protected", unread: "Unread", emptySelection: "No message selected", selectConversation: "Select a message to view the conversation", thread: "Message thread", replyLabel: "Reply text", replyPlaceholder: "Write your reply…", sending: "Sending…", send: "Send" } }, true, true);

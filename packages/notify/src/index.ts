@@ -26,6 +26,7 @@ export {
   telegramAdapter,
   whatsappAdapter,
 } from "./adapters/index.js";
+export { ZarinpalAdapter, zarinpalAdapter, type PaymentResult, type ZarinpalHttpClient } from "./adapters/zarinpal.adapter.js";
 
 export {
   MESSAGE_TEMPLATES,

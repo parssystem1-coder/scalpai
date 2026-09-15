@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { DbService } from "@scalpai/db";
 import { AnalysesController } from "./analyses.controller.js";
 import { AftercareController } from "./aftercare/aftercare.controller.js";
+import { InboundController } from "./aftercare/inbound.controller.js";
 import { AftercareRepository } from "./aftercare/aftercare.repository.js";
 import { AftercareService } from "./aftercare/aftercare.service.js";
 import { AftercareWorker } from "./aftercare/aftercare.worker.js";
@@ -14,8 +15,11 @@ import { resolveJwtConfig } from "./auth/jwt.config.js";
 import { LoginThrottleService } from "./auth/login-throttle.service.js";
 import { JwtAccessGuard } from "./auth/jwt-access.guard.js";
 import { BillingController } from "./billing/billing.controller.js";
+import { PaymentController } from "./billing/payment.controller.js";
 import { BillingRepository } from "./billing/billing.repository.js";
 import { BillingService } from "./billing/billing.service.js";
+import { PaymentService } from "./billing/payment.service.js";
+import { WebhookGuard } from "./billing/webhook.guard.js";
 import { FeatureGuard } from "./common/feature.guard.js";
 import { QuotaGuard } from "./common/quota.guard.js";
 import { RateLimitGuard } from "./common/rate-limit.guard.js";
@@ -41,73 +45,21 @@ import { registerTenantContext } from "./tenancy/tenant-context.hook.js";
 import { TenantScope } from "./tenancy/tenant.scope.js";
 
 const jwt = resolveJwtConfig();
-
-// The mock object store is a build-time opt-in: with STORAGE_DRIVER unset (or
-// in production, where 'mock' is refused outright) the route does not exist.
 const mockStorage = isMockStorageEnabled();
-
-// Phase 5a (ADR-0046): same shape as the mock store. A deployment that is not
-// the worker replica should not have the worker in its container at all — a
-// provider that exists and quietly declines to run is harder to reason about
-// than one that is absent.
 const aftercareWorker = AftercareWorker.isEnabled();
 
 @Module({
-  imports: [
-    JwtModule.register({
-      secret: jwt.secret,
-      signOptions: {
-        expiresIn: jwt.accessTtl,
-        issuer: jwt.issuer,
-        audience: jwt.audience,
-        keyid: jwt.kid,
-      },
-    }),
-  ],
+  imports: [JwtModule.register({ secret: jwt.secret, signOptions: { expiresIn: jwt.accessTtl, issuer: jwt.issuer, audience: jwt.audience, keyid: jwt.kid } })],
   controllers: [
-    AuthController,
-    CoreController,
-    PlansController,
-    GalleryController,
-    AnalysesController,
-    SyncController,
-    PrivacyController,
-    // Phase 10 (M2/ADR-0043): the licence verdict comes from a real Ed25519
-    // verification here, not from a literal in the browser.
-    LicenseController,
-    // Phase 9 (L3/ADR-0042): readiness, liveness and the metrics scrape.
-    OpsController,
-    // Phase 5a (ADR-0046): aftercare sequences/enrollments/inbox, and billing.
-    AftercareController,
-    BillingController,
+    AuthController, CoreController, PlansController, GalleryController, AnalysesController, SyncController, PrivacyController,
+    LicenseController, OpsController, AftercareController, InboundController, BillingController, PaymentController,
     ...(mockStorage ? [MockStorageController] : []),
   ],
   providers: [
-    DbService,
-    StateStore,
-    AuthService,
-    TenantScope,
-    EntitlementService,
-    LoginThrottleService,
-    StorageService,
-    LicenseService,
-    // Phase 8 (ADR-0041): quota, object store and the upload session row have to
-    // move together, so exactly one service owns that ordering.
-    UploadService,
-    // Phase 5a (ADR-0046): the only door to upload_mb / analyses / messages_sent.
-    MeteringService,
-    AftercareRepository,
-    AftercareService,
-    BillingRepository,
-    BillingService,
-    ...(aftercareWorker ? [AftercareWorker] : []),
-    RolesGuard,
-    FeatureGuard,
-    QuotaGuard,
-    RateLimitGuard,
+    DbService, StateStore, AuthService, TenantScope, EntitlementService, LoginThrottleService, StorageService, LicenseService,
+    UploadService, MeteringService, AftercareRepository, AftercareService, BillingRepository, BillingService, PaymentService,
+    WebhookGuard, ...(aftercareWorker ? [AftercareWorker] : []), RolesGuard, FeatureGuard, QuotaGuard, RateLimitGuard,
     { provide: APP_GUARD, useClass: JwtAccessGuard },
-    // L4: the per-clinic request budget runs right after authentication, before
-    // any handler work — a burst must be cheap to refuse.
     { provide: APP_GUARD, useExisting: RateLimitGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useExisting: FeatureGuard },
@@ -117,17 +69,11 @@ const aftercareWorker = AftercareWorker.isEnabled();
 })
 export class AppModule implements OnModuleInit {
   constructor(private adapterHost: HttpAdapterHost) {}
-
   onModuleInit(): void {
-    // Phase 9 (L3): metrics + alerting subscribe to the access log exactly once.
     installObservability();
     const fastify = this.adapterHost.httpAdapter?.getInstance<FastifyInstance>();
     if (!fastify) return;
-    // Phase 6 (L3): the request id is minted before anything else so every log
-    // line of this request — access log, error filter, audit warnings — shares it.
     registerRequestLogging(fastify);
-    // WEAKNESSES R3 — must be the first hook that touches tenancy: everything
-    // downstream (guards, handlers, repos) resolves its tenant from this store.
     registerTenantContext(fastify);
     if (mockStorage) registerMockStorageParsers(fastify);
   }
