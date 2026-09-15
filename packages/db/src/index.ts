@@ -274,6 +274,17 @@ export {
   type SequenceRow,
 } from "./repos/aftercare.repo.js";
 /**
+ * Phase 5a (ADR-0046) — the scheduler's ONE cross-tenant read. Backed by the
+ * SECURITY DEFINER `fn_aftercare_due_clinics` (0018), which returns clinic
+ * identity only. Everything the worker does afterwards runs inside a normal
+ * per-clinic RLS transaction.
+ */
+export {
+  DUE_CLINIC_LIMIT_MAX,
+  listDueClinics,
+  type DueClinic,
+} from "./repos/aftercare-scheduler.repo.js";
+/**
  * Phase 5a (ADR-0046) — messaging gateway. No phone number and no outbound body
  * ever reaches a column: `recipientDigest` is called before every insert, and an
  * inbound body is stored only as a `phi.v1` envelope bound to its own row.
