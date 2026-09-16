@@ -1,5 +1,4 @@
-import { describe, expect, it } from "vitest";
-import { vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PaymentService } from "./payment.service.js";
 import type { PaymentAttemptsRepository } from "./payment-attempts.repository.js";
 import type { BillingService } from "./billing.service.js";
