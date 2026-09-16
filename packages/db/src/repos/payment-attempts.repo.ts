@@ -38,9 +38,9 @@ export type PaymentAttemptStatus =
   | "expired";
 
 /** حالت‌های پایانی: هیچ گذاری از آن‌ها بیرون نمی‌رود. */
-const TERMINAL: readonly string[] = ["verified", "failed", "expired"];
+const TERMINAL: string[] = ["verified", "failed", "expired"];
 /** حالت‌هایی که هنوز منتظر پروایدرند. */
-const OPEN: readonly string[] = ["pending", "started"];
+const OPEN: string[] = ["pending", "started"];
 
 export class PaymentAttemptError extends Error {
   constructor(message: string) {

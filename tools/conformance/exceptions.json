@@ -98,6 +98,13 @@
     "adr": "ADR-0028",
     "reason": "webhook_providers is a platform registry (provider→clinic binding) without RLS; WebhookGuard must query it BEFORE tenant context is set",
     "since": "2026-09-16"
+  },
+  {
+    "rule": "architecture-call-sites",
+    "file": "apps/api/src/billing/payment-attempts.repository.ts",
+    "adr": "ADR-0003",
+    "reason": "payment attempts repo imports TenantScope to open clinic-scoped transactions; same pattern as billing.repository.ts (ADR-0046)",
+    "since": "2026-09-16"
   }
 ]
 }
