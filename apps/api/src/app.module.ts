@@ -18,6 +18,7 @@ import { BillingController } from "./billing/billing.controller.js";
 import { PaymentController } from "./billing/payment.controller.js";
 import { BillingRepository } from "./billing/billing.repository.js";
 import { BillingService } from "./billing/billing.service.js";
+import { PaymentAttemptsRepository } from "./billing/payment-attempts.repository.js";
 import { PaymentService } from "./billing/payment.service.js";
 import { WebhookGuard } from "./billing/webhook.guard.js";
 import { FeatureGuard } from "./common/feature.guard.js";
@@ -57,7 +58,8 @@ const aftercareWorker = AftercareWorker.isEnabled();
   ],
   providers: [
     DbService, StateStore, AuthService, TenantScope, EntitlementService, LoginThrottleService, StorageService, LicenseService,
-    UploadService, MeteringService, AftercareRepository, AftercareService, BillingRepository, BillingService, PaymentService,
+    UploadService, MeteringService, AftercareRepository, AftercareService, BillingRepository, BillingService,
+    PaymentAttemptsRepository, PaymentService,
     WebhookGuard, ...(aftercareWorker ? [AftercareWorker] : []), RolesGuard, FeatureGuard, QuotaGuard, RateLimitGuard,
     { provide: APP_GUARD, useClass: JwtAccessGuard },
     { provide: APP_GUARD, useExisting: RateLimitGuard },
