@@ -151,4 +151,17 @@ export async function applyGrants(client: PoolClient): Promise<void> {
     END
     $privacy$;
   `);
+
+  // B3 money boundary (0021). A payment attempt is evidence that money moved:
+  // soft-delete is the only way out, so the CONTRACT step of 0021 is repeated
+  // here — otherwise the blanket GRANT above hands DELETE straight back.
+  await client.query(`
+    DO $payments$
+    BEGIN
+      IF to_regclass('public.payment_attempts') IS NOT NULL THEN
+        EXECUTE 'REVOKE DELETE ON payment_attempts FROM scalpai_app';
+      END IF;
+    END
+    $payments$;
+  `);
 }

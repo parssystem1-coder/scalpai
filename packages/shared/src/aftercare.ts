@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * فاز ۵a — Aftercare، Messaging و Billing (ADR-0046).
  *
- * قرارداد واحدِ سیمی برای هر سه مادول. پوره‌ ES: نه node:crypto، نه fs —
+ * قرارداد واحدِ سیمی برای هر سه مادول. پوره‌ اس ای: نه node:crypto، نه fs —
  * باندل مرورگر هم همین فایل را import می‌کند.
  *
  * دو چیزی که اینجا عمدی است و موقع ریویو به چشم می‌آید:
@@ -18,7 +18,7 @@ import { z } from "zod";
  *      پاسخی و هیچ ردیفی شماره برنمی‌گرداند — فقط hash.
  */
 
-/* ── مجموعه‌های بسته ──────────────────────────────────────────── */
+/* ── مجموعه‌های بسته ────────────────────────────────── */
 
 export const MESSAGING_CHANNELS = ["kavenegar", "bale", "eitaa", "telegram", "whatsapp"] as const;
 export type MessagingChannel = (typeof MESSAGING_CHANNELS)[number];
@@ -50,7 +50,33 @@ export type InvoiceState = (typeof INVOICE_STATES)[number];
 export const PAYMENT_METHODS = ["cash", "card", "transfer", "gateway", "credit"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-/* ── کرانه‌ها ──────────────────────────────────────────────────── */
+/**
+ * حالت‌های یک تلاش پرداخت (بلاکر B3) — همان مجموعه‌ی CHECK در 0021.
+ *
+ * حالت پرداخت دیگر در حافظه‌ی پروسه نیست، در Postgres است؛ پس ماشین حالت
+ * باید در هر سه جا یکی باشد: قید دیتابیس، ریپوی packages/db، و این قرارداد.
+ *
+ *   pending → started → callback_received → verified | failed
+ *   pending | started → expired
+ */
+export const PAYMENT_ATTEMPT_STATUSES = [
+  "pending",
+  "started",
+  "callback_received",
+  "verified",
+  "failed",
+  "expired",
+] as const;
+export type PaymentAttemptStatus = (typeof PAYMENT_ATTEMPT_STATUSES)[number];
+
+/** حالت‌های پایانی: هیچ گذاری از آن‌ها بیرون نمی‌رود. */
+export const PAYMENT_ATTEMPT_TERMINAL_STATUSES = ["verified", "failed", "expired"] as const;
+
+export function isPaymentAttemptTerminal(status: string): boolean {
+  return (PAYMENT_ATTEMPT_TERMINAL_STATUSES as readonly string[]).includes(status);
+}
+
+/* ── کرانه‌ها ────────────────────────────────────────── */
 
 /** سقف numeric(12,0) پشت همه‌ی ستون‌های مبلغ. ریال کسر ندارد، پس int است. */
 export const MONEY_MAX = 999_999_999_999;
@@ -74,10 +100,10 @@ export const TemplateKey = z
   .max(MESSAGE_TEMPLATE_KEY_MAX)
   .regex(/^[a-z][a-z0-9_.-]*$/, "templateKey فقط حروف کوچک، رقم، _ . - می‌پذیرد");
 
-/* ══ ۱) Aftercare sequences ═══════════════════════════════════════════ */
+/* ══ ۱) Aftercare sequences ════════════════════════════════════════ */
 
 /**
- * یک گام. `offsetHours` فاصله از لحظه ثبت‌نام است، نه از گام قبلی: با فاصله‌ی
+ * یک گام. `offsetHours` فاصله از لحطه ثبت‌نام است، نه از گام قبلی: با فاصله‌ی
  * نسبی، یک تاخیر در گام دوم همه‌ی گام‌های بعد را جابه‌جا می‌کند و «پیام روز
  * هفتم» دیگر روز هفتم نیست.
  */
@@ -92,7 +118,7 @@ export type AftercareStepDto = z.infer<typeof AftercareStep>;
 
 /**
  * گام‌ها باید صعودی و بی‌تکرار باشند. دو گام با همان offsetHours و همان
- * channel یعنی دو پیام در یک لحظه روی یک خط — کاربر این را نمی‌خواسته، دو بار
+ * channel یعنی دو پیام در یک لحطه روی یک خط — کاربر این را نمی‌خواسته، دو بار
  * کلیک کرده.
  */
 const AftercareSteps = z
@@ -169,7 +195,7 @@ export const AftercareSequenceUpdate = z
   });
 export type AftercareSequenceUpdateDto = z.infer<typeof AftercareSequenceUpdate>;
 
-/* ══ ۲) Enrollments ══════════════════════════════════════════════════ */
+/* ══ ۲) Enrollments ══════════════════════════════════════════════ */
 
 export const AftercareEnrollmentCreate = z.object({
   sequenceId: Uuid,
@@ -199,7 +225,7 @@ export const AftercareEnrollmentQuery = z.object({
 });
 export type AftercareEnrollmentQueryDto = z.infer<typeof AftercareEnrollmentQuery>;
 
-/* ══ ۳) Messaging ─ outbound ═════════════════════════════════════════ */
+/* ══ ۳) Messaging ─ outbound ══════════════════════════════════════ */
 
 /**
  * ارسال دستی یک پیام خارج از دنباله. مخاطب با `patientId` مشخص می‌شود نه
@@ -241,7 +267,7 @@ export const MessageLogEntry = z.object({
 });
 export type MessageLogEntryDto = z.infer<typeof MessageLogEntry>;
 
-/* ══ ۴) Messaging ─ inbound ══════════════════════════════════════════ */
+/* ══ ۴) Messaging ─ inbound ═══════════════════════════════════════ */
 
 /**
  * تنها جای این فایل که شماره تلفن می‌پذیرد: webhook پروایدر شماره می‌فرستد
@@ -292,7 +318,7 @@ export const InboxEntry = z.object({
 });
 export type InboxEntryDto = z.infer<typeof InboxEntry>;
 
-/* ══ ۵) Billing ─ products ═══════════════════════════════════════════ */
+/* ══ ۵) Billing ─ products ════════════════════════════════════════ */
 
 export const ProductCreate = z
   .object({
@@ -343,7 +369,7 @@ export const ProductQuery = z.object({
 });
 export type ProductQueryDto = z.infer<typeof ProductQuery>;
 
-/* ══ ۶) Billing ─ invoices ══════════════════════════════════════════ */
+/* ══ ۶) Billing ─ invoices ═══════════════════════════════════════ */
 
 /**
  * یک سطر. اگر `productId` بیاید، سرور description/unitPrice/taxRate را از کاتالوگ
@@ -431,7 +457,7 @@ export const InvoiceQuery = z.object({
 });
 export type InvoiceQueryDto = z.infer<typeof InvoiceQuery>;
 
-/* ══ ۷) Metering ═══════════════════════════════════════════════════ */
+/* ══ ۷) Metering ══════════════════════════════════════════════ */
 
 /**
  * متریک‌های متر شده‌ی فاز ۵a. نام‌ها همان `usage_counters.metric` هستند — اگر

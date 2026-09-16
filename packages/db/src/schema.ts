@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, bigserial, boolean, customType, date, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, customType, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 /** Mirror of the hand-written SQL migrations (ADR-0002). */
 
@@ -600,6 +600,53 @@ export const invoiceItems = pgTable("invoice_items", {
   uniqueIndex("invoice_items_position_live_uq")
     .on(t.invoiceId, t.position)
     .where(sql`deleted_at IS NULL`),
+]);
+
+/**
+ * تلاش‌های پرداخت — بلاکر B3 (مایگریشن 0021).
+ *
+ * جای چهار Map درون‌حافظه‌ی PaymentService. حالتِ پرداخت روی دیسک است، پس
+ * ری‌استارت authority را گم نمی‌کند و رپلیکای دوم authority دوم نمی‌سازد.
+ *
+ * ماشین حالت: pending → started → callback_received → verified | failed،
+ * و pending | started → expired برای کسی که برنگشت. گذارها در ریپو با
+ * compare-and-set انجام می‌شوند و حالت‌های پایانی گذار ندارند.
+ *
+ * یکتاییِ «یک تلاش فعال برای هر فاکتور» جزئی است و شرطِ حالت را در خودش
+ * دارد: تلاش verified/failed/expired باید بگذارد تلاش تازه‌ای شروع شود، وگرنه
+ * یک پرداخت ناموفق فاکتور را برای همیشه قفل می‌کند.
+ */
+export const paymentAttempts = pgTable("payment_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clinicId: uuid("clinic_id").notNull().references(() => clinics.id),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id),
+  /** تا پاسخ پروایدر خالی است — ردیف پیش از تماس با درگاه ساخته می‌شود. */
+  authority: text("authority").notNull().default(""),
+  /** ریال، عدد صحیح. مانده‌ی فاکتور در لحظه شروع تلاش. */
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  redirectUrl: text("redirect_url"),
+  /** pending | started | callback_received | verified | failed | expired */
+  status: text("status").notNull().default("pending"),
+  provider: text("provider").notNull().default("zarinpal"),
+  providerRefId: text("provider_ref_id"),
+  errorReason: text("error_reason"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("payment_attempts_active_invoice_uq")
+    .on(t.invoiceId)
+    .where(sql`status NOT IN ('verified', 'failed', 'expired') AND deleted_at IS NULL`),
+  uniqueIndex("payment_attempts_authority_uq")
+    .on(t.authority)
+    .where(sql`authority <> '' AND deleted_at IS NULL`),
+  index("payment_attempts_clinic_invoice_idx")
+    .on(t.clinicId, t.invoiceId)
+    .where(sql`deleted_at IS NULL`),
+  index("payment_attempts_open_expiry_idx")
+    .on(t.expiresAt)
+    .where(sql`status IN ('pending', 'started') AND deleted_at IS NULL`),
 ]);
 
 /**

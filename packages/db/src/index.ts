@@ -339,6 +339,38 @@ export {
   type ProductFilter,
   type ProductPatch,
 } from "./repos/billing.repo.js";
+/**
+ * B3 — the payment state machine. `payment_attempts` (0021) replaces the four
+ * in-memory Maps PaymentService used to keep: a restart lost the authority and a
+ * second replica minted a duplicate one. Every transition here is
+ * compare-and-set, and `settleVerifiedAttempt` commits the verified attempt and
+ * the invoice payment together.
+ *
+ * `resolvePaymentAttemptClinic` is the ONE cross-tenant read of this path: the
+ * gateway callback carries no JWT and no HMAC, so the clinic has to be resolved
+ * from the authority before an RLS transaction can be opened at all.
+ */
+export {
+  PAYMENT_ATTEMPT_TTL_MS,
+  PaymentAttemptError,
+  claimPaymentAttempt,
+  claimPaymentCallback,
+  createPendingAttempt,
+  expireStalePaymentAttempts,
+  findActiveAttemptByInvoice,
+  findAttemptByAuthority,
+  markExpired,
+  resolvePaymentAttemptClinic,
+  settleVerifiedAttempt,
+  transitionToCallbackReceived,
+  transitionToFailed,
+  transitionToStarted,
+  transitionToVerified,
+  type AttemptClaim,
+  type CallbackClaim,
+  type PaymentAttemptRecord,
+  type PaymentAttemptStatus,
+} from "./repos/payment-attempts.repo.js";
 export {
   findActiveProvider,
   findActiveProviderForClinic,
