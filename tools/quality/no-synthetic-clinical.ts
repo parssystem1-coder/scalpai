@@ -14,7 +14,7 @@
  *
  * Exit 0 = clean. Any hit lists file, line and the offending construct.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const WEB_SRC = join(process.cwd(), "apps", "web", "src");
@@ -42,13 +42,12 @@ interface Violation {
 }
 
 function* walkTs(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      if (entry === "__tests__") continue;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__") continue;
       yield* walkTs(full);
-    } else if ((entry.endsWith(".ts") || entry.endsWith(".tsx")) && !entry.endsWith(".spec.ts") && !entry.endsWith(".spec.tsx")) {
+    } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) && !entry.name.endsWith(".spec.ts") && !entry.name.endsWith(".spec.tsx")) {
       yield full;
     }
   }

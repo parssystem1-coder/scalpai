@@ -17,7 +17,7 @@
  * Exit 0 = every used key resolves in both locales. Any miss lists the key,
  * the locales missing it and the files that use it.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 
@@ -144,13 +144,12 @@ function harvestConstBundles(sourceFile: ts.SourceFile, bundles: Map<string, Set
 function collectUsedKeys(): Map<string, Set<string>> {
   const used = new Map<string, Set<string>>();
   const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      const stat = statSync(full);
-      if (stat.isDirectory()) {
-        if (entry === "__tests__" || entry === "node_modules") continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "__tests__" || entry.name === "node_modules") continue;
         walk(full);
-      } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
+      } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) {
         const source = readFileSync(full, "utf8");
         const re = /\b(?:i18n\.)?t\(\s*["'`]([A-Za-z][\w.-]*)["'`]/g;
         for (const match of source.matchAll(re)) {
@@ -176,13 +175,12 @@ function main(): number {
 
   // Every other file may register bundles via addResourceBundle (e.g. inbox.i18n.ts).
   const walkAll = (dir: string, visit: (file: string) => void): void => {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      const stat = statSync(full);
-      if (stat.isDirectory()) {
-        if (entry === "__tests__" || entry === "node_modules") continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "__tests__" || entry.name === "node_modules") continue;
         walkAll(full, visit);
-      } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
+      } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) {
         visit(full);
       }
     }

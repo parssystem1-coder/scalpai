@@ -20,7 +20,7 @@
  *
  * Exit 0 = the lock is inherited by construction, not wired per page.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 
@@ -47,16 +47,15 @@ interface Violation {
 const violations: Violation[] = [];
 
 function* walkTs(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      if (entry === "__tests__" || entry === "node_modules") continue;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__" || entry.name === "node_modules") continue;
       yield* walkTs(full);
-    } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
+    } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) {
       // Spec files test AutoLock directly — production coverage is the rule,
       // test wiring is not.
-      if (entry.includes(".spec.")) continue;
+      if (entry.name.includes(".spec.")) continue;
       yield full;
     }
   }
