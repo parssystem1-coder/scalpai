@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
-import AutoLock from "../components/AutoLock.js";
 import DigitalConsentModal from "../components/modals/DigitalConsentModal.js";
 import { faNum, toggleLang } from "../i18n.js";
 import { uploadChunked, getPendingUploads, type PendingUploadState } from "../offline/chunked-upload.js";
@@ -262,7 +261,6 @@ export default function PatientGalleryPage({ onLoggedOut }: { onLoggedOut: () =>
 
   return (
     <main style={{ maxWidth: 980, margin: "4vh auto", padding: "0 16px" }}>
-      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ margin: 0 }}>
           {t("gallery.title")} {patientQuery.data ? `(${patientQuery.data.firstName} ${patientQuery.data.lastName})` : ""}

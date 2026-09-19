@@ -3,15 +3,20 @@ import { useEffect, useRef } from "react";
 const EVENTS = ["mousemove", "keydown", "wheel", "touchstart", "click"] as const;
 
 /**
- * Auto-lock (DESIGN §13 / playbook 2.5): after `minutes` of no user activity
- * the callback fires (caller drops the in-memory token and returns to login).
- * Renders nothing; activity listeners are passive.
+ * Auto-lock (DESIGN §13 / playbook 2 L3a): after the idle window elapses with
+ * no user activity the callback fires once (caller drops the in-memory token
+ * and returns to /login). Renders nothing; activity listeners are passive.
+ *
+ * The window is in SECONDS so the e2e suite can live through a real lock
+ * without faking the browser clock (clock fast-forward crashed the real page
+ * under the dev server). The primary wiring passes AUTO_LOCK_SECONDS; 600s is
+ * the §13 default.
  */
 export default function AutoLock({
-  minutes = 10,
+  seconds = 600,
   onLock,
 }: {
-  minutes?: number;
+  seconds?: number;
   onLock: () => void;
 }) {
   const firedRef = useRef(false);
@@ -28,7 +33,7 @@ export default function AutoLock({
           firedRef.current = true;
           cbRef.current();
         }
-      }, minutes * 60_000);
+      }, seconds * 1_000);
     };
     reset();
     for (const ev of EVENTS) window.addEventListener(ev, reset, { passive: true });
@@ -36,7 +41,7 @@ export default function AutoLock({
       if (timerRef.current) clearTimeout(timerRef.current);
       for (const ev of EVENTS) window.removeEventListener(ev, reset);
     };
-  }, [minutes]);
+  }, [seconds]);
 
   return null;
 }

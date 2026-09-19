@@ -300,6 +300,12 @@ jobs:
       - name: no-synthetic-clinical
         run: bash tools/ci/run-gate.sh no-synthetic-clinical npx tsx tools/quality/no-synthetic-clinical.ts
 
+      - name: locale-parity
+        run: bash tools/ci/run-gate.sh locale-parity npx tsx tools/quality/locale-parity.ts
+
+      - name: auto-lock-coverage
+        run: bash tools/ci/run-gate.sh auto-lock-coverage npx tsx tools/quality/auto-lock-coverage.ts
+
       - name: Upload Playwright report and traces
         if: always()
         uses: actions/upload-artifact@v4

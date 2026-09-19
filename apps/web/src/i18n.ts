@@ -710,6 +710,7 @@ follicleCaliber: {
       captured: "{{frames}} فریم تریکوسکوپی با وضوح بالا در گالری و هود هوش مصنوعی ذخیره گردید.",
       photoDeleted: "تصویر با موفقیت از پرونده بیمار حذف شد.",
       caliperSaved: "کالیبر تار ({{microns}} µm) به عنوان ضخامت فریم ثبت شد.",
+      uploadFailed: "آپلود به ذخیره‌ساز ناموفق بود؛ تغییرات برگردانده شد.",
       notesSaved: "یادداشت و توصیه بالینی در پرونده بیمار ذخیره شد.",
     },
     photoDates: {
@@ -1441,6 +1442,7 @@ const en = {
       captured: "{{frames}} high-resolution trichoscopy frames saved to the gallery and the AI HUD.",
       photoDeleted: "The image was removed from the patient record.",
       caliperSaved: "Hair caliper ({{microns}} µm) recorded as the frame thickness.",
+      uploadFailed: "Upload to storage failed; the change was rolled back.",
       notesSaved: "Clinical note and recommendation saved to the patient record.",
     },
     photoDates: {
