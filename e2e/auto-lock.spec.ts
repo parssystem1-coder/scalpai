@@ -9,32 +9,23 @@ import { CLINIC_A_OWNER, login } from "./helpers/session.js";
  * the user is redirected to /login and the protected screen is not reachable
  * through history.
  *
- * Two modes:
- *  - E2E_AUTO_LOCK_SECONDS set (local run): a REAL idle lock against the dev
- *    server. page.clock fast-forward crashed the real page under vite dev, so
- *    the app honours VITE_AUTO_LOCK_SECONDS and we wait out an actual 3s
- *    window with generous real-time margins for React/vite latency.
- *  - unset (CI): page.clock fast-forwards the 10-minute window instead of a
- *    10-minute sleep (Playwright >= 1.45). The margin covers Playwright's own
- *    scheduled flush.
+ * The app honours VITE_AUTO_LOCK_SECONDS (whole seconds, e2e-only escape
+ * hatch — the production build never sets it, so §13 keeps its full 600s
+ * window). The test waits out a REAL lock instead of faking the clock:
+ * page.clock fast-forward proved destructive twice — it crashed the page
+ * under the local dev server and stalled the lock in CI.
+ *
+ * At 3s the margin absorbs vite/React latency; keep the total well inside the
+ * 60s test timeout.
  */
-const LOCAL_WINDOW_S = Number(process.env.E2E_AUTO_LOCK_SECONDS ?? 0);
+const WINDOW_S = Number(process.env.E2E_AUTO_LOCK_SECONDS ?? 3);
 
 test("@smoke idle session locks and lands on /login", async ({ page }) => {
   await login(page, CLINIC_A_OWNER);
   await expect(page).toHaveURL(/\/dashboard/);
 
-  if (LOCAL_WINDOW_S > 0) {
-    // Real-time mode: the app lock fires at ~3s; allow vite dev latency.
-    await page.waitForURL(/\/login/, { timeout: 60_000 });
-  } else {
-    // Clock mode: install AFTER login so token requests run on real time.
-    await page.clock.install();
-    await page.clock.runFor(1_000);
-    // Fast-forward one idle window plus a beat — no activity in between.
-    await page.clock.runFor(10 * 60_000 + 5_000);
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
-  }
+  // No user activity from here on — the real timer fires the lock.
+  await page.waitForURL(/\/login/, { timeout: (WINDOW_S + 30) * 1_000 });
 
   // Lock = token dropped + redirect to /login (replace:true).
   await expect(page).toHaveURL(/\/login/);

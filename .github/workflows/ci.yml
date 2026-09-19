@@ -296,6 +296,13 @@ jobs:
 
       - name: Playwright @smoke (login, create patient, persistence, see it listed)
         run: bash tools/ci/run-gate.sh e2e-smoke npm run e2e:smoke
+        env:
+          # The auto-lock e2e waits out a REAL idle window (VITE_AUTO_LOCK_SECONDS
+          # is an e2e-only escape hatch; the production build keeps the §13 600s
+          # window). 15s stays far above sibling smoke specs' inter-action gaps
+          # (so their steps never trip the lock) and far below the test timeout.
+          E2E_AUTO_LOCK_SECONDS: "15"
+          VITE_AUTO_LOCK_SECONDS: "15"
 
       - name: no-synthetic-clinical
         run: bash tools/ci/run-gate.sh no-synthetic-clinical npx tsx tools/quality/no-synthetic-clinical.ts
