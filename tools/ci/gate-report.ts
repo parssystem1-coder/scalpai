@@ -34,6 +34,10 @@ export const REQUIRED_GATES = [
   "audit",
   "secret-scan",
   "e2e-smoke",
+  // Phase 4 Wave 2 (P4-B02): the clinical production paths must never invent
+  // metrics — AST-level scan, not a source grep (see tools/quality/
+  // no-synthetic-clinical.ts).
+  "no-synthetic-clinical",
   "compose-config",
   "compose-secrets-negative",
   "docker-build",

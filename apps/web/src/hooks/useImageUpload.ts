@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type Dispatch, type DragEvent, type SetStateAction } from "react";
+import { uploadChunked } from "../offline/chunked-upload.js";
 import type { TrichoscopyImage } from "../data/dashboard-types";
 
 interface ImageUploadInput {
@@ -9,11 +10,22 @@ interface ImageUploadInput {
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
+/**
+ * Dashboard upload path (P4-B01/B02 / F10 remediation — Wave 2).
+ *
+ * The old hook base64-encoded the file into a data URL held in React state —
+ * the upload never left the browser — and stamped fake density/thickness/99%
+ * quality onto the record. It now goes through the SAME resumable pipeline the
+ * patient gallery uses (presign → PUT → confirm; ADR-0041), and the local
+ * record carries only what is true before the server replies: identity, area
+ * and a pending marker. Metrics appear after real analysis, never invented.
+ */
 export function useImageUpload({ selectedPatient, selectedArea, setLocalImages, setActiveInspectedPhoto, t }: ImageUploadInput) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const feedbackTimer = useRef<number | null>(null);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => () => {
     if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
@@ -35,25 +47,41 @@ export function useImageUpload({ selectedPatient, selectedArea, setLocalImages, 
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result;
-      if (typeof dataUrl !== "string" || !dataUrl) return;
-      const newImg: TrichoscopyImage = {
-        id: `upload-${Date.now()}`,
-        patientId: selectedPatient.id,
-        url: dataUrl,
-        area: selectedArea,
-        date: t("dashboard.photoDates.uploaded"),
-        density: Math.round(138 + Math.random() * 26),
-        thickness: `${Math.round(64 + Math.random() * 14)} µm`,
-        qualityScore: 99,
-      };
-      setLocalImages((prev) => ({ ...prev, [selectedPatient.id]: [newImg, ...(prev[selectedPatient.id] || [])] }));
-      setActiveInspectedPhoto(newImg);
-      showFeedback(t("dashboard.toasts.uploaded", { name: file.name }), 6000);
+    // Placeholder row: truthful fields only. The URL is the object URL of the
+    // local file (viewable now); the server id arrives with the query
+    // invalidation after the upload completes.
+    const pendingId = crypto.randomUUID();
+    const localUrl = URL.createObjectURL(file);
+    const pendingImg: TrichoscopyImage = {
+      id: pendingId,
+      patientId: selectedPatient.id,
+      url: localUrl,
+      area: selectedArea,
+      date: t("dashboard.photoDates.uploaded"),
+      // Metrics are absent, not zero: they arrive only from a real analysis.
+      notes: "pending-upload",
     };
-    reader.readAsDataURL(file);
+    setLocalImages((prev) => ({ ...prev, [selectedPatient.id]: [pendingImg, ...(prev[selectedPatient.id] || [])] }));
+    setActiveInspectedPhoto(pendingImg);
+    setIsUploading(true);
+
+    void uploadChunked(file, selectedPatient.id)
+      .then(() => {
+        showFeedback(t("dashboard.toasts.uploaded", { name: file.name }), 6000);
+      })
+      .catch(() => {
+        // Roll the pending row back: an upload that failed must not sit in the
+        // gallery looking like data.
+        setLocalImages((prev) => ({
+          ...prev,
+          [selectedPatient.id]: (prev[selectedPatient.id] || []).filter((img) => img.id !== pendingId),
+        }));
+        showFeedback(t("dashboard.toasts.uploadFailed"), 6000);
+      })
+      .finally(() => {
+        setIsUploading(false);
+        URL.revokeObjectURL(localUrl);
+      });
   }, [selectedArea, selectedPatient, setActiveInspectedPhoto, setLocalImages, showFeedback, t]);
 
   const handleFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -79,5 +107,5 @@ export function useImageUpload({ selectedPatient, selectedArea, setLocalImages, 
     setIsDraggingOver(false);
   }, []);
 
-  return { fileInputRef, uploadFeedback, setUploadFeedback, isDraggingOver, handleFileInputChange, handleDrop, handleDragOver, handleDragLeave };
+  return { fileInputRef, uploadFeedback, setUploadFeedback, isDraggingOver, isUploading, handleFileInputChange, handleDrop, handleDragOver, handleDragLeave };
 }

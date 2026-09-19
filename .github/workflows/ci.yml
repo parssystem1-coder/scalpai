@@ -294,8 +294,11 @@ jobs:
       - name: Install the Chromium browser Playwright drives
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright @smoke (login, create patient, see it listed)
+      - name: Playwright @smoke (login, create patient, persistence, see it listed)
         run: bash tools/ci/run-gate.sh e2e-smoke npm run e2e:smoke
+
+      - name: no-synthetic-clinical
+        run: bash tools/ci/run-gate.sh no-synthetic-clinical npx tsx tools/quality/no-synthetic-clinical.ts
 
       - name: Upload Playwright report and traces
         if: always()

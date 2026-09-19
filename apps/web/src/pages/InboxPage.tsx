@@ -128,7 +128,6 @@ export const InboxPage: React.FC = () => {
 
   return (
     <main
-      dir="rtl"
       className="min-h-screen bg-[oklch(85%_0.03_28)] p-4 md:p-8"
       aria-labelledby="inbox-title"
     >

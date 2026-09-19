@@ -271,9 +271,11 @@ export function TrichoscopyGallerySection({
                             )}
                             <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 backdrop-blur-md text-emerald-800 text-[0.65rem] font-bold flex items-center gap-1 shadow-xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              {t("dashboard.galleryVision.quantumClarity", {
-                                value: faNum(photo.qualityScore),
-                              })}
+                              {photo.qualityScore === undefined
+                                ? t("dashboard.galleryVision.notMeasured")
+                                : t("dashboard.galleryVision.quantumClarity", {
+                                    value: faNum(photo.qualityScore),
+                                  })}
                             </div>
                           </div>
 
@@ -299,17 +301,21 @@ export function TrichoscopyGallerySection({
                                 })}
                               </span>
                               <span>
-                                {t("dashboard.galleryVision.thicknessLabel", {
-                                  value: faNum(photo.thickness),
-                                })}
+                                {photo.thickness === undefined
+                                  ? t("dashboard.galleryVision.notMeasured")
+                                  : t("dashboard.galleryVision.thicknessLabel", {
+                                      value: faNum(photo.thickness),
+                                    })}
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between pt-3 border-t border-black/5 gap-2">
                               <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                                {t("dashboard.galleryVision.densityLabel", {
-                                  value: faNum(photo.density),
-                                })}
+                                {photo.density === undefined
+                                  ? t("dashboard.galleryVision.notMeasured")
+                                  : t("dashboard.galleryVision.densityLabel", {
+                                      value: faNum(photo.density),
+                                    })}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <button

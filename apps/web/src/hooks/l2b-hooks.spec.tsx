@@ -58,22 +58,53 @@ describe("L2b dashboard hooks", () => {
     expect(result.current.selectedPatient?.lastName).toBe("Test");
   });
 
-  it("runs the analysis pipeline and exposes a stable render result", async () => {
+  it("runs the real engine on a provided image and exposes provenance-carrying result", async () => {
+    // 64x64 RGBA buffer: noise-free gradient the heuristic engine scores deterministically.
+    const width = 64;
+    const height = 64;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < width * height; i++) {
+      data[i * 4] = 230;
+      data[i * 4 + 1] = 200;
+      data[i * 4 + 2] = 190;
+      data[i * 4 + 3] = 255;
+    }
+    const image = { data, width, height };
+
     const { result } = renderHook(() =>
-      useDashboardAnalysis({
-        caliberHealthy: "Healthy",
-        caliberStandard: (microns) => `${microns} µm`,
-        protocolPeptide: "Peptide",
-        protocolSoothing: "Soothing",
-        protocolMeso: "Meso",
-      }),
+      useDashboardAnalysis(
+        { protocolSoothing: "Soothing", protocolMeso: "Meso" },
+        {
+          loadImage: async () => image,
+          hashImage: async (img) => `sha-${img.data.byteLength}`,
+        },
+      ),
+    );
+
+    expect(result.current.result.state).toBe("empty");
+
+    await act(async () => {
+      await result.current.runAnalysis({ url: "https://cdn.example.com/real.jpg", galleryItemId: "g9" });
+    });
+
+    const state = result.current.result;
+    if (state.state !== "ready") throw new Error("expected ready state");
+    expect(state.data.scores.redness).toBeTypeOf("number");
+    expect(state.data.recommendation).toMatch(/Meso|Soothing/);
+    expect(state.provenance.imageHash).toMatch(/^sha-/);
+    expect(state.provenance.modelVersion).toBe("heuristic-v0");
+    expect(state.provenance.galleryItemId).toBe("g9");
+  });
+
+  it("transitions to error state without an image instead of fabricating a result", async () => {
+    const { result } = renderHook(() =>
+      useDashboardAnalysis({ protocolSoothing: "Soothing", protocolMeso: "Meso" }),
     );
 
     await act(async () => {
       await result.current.runAnalysis();
     });
 
-    expect(result.current.result.scores.redness).toBeTypeOf("number");
-    expect(result.current.result.recommendation).toMatch(/Meso|Soothing/);
+    expect(result.current.result.state).toBe("error");
   });
 });

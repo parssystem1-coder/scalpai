@@ -12,16 +12,21 @@ const tr = (key: string, options: Record<string, unknown> = {}): string =>
 const PATIENT = "Maryam Rezaei";
 
 /** Engine output, not copy: an ASCII fixture keeps the spec language-neutral. */
-const DATA: AnalyticsData = {
+const RESULT = {
   scores: { redness: 22, flakeTexture: 26, densityProxy: 88 },
   severity: 24,
-  anagenRatio: 87,
-  hairCaliber: "76 µm",
+  modelVersion: "heuristic-v0",
   recommendation: "AI-synthesised peptide protocol (fixture)",
-  matrixHydration: 92,
-  tensorConfidence: 97.4,
-  follicularUnits: { single: 24, double: 52, triple: 24 },
 };
+
+const PROVENANCE = {
+  imageHash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  modelVersion: "heuristic-v0",
+  analyzedAt: "2026-09-19T10:00:00Z",
+  galleryItemId: "g1",
+};
+
+const DATA: AnalyticsData = { state: "ready", data: RESULT, provenance: PROVENANCE };
 
 describe("AnalyticsSection (Phase 5 i18n, Phase B testids)", () => {
   it("renders the translated badge, heading and patient-aware subtitle", () => {
@@ -48,18 +53,19 @@ describe("AnalyticsSection (Phase 5 i18n, Phase B testids)", () => {
 
     expect(screen.getByTestId("analytics-metric-value-redness").textContent).toBe(`${faNum(22)}%`);
     expect(screen.getByTestId("analytics-metric-value-flake").textContent).toBe(`${faNum(26)}%`);
-    expect(screen.getByTestId("analytics-metric-value-anagen").textContent).toBe(`${faNum(87)}%`);
+    // Derived from the real engine severity, not an invented anagen value.
+    expect(screen.getByTestId("analytics-metric-value-anagen").textContent).toBe(`${faNum(76)}%`);
     expect(screen.getByTestId("analytics-metric-value-hydration").textContent).toBe(
-      `${faNum(92)}%`
+      `${faNum(75)}%`
     );
-    expect(screen.getByTestId("analytics-tensor-confidence").textContent).toContain(
-      tr("dashboard.analytics.tensorConfidence", { value: faNum(97.4) })
+    expect(screen.getByTestId("analytics-provenance").textContent).toContain(
+      tr("dashboard.analytics.provenanceLabel", { model: "heuristic-v0" })
     );
   });
 
   it("swaps the scan button copy while the engine is running", () => {
     const { unmount } = render(
-      <AnalyticsSection data={DATA} patientName={PATIENT} isAnalyzing={false} />
+      <AnalyticsSection data={DATA} patientName={PATIENT} />
     );
     expect(screen.getByTestId("analytics-rerun-btn").textContent).toContain(
       tr("dashboard.analytics.rerun")
@@ -67,7 +73,7 @@ describe("AnalyticsSection (Phase 5 i18n, Phase B testids)", () => {
     expect(screen.getByTestId("analytics-rerun-btn").hasAttribute("disabled")).toBe(false);
     unmount();
 
-    render(<AnalyticsSection data={DATA} patientName={PATIENT} isAnalyzing={true} />);
+    render(<AnalyticsSection data={{ state: "analyzing" }} patientName={PATIENT} />);
     expect(screen.getByTestId("analytics-rerun-btn").textContent).toContain(
       tr("dashboard.analytics.processing")
     );
@@ -97,7 +103,7 @@ describe("AnalyticsSection (Phase 5 i18n, Phase B testids)", () => {
     expect(screen.getByTestId("analytics-protocol-title").textContent).toBe(
       tr("dashboard.analytics.protocol.title")
     );
-    expect(screen.getByTestId("analytics-recommendation").textContent).toBe(DATA.recommendation);
+    expect(screen.getByTestId("analytics-recommendation").textContent).toBe(RESULT.recommendation);
 
     fireEvent.click(screen.getByTestId("analytics-rerun-btn"));
     fireEvent.click(screen.getByTestId("analytics-education-btn"));

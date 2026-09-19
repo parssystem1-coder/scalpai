@@ -1,74 +1,114 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { createEngine } from "@scalpai/analysis-engine";
-import type { AnalyticsData } from "../components/sections/AnalyticsSection";
+import type { RgbaImage } from "@scalpai/analysis-engine";
+import type {
+  AnalysisProvenance,
+  AnalyticsData,
+  AnalyticsResult,
+} from "../components/sections/AnalyticsSection";
 
 export interface DashboardAnalysisLabels {
-  caliberHealthy: string;
-  caliberStandard: (microns: number) => string;
-  protocolPeptide: string;
   protocolSoothing: string;
   protocolMeso: string;
+}
+
+export interface DashboardAnalysisInput {
+  url: string;
+  /** Server gallery item id, when the analysed photo is a stored one. */
+  galleryItemId?: string;
+}
+
+export interface DashboardAnalysisDeps {
+  /** Injectable seam for tests — the browser default decodes via canvas. */
+  loadImage?: (url: string) => Promise<RgbaImage>;
+  hashImage?: (image: RgbaImage) => Promise<string>;
 }
 
 export interface DashboardAnalysisState {
   isAnalyzing: boolean;
   result: AnalyticsData;
-  runAnalysis: () => Promise<void>;
+  runAnalysis: (input?: DashboardAnalysisInput) => Promise<void>;
 }
 
-const INITIAL_ANALYSIS: AnalyticsData = {
-  scores: { redness: 22, flakeTexture: 26, densityProxy: 88 },
-  severity: 24,
-  anagenRatio: 87,
-  hairCaliber: "",
-  recommendation: "",
-  matrixHydration: 92,
-  tensorConfidence: 97.4,
-  follicularUnits: { single: 24, double: 52, triple: 24 },
-};
+/**
+ * Decode the real pixels behind a photo URL. The analysis runs on what the
+ * clinician actually sees — the old hook fed the engine a constant colour
+ * buffer and labelled the output with Math.random (P4-B02/F09).
+ */
+async function decodeToRgba(url: string): Promise<RgbaImage> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`image fetch failed: ${res.status}`);
+  const bitmap = await createImageBitmap(await res.blob());
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2d context unavailable");
+    const frame = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    return { data: frame.data, width: frame.width, height: frame.height };
+  } finally {
+    bitmap.close();
+  }
+}
 
-/** Owns the deterministic clinical analysis pipeline and exposes render data. */
-export function useDashboardAnalysis(labels: DashboardAnalysisLabels): DashboardAnalysisState {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<AnalyticsData>({
-    ...INITIAL_ANALYSIS,
-    hairCaliber: labels.caliberHealthy,
-    recommendation: labels.protocolPeptide,
-  });
+/** sha256 over the exact bytes the engine consumed — the provenance anchor. */
+async function sha256Hex(image: RgbaImage): Promise<string> {
+  const bytes = new Uint8Array(
+    image.data.buffer.slice(image.data.byteOffset, image.data.byteOffset + image.data.byteLength) as ArrayBuffer,
+  );
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
-  const runAnalysis = async () => {
-    setIsAnalyzing(true);
-    try {
-      const syntheticData = new Uint8ClampedArray(128 * 128 * 4);
-      for (let i = 0; i < syntheticData.length; i += 4) {
-        syntheticData[i] = 225;
-        syntheticData[i + 1] = 185;
-        syntheticData[i + 2] = 175;
-        syntheticData[i + 3] = 255;
+/**
+ * Owns the analysis pipeline (P4-B02 / F09 remediation — Wave 2).
+ *
+ * The state is a discriminated union with no default clinical payload:
+ * before a real run the UI renders its empty state. A `ready` result exists
+ * only after the engine consumed real pixels and carries their hash plus the
+ * model version — the same contract the server verifies on ingest (ADR-0043).
+ */
+export function useDashboardAnalysis(
+  labels: DashboardAnalysisLabels,
+  deps: DashboardAnalysisDeps = {},
+): DashboardAnalysisState {
+  const [result, setResult] = useState<AnalyticsData>({ state: "empty" });
+  const loadImage = deps.loadImage ?? decodeToRgba;
+  const hashImage = deps.hashImage ?? sha256Hex;
+
+  const runAnalysis = useCallback(
+    async (input?: DashboardAnalysisInput) => {
+      if (!input?.url) {
+        setResult({ state: "error" });
+        return;
       }
-      const output = await createEngine().analyze({
-        image: { data: syntheticData, width: 128, height: 128 },
-      });
-      setResult({
-        scores: output.scores,
-        severity: output.severity,
-        anagenRatio: Math.round(82 + Math.random() * 12),
-        hairCaliber: labels.caliberStandard(Math.round(68 + Math.random() * 12)),
-        matrixHydration: Math.round(86 + Math.random() * 10),
-        tensorConfidence: 98.2,
-        follicularUnits: {
-          single: Math.round(18 + Math.random() * 8),
-          double: Math.round(48 + Math.random() * 10),
-          triple: Math.round(25 + Math.random() * 10),
-        },
-        recommendation: output.scores.redness > 35 ? labels.protocolSoothing : labels.protocolMeso,
-      });
-    } catch {
-      // The UI keeps the last stable result when the analysis backend fails.
-    } finally {
-      window.setTimeout(() => setIsAnalyzing(false), 900);
-    }
-  };
+      setResult({ state: "analyzing" });
+      try {
+        const image = await loadImage(input.url);
+        const output = await createEngine().analyze({ image });
+        const data: AnalyticsResult = {
+          scores: output.scores,
+          severity: output.severity,
+          modelVersion: output.modelVersion,
+          recommendation:
+            output.scores.redness > 35 ? labels.protocolSoothing : labels.protocolMeso,
+        };
+        const provenance: AnalysisProvenance = {
+          imageHash: await hashImage(image),
+          modelVersion: output.modelVersion,
+          analyzedAt: new Date().toISOString(),
+          galleryItemId: input.galleryItemId,
+        };
+        setResult({ state: "ready", data, provenance });
+      } catch {
+        setResult({ state: "error" });
+      }
+    },
+    [hashImage, labels.protocolMeso, labels.protocolSoothing, loadImage],
+  );
 
-  return { isAnalyzing, result, runAnalysis };
+  return { isAnalyzing: result.state === "analyzing", result, runAnalysis };
 }

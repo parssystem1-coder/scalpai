@@ -1,6 +1,6 @@
 import type { ConditionKey, SeverityLevel } from "@scalpai/education";
 import type { Dispatch, SetStateAction } from "react";
-import type { AnalyticsData } from "../components/sections/AnalyticsSection";
+import type { AnalyticsData, AnalyticsResult } from "../components/sections/AnalyticsSection";
 import type { Patient } from "../data/dashboard-types";
 
 interface ConditionMappingParams {
@@ -40,12 +40,19 @@ const handleOpenAiEducation = () => {
       break;
     }
   }
-  if (conditionKey === "androgenetic_alopecia" && aiResult.scores.redness > 35) {
+  const engineResult: AnalyticsResult | null = aiResult.state === "ready" ? aiResult.data : null;
+  if (conditionKey === "androgenetic_alopecia" && engineResult && engineResult.scores.redness > 35) {
     conditionKey = "seborrheic_dermatitis";
   }
 
     const severity: SeverityLevel =
-      aiResult.severity < 20 ? "mild" : aiResult.severity > 45 ? "severe" : "moderate";
+      engineResult === null
+        ? "moderate"
+        : engineResult.severity < 20
+          ? "mild"
+          : engineResult.severity > 45
+            ? "severe"
+            : "moderate";
 
     setEducationCondition(conditionKey);
     setEducationSeverity(severity);

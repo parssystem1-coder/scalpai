@@ -22,9 +22,11 @@ export interface TrichoscopyImage {
   area: "vertex" | "temple" | "frontal" | "occiput";
   /** ISO `YYYY-MM-DD` for stored frames; freshly captured frames carry a label. */
   date: string;
-  density: number;
-  thickness: string;
-  qualityScore: number;
+  /** Clinical metrics are optional by contract: they exist only after a real
+   *  server-side analysis. `undefined` means "not measured", never "zero". */
+  density?: number;
+  thickness?: string;
+  qualityScore?: number;
   tags?: string[];
   notes?: string;
 }
