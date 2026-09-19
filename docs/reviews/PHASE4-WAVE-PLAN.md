@@ -33,7 +33,7 @@
 | F09-adjacent | `hooks/useGalleryFilters.ts` | حذف ردیف عکس fallback با متریک جعلی (98% clarity از هیچ) |
 | F09-adjacent | `hooks/useDashboardRecords.ts` | حذف مقادیر بالینی جعلی بیمار جدید (154/85/90/...) |
 | F05 | `NeuralSegmentationOverlay.tsx` | حذف ادعاهای اثبات‌ناپذیر «4K» و «Tensor-Model: v4.8» → برچسب i18n «کمکی و غیرتشخیصی»؛ ترجمهٔ `alt` |
-| گیت | `tools/quality/no-synthetic-clinical.ts` + `gate-report.ts` + `ci.yml` + `package.json` | گیت `no-synthetic-clinical` (سطح AST): ممنوعیت Math.random در مسیرهای بالینی، literal عددی برای متریک‌ها، id مشتق از کلاک؛ allowlist تزئینی HairCanvas؛ در REQUIRED_GATES و ci.yml |
+| گیت | `tools/quality/no-synthetic-clinical.ts` + `gate-report.ts` + `ci.yml` | گیت `no-synthetic-clinical` (سطح AST): ممنوعیت Math.random در مسیرهای بالینی، literal عددی برای متریک‌ها، id مشتق از کلاک؛ allowlist تزئینی HairCanvas؛ در REQUIRED_GATES و ci.yml (بدون دست‌زدن به package.json تا گیت lockfile آزار نشود) |
 | C1 | `e2e/dashboard-persistence.spec.ts` | تست @smoke پایداری: بیمار ساخته‌شده در UI بعد از reload کامل صفحه باقی می‌ماند |
 | F01- collateral | `tools/quality/product.phase10.spec.ts` | تست L2d که به‌اشتباه `<FeatureErrorBoundary>/<Suspense>/contentVisibility` را از ClinicalDashboard (یعنی از کامنت F01) می‌خواست، به محل واقعی (HologramSection) اصلاح شد |
 

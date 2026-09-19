@@ -298,7 +298,7 @@ jobs:
         run: bash tools/ci/run-gate.sh e2e-smoke npm run e2e:smoke
 
       - name: no-synthetic-clinical
-        run: bash tools/ci/run-gate.sh no-synthetic-clinical npm run scan:synthetic
+        run: bash tools/ci/run-gate.sh no-synthetic-clinical npx tsx tools/quality/no-synthetic-clinical.ts
 
       - name: Upload Playwright report and traces
         if: always()
