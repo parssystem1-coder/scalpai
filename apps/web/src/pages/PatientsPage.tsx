@@ -6,7 +6,6 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { PatientCreate, type PatientCreate as PatientDto } from "@scalpai/shared";
 import { apiFetch, ApiError, clearAccessToken } from "../api/client.js";
-import AutoLock from "../components/AutoLock.js";
 import PendingBadge from "../components/PendingBadge.js";
 import DigitalConsentModal from "../components/modals/DigitalConsentModal.js";
 import { useSync } from "../offline/SyncProvider.js";
@@ -100,7 +99,6 @@ export default function PatientsPage({ onLoggedOut }: { onLoggedOut: () => void 
 
   return (
     <main style={{ maxWidth: 780, margin: "8vh auto", padding: "0 16px" }}>
-      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <h1 data-testid="patients-title" style={{ margin: 0 }}>{t("patients.title")}</h1>
         <PendingBadge />

@@ -12,7 +12,6 @@ import {
 } from "@scalpai/shared";
 import { useTranslation } from "react-i18next";
 import { faNum, toggleLang } from "../i18n.js";
-import AutoLock from "../components/AutoLock.js";
 
 interface Scores {
   redness: number;
@@ -134,7 +133,6 @@ export default function AnalysisPage({ onLoggedOut }: { onLoggedOut: () => void 
 
   return (
     <main style={{ maxWidth: 720, margin: "4vh auto" }}>
-      <AutoLock minutes={10} onLock={() => { clearAccessToken(); onLoggedOut(); }} />
       <h1>{t("analysis.title")}</h1>
       <button type="button" onClick={toggleLang}>{i18n.language === "fa" ? "EN" : "فا"}</button>
       <Link to={`/patients/${pid}/gallery`}>{t("analysis.back")}</Link>

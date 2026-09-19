@@ -38,6 +38,13 @@ export const REQUIRED_GATES = [
   // metrics — AST-level scan, not a source grep (see tools/quality/
   // no-synthetic-clinical.ts).
   "no-synthetic-clinical",
+  // Phase 4 Wave 3: locale parity as behaviour — every t() key used in
+  // apps/web must resolve in BOTH locales (tools/quality/locale-parity.ts).
+  "locale-parity",
+  // Phase 4 Wave 3 (P4-B08/F14): the idle auto-lock is inherited by
+  // construction from ProtectedRoute — never wired per page, never absent
+  // (tools/quality/auto-lock-coverage.ts).
+  "auto-lock-coverage",
   "compose-config",
   "compose-secrets-negative",
   "docker-build",

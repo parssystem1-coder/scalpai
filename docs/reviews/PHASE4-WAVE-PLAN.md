@@ -39,10 +39,20 @@
 
 **شواهد موج ۲ (اجرای کامل، دو بار):** ۱۵۸ تست وب سبز · ۱۳۰ تست quality/ci سبز (شامل به‌روزرسانی H15 `pipeline.phase5.spec.ts` برای ثبت `dashboard-persistence.spec.ts` در فهرست قفل‌شدهٔ اسپک‌ها — دقیقاً همان کاری که این گیت برایش ساخته شده) · typecheck کل ریپو سبز · lint سبز · conformance PASS (16 rules) · `no-synthetic-clinical` PASS (27 فایل، 1 allowlist) · parity gate-report↔ci.yml سبز
 
-## موج ۳ — قفل رفتار امنیتی UI (P1)
+## موج ۳ — قفل رفتار امنیتی UI (P1) — تکمیل شد (2026-09-20)
 
-- AutoLock داخل `ProtectedRoute` (پوشش PatientsPage و InboxPage که امروز بدون قفل‌اند).
-- تبدیل گیت locale-parity به تست رندر دو-زبانه (fa/en → documentElement.dir) در CI.
+| آیتم | فایل | کار |
+|---|---|---|
+| F14/P4-B08 | `ProtectedRoute.tsx` | AutoLock در نقطهٔ اوج (choke point) سوار شد — هر route جدید محافظت‌شده، قفل را با ارث می‌برد |
+| F14 | `PatientsPage` / `PatientGalleryPage` / `AnalysisPage` / `ClinicalDashboard` | سیم‌کشی دستی per-page حذف شد |
+| F14 | `InboxPage` | حفرهٔ پوشش بسته شد — از طریق ProtectedRoute قفل می‌گیرد |
+| F15 | `tools/quality/locale-parity.ts` | گیت AST/i18n: کلیدهای fa/en باید یکسان باشند و هر کلید مصرفی در هر دو resolve شود (+1 کلید گم‌شدهٔ واقعی رفع شد) |
+| F15 | `apps/web/src/__tests__/locale-parity.spec.tsx` | تست رندر دو-زبانه: fa → `dir=rtl`، en → `dir=ltr`، هر دو روی داشبورد واقعی |
+| — | `tools/quality/auto-lock-coverage.ts` | گیت AST: هر route پشت ProtectedRoute / allowlist مستند |
+| — | `e2e/auto-lock.spec.ts` | e2e واقعی: قفل ۱۰ دقیقه‌ای در CI با `page.clock`، محلی با پنجرهٔ واقعی ۳ ثانیه‌ای (`VITE_AUTO_LOCK_SECONDS`) چون fast-forward ساعت صفحه را کرش می‌کرد |
+| — | `REQUIRED_GATES` + `ci.yml` | `locale-parity` و `auto-lock` ثبت شدند (parity تست سبز) |
+
+**شواهد موج ۳:** ۱۶۶ تست وب سبز (۷ جدید) · ۱۳۰ تست quality/ci سبز · typecheck سبز · lint سبز · conformance PASS (16 rules) · هر ۳ گیت AST سبز · e2e محلی ۳/۳ سبز (قفل واقعی در Chrome سیستم؛ chromium CDN در این محیط 403 می‌دهد — CI خودش chromium دارد)
 
 ## موج ۴ — گیت‌های enforcement (P1)
 
