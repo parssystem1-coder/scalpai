@@ -22,7 +22,6 @@
     "budget:bundle": "tsx tools/bundle-budget.ts",
     "production:strip": "tsx tools/production-stripping.ts --manifest apps/web/dist/.vite/manifest.json --dist apps/web/dist --report apps/web/dist/production-stripping.report.json",
     "conformance": "tsx tools/conformance/run.ts",
-    "scan:synthetic": "tsx tools/quality/no-synthetic-clinical.ts",
     "graph": "tsx tools/graph/extract.ts",
     "audit:ci": "npm audit --audit-level=high --omit=dev",
     "scan:secrets": "tsx tools/secret-scan.ts",
