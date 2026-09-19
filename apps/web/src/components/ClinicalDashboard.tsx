@@ -39,7 +39,6 @@ import { useConditionMapping } from "../hooks/useConditionMapping";
 import { useGalleryFilters } from "../hooks/useGalleryFilters";
 export { SECTIONS };
 export type { SectionId };
-// dataProvider.mode="demo", <DemoWatermark mode={dataProvider.mode} surface="dashboard" />, dataMode={dataProvider.mode}, dashboard.galleryVision.thumbAlt, dashboard.lightbox.imageAlt, dashboard.galleryVision.tagChip, <FeatureErrorBoundary>, <Suspense>, lazy(() => import("./LuxuryScalp3D")), contentVisibility: "auto", useState<Patient | null>(null), dashboard.emptyState.title, dashboard.dividers.patients, dashboard.dividers.scalpMap, dashboard.dividers.trichoscopy, dashboard.dividers.aiEngine, dashboard.dividers.hologram.
 
 interface ClinicalDashboardProps {
   userEmail?: string;
@@ -110,10 +109,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const { selectedArea, setSelectedArea, patientPhotos } = useGalleryFilters({ selectedPatient, localImages });
   const { fileInputRef, uploadFeedback, setUploadFeedback, isDraggingOver, handleFileInputChange, handleDrop, handleDragOver, handleDragLeave } = useImageUpload({ selectedPatient, selectedArea, setLocalImages, setActiveInspectedPhoto, t });
 
-  const { isAnalyzing, result: aiResult, runAnalysis: handleRunAiAnalysis } = useDashboardAnalysis({
-    caliberHealthy: t("dashboard.ai.caliberHealthy"),
-    caliberStandard: (microns) => t("dashboard.ai.caliberStandard", { microns }),
-    protocolPeptide: t("dashboard.ai.protocolPeptide"),
+  const { result: aiResult, runAnalysis: handleRunAiAnalysis } = useDashboardAnalysis({
     protocolSoothing: t("dashboard.ai.protocolSoothing"),
     protocolMeso: t("dashboard.ai.protocolMeso"),
   });
@@ -196,8 +192,14 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         <AnalyticsSection
           data={aiResult}
           patientName={`${selectedPatient.firstName} ${selectedPatient.lastName}`}
-          isAnalyzing={isAnalyzing}
-          onRunAnalysis={() => { void handleRunAiAnalysis(); }}
+          onRunAnalysis={() => {
+            const analysed = activeInspectedPhoto ?? patientPhotos[0] ?? null;
+            void handleRunAiAnalysis(
+              analysed
+                ? { url: analysed.url, galleryItemId: analysed.id }
+                : undefined,
+            );
+          }}
           onOpenEducation={handleOpenAiEducation}
           onOpenPdfReport={openPdfReport}
           onNavigate={scrollToSection}

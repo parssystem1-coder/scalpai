@@ -18,9 +18,10 @@ export interface ComparePhotoItem {
   url: string;
   area: "vertex" | "temple" | "frontal" | "occiput";
   date: string;
-  density: number;
-  thickness: string;
-  qualityScore: number;
+  /** Optional by contract: only a real analysis measures these (P4-B02). */
+  density?: number;
+  thickness?: string;
+  qualityScore?: number;
   tags?: string[];
   notes?: string;
 }
@@ -229,17 +230,23 @@ export default function BeforeAfterCompareModal({
       ctx.font = "bold 15px system-ui, sans-serif";
       ctx.fillText(t("dashboard.compareModal.canvasAnalysis"), 1120, ribbonY + 35);
 
-      const deltaText = `${densityDelta >= 0 ? `+${densityDelta}` : densityDelta} ${t("dashboard.compareModal.densityUnit")}  (${densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)`;
-      ctx.fillStyle = densityDelta >= 0 ? "#10b981" : "#f43f5e";
+      // An unmeasured pair exports an honest "not measured" note, not a fake delta.
+      const deltaText =
+        densityDelta !== null && densityPercentChange !== null
+          ? `${densityDelta >= 0 ? `+${densityDelta}` : densityDelta} ${t("dashboard.compareModal.densityUnit")}  (${densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)`
+          : t("dashboard.galleryVision.notMeasured");
+      ctx.fillStyle = densityDelta !== null && densityDelta >= 0 ? "#10b981" : "#f43f5e";
       ctx.font = "bold 24px monospace";
       ctx.fillText(deltaText, 1120, ribbonY + 75);
 
       ctx.fillStyle = "#a8a29e";
       ctx.font = "13px system-ui, sans-serif";
       ctx.fillText(
-        densityDelta >= 0
-          ? t("dashboard.compareModal.canvasPositiveTrend")
-          : t("dashboard.compareModal.canvasNegativeTrend"),
+        densityDelta === null
+          ? t("dashboard.galleryVision.notMeasured")
+          : densityDelta >= 0
+            ? t("dashboard.compareModal.canvasPositiveTrend")
+            : t("dashboard.compareModal.canvasNegativeTrend"),
         1120,
         ribbonY + 105
       );
@@ -283,12 +290,15 @@ export default function BeforeAfterCompareModal({
     return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
   }, []);
 
+  // Densities are optional — an unmeasured pair must not fake a trend line.
   const densityDelta =
-    photoA && photoB ? photoB.density - photoA.density : 0;
+    photoA && photoB && photoA.density !== undefined && photoB.density !== undefined
+      ? photoB.density - photoA.density
+      : null;
   const densityPercentChange =
-    photoA && photoA.density > 0
+    densityDelta !== null && photoA?.density !== undefined && photoA.density > 0
       ? Math.round((densityDelta / photoA.density) * 100)
-      : 0;
+      : null;
 
   const filteredPhotos =
     filterArea === "all"
@@ -454,18 +464,18 @@ export default function BeforeAfterCompareModal({
             <div className="flex items-center gap-2">
               <TrendingUp
                 className={`w-4 h-4 ${
-                  densityDelta >= 0 ? "text-emerald-400" : "text-amber-400"
+                  densityDelta !== null && densityDelta >= 0 ? "text-emerald-400" : "text-amber-400"
                 }`}
               />
               <span className="text-stone-300 font-medium">{t("dashboard.compareModal.densityChange")}</span>
               <span
                 className={`font-bold font-mono text-sm ${
-                  densityDelta >= 0 ? "text-emerald-300" : "text-amber-300"
+                  densityDelta !== null && densityDelta >= 0 ? "text-emerald-300" : "text-amber-300"
                 }`}
               >
-                {densityDelta >= 0 ? `+${densityDelta}` : densityDelta} {t("dashboard.compareModal.densityUnit")}
-                {" "}
-                ({densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)
+                {densityDelta !== null && densityPercentChange !== null
+                  ? `${densityDelta >= 0 ? `+${densityDelta}` : densityDelta} ${t("dashboard.compareModal.densityUnit")} (${densityPercentChange >= 0 ? `+${densityPercentChange}` : densityPercentChange}%)`
+                  : t("dashboard.galleryVision.notMeasured")}
               </span>
             </div>
             <div className="flex items-center gap-2 text-stone-400">

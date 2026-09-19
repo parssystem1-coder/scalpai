@@ -1,8 +1,6 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { Patient, TrichoscopyImage } from "../data/dashboard-types";
 
-const FALLBACK_PHOTO_DATE = "2024-08-31";
-
 interface GalleryFilterInput {
   selectedPatient: Patient | null;
   localImages: Record<string, TrichoscopyImage[]>;
@@ -21,18 +19,7 @@ export function useGalleryFilters({ selectedPatient, localImages }: GalleryFilte
   const [selectedTagFilter, setSelectedTagFilter] = useState("all");
 
   const patientPhotos = useMemo(() => {
-    const allPatientPhotos = selectedPatient
-      ? localImages[selectedPatient.id] ?? [{
-          id: "img-default",
-          patientId: selectedPatient.id,
-          url: "/trichoscopy/vertex.jpg",
-          area: "vertex" as const,
-          date: FALLBACK_PHOTO_DATE,
-          density: selectedPatient.hairDensity || 148,
-          thickness: "72 µm",
-          qualityScore: 98,
-        }]
-      : [];
+    const allPatientPhotos = selectedPatient ? localImages[selectedPatient.id] ?? [] : [];
 
     if (selectedTagFilter === "all") return allPatientPhotos;
     if (selectedTagFilter === "has_notes") {

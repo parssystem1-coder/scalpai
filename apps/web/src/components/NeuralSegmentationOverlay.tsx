@@ -59,7 +59,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-[oklch(62%_0.09_16)] animate-pulse" />
           <span className="font-mono text-[oklch(20%_0.02_20)] font-bold tracking-wider">
-            AI TRICHO-VISION HUD • 4K
+            {t("dashboard.neuralSegmentation.hudTitle")}
           </span>
           <span className="px-2.5 py-0.5 rounded-full bg-white/80 border border-black/5 text-[0.65rem] text-[oklch(40%_0.02_20)] font-medium shadow-xs">
             {t("dashboard.neuralSegmentation.areaPrefix", { area: areaName })}
@@ -110,7 +110,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
       <div className="relative aspect-16/10 rounded-2xl overflow-hidden bg-stone-900 border border-white/30 shadow-lg">
         <img
           src={imageUrl}
-          alt="Trichoscopy Microscopic View"
+          alt={t("dashboard.neuralSegmentation.imageAlt")}
           className={`w-full h-full object-cover transition-all duration-700 ${
             heatmapMode ? "brightness-75 contrast-125 saturate-200 hue-rotate-30" : ""
           }`}
@@ -216,7 +216,7 @@ export const NeuralSegmentationOverlay: React.FC<NeuralSegmentationOverlayProps>
           </div>
 
           <span className="text-[0.65rem] font-mono text-rose-300/90">
-            Tensor-Model: v4.8 • {patientName}
+            {t("dashboard.neuralSegmentation.assistantLabel")} • {patientName}
           </span>
         </div>
       </div>

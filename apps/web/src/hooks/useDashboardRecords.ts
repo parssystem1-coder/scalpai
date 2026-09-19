@@ -75,18 +75,23 @@ export function useDashboardRecords(
   const addPatient = useCallback((input: NewPatientInput, labels: { today: string; defaultCondition: string }): Patient | null => {
     if (!input.firstName || !input.lastName) return null;
     const created: Patient = {
-      id: `pat-${Date.now().toString().slice(-4)}`,
+      // Server-shaped id: the local roster must never mint display ids from the
+      // wall clock (collisions + synthetic provenance). Full uuid until the API
+      // POST returns the real one (Wave 2, C1).
+      id: crypto.randomUUID(),
       firstName: input.firstName,
       lastName: input.lastName,
       phone: input.phone || "09120000000",
       lastVisit: labels.today,
       scalpCondition: input.condition || labels.defaultCondition,
-      hairDensity: 154,
-      anagenRatio: 85,
-      keratinHealth: 90,
-      sebumBalance: 75,
-      microcirculation: 80,
-      stemCellVitality: 85,
+      // Clinical metrics stay unset until real measurements exist — the
+      // dashboard must not pre-fill a new record with invented numbers.
+      hairDensity: undefined,
+      anagenRatio: undefined,
+      keratinHealth: undefined,
+      sebumBalance: undefined,
+      microcirculation: undefined,
+      stemCellVitality: undefined,
     };
     setPatients((current) => [created, ...current]);
     setSelectedPatient(created);

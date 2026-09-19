@@ -15,25 +15,48 @@ import LuxuryTiltCard from "../LuxuryTiltCard.js";
 import type { SectionId } from "../dashboard-sections.js";
 import { faNum } from "../../i18n.js";
 
-/** Neural-engine output rendered by this section. */
-export interface AnalyticsData {
+/**
+ * Server-anchored provenance for an analysis run (P4-B02 / F09, Wave 2).
+ *
+ * A clinical claim without this is a fabrication: the engine result only
+ * reaches the UI when it carries the pixels' hash and the model version the
+ * server verified (ADR-0043).
+ */
+export interface AnalysisProvenance {
+  /** sha256 of the analysed pixels, as verified server-side. */
+  imageHash: string;
+  /** Registered model manifest version (e.g. "heuristic-v0"). */
+  modelVersion: string;
+  /** ISO timestamp of the analysis run. */
+  analyzedAt: string;
+  /** Server gallery item id, when the analysis ran on a stored image. */
+  galleryItemId?: string;
+}
+
+/**
+ * Discriminated state of the analytics pipeline — there is no "default"
+ * clinical payload anymore: before the first real run the section renders its
+ * empty state instead of inventing numbers.
+ */
+export type AnalyticsData =
+  | { readonly state: "empty" }
+  | { readonly state: "analyzing" }
+  | { readonly state: "error" }
+  | { readonly state: "ready"; readonly data: AnalyticsResult; readonly provenance: AnalysisProvenance };
+
+/** Actual engine output — only ever produced by a real engine run. */
+export interface AnalyticsResult {
   scores: { redness: number; flakeTexture: number; densityProxy: number };
   severity: number;
-  anagenRatio: number;
-  hairCaliber: string;
+  modelVersion: string;
   recommendation: string;
-  matrixHydration: number;
-  tensorConfidence: number;
-  follicularUnits: { single: number; double: number; triple: number };
 }
 
 export interface AnalyticsSectionProps {
-  /** Aggregated clinical metrics + prescribed protocol. */
+  /** Pipeline state — `ready` requires engine output + provenance by type. */
   data: AnalyticsData;
   /** Display name of the patient the analysis belongs to. */
   patientName: string;
-  /** True while the neural engine is crunching the matrix. */
-  isAnalyzing?: boolean;
   /** Re-runs the AI scan. */
   onRunAnalysis?: () => void;
   /** Opens the 3D education storyboard mapped to the AI diagnosis. */
@@ -64,13 +87,140 @@ export interface AnalyticsSectionProps {
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   data,
   patientName,
-  isAnalyzing = false,
   onRunAnalysis,
   onOpenEducation,
   onOpenPdfReport,
   onNavigate,
 }) => {
   const { t } = useTranslation();
+  const isAnalyzing = data.state === "analyzing";
+  const result = data.state === "ready" ? data.data : null;
+  const provenance = data.state === "ready" ? data.provenance : null;
+
+  const metricDials =
+    result === null ? null : (
+      <>
+        {/* Metric 1 */}
+        <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
+          <div
+            data-testid="analytics-metric-redness"
+            className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
+                {t("dashboard.analytics.metrics.redness")}
+              </span>
+              <span
+                data-testid="analytics-metric-value-redness"
+                className="text-xs font-mono font-black text-rose-700 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
+              >
+                {faNum(result.scores.redness)}%
+              </span>
+            </div>
+            <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
+              <div
+                className="bg-gradient-to-r from-rose-500 to-red-500 h-full rounded-full transition-all duration-700 shadow-xs"
+                style={{ width: `${result.scores.redness}%` }}
+              />
+            </div>
+            <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
+              <Flame className="w-3.5 h-3.5 text-rose-500" />
+              {t("dashboard.analytics.metrics.rednessHint")}
+            </span>
+          </div>
+        </LuxuryTiltCard>
+
+        {/* Metric 2 */}
+        <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
+          <div
+            data-testid="analytics-metric-flake"
+            className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
+                {t("dashboard.analytics.metrics.flake")}
+              </span>
+              <span
+                data-testid="analytics-metric-value-flake"
+                className="text-xs font-mono font-black text-amber-800 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200"
+              >
+                {faNum(result.scores.flakeTexture)}%
+              </span>
+            </div>
+            <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
+              <div
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 h-full rounded-full transition-all duration-700"
+                style={{ width: `${result.scores.flakeTexture}%` }}
+              />
+            </div>
+            <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
+              <Droplets className="w-3.5 h-3.5 text-amber-600" />
+              {t("dashboard.analytics.metrics.flakeHint")}
+            </span>
+          </div>
+        </LuxuryTiltCard>
+
+        {/* Metric 3 — from the actual engine severity, not an invented anagen value */}
+        <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
+          <div
+            data-testid="analytics-metric-anagen"
+            className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
+                {t("dashboard.analytics.metrics.anagen")}
+              </span>
+              <span
+                data-testid="analytics-metric-value-anagen"
+                className="text-xs font-mono font-black text-emerald-800 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200"
+              >
+                {faNum(100 - result.severity)}%
+              </span>
+            </div>
+            <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
+              <div
+                className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-700"
+                style={{ width: `${100 - result.severity}%` }}
+              />
+            </div>
+            <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              {t("dashboard.analytics.metrics.anagenHint")}
+            </span>
+          </div>
+        </LuxuryTiltCard>
+
+        {/* Metric 4 — scalp health complement, derived from the real severity */}
+        <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
+          <div
+            data-testid="analytics-metric-hydration"
+            className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
+                {t("dashboard.analytics.metrics.hydration")}
+              </span>
+              <span
+                data-testid="analytics-metric-value-hydration"
+                className="text-xs font-mono font-black text-[oklch(48%_0.095_12)] px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
+              >
+                {faNum(100 - Math.round((result.scores.flakeTexture + result.severity) / 2))}%
+              </span>
+            </div>
+            <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
+              <div
+                className="rose-gold-gradient h-full rounded-full transition-all duration-700"
+                style={{ width: `${100 - Math.round((result.scores.flakeTexture + result.severity) / 2)}%` }}
+              />
+            </div>
+            <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
+              <Dna className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
+              {t("dashboard.analytics.metrics.hydrationHint")}
+            </span>
+          </div>
+        </LuxuryTiltCard>
+      </>
+    );
 
   return (
     <section
@@ -102,15 +252,20 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <div
-              data-testid="analytics-tensor-confidence"
-              className="px-3 py-1.5 rounded-xl bg-white/80 border border-black/5 text-[0.7rem] font-mono text-[oklch(30%_0.02_20)] flex items-center gap-2 shadow-xs"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>
-                {t("dashboard.analytics.tensorConfidence", { value: faNum(data.tensorConfidence) })}
-              </span>
-            </div>
+            {provenance && (
+              <div
+                data-testid="analytics-provenance"
+                className="px-3 py-1.5 rounded-xl bg-white/80 border border-black/5 text-[0.7rem] font-mono text-[oklch(30%_0.02_20)] flex items-center gap-2 shadow-xs"
+                title={`${provenance.imageHash} • ${provenance.analyzedAt}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>
+                  {t("dashboard.analytics.provenanceLabel", {
+                    model: provenance.modelVersion,
+                  })}
+                </span>
+              </div>
+            )}
 
             <button
               data-testid="analytics-rerun-btn"
@@ -136,128 +291,24 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
           </div>
         </div>
 
-          {/* 4 Holographic 3D Metric Dials */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            {/* Metric 1 */}
-            <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div
-                data-testid="analytics-metric-redness"
-                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.analytics.metrics.redness")}
-                  </span>
-                  <span
-                    data-testid="analytics-metric-value-redness"
-                    className="text-xs font-mono font-black text-rose-700 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
-                  >
-                    {faNum(data.scores.redness)}%
-                  </span>
-                </div>
-                <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
-                  <div
-                    className="bg-gradient-to-r from-rose-500 to-red-500 h-full rounded-full transition-all duration-700 shadow-xs"
-                    style={{ width: `${data.scores.redness}%` }}
-                  />
-                </div>
-                <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
-                  <Flame className="w-3.5 h-3.5 text-rose-500" />
-                  {t("dashboard.analytics.metrics.rednessHint")}
-                </span>
-              </div>
-            </LuxuryTiltCard>
-
-            {/* Metric 2 */}
-            <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div
-                data-testid="analytics-metric-flake"
-                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.analytics.metrics.flake")}
-                  </span>
-                  <span
-                    data-testid="analytics-metric-value-flake"
-                    className="text-xs font-mono font-black text-amber-800 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200"
-                  >
-                    {faNum(data.scores.flakeTexture)}%
-                  </span>
-                </div>
-                <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
-                  <div
-                    className="bg-gradient-to-r from-amber-400 to-yellow-500 h-full rounded-full transition-all duration-700"
-                    style={{ width: `${data.scores.flakeTexture}%` }}
-                  />
-                </div>
-                <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
-                  <Droplets className="w-3.5 h-3.5 text-amber-600" />
-                  {t("dashboard.analytics.metrics.flakeHint")}
-                </span>
-              </div>
-            </LuxuryTiltCard>
-
-            {/* Metric 3 */}
-            <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div
-                data-testid="analytics-metric-anagen"
-                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.analytics.metrics.anagen")}
-                  </span>
-                  <span
-                    data-testid="analytics-metric-value-anagen"
-                    className="text-xs font-mono font-black text-emerald-800 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200"
-                  >
-                    {faNum(data.anagenRatio)}%
-                  </span>
-                </div>
-                <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
-                  <div
-                    className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-700"
-                    style={{ width: `${data.anagenRatio}%` }}
-                  />
-                </div>
-                <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  {t("dashboard.analytics.metrics.anagenHint")}
-                </span>
-              </div>
-            </LuxuryTiltCard>
-
-            {/* Metric 4 */}
-            <LuxuryTiltCard maxTilt={6} className="rounded-3xl">
-              <div
-                data-testid="analytics-metric-hydration"
-                className="p-5 rounded-3xl bg-white/60 border border-white/80 backdrop-blur-xl shadow-md flex flex-col justify-between h-full"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[oklch(20%_0.02_20)]">
-                    {t("dashboard.analytics.metrics.hydration")}
-                  </span>
-                  <span
-                    data-testid="analytics-metric-value-hydration"
-                    className="text-xs font-mono font-black text-[oklch(48%_0.095_12)] px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200"
-                  >
-                    {faNum(data.matrixHydration)}%
-                  </span>
-                </div>
-                <div className="my-4 w-full bg-stone-200/70 h-2.5 rounded-full overflow-hidden border border-white/60">
-                  <div
-                    className="rose-gold-gradient h-full rounded-full transition-all duration-700"
-                    style={{ width: `${data.matrixHydration}%` }}
-                  />
-                </div>
-                <span className="text-[0.68rem] text-[oklch(45%_0.02_20)] flex items-center gap-1 font-medium">
-                  <Dna className="w-3.5 h-3.5 text-[oklch(62%_0.09_16)]" />
-                  {t("dashboard.analytics.metrics.hydrationHint")}
-                </span>
-              </div>
-            </LuxuryTiltCard>
-          </div>
+          {/* Metric dials: only from a provenance-carrying engine result */}
+          {result === null ? (
+            <div
+              data-testid="analytics-empty"
+              className="p-8 rounded-3xl bg-white/50 border border-dashed border-stone-300 text-center space-y-2"
+            >
+              <p className="text-sm font-bold text-[oklch(30%_0.02_20)]">
+                {data.state === "error"
+                  ? t("dashboard.analytics.errorTitle")
+                  : t("dashboard.analytics.emptyTitle")}
+              </p>
+              <p className="text-xs text-[oklch(45%_0.02_20)] max-w-md mx-auto">
+                {t("dashboard.analytics.emptyHint", { patient: patientName })}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">{metricDials}</div>
+          )}
 
           {/* Protocol Prescription Luxury Card */}
           <div className="p-6 md:p-7 rounded-[28px] bg-white/60 border border-white/80 backdrop-blur-xl shadow-md">
@@ -308,7 +359,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               data-testid="analytics-recommendation"
               className="bg-white/80 backdrop-blur-xl p-5 rounded-2xl border border-[oklch(62%_0.09_16/0.2)] leading-relaxed text-xs text-[oklch(20%_0.02_20)] shadow-inner"
             >
-              {data.recommendation}
+              {result?.recommendation ?? t("dashboard.analytics.emptyHint", { patient: patientName })}
             </div>
           </div>
         </div>

@@ -301,9 +301,10 @@ describe("H15 - every e2e spec is tagged, and something really runs it", () => {
     return [...new Set([...read(rel).matchAll(/\btest\(\s*"(@[a-z0-9-]+)/g)].map((m) => m[1]!))].sort();
   }
 
-  it("ships the five suites phase 5 promised", () => {
+  it("ships the suites phase 5 promised (plus the phase-4 persistence guard)", () => {
     expect(specs).toEqual([
       "analysis.spec.ts",
+      "dashboard-persistence.spec.ts",
       "offline.spec.ts",
       "perf.gallery.spec.ts",
       "smoke.spec.ts",

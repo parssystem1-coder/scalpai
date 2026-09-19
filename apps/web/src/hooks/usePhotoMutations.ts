@@ -49,18 +49,17 @@ export function usePhotoMutations({
       "step-temporal": "temple",
       "step-occiput": "occiput",
     };
-    const newImagesList = Object.entries(frames).map(([stepId, frameUrl], index): TrichoscopyImage => {
+    const newImagesList = Object.entries(frames).map(([stepId, frameUrl]): TrichoscopyImage => {
       const area = zoneMapping[stepId] || selectedArea;
       const tags = stepTags?.[stepId] || [];
       return {
-        id: `capture-${Date.now()}-${index}`,
+        id: crypto.randomUUID(),
         patientId: selectedPatient.id,
         url: frameUrl,
         area,
         date: t("dashboard.photoDates.captured"),
-        density: area === "occiput" ? 205 : Math.round(135 + Math.random() * 30),
-        thickness: `${Math.round(65 + Math.random() * 12)} µm`,
-        qualityScore: 99,
+        // Metrics are absent, not zero: they arrive only from a real
+        // server-side analysis, never invented at capture time (P4-B02).
         tags: tags.length > 0 ? tags : undefined,
       };
     });
