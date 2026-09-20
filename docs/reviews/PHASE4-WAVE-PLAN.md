@@ -69,9 +69,16 @@
 | گیت | `tools/ci/gate-report.ts` + `ci.yml` | گیت `perf-baseline` در REQUIRED_GATES و job `e2e-smoke` (`npx playwright test e2e/perf.hologram.spec.ts`) |
 | — | `tools/ci/pipeline.phase5.spec.ts` | فهرست قفل‌شدهٔ اسپک‌ها + `perf.hologram.spec.ts` |
 
-باقی‌ماندهٔ موج ۴: `a11y-dialog` و `dashboard-integration` (سوییتهای زیرین هنوز ساخته نشده‌اند) و `doc-status-consistency` (rule جدید conformance) — موج بعدی.
+موج ۴ — تکمیل کامل (2026-09-21، ادامهٔ C12/F20):
 
-**شواهد C12/F20:** ۶ تست وب (marks + hologram-marks) سبز · ۵۰ تست pipeline.phase5 (parity گیت↔ci.yml و فهرست اسپک‌ها) سبز · ۳ تست schema baseline سبز.
+| آیتم | فایل | کار |
+|---|---|---|
+| C7 | `tools/conformance/rules/doc-status-consistency.ts` (جدید) | rule conformance: هیچ سند ledger نمی‌تواند فازی را [x] بزند که سند گیت کامل اعلام نکرده؛ allowlist با ADR اجباری؛ fixture + self-test داخلی (ADR-21) — در `npm run conformance` (۱۷ rule) |
+| C9/F07 | `apps/web/src/components/modals/__tests__/dialog-a11y.spec.tsx` (جدید) | رفتاری روی DialogPrimitive واقعی: فوکوس داخل، Tab/Shift+Tab wrap، Escape، restore فوکوس؛ ساختاری: نه `*Modal.tsx` بیرون `modals/` و هر ۹ مدال از primitive مشترک — ۱۷ تست سبز |
+| C1/C2 | `apps/web/src/__tests__/ClinicalDashboard.integration.spec.tsx` (جدید) | رندر واقعی ClinicalDashboard روی provider تست: بیمار provider رندر می‌شود، roster سینتتیک هرگز نه، حالت خالی analytics قبل از تحلیل واقعی، بدون متریک جعلی — ۵ تست سبز |
+| گیت | `tools/ci/gate-report.ts` + `ci.yml` | `a11y-dialog` و `dashboard-integration` در REQUIRED_GATES و job `e2e-smoke` (parity تست سبز) |
+
+**همهٔ شش گیت enforcement موج ۴ ثبت شدند:** no-synthetic-clinical (موج ۲) · locale-parity و auto-lock (موج ۳) · perf-baseline، a11y-dialog و dashboard-integration (این موج) + rule conformance ششم (doc-status-consistency). موج ۵ می‌تواند شروع شود.
 
 ## موج ۵ — release engineering و اصلاح ثبت گیت (P1)
 

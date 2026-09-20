@@ -49,6 +49,14 @@ export const REQUIRED_GATES = [
   // real browser and stay under the committed baseline
   // (e2e/perf.hologram.spec.ts vs tools/perf/hologram-ttfr.baseline.json).
   "perf-baseline",
+  // Phase 4 Wave 4 (C9/F07): the shared dialog primitive owns focus
+  // trap/restore/Escape, every modal mounts through it, and no *Modal.tsx is
+  // left outside components/modals/ (modals/__tests__/dialog-a11y.spec.tsx).
+  "a11y-dialog",
+  // Phase 4 Wave 4 (C1/C2): the dashboard renders REAL provider data, never a
+  // synthetic roster or fabricated metrics
+  // (apps/web/src/__tests__/ClinicalDashboard.integration.spec.tsx).
+  "dashboard-integration",
   "compose-config",
   "compose-secrets-negative",
   "docker-build",
