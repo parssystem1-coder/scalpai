@@ -33,6 +33,12 @@ export default defineConfig({
     video: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+  // Local-only project: drives the machine's installed Chrome when the
+  // Playwright browser CDN is unreachable (corporate 403). CI always uses the
+  // pinned `chromium`; nothing selects this project there.
+  projects: process.env.E2E_PERF_CHANNEL
+    ? [{ name: "chromium-system", use: { channel: process.env.E2E_PERF_CHANNEL } }]
+    : undefined,
   webServer: [
     {
       command:

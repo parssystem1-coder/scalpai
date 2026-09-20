@@ -45,6 +45,10 @@ export const REQUIRED_GATES = [
   // construction from ProtectedRoute — never wired per page, never absent
   // (tools/quality/auto-lock-coverage.ts).
   "auto-lock-coverage",
+  // Phase 4 Wave 4 (C12/F20): the hologram ttfr measurement must EXIST in a
+  // real browser and stay under the committed baseline
+  // (e2e/perf.hologram.spec.ts vs tools/perf/hologram-ttfr.baseline.json).
+  "perf-baseline",
   "compose-config",
   "compose-secrets-negative",
   "docker-build",

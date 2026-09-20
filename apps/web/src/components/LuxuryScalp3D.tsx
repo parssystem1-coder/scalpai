@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
+import { markHologramFirstFrame } from "../perf/marks.js";
 
 export type VisualMode = "silk" | "follicle" | "scan";
 
@@ -198,6 +199,10 @@ export default function LuxuryScalp3D() {
     let animationFrameId: number;
     const clock = new THREE.Clock();
 
+    // C12/F20: the first rendered frame closes the hologram:ttfr measurement
+    // (the opening mark sits in HologramSection before the lazy chunk resolves).
+    let firstFrameMarked = false;
+
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
@@ -217,6 +222,13 @@ export default function LuxuryScalp3D() {
       particleField.rotation.y = elapsedTime * 0.06;
 
       renderer.render(scene, camera);
+
+      // The mark fires AFTER the first real renderer.render: hologram:ttfr is
+      // the time to the first RENDERED frame, not to the first scheduled one.
+      if (!firstFrameMarked) {
+        firstFrameMarked = true;
+        markHologramFirstFrame();
+      }
     };
 
     animate();

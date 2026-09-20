@@ -313,6 +313,13 @@ jobs:
       - name: auto-lock-coverage
         run: bash tools/ci/run-gate.sh auto-lock-coverage npx tsx tools/quality/auto-lock-coverage.ts
 
+      # C12/F20 (wave 4): the hologram ttfr measurement itself is the gate. The
+      # web+API stack from the @smoke steps above is still up, so the targeted
+      # spec runs without a second stack boot - the measurement must exist and
+      # stay under the COMMITTED baseline (no env-var ceiling).
+      - name: perf-baseline (hologram ttfr vs the committed baseline)
+        run: bash tools/ci/run-gate.sh perf-baseline npx playwright test e2e/perf.hologram.spec.ts
+
       - name: Upload Playwright report and traces
         if: always()
         uses: actions/upload-artifact@v4
