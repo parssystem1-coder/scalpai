@@ -3,10 +3,15 @@ import { ArrowUp, HeartHandshake } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FeatureErrorBoundary from "../FeatureErrorBoundary";
 import type { Patient } from "../../data/dashboard-types";
+import { markHologramMountStart } from "../../perf/marks.js";
 const LuxuryScalp3D = lazy(() => import("../LuxuryScalp3D"));
 
 export default function HologramSection({ selectedPatient, onBackToPatients }: { selectedPatient: Patient; onBackToPatients: () => void }) {
   const { t } = useTranslation();
+
+  // C12/F20: the hologram:ttfr clock opens here, before the lazy 3D chunk is
+  // even requested - the metric covers network + parse + first rendered frame.
+  markHologramMountStart();
   return (
         <section id="section-3d-model" className="scroll-mt-28 space-y-6">
           <div className="rounded-[32px] p-6 md:p-8 bg-[oklch(98%_0.008_28/0.45)] border border-white/80 backdrop-blur-[34px] shadow-[0_24px_60px_oklch(30%_0.04_15/0.08)]">

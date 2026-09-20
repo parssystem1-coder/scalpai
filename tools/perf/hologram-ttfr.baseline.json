@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "metric": "hologram:ttfr",
+  "valueMs": 30000,
+  "regressionTolerance": 0.2,
+  "environment": "vite dev server (playwright.config.ts webServer), Chromium; CI runners commonly render WebGL on SwiftShader",
+  "provenance": "initial lenient ceiling - tighten from recorded nightly @perf evidence (docs/reviews/PHASE4-WAVE-PLAN.md, wave 4)",
+  "updatedAt": "2026-09-21"
+}

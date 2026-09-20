@@ -54,10 +54,24 @@
 
 **شواهد موج ۳:** ۱۶۶ تست وب سبز (۷ جدید) · ۱۳۰ تست quality/ci سبز · typecheck سبز · lint سبز · conformance PASS (16 rules) · هر ۳ گیت AST سبز · e2e محلی ۳/۳ سبز (قفل واقعی در Chrome سیستم؛ chromium CDN در این محیط 403 می‌دهد — CI خودش chromium دارد)
 
-## موج ۴ — گیت‌های enforcement (P1)
+## موج ۴ — گیت‌های enforcement (P1) — C12/F20 تکمیل شد (2026-09-21)
 
-- افزودن به `REQUIRED_GATES` + `ci.yml`: `a11y-dialog`، `locale-parity`، `dashboard-integration`، `no-synthetic-clinical`، `perf-baseline`، `doc-status-consistency`.
-- `performance.mark/measure` برای HologramSection + baseline JSON کامیت‌شده.
+| آیتم | فایل | کار |
+|---|---|---|
+| C12/F20 | `apps/web/src/perf/marks.ts` (جدید) | ماژول نازک marks: `markHologramMountStart` / `markHologramFirstFrame` / `HOLOGRAM_TTFR` — no-op در vitest، رعایت `prefers-reduced-motion`، هرگز throw نمی‌کند؛ escape hatch مستند `VITE_PERF_MARKS=1` فقط برای تست واحد |
+| C12 | `apps/web/src/components/sections/HologramSection.tsx` | `markHologramMountStart()` قبل از resolve شدن chunk لِیزی 3D — ساعت ttfr از شروع mount می‌شود |
+| C12 | `apps/web/src/components/LuxuryScalp3D.tsx` | `markHologramFirstFrame()` بعد از اولین `renderer.render` واقعی — نه فقط زمان‌بندی فریم |
+| C12 | `apps/web/src/perf/marks.spec.ts` (جدید) | ۴ تست واحد ماژول marks (مسیر واقعی با `VITE_PERF_MARKS=1` + performance جعلی) |
+| C12 | `apps/web/src/components/__tests__/hologram-marks.spec.tsx` (جدید) | ساعت دقیقاً یک‌بار در mount باز می‌شود؛ remount ساعت جدید می‌گشاید |
+| C12 | `tools/perf/hologram-ttfr.baseline.json` (جدید) | baseline کامیت‌شده (سقف اولیه محافظه‌کارانه ۳۰٬۰۰۰ms — سفت‌شدن بعد از شواهد nightly) |
+| C12 | `tools/perf/hologram-ttfr.baseline.spec.ts` (جدید) | گارد fail-closed اسکیمای baseline (به سبک bundle-budget policy) |
+| C12 | `e2e/perf.hologram.spec.ts` (جدید) | تست @perf: خواندن `performance.getEntriesByName("hologram:ttfr")` در مرورگر واقعی — باید موجود باشد و ≤ baseline × 1.2 |
+| گیت | `tools/ci/gate-report.ts` + `ci.yml` | گیت `perf-baseline` در REQUIRED_GATES و job `e2e-smoke` (`npx playwright test e2e/perf.hologram.spec.ts`) |
+| — | `tools/ci/pipeline.phase5.spec.ts` | فهرست قفل‌شدهٔ اسپک‌ها + `perf.hologram.spec.ts` |
+
+باقی‌ماندهٔ موج ۴: `a11y-dialog` و `dashboard-integration` (سوییتهای زیرین هنوز ساخته نشده‌اند) و `doc-status-consistency` (rule جدید conformance) — موج بعدی.
+
+**شواهد C12/F20:** ۶ تست وب (marks + hologram-marks) سبز · ۵۰ تست pipeline.phase5 (parity گیت↔ci.yml و فهرست اسپک‌ها) سبز · ۳ تست schema baseline سبز.
 
 ## موج ۵ — release engineering و اصلاح ثبت گیت (P1)
 

@@ -308,6 +308,7 @@ describe("H15 - every e2e spec is tagged, and something really runs it", () => {
       "dashboard-persistence.spec.ts",
       "offline.spec.ts",
       "perf.gallery.spec.ts",
+      "perf.hologram.spec.ts",
       "smoke.spec.ts",
       "upload-big.spec.ts",
     ]);
