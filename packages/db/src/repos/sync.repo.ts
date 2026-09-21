@@ -97,13 +97,24 @@ function rejectionReason(reason: "missing-base-version" | "unknown-base-version"
 }
 
 async function applyPatientCreate(ctx: PushCtx, env: MutationEnvelope): Promise<ApplyOutcome> {
+  // ADR-0049: an offline create without identity fields used to become an
+  // empty-identity row (asText() of a missing field is ""), because a
+  // redacting outbox boundary or an older build can strip them. The server
+  // refuses such mutations with a NAMED reason so the client dead-letters
+  // them instead of the clinical record silently losing its identity.
+  const firstName = asText(env.payload.firstName).trim();
+  const lastName = asText(env.payload.lastName).trim();
+  const phone = asText(env.payload.phone).trim();
+  if (firstName === "" || lastName === "" || phone === "") {
+    throw new MutationRejected("missing required patient identity fields (ADR-0049)");
+  }
   const rows = await ctx.tx
     .insert(patients)
     .values({
       clinicId: ctx.clinicId,
-      firstName: asText(env.payload.firstName),
-      lastName: asText(env.payload.lastName),
-      phone: asText(env.payload.phone),
+      firstName,
+      lastName,
+      phone,
       gender: (env.payload.gender as string) ?? null,
       birthDate: (env.payload.birthDate as string) ?? null,
       createdBy: ctx.userId,
