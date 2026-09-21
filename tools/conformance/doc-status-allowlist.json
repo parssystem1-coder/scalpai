@@ -1,0 +1,35 @@
+{
+  "comment": "doc-status-consistency (ADR-0048): [x] phase-status claims in ledger docs that docs/PHASE4-CLOSURE-GATE.md has not yet confirmed. Every entry MUST reference a registered ADR (ADR-\\d{3,4}) or the harness fails the build; phase/file act as exact matchers. Remove an entry the moment the gate document ticks the phase - the allowlist is a bridge, not a graveyard.",
+  "allowlist": [
+    {
+      "phase": "phase-1",
+      "file": "docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md",
+      "adr": "ADR-0048",
+      "reason": "refactor-local data-extraction milestone; deliberately scoped narrower than the phase-4 clinical gate, which stays open until the full wave plan closes"
+    },
+    {
+      "phase": "phase-2",
+      "file": "docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md",
+      "adr": "ADR-0048",
+      "reason": "refactor-local header/tabs milestone; same narrower scope as phase-1"
+    },
+    {
+      "phase": "phase-3",
+      "file": "docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md",
+      "adr": "ADR-0048",
+      "reason": "refactor-local section-extraction milestone; same narrower scope as phase-1"
+    },
+    {
+      "phase": "phase-4",
+      "file": "docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md",
+      "adr": "ADR-0048",
+      "reason": "refactor-local modal-extraction milestone (PR #69 + #70); the phase-4 CLINICAL closure is tracked only in docs/PHASE4-CLOSURE-GATE.md and remains open"
+    },
+    {
+      "phase": "phase-5",
+      "file": "docs/ROADMAP-CLINICAL-DASHBOARD-REFACTOR.md",
+      "adr": "ADR-0048",
+      "reason": "refactor-local i18n/RTL milestone (PR #69 + #70); same narrower scope as phase-1"
+    }
+  ]
+}

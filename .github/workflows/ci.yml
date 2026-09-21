@@ -310,6 +310,16 @@ jobs:
       - name: locale-parity
         run: bash tools/ci/run-gate.sh locale-parity npx tsx tools/quality/locale-parity.ts
 
+      # Wave 4 (C9/F07): focus trap/restore/Escape live in the shared primitive,
+      # every modal mounts through it, no *Modal.tsx remains outside modals/.
+      - name: a11y-dialog
+        run: bash tools/ci/run-gate.sh a11y-dialog npx vitest run apps/web/src/components/modals/__tests__/dialog-a11y.spec.tsx
+
+      # Wave 4 (C1/C2): the dashboard renders real provider data - no synthetic
+      # roster, no fabricated metrics.
+      - name: dashboard-integration
+        run: bash tools/ci/run-gate.sh dashboard-integration npx vitest run apps/web/src/__tests__/ClinicalDashboard.integration.spec.tsx
+
       - name: auto-lock-coverage
         run: bash tools/ci/run-gate.sh auto-lock-coverage npx tsx tools/quality/auto-lock-coverage.ts
 

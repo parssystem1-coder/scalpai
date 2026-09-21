@@ -1,4 +1,5 @@
 import type { Rule } from "../lib/types.js";
+import { docStatusConsistency } from "./doc-status-consistency.js";
 import {
   dbAccess,
   encodingGuard,
@@ -41,4 +42,5 @@ export const RULES: Rule[] = [
   configSchemaValidation,
   architectureCallSites,
   tsxImportBoundaries,
+  docStatusConsistency,
 ];
