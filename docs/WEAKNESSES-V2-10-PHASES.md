@@ -1,8 +1,8 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: این فایل سابقهٔ فازهای ۱ تا ۱۰ را ثبت می‌کند؛ **Closure Gate فاز ۴ هنوز باز است** و ادعاهای تکمیل M1/L2 تا ارائهٔ شواهد مستقل در آن gate قطعی محسوب نمی‌شوند.
+> وضعیت: این فایل سابقهٔ فازهای ۱ تا ۱۰ را ثبت می‌کند؛ **Closure Gate فاز ۴ هنوز باز است** (۲۰۲۶-۰۹-۲۱: ۹/۱۳ PASS) و ادعاهای تکمیل M1/L2 تا ارائهٔ شواهد مستقل در آن gate قطعی محسوب نمی‌شوند. شش گیت enforcement موج ۴ (پنج گیت مستقل + rule `doc-status-consistency` در گیت conformance) فعال و سبزند (PR #91 + #92)؛ چهار سطر باز سند گیت: E2E persistence، release promotion/rollback، area keys و GATE_REVIEW مستقل.
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
-> تاریخ آخرین بروزرسانی: 2026-09-13 · مخزن: `parssystem1-coder/scalpai`
+> تاریخ آخرین بروزرسانی: 2026-09-21 · مخزن: `parssystem1-coder/scalpai`
 
 ## حکم ممیزی
 
@@ -208,7 +208,7 @@
 
 **هدف خروج:** ادعاهای محصول، معماری و UX با واقعیت کد یکی باشند.
 
-**وضعیت:** ۱۳ از ۱۹ مورد تکمیل شد؛ ۷ باقی‌مانده برای نشست بعدی.
+**وضعیت:** تمام موارد فهرست‌شدهٔ این فاز بسته شده‌اند (بخش «باقی‌مانده» اکنون ثبت تاریخی بسته‌شدن‌هاست). ادامهٔ کار فاز ۴ فقط در سند گیت دنبال می‌شود: ۹/۱۳ PASS — چهار سطر باز: E2E persistence (سطر ۱)، release promotion/rollback (سطر ۶)، area keys (سطر ۱۱)، GATE_REVIEW مستقل (سطر ۱۳).
 
 ### تکمیل‌شده (۱۳ مورد):
 
@@ -228,8 +228,12 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### باقی‌مانده: **موارد Closure Gate فاز ۴ هنوز نیازمند شواهد مستقل هستند.**
+### بسته‌شده (ادامهٔ فاز ۱۰): موارد Closure Gate فاز ۴ — شش گیت enforcement موج ۴ (پنج گیت مستقل + rule `doc-status-consistency` در گیت conformance) فعال و سبز شد؛ چهار سطر باز سند گیت: E2E persistence، release promotion/rollback، area keys، GATE_REVIEW مستقل.
 
+- [x] **C12/F20** نشان‌های پرفورمنس سه‌بعدی: markHologramMountStart/markHologramFirstFrame در مسیر رندر واقعی، baseline کامیت‌شده (tolerance ۲۰٪، fail-closed) و e2e تگ‌دار @perf که هر شب و در گیت `perf-baseline` CI سنجیده می‌شود. (PR #91 — مرج‌شده به main، CI سبز)
+- [x] **C9/F07** گیت `a11y-dialog`: سوییتهٔ رفتاری روی DialogPrimitive (focus in/out، Tab/Shift+Tab wrap، Escape، restore) + بررسی ساختاری مونتاژ همهٔ مدال‌ها از primitive مشترک و نبود *Modal.tsx بیرون از modals/. (PR #92)
+- [x] **C1/C2** گیت `dashboard-integration`: ClinicalDashboard واقعی روی test data provider — رندر بیماران provider و نه roster ساختگی، state خالی واقعی analytics. (PR #92)
+- [x] **C7/P4-B07** rule `doc-status-consistency` در conformance + ADR-0048 و allowlist — تناقض ادعای اسناد با سند گیت دیگر قابل کامیت نیست؛ اسکن CRLF-safe است. (PR #92)
 - [x] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود. — **تکمیل شده: ClinicalDashboard و NeuralSegmentationOverlay هیچ import از SAMPLE_* ندارند؛ dashboard-samples.ts پشت import.meta.env.DEV guard قرار دارد؛ DemoWatermark در DashboardShell و NeuralSegmentationOverlay رندر می‌شود؛ m1b-runtime-wiring.spec.ts سبز؛ production-mocks exceptions از exceptions.json حذف شد.**
 - [x] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند) — **تکمیل شده: ۴ کامپوننت، ~۸۵ کلید fa/en، ۶ تست parity سبز، typecheck/lint بدون خطا)**
 - [x] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded. — **تکمیل شده: ۱۵ کامپوننت، ~۲۸۰ کلید fa/en، ۱۶ فایل تغییر، orphan/dangling=0، ۷۶ تست سبز)**

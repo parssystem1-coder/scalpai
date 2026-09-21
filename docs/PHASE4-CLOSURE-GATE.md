@@ -310,14 +310,14 @@ Update `tools/conformance/exceptions.json`:
 
 ## Section 10 — Gate Decision
 
-**GATE STATUS: 🟡 AMBER — 7/13 PASS, 6 evidence pending**
+**GATE STATUS: 🟡 AMBER — 9/13 PASS, 4 evidence pending**
 
 ### Minimum Viable Closure (must all be GREEN)
 
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
 | 1 | Dashboard API-first path verified by E2E | ❌ PENDING | Needs E2E test for offline→online persistence |
-| 2 | No synthetic clinical claims in production | ❌ PENDING | Needs behavioral negative test (not grep-based) |
+| 2 | No synthetic clinical claims in production | ✅ PASS | AST-level gate `no-synthetic-clinical` (not grep) in REQUIRED_GATES + ci.yml, green in CI (wave 2 enforcement; conformance 17 rules PASS) |
 | 3 | GitHub ruleset enforced on `main` | ✅ PASS | `GET /repos/.../rulesets/23283587` → `enforcement: active` (PR #69 Wave 1) |
 | 4 | Fastify audit clean or accepted | ✅ PASS | `fastify@5.12.1+`, `@nestjs/platform-fastify@12.0.1`, `npm audit --audit-level=high` exit 0 (PR #69 Wave 1) |
 | 5 | Offline PHI encryption verified | ✅ PASS | PHI redaction enforced in `sync.ts` + test `packages/shared/src/phi.ts` (PR #69 Wave 4) |
@@ -327,7 +327,7 @@ Update `tools/conformance/exceptions.json`:
 | 9 | 7 modals extracted to `modals/` + focus trap/restore/Escape on all | ✅ PASS | 10 modals in `modals/`, DialogPrimitive.tsx + 6 tests (PR #69 Wave 2 + PR #70) |
 | 10 | `dir="rtl"` removed from hardcoded files | ✅ PASS | Removed from App.tsx, LandingPage.tsx, RegisterForm.tsx, ProPlansView.tsx, DemoBanner.tsx, BeforeAfterCompareModal.tsx, FeatureErrorBoundary.tsx, LoginPage.tsx — grep clean (PR #70) |
 | 11 | Area keys translated | ❌ PENDING | 3/5 surfaces translated; TrichoscopyGallerySection and PhotoLightbox need completion |
-| 12 | 3D performance marks exist | ❌ PENDING | Zero `performance.mark` in codebase |
+| 12 | 3D performance marks exist | ✅ PASS | `markHologramMountStart`/`markHologramFirstFrame` in the real render path; committed baseline + `perf-baseline` CI gate (PR #91) |
 | 13 | External GATE_REVIEW PASS | ❌ PENDING | No Phase 4 gate review document exists |
 
 ### Evidence Links
@@ -363,6 +363,7 @@ Update `tools/conformance/exceptions.json`:
 | Date | Author | Change |
 |---|---|---|
 | 2026-09-13 | AI Assistant | Created from audit report + deep analysis synthesis |
+| 2026-09-21 | AI Assistant | Wave 4 enforcement closed (PR #91, #92): rows #2 and #12 flipped to PASS with evidence; docs reconciled |
 
 ---
 
