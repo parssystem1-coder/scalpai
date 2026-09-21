@@ -10,4 +10,4 @@
 
 ## Roadmap Sync
 
-- [ ] Phase 4 evidence pending (E2E, perf marks)
+- [ ] Phase 4: evidence pending (E2E, perf marks)

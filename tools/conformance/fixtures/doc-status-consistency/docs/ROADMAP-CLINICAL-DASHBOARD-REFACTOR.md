@@ -2,9 +2,9 @@
 
 ## Phase 4 — Clinical Dashboard
 
-- [x] HologramSection extracted with lazy 3D loading
-- [x] Bundle size measured
+- [x] Phase 4: HologramSection extracted with lazy 3D loading
+- [x] Bundle size measured with `npm run build`
 
 ## Phase 5 — Portal
 
-- [ ] Portal work has not started
+- [ ] Phase 5: portal work has not started

@@ -11,21 +11,24 @@ import { readRoot } from "../lib/walk.js";
  * Success Checklist contradicted its own Phase 4 section. Prose is reviewed by
  * humans; this rule makes the contradiction itself machine-checkable.
  *
- * Mechanism (grep is the right tool here because status claims are ABSENCE
- * rules, exactly like the no-dir="rtl" walk - docs/PHASE4-REMEDIATION-PLAN.md
- * section 5):
+ * SCOPE - a checkbox line is a PHASE-STATUS CLAIM only when the item text
+ * itself opens with an explicit phase id ("Phase 4:", "فاز ۳", "Slice M2",
+ * "Wave 1"). Bare M/W tokens buried mid-sentence or inherited from a section
+ * heading are NOT claims: PROGRESS.md and WEAKNESSES are task/weakness ledgers
+ * whose every line cites its own PR, and treating them as phase closures made
+ * the first version of this rule flag 94 legitimate history entries on CI.
+ * Scope is a ratchet like the persian-literals rule: widening it is a
+ * deliberate edit, never an accident.
  *
- *   1. The gate document declares the mandatory [ ] checkboxes per phase id.
- *   2. Every other ledger doc may only claim [x] for a phase the gate
- *      document also marks [x]; the gate document's own claims are exempt
- *      because it IS the ledger (F01: a self-signed claim still needs a
- *      criterion row pointing at evidence).
- *   3. An allowlist file (same directory, JSON with ADR refs, validated like
- *      exceptions.json) carries decisions the ledger has not caught up with.
+ * SEMANTICS - a [x] phase-status claim in a ledger doc must be agreed by the
+ * gate document (which needs [x] entries for the same phase) or registered in
+ * the allowlist with an ADR. The gate document's own claims are exempt because
+ * it IS the ledger (F01: a self-signed claim still needs a criterion row).
  *
- * SCOPE IS A RATCHET like the persian-literals rule: status claims are only
- * read from the ledger docs below; adding a file is deliberate, never
- * accidental.
+ * LINE SPLITTING MUST BE /\r?\n/ - this repo is edited on Windows, and a
+ * naive (.*)$ leaves a trailing \r that silently blinds every regex on one
+ * checkout while firing on another. The first CI run of this rule proved the
+ * point: green locally, 94 findings in CI, same tree.
  */
 
 const RULE_NAME = "doc-status-consistency";
@@ -42,31 +45,39 @@ const STATUS_DOCS = [
 /** The gate document - the ledger. Its own claims are not cross-checked. */
 const GATE_DOC = "docs/PHASE4-CLOSURE-GATE.md";
 
-/** `# heading` or `## heading` lines, lowercased for matching. */
-const HEADING = /^#{1,4}\s+(.*)$/;
-
-/** A Markdown checkbox in either state, captured with its line text. */
+/** A Markdown checkbox in either state, captured with its item text. */
 const CHECKBOX = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/;
 
-/** Phase id like "Phase 4", "فاز 4", "M5", "L2", "Slice M4", "Wave 3". */
-const PHASE_TOKEN = /\b(phase|فاز|slice|wave|موج)\s*#?(\d{1,2})\b|\b([MLW]\d{1,2}[a-z]?)\b/i;
+/**
+ * A phase-status claim opens the ITEM TEXT with an explicit phase id. The
+ * leading markdown emphasis/backticks are stripped first, so "- [x] **W02**
+ * ..." is a weakness closure, not a phase claim.
+ */
+const CLAIM_RX = /^(?:phase|فاز|slice|wave|موج)\s*#?(\d{1,2})\b/i;
+
+/** Phase id like "Phase 4", "فاز 4", "Slice M4", "Wave 3". */
+const WORD_TO_KIND: Record<string, string> = {
+  phase: "phase",
+  فاز: "phase",
+  slice: "m",
+  wave: "wave",
+  موج: "wave",
+};
 
 interface PhaseId {
-  /** Canonical form, e.g. "phase-4", "m5", "l2". */
+  /** Canonical form, e.g. "phase-4", "m4", "wave-3". */
   key: string;
   display: string;
 }
 
-function parsePhaseId(text: string): PhaseId | null {
-  const m = PHASE_TOKEN.exec(text);
+function parseClaim(itemText: string): PhaseId | null {
+  const m = CLAIM_RX.exec(itemText.replace(/^[\s>*_`#-]+/, ""));
   if (m === null) return null;
-  if (m[3] !== undefined) return { key: m[3].toLowerCase(), display: m[3] };
-  const kind = m[1] ?? "";
-  const num = m[2] ?? "";
-  if (kind.toLowerCase() === "phase" || kind === "فاز") return { key: `phase-${num}`, display: `Phase ${num}` };
-  if (kind.toLowerCase() === "slice") return { key: `m${num}`, display: `Slice M${num}` };
-  if (kind.toLowerCase() === "wave" || kind === "موج") return { key: `wave-${num}`, display: `Wave ${num}` };
-  return null;
+  const kind = WORD_TO_KIND[(m[0].match(/[a-z\u0600-\u06FF]+/i)?.[0] ?? "").toLowerCase()] ?? "phase";
+  const num = m[1] ?? "";
+  if (kind === "m") return { key: `m${num}`, display: `Slice M${num}` };
+  if (kind === "wave") return { key: `wave-${num}`, display: `Wave ${num}` };
+  return { key: `phase-${num}`, display: `Phase ${num}` };
 }
 
 interface CheckEntry {
@@ -85,19 +96,12 @@ function scanDoc(root: string, rel: string): DocScan {
   const out: Map<string, CheckEntry[]> = new Map();
   if (!existsSync(join(root, rel))) return { claims: out, exists: false };
 
-  let heading = "";
   readRoot(root, rel)
-    .split("\n")
+    .split(/\r?\n/)
     .forEach((line, i) => {
-      const h = HEADING.exec(line);
-      if (h !== null) {
-        heading = h[1] ?? "";
-        return;
-      }
       const cb = CHECKBOX.exec(line);
       if (cb === null) return;
-      const context = `${heading} ${cb[2] ?? ""}`;
-      const phase = parsePhaseId(context);
+      const phase = parseClaim(cb[2] ?? "");
       if (phase === null) return;
       const list = out.get(phase.key) ?? [];
       list.push({ line: i + 1, done: (cb[1] ?? " ").toLowerCase() === "x", phase });
