@@ -69,7 +69,7 @@
   - [x] ثبت سند رسمی گیت فاز ۳: `docs/gates/GATE_REVIEW_phase-3-2026-09-04.md` ✅
 
 ## فاز 4 — تجربه (تکمیل‌شده ✅)
-> 🔒 Gate: IN PROGRESS — Section 10 Closure Gate 11/13 PASS, 2 evidence pending — شش گیت enforcement موج ۴ همگی فعال و سبز (PR #91, #92)
+> 🔒 Gate: IN PROGRESS — Section 10 Closure Gate 12/13 PASS, 1 evidence pending — گیت‌های enforcement موج ۴ فعال و سبز (PR #91, #92) + مسیر release با ADR-0050: پنج گیت جدید `release-*` (promote/attest/digest-pin/drill/runbook) در REQUIRED_GATES (۳۷ گیت)، SBOM/provenance و rollback drill واقعی هر شب در nightly
 > پیاده‌سازی کامل استانداردهای DESIGN-V2 §11 و §12 + Wave 1-4 remediation (PR #69, #70) + بستن گیت‌های موج ۴: perf-baseline، a11y-dialog، dashboard-integration، doc-status-consistency (PR #91 + #92)
 - [x] Education E1: پکیج `@scalpai/education` با ۸ استوری‌بورد/عارضه بالینی در ۳ سطح شدت + مودال تعاملی سه‌بعدی و استیت‌ماشین عوارض (DESIGN-V2 §11)
 - [x] گزارش PDF بالینی: ماژول رسمی تریکوسکوپی با تقویم جلالی، جدول متریک‌های بیومتریک، نسخه چاپی A4 و کد اصالت دیجیتال

@@ -569,6 +569,65 @@ jobs:
         working-directory: ops
         run: bash ../tools/ci/run-gate.sh stack-boot docker compose -f prod.yml --env-file ci.env up -d --wait --wait-timeout 240 api web
 
+      # ---- Wave 5 (C6/P4-B06, ADR-0050): the release path is enforced here ----
+      # A LOCAL OCI registry: fork PRs never get GHCR credentials, and the
+      # promotion contract must be exercisable on every PR (dependabot runs too).
+      # release.yml does the identical flow against GHCR on main.
+      - name: Start a local OCI registry for the promotion
+        run: |
+          docker run -d --name release-registry --restart always -p 127.0.0.1:5000:5000 registry:2.8.3
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/v2/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+      - name: Promote the digests CI built (build once, push by digest)
+        run: |
+          echo "127.0.0.1 release-registry" | sudo tee -a /etc/hosts
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/run-gate.sh release-promote \
+            bash tools/ci/release-promote.sh --registry 127.0.0.1:5000 --tag "ci-${GITHUB_SHA::12}" --commit "$GITHUB_SHA"
+
+      - name: SBOM + provenance for the promoted digests
+        run: |
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/run-gate.sh release-attest \
+            bash tools/ci/release-attest.sh --tag "ci-${GITHUB_SHA::12}"
+
+      - name: Pin prod.yml to the promoted digests (tags never deploy)
+        run: bash tools/ci/run-gate.sh release-digest-pin \
+          bash tools/ci/release-digest-pin.sh --tag "ci-${GITHUB_SHA::12}" --env-file "ops/ci.env"
+
+      - name: Rollback drill - boot prod digest, promote staging digest, roll back, roll forward
+        run: |
+          STAGING_TAG="staging-${GITHUB_SHA::12}"
+          SCALPAI_RELEASE_CHANNEL=staging SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/release-promote.sh --registry 127.0.0.1:5000 --tag "$STAGING_TAG" --commit "$GITHUB_SHA"
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/release-attest.sh --tag "$STAGING_TAG"
+          bash tools/ci/run-gate.sh release-drill \
+            bash tools/ci/release-rollback-drill.sh --prod-tag "ci-${GITHUB_SHA::12}" --staging-tag "$STAGING_TAG" --compose-env "ops/ci.env"
+
+      - name: The release runbook refuses an out-of-order path (negative proof)
+        run: |
+          if bash tools/ci/release-runbook.sh deploy "ci-${GITHUB_SHA::12}" 2>runbook.err; then
+            echo "::error::runbook deployed without attestation gating"; cat runbook.err; exit 1
+          fi
+          grep -q "not attested" runbook.err || { echo "::error::unexpected runbook failure"; cat runbook.err; exit 1; }
+          bash tools/ci/run-gate.sh release-runbook \
+            bash tools/ci/release-runbook.sh rollback "staging-${GITHUB_SHA::12}"
+
+      - name: Upload the release ledger + attestations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ledger
+          path: |
+            docs/releases/releases-ledger.jsonl
+            ci-evidence/release-sbom-*.json
+            ci-evidence/provenance-*.json
+          retention-days: 90
+
       - name: Migration ran exactly once, as the owner role
         working-directory: ops
         run: >

@@ -1,0 +1,135 @@
+name: Release
+
+# ADR-0050 - the scheduled full release path (gate row #6, C6/P4-B06).
+#
+# CI's `deployment` job promotes into an EPHEMERAL local registry on every PR;
+# this workflow is the same promotion against the REAL registry (GHCR):
+#
+#   1. build ONCE through ops/prod.yml (the one supported topology, ADR-0036);
+#   2. push both digests, record them in docs/releases/releases-ledger.jsonl;
+#   3. write CycloneDX SBOM + SLSA provenance (attestation evidence);
+#   4. digest-pin prod.yml and record the STAGING deploy;
+#   5. wait for the `production` environment approval, then record the PROD
+#      deploy OF THE SAME DIGESTS.
+#
+# The deploy steps RECORD the promotion (what the gate contract needs);
+# bringing a specific host up is `bash tools/ci/release-runbook.sh deploy
+# <tag>` on that host - the same digests, the same ledger.
+#
+# The ledger line is committed back to main via PR (the ledger is append-only;
+# the only legal edit is ADDING a line).
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday nights - after the nightly drills
+  workflow_dispatch:
+    inputs:
+      promote_prod_tag:
+        description: "Promote the prod image tag this run (requires the production environment approval)"
+        type: boolean
+        default: false
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: build once, promote digests, attest, digest-pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
+      SCALPAI_RELEASE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write a complete secret set (generated on the runner, never committed)
+        working-directory: ops
+        run: |
+          umask 077
+          PHI_KEY=$(openssl rand -base64 32 | tr -d '\n')
+          cat > ci.env <<ENV
+          SCALPAI_DOMAIN=clinic.example.com
+          ACME_EMAIL=admin@example.com
+          POSTGRES_USER=scalpai_owner
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          POSTGRES_DB=scalpai
+          APP_ROLE_PASSWORD=$(openssl rand -hex 16)
+          MINIO_ROOT_USER=scalpai_admin
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+          S3_BUCKET=scalpai-media
+          JWT_SECRET=$(openssl rand -hex 32)
+          PHI_KEY_RING=[{"kid":"k2026rel","key":"$PHI_KEY","state":"active","createdAt":"2026-09-21T00:00:00.000Z"}]
+          ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
+          BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-recipients.txt
+          BACKUP_OFFSITE_ENDPOINT=https://s3.provider.example
+          BACKUP_OFFSITE_BUCKET=scalpai-offsite
+          BACKUP_OFFSITE_ACCESS_KEY=$(openssl rand -hex 12)
+          BACKUP_OFFSITE_SECRET_KEY=$(openssl rand -hex 16)
+          ENV
+
+      - name: Promote the prod digests (build once, push by digest)
+        run: |
+          bash tools/ci/run-gate.sh release-promote \
+            bash tools/ci/release-promote.sh \
+              --registry "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" \
+              --tag "prod-${GITHUB_SHA::12}" --commit "$GITHUB_SHA"
+
+      - name: SBOM + provenance for the promoted digests
+        run: |
+          bash tools/ci/run-gate.sh release-attest \
+            bash tools/ci/release-attest.sh --tag "prod-${GITHUB_SHA::12}"
+
+      - name: Digest-pin prod.yml to the promoted digests
+        run: |
+          bash tools/ci/run-gate.sh release-digest-pin \
+            bash tools/ci/release-digest-pin.sh --tag "prod-${GITHUB_SHA::12}" --env-file "ops/ci.env"
+
+      - name: Record the staging deploy (same digests the prod tag will get)
+        run: |
+          bash tools/ci/run-gate.sh release-runbook \
+            bash tools/ci/release-runbook.sh deploy "prod-${GITHUB_SHA::12}"
+
+      - name: Promote the prod tag (environment approval gates this step)
+        if: github.event_name == 'workflow_dispatch' && inputs.promote_prod_tag
+        environment: production
+        run: |
+          echo "prod tag promoted: prod-${GITHUB_SHA::12}"
+          docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/scalpai-web@$(grep -o '"web":"[^"]*"' docs/releases/releases-ledger.jsonl | tail -n1 | cut -d'"' -f4)" >/dev/null
+
+      - name: Upload the release ledger + attestations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ledger
+          path: |
+            docs/releases/releases-ledger.jsonl
+            ci-evidence/release-sbom-*.json
+            ci-evidence/provenance-*.json
+          retention-days: 90
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-evidence
+          path: ci-evidence
+          retention-days: 30

@@ -39,6 +39,12 @@ COPY . .
 RUN npm ci --omit=dev --legacy-peer-deps
 
 FROM node:26.8-alpine AS runner
+# ADR-0050: the release channel baked into the image (prod|staging). The two
+# channels run the SAME artifact pipeline - only this label differs, so CI can
+# promote two distinct digests from one build and the rollback drill has a
+# real "previous release" to roll back to.
+ARG RELEASE_CHANNEL=prod
+LABEL org.opencontainers.image.version="$RELEASE_CHANNEL"
 WORKDIR /app
 ENV NODE_ENV=production
 # The one-shot migrate container runs `npm run db:migrate:prod` as the
