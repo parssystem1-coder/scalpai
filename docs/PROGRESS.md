@@ -69,13 +69,14 @@
   - [x] ثبت سند رسمی گیت فاز ۳: `docs/gates/GATE_REVIEW_phase-3-2026-09-04.md` ✅
 
 ## فاز 4 — تجربه (تکمیل‌شده ✅)
-> 🔒 Gate: IN PROGRESS — Section 10 Closure Gate 7/13 PASS, 6/13 evidence pending
-> پیاده‌سازی کامل استانداردهای DESIGN-V2 §11 و §12 + Wave 1-4 remediation (PR #69, #70)
+> 🔒 Gate: IN PROGRESS — Section 10 Closure Gate 9/13 PASS, 4 evidence pending — شش گیت enforcement موج ۴ همگی فعال و سبز (PR #91, #92)
+> پیاده‌سازی کامل استانداردهای DESIGN-V2 §11 و §12 + Wave 1-4 remediation (PR #69, #70) + بستن گیت‌های موج ۴: perf-baseline، a11y-dialog، dashboard-integration، doc-status-consistency (PR #91 + #92)
 - [x] Education E1: پکیج `@scalpai/education` با ۸ استوری‌بورد/عارضه بالینی در ۳ سطح شدت + مودال تعاملی سه‌بعدی و استیت‌ماشین عوارض (DESIGN-V2 §11)
 - [x] گزارش PDF بالینی: ماژول رسمی تریکوسکوپی با تقویم جلالی، جدول متریک‌های بیومتریک، نسخه چاپی A4 و کد اصالت دیجیتال
 - [x] داشبورد Scalp Map + guided capture پرامپت: نقشه هیت‌مپ ۵ ناحیه آناتومیک + گیت ۴ زاویه استاندارد عکاسی درماتوسکوپی و اعتبارسنجی کیفیت تصویر
 - [x] پوسته Electron نازک: درایورهای ارتباط با سخت‌افزارهای تریکوسکوپی UVC و لایه کش محلی در `apps/desktop`
 - [x] Router وب + i18n کامل PatientsPage (W18/W19)
+- [x] گیت‌های enforcement موج ۴: پنج گیت مستقل در REQUIRED_GATES (۳۲ گیت) و ci.yml — no-synthetic-clinical، locale-parity، perf-baseline (hologram ttfr در برابر baseline کامیت‌شده)، a11y-dialog، dashboard-integration — و rule `doc-status-consistency` درون گیت conformance؛ همگی در CI واقعی اجرا و سبز (PR #91 + #92)
 
 ## فاز 5 — رشد تجاری (Aftercare-first)
 > 🔒 Gate: PASS — 2026-09-15 — docs/gates/GATE_REVIEW_phase-5-2026-09-15.md
