@@ -110,7 +110,18 @@ boot() {
   local label="$1" api_digest="$2" web_digest="$3"
   echo "drill: boot $label (api=$api_digest web=$web_digest)"
   pin "$api_digest" "$web_digest" || return 1
-  compose up -d --no-build --wait --wait-timeout "$wait" web api || return 1
+  if ! compose up -d --no-build --wait --wait-timeout "$wait" web api; then
+    # Diagnose the failed boot: which image ran, what it tried to exec, and the
+    # container's own logs - otherwise a one-shot exit code is all we get.
+    echo "drill: boot failed - diagnostics follow" >&2
+    compose ps -a 2>&1 | tail -12 >&2 || true
+    docker inspect --format '{{.Name}} image={{.Config.Image}} cmd={{.Config.Cmd}} user={{.Config.User}} workdir={{.Config.WorkingDir}} exit={{.State.ExitCode}} err={{.State.Error}}' \
+      scalpai-migrate-1 2>&1 | tail -5 >&2 || true
+    docker logs --tail 30 scalpai-migrate-1 2>&1 | tail -30 >&2 || true
+    docker image inspect "$api_digest" --format 'pinned api image: os={{.Os}} arch={{.Architecture}} user={{.Config.User}} workdir={{.Config.WorkingDir}} entry={{.Config.Entrypoint}} cmd={{.Config.Cmd}}' \
+      2>&1 | tail -3 >&2 || true
+    return 1
+  fi
   wait_for_health "$label" || return 1
 }
 
