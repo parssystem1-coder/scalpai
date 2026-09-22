@@ -658,6 +658,7 @@ on: pull_request  +  push:main
 | **23** | **سیاست Merge دو لاین: Fast (docs) / Gated (داده‌محور) — auto-merge بعد از CI سبز؛ گزارش CI فقط artifact** | PR اجباری برای همه، یا push آزاد برای همه | تیم تک‌نفره: تشریفات PR بی‌ارزش است مگر تست ابری قبل از land شدن اجرا شود |
 | **24** | **توسعه لوکال با PostgreSQL 17 native — Docker فقط CI/استقرار** | نصب Docker Desktop در فاز توسعه | محدودیت منابع سیستم؛ env یکسان (`DATABASE_URL`) هر دو مسیر را پوشش می‌دهد |
 | **25** | **Audit = AuditService داخل تراکنش + REVOKE سطح SQL (نه Interceptor)** | AuditLogInterceptor خارج از tx | اتمیک بودن mutation+audit؛ ضدبازنویسی حتی با نقص کد — ADR-0025 |
+| **51** | **IndexedDB آفلاین = دلتای redactشده، نه پاکت ciphertext** | استفاده از PHI_KEY_RING در مرورگر / WebCrypto با کلید نشست | مرورگر هرگز PHI_KEY_RING ندارد (ADR-0038)؛ کنترل B05 = redact + wipe هنگام logout — ADR-0051 |
 
 ---
 
