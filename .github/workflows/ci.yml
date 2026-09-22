@@ -595,8 +595,9 @@ jobs:
             bash tools/ci/release-attest.sh --tag "ci-${GITHUB_SHA::12}"
 
       - name: Pin prod.yml to the promoted digests (tags never deploy)
-        run: bash tools/ci/run-gate.sh release-digest-pin \
-          bash tools/ci/release-digest-pin.sh --tag "ci-${GITHUB_SHA::12}" --env-file "ops/ci.env"
+        run: |
+          bash tools/ci/run-gate.sh release-digest-pin \
+            bash tools/ci/release-digest-pin.sh --tag "ci-${GITHUB_SHA::12}" --env-file "ops/ci.env"
 
       - name: Rollback drill - boot prod digest, promote staging digest, roll back, roll forward
         run: |
