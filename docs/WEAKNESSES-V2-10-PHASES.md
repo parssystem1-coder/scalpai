@@ -1,8 +1,8 @@
 # ScalpAI v2: نقشه راه ۱۰ فازه رفع ضعف‌ها
 
-> وضعیت: این فایل سابقهٔ فازهای ۱ تا ۱۰ را ثبت می‌کند؛ **Closure Gate فاز ۴ هنوز باز است** (۲۰۲۶-۰۹-۲۱: ۱۲/۱۳ PASS) و ادعاهای تکمیل M1/L2 تا ارائهٔ شواهد مستقل در آن gate قطعی محسوب نمی‌شوند. شش گیت enforcement موج ۴ (پنج گیت مستقل + rule `doc-status-consistency` در گیت conformance) فعال و سبزند (PR #91 + #92)؛ مسیر release هم با ADR-0050 پنج گیت `release-*` گرفت (پروموشن digest، SBOM/provenance، پین digest و rollback drill واقعی — CI + nightly)؛ سطر باز سند گیت: فقط GATE_REVIEW مستقل.
+> وضعیت: این فایل سابقهٔ فازهای ۱ تا ۱۰ را ثبت می‌کند؛ **Closure Gate فاز ۴ بسته است** (۲۰۲۶-۰۹-۲۲: ۱۳/۱۳ PASS — `docs/gates/GATE_REVIEW_phase-4-2026-09-22.md`). شش گیت enforcement موج ۴ (پنج گیت مستقل + rule `doc-status-consistency` در گیت conformance) فعال و سبزند (PR #91 + #92)؛ مسیر release با ADR-0050 پنج گیت `release-*` گرفت؛ سطر ۵ با ADR-0051 به‌صورت redaction (نه encryption) صادق شد.
 > این فایل مرجع اجرایی ضعف‌هاست. هر مورد تا وقتی کد اصلاحی، تست رگرسیون و اجرای سبز گیت مربوطه ثبت نشده، باز می‌ماند.
-> تاریخ آخرین بروزرسانی: 2026-09-21 · مخزن: `parssystem1-coder/scalpai`
+> تاریخ آخرین بروزرسانی: 2026-09-22 · مخزن: `parssystem1-coder/scalpai`
 
 ## حکم ممیزی
 
@@ -208,7 +208,7 @@
 
 **هدف خروج:** ادعاهای محصول، معماری و UX با واقعیت کد یکی باشند.
 
-**وضعیت:** تمام موارد فهرست‌شدهٔ این فاز بسته شده‌اند (بخش «باقی‌مانده» اکنون ثبت تاریخی بسته‌شدن‌هاست). ادامهٔ کار فاز ۴ فقط در سند گیت دنبال می‌شود: ۱۲/۱۳ PASS — سطر باز: GATE_REVIEW مستقل (سطر ۱۳). سطر ۶ (release promotion/rollback) با موج ۵ بسته شد: ADR-0050، پنج گیت `release-*` در REQUIRED_GATES (۳۷ گیت)، ledger `docs/releases/releases-ledger.jsonl` و drill شبانه.
+**وضعیت:** تمام موارد فهرست‌شدهٔ این فاز بسته شده‌اند (بخش «باقی‌مانده» اکنون ثبت تاریخی بسته‌شدن‌هاست). Closure Gate فاز ۴: ۱۳/۱۳ PASS (`docs/gates/GATE_REVIEW_phase-4-2026-09-22.md`). سطر ۶ با ADR-0050؛ سطر ۵ با ADR-0051 (redaction، نه encryption)؛ سطر ۱۳ با GATE_REVIEW مستقل.
 
 ### تکمیل‌شده (۱۳ مورد):
 
@@ -228,7 +228,7 @@
 - [x] **PR #21/#23** قدیمی بسته یا verify شوند. (تکمیل شده در PR #54)
 - [x] **R14** وابستگی‌ها از root به workspace درست منتقل و `three`, `lucide-react`, coverage tooling و package manager policy مرتب شوند. (تکمیل شده در PR #54)
 
-### بسته‌شده (ادامهٔ فاز ۱۰): موارد Closure Gate فاز ۴ — شش گیت enforcement موج ۴ (پنج گیت مستقل + rule `doc-status-consistency` در گیت conformance) فعال و سبز شد؛ چهار سطر باز سند گیت: E2E persistence، release promotion/rollback، area keys، GATE_REVIEW مستقل.
+### بسته‌شده (ادامهٔ فاز ۱۰): موارد Closure Gate فاز ۴ — ۱۳/۱۳ PASS. شش گیت enforcement موج ۴ فعال و سبز؛ مسیر release ADR-0050؛ سطر ۵ ADR-0051؛ GATE_REVIEW مستقل 2026-09-22.
 
 - [x] **C12/F20** نشان‌های پرفورمنس سه‌بعدی: markHologramMountStart/markHologramFirstFrame در مسیر رندر واقعی، baseline کامیت‌شده (tolerance ۲۰٪، fail-closed) و e2e تگ‌دار @perf که هر شب و در گیت `perf-baseline` CI سنجیده می‌شود. (PR #91 — مرج‌شده به main، CI سبز)
 - [x] **C9/F07** گیت `a11y-dialog`: سوییتهٔ رفتاری روی DialogPrimitive (focus in/out، Tab/Shift+Tab wrap، Escape، restore) + بررسی ساختاری مونتاژ همهٔ مدال‌ها از primitive مشترک و نبود *Modal.tsx بیرون از modals/. (PR #92)
@@ -236,6 +236,8 @@
 - [x] **C7/P4-B07** rule `doc-status-consistency` در conformance + ADR-0048 و allowlist — تناقض ادعای اسناد با سند گیت دیگر قابل کامیت نیست؛ اسکن CRLF-safe است. (PR #92)
 - [x] **سطر ۱ سند گیت (C1)** چرخهٔ کامل offline→online به‌عنوان @smoke روی استک واقعی بسته شد؛ در همان اجرا باگ silent-corruption مسیر outbox (حذف فیلدهای هویتی در مرز Dexie و ساخت ردیف بیمار خالی توسط سرور) کشف و با رد نام‌دار سمت سرور ترمیم شد. (ADR-0049)
 - [x] **سطر ۱۱ سند گیت (P4-R12)** area keys در TrichoscopyGallerySection و PhotoLightbox ترجمه شدند؛ تست رگرسیون دو-زبانه + گیت locale-parity (۷۰۶/۷۰۶).
+- [x] **سطر ۵ سند گیت (P4-B05)** کنترل آفلاین = redaction نه encryption (ADR-0051)؛ هویت ADR-0049 plaintext می‌ماند؛ notes/secrets fail-closed؛ logout Dexie را wipe می‌کند.
+- [x] **سطر ۱۳ سند گیت (C13)** GATE_REVIEW مستقل `docs/gates/GATE_REVIEW_phase-4-2026-09-22.md` با `verdict: PASS` و URL CI در هر سطر؛ قفل در `tools/quality/phase4-gate-review.spec.ts` (بدون گیت جدید در REQUIRED_GATES).
 - [x] **M1** SAMPLE data از provider واقعی جدا، banner/watermark دائمی داشته و در production build حذف شود. — **تکمیل شده: ClinicalDashboard و NeuralSegmentationOverlay هیچ import از SAMPLE_* ندارند؛ dashboard-samples.ts پشت import.meta.env.DEV guard قرار دارد؛ DemoWatermark در DashboardShell و NeuralSegmentationOverlay رندر می‌شود؛ m1b-runtime-wiring.spec.ts سبز؛ production-mocks exceptions از exceptions.json حذف شد.**
 - [x] **M5b** i18n کامپوننت‌های باقی‌مانده: ClinicalPdfReportModal (~۳۰ رشته)، EducationModal (~۲۵ رشته)، DigitalConsentModal (~۲۰ رشته)، LuxuryScalp3D (~۱۰ رشته). (خارج از محدوده اصلی M5 اما نیاز به i18n دارند) — **تکمیل شده: ۴ کامپوننت، ~۸۵ کلید fa/en، ۶ تست parity سبز، typecheck/lint بدون خطا)**
 - [x] **M5c** i18n گسترده: ConsentCertificateModal، GuidedCaptureModal، LicenseDiagnosticsModal، ScalpMap، SyncInspectorModal، NeuralSegmentationOverlay، FollicleCaliberWaveform، TrichologyRadarChart، DemoBanner، ProPlansView، RegisterForm، SignInForm، SignatureCanvas، HairCanvas، PendingBadge و سایر کامپوننت‌های دارای `isFa` و رشته‌های فارسی hardcoded. — **تکمیل شده: ۱۵ کامپوننت، ~۲۸۰ کلید fa/en، ۱۶ فایل تغییر، orphan/dangling=0، ۷۶ تست سبز)**

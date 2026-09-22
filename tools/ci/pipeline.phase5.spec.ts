@@ -389,6 +389,18 @@ describe("CI hygiene - cancellation and artifact retention", () => {
   });
 });
 
+describe("Phase 4 Wave 5 / C13 - independent GATE_REVIEW is locked in the existing suite", () => {
+  it("does not add a new REQUIRED_GATES entry (parity with ci.yml stays at 37)", () => {
+    expect(REQUIRED_GATES).toHaveLength(37);
+    expect(REQUIRED_GATES).not.toContain("phase4-gate-review");
+  });
+
+  it("exists as a behavioural checker plus spec under tools/quality", () => {
+    expect(existsSync(join(ROOT, "tools/quality/phase4-gate-review.ts"))).toBe(true);
+    expect(existsSync(join(ROOT, "tools/quality/phase4-gate-review.spec.ts"))).toBe(true);
+  });
+});
+
 describe("M14/H15 - npm is the only package manager on executable surfaces", () => {
   const files = [
     ".github/workflows/ci.yml",
