@@ -8,8 +8,10 @@ import DialogPrimitive from "./DialogPrimitive";
 export interface PhotoLightboxProps {
   previewPhotoModal: TrichoscopyImage | null; selectedPatient: Patient; photosByPatient: Record<string, readonly TrichoscopyImage[]>;
   onClose: () => void; onDeletePhoto: (id: string) => void; onCompare: (a: string, b: string) => void; onInspectHud: (photo: TrichoscopyImage) => void;
+  /** Translated area display label (gate criterion 11: area keys must resolve, never the raw enum). */
+  areaLabel: (area: string) => string;
 }
-export default function PhotoLightbox({ previewPhotoModal, selectedPatient, photosByPatient, onClose, onDeletePhoto, onCompare, onInspectHud }: PhotoLightboxProps) {
+export default function PhotoLightbox({ previewPhotoModal, selectedPatient, photosByPatient, onClose, onDeletePhoto, onCompare, onInspectHud, areaLabel }: PhotoLightboxProps) {
   const { t } = useTranslation();
   const [lightboxZoom, setLightboxZoom] = useState(1); const [lightboxPan, setLightboxPan] = useState({x:0,y:0}); const [lightboxRotation, setLightboxRotation] = useState(0); const [isLightboxPanning, setIsLightboxPanning] = useState(false);
   const lightboxPanStart=useRef({x:0,y:0}); const lightboxTouchStart=useRef({x:0,y:0}); const firstRef=useRef<HTMLButtonElement>(null); const returnFocus=useRef<HTMLElement|null>(null);
@@ -42,7 +44,7 @@ export default function PhotoLightbox({ previewPhotoModal, selectedPatient, phot
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>{t("dashboard.lightbox.title", { area: previewPhotoModal.area })}</span>
+                    <span>{t("dashboard.lightbox.title", { area: areaLabel(previewPhotoModal.area) })}</span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 border border-cyan-800 text-cyan-300">
                       {t("dashboard.lightbox.zoomBadge", {
                         value: faNum(Math.round(lightboxZoom * 100)),

@@ -71,6 +71,14 @@ export const REQUIRED_GATES = [
   "backup-freshness",
   "backup-offsite",
   "restore-drill",
+  // Phase 4 Wave 5 (C6/P4-B06, ADR-0050): the release path is enforced, not
+  // documented - promote by digest, SBOM/provenance, digest-pinned deploy and
+  // a REAL rollback drill (boot -> promote -> rollback -> health -> forward).
+  "release-promote",
+  "release-attest",
+  "release-digest-pin",
+  "release-drill",
+  "release-runbook",
 ] as const;
 
 /**

@@ -57,7 +57,8 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
   const { t } = useTranslation();
 
   /** Localised name of a trichoscopy area (`vertex`, `temple`, ...). */
-  const areaLabel = (area: string): string => t(`dashboard.galleryVision.areas.${area}`);
+  const areaLabel = (area: string): string =>
+    t(`dashboard.galleryVision.areas.${area}`, { defaultValue: area });
 
   const { activeSection, showBackToTop, scrollToSection } = useDashboardNavigation();
   const { bus } = useDashboardEventBus();
@@ -296,6 +297,7 @@ export const ClinicalDashboard: React.FC<ClinicalDashboardProps> = ({
         onDeletePhoto={handleDeletePhoto}
         onCompare={(a, b) => { setCompareDefaultA(a); setCompareDefaultB(b); openBeforeAfter(); }}
         onInspectHud={(photo) => { setActiveInspectedPhoto(photo); setPreviewPhotoModal(null); scrollToSection("gallery"); }}
+        areaLabel={areaLabel}
       />
     </DashboardShell>
   );

@@ -83,4 +83,5 @@
 ## موج ۵ — release engineering و اصلاح ثبت گیت (P1)
 
 - `release.yml`: build یک‌باره، push با digest، SBOM/provenance/signing، rollback drill.
+- **انجام شد (2026-09-21، ADR-0050):** پنج گیت `release-promote`، `release-attest`، `release-digest-pin`، `release-drill`، `release-runbook` در REQUIRED_GATES (۳۷ گیت) و در job `deployment` CI؛ `release.yml` هفتگی روی main با GHCR + environment approval برای تگ prod؛ drill کامل (boot از digest prod → promote staging → rollback با health → roll-forward) در job مستقل شبانهٔ `release-drill`؛ ledger `docs/releases/releases-ledger.jsonl` append-only؛ `prod.yml` برای api/web/migrate با `SCALPAI_API_IMAGE`/`SCALPAI_WEB_IMAGE` قابل پین‌کردن به `repo@sha256:...`؛ اسپک قفل `tools/ops/release-promotion.phase5.spec.ts` (۳۰ تست، شامل selftest زندهٔ fail-closed اسکریپت‌ها). سطر ۶ سند گیت PASS شد (۱۲/۱۳).
 - اصلاح ledger: معیار ۱۳ گیت فاز ۴ → PENDING (GATE_REVIEW فعلی خود-ارزیابی است)، معیار ۵ → نیمه‌کاره (redact ≠ encrypt)، بازگشایی M1/M5 با ارجاع به F01 تا موج ۱ ثبت رسمی شود.

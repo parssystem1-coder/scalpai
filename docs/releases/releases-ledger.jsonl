@@ -1,0 +1,4 @@
+# ScalpAI release ledger (ADR-0050, append-only).
+# One JSON object per line; the only legal edit is ADDING a line.
+# kinds: promote | attest | deploy | rollback | rollback-drill
+{"ts":"2026-09-21T00:00:00Z","kind":"note","message":"ledger opened with wave 5 (gate row #6); promotion records start with the first tagged release"}

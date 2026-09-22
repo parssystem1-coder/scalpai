@@ -47,6 +47,13 @@ services:
           memory: 256M
 
   web:
+    # ADR-0050: SCALPAI_WEB_IMAGE is set only by the release path (CI, the
+    # drill, or an operator deploy) and MUST be a promoted digest ref
+    # (repo@sha256:...) when present - the prod path deploys exactly what CI
+    # built and scanned, never a mutable tag or a locally rebuilt image.
+    # Unset (local dev/CI build jobs), the image: line is ignored and compose
+    # builds from source as before.
+    image: ${SCALPAI_WEB_IMAGE:-scalpai-web:local}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
@@ -75,6 +82,10 @@ services:
   # production image that has to keep a TypeScript runner installed in order to
   # migrate is a production image that ships its whole dev tree to be scanned.
   migrate:
+    # ADR-0050: the one-shot migration runs the SAME image the API will run
+    # (a promoted digest when SCALPAI_API_IMAGE is set), so prod never
+    # migrates with a binary set different from the runtime it enables.
+    image: ${SCALPAI_API_IMAGE:-scalpai-api:local}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -98,6 +109,8 @@ services:
           memory: 512M
 
   api:
+    # ADR-0050: see `migrate` above - one digest for migrate + api.
+    image: ${SCALPAI_API_IMAGE:-scalpai-api:local}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile

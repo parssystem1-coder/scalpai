@@ -9,6 +9,9 @@ RUN npm ci --legacy-peer-deps
 RUN npm exec -- turbo run build --filter=@scalpai/app-web...
 
 FROM nginx:1.27-alpine AS runner
+# ADR-0050: release channel label (see apps/api/Dockerfile).
+ARG RELEASE_CHANNEL=prod
+LABEL org.opencontainers.image.version="$RELEASE_CHANNEL"
 
 # M17: tools/ci/image-scan.sh blocks the build on any FIXABLE CRITICAL, so the
 # base package set is patched at build time. The nginx tag stays pinned - this

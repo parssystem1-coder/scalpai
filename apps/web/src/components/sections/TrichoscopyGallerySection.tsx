@@ -262,7 +262,7 @@ export function TrichoscopyGallerySection({
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                             <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[oklch(20%_0.02_20)] text-[0.65rem] font-bold border border-white/80 shadow-xs">
-                              {t("dashboard.galleryVision.areaLabel", { area: photo.area })}
+                              {t("dashboard.galleryVision.areaLabel", { area: areaLabel(photo.area) })}
                             </div>
                             {isCurrentHUD && (
                               <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[oklch(62%_0.09_16)] text-white text-[0.62rem] font-bold shadow-xs">

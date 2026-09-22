@@ -247,3 +247,92 @@ jobs:
           name: nightly-drill-evidence
           path: ci-evidence
           retention-days: 30
+
+  release-drill:
+    name: nightly release drill (promote, attest, digest-pin, rollback, roll-forward)
+    # ADR-0050: the rollback path is exercised EVERY NIGHT against a fresh
+    # registry + stack, exactly like the CI deployment job does per PR - so a
+    # regression in the release path can never hide between releases.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a complete secret set (generated on the runner, never committed)
+        working-directory: ops
+        run: |
+          umask 077
+          PHI_KEY=$(openssl rand -base64 32 | tr -d '\n')
+          cat > ci.env <<ENV
+          SCALPAI_DOMAIN=clinic.example.com
+          ACME_EMAIL=admin@example.com
+          POSTGRES_USER=scalpai_owner
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          POSTGRES_DB=scalpai
+          APP_ROLE_PASSWORD=$(openssl rand -hex 16)
+          MINIO_ROOT_USER=scalpai_admin
+          MINIO_ROOT_PASSWORD=$(openssl rand -hex 16)
+          S3_BUCKET=scalpai-media
+          JWT_SECRET=$(openssl rand -hex 32)
+          PHI_KEY_RING=[{"kid":"k2026ci","key":"$PHI_KEY","state":"active","createdAt":"2026-09-09T00:00:00.000Z"}]
+          ALERT_WEBHOOK_URL=http://127.0.0.1:9/alerts
+          BACKUP_AGE_RECIPIENTS_FILE=/tmp/scalpai-recipients.txt
+          BACKUP_OFFSITE_ENDPOINT=https://s3.provider.example
+          BACKUP_OFFSITE_BUCKET=scalpai-offsite
+          BACKUP_OFFSITE_ACCESS_KEY=$(openssl rand -hex 12)
+          BACKUP_OFFSITE_SECRET_KEY=$(openssl rand -hex 16)
+          ENV
+
+      - name: Start a local OCI registry
+        run: |
+          docker run -d --name release-registry -p 127.0.0.1:5000:5000 registry:2.8.3
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/v2/ >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+      - name: Promote + attest two release channels from one build
+        run: |
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/run-gate.sh release-promote \
+            bash tools/ci/release-promote.sh --registry 127.0.0.1:5000 --tag "nightly-prod" --commit "$GITHUB_SHA"
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/run-gate.sh release-attest \
+            bash tools/ci/release-attest.sh --tag "nightly-prod"
+          SCALPAI_RELEASE_CHANNEL=staging SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/release-promote.sh --registry 127.0.0.1:5000 --tag "nightly-staging" --commit "$GITHUB_SHA"
+          SCALPAI_RELEASE_REGISTRY=127.0.0.1:5000 \
+            bash tools/ci/release-attest.sh --tag "nightly-staging"
+
+      - name: Digest-pin + full rollback drill on the real stack
+        run: |
+          bash tools/ci/run-gate.sh release-digest-pin \
+            bash tools/ci/release-digest-pin.sh --tag "nightly-prod" --env-file "ops/ci.env"
+          bash tools/ci/run-gate.sh release-drill \
+            bash tools/ci/release-rollback-drill.sh --prod-tag "nightly-prod" --staging-tag "nightly-staging" --compose-env "ops/ci.env"
+
+      - name: Tear down
+        if: always()
+        working-directory: ops
+        run: docker compose -f prod.yml --env-file ci.env down -v
+
+      - name: Upload the release ledger + attestations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-release-ledger
+          path: |
+            docs/releases/releases-ledger.jsonl
+            ci-evidence/release-sbom-*.json
+            ci-evidence/provenance-*.json
+          retention-days: 30
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-release-evidence
+          path: ci-evidence
+          retention-days: 30

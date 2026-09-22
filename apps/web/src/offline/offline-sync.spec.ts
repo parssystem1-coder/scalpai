@@ -66,10 +66,23 @@ describe("outbox records", () => {
     expect(back.envelope.payload).toEqual({ id: "p1", gender: "female" });
   });
 
-  it("never writes readable PHI into IndexedDB", () => {
-    const record = toRecord(item({ firstName: "علی", phone: "09120000000", notes: "محرمانه", gender: "male" }), scope);
+  it("keeps patient identity fields but still never writes readable PHI into IndexedDB (ADR-0049)", () => {
+    const record = toRecord(
+      item({ firstName: "علی", lastName: "رضایی", phone: "09120000000", notes: "محرمانه", gender: "male" }),
+      scope,
+    );
     const stored = JSON.parse(record.payload) as Record<string, unknown>;
-    expect(stored).toEqual({ gender: "male" });
+    // Identity survives (the server applies PatientCreate verbatim)…
+    expect(stored).toMatchObject({ firstName: "علی", lastName: "رضایی", phone: "09120000000", gender: "male" });
+    // …while free-text PHI and secrets stay redacted, fail-closed.
+    expect(stored.notes).toBeUndefined();
+    expect("password" in stored).toBe(false);
+  });
+
+  it("drops empty identity fields so the server's ADR-0049 refusal is the named outcome", () => {
+    const record = toRecord(item({ firstName: "", lastName: "", phone: "" }), scope);
+    const stored = JSON.parse(record.payload) as Record<string, unknown>;
+    expect(stored).toEqual({});
   });
 
   it("survives a corrupted payload without throwing", () => {

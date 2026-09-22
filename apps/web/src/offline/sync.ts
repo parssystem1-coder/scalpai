@@ -22,7 +22,19 @@ const PULL_CURSOR_KEY = "pull-cursor";
 export function toRecord(item: OutboxItem, scope: OfflineScope, createdAt?: number): OutboxRecord {
   const envelope = item.envelope;
   const payload = redactPhiPayload(envelope.payload);
-  assertRedactedPhiPayload(payload);
+  // ADR-0049: the patient IDENTITY fields are part of the §8 sync contract as
+  // PLAINTEXT on the server path (findForbiddenPhi exempts exactly these five),
+  // so the redaction boundary must carry them too — otherwise
+  // applyPatientCreate turns an offline create into an empty-identity row.
+  // Everything else stays redacted and the fail-closed assertion below only
+  // guards the redacted remainder (no notes, no free text, no secrets).
+  const identity: Record<string, unknown> = {};
+  for (const key of ["firstName", "lastName", "phone", "birthDate", "gender"]) {
+    const value = envelope.payload[key];
+    if (typeof value === "string" && value.length > 0) identity[key] = value;
+  }
+  const rest = Object.fromEntries(Object.entries(payload).filter(([key]) => !(key in identity)));
+  assertRedactedPhiPayload(rest);
   return {
     id: envelope.clientMutationId,
     entity: envelope.entity,
@@ -30,9 +42,9 @@ export function toRecord(item: OutboxItem, scope: OfflineScope, createdAt?: numb
     schemaVersion: envelope.schemaVersion,
     clientUpdatedAt: envelope.clientUpdatedAt,
     baseVersion: envelope.baseVersion ?? null,
-    // IndexedDB is not a secret store: keep the same redacted delta that the
-    // server ledger will receive. Ciphertext survives; readable notes do not.
-    payload: JSON.stringify(payload),
+    // IndexedDB is not a secret store: the redacted delta the server ledger
+    // receives, PLUS the identity fields ADR-0049 exempts.
+    payload: JSON.stringify({ ...rest, ...identity }),
     createdAt: createdAt ?? Date.now(),
     attempts: item.attempts,
     nextAttemptAt: item.nextAttemptAt,
