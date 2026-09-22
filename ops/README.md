@@ -53,7 +53,11 @@ curl -fsS https://YOUR_DOMAIN/api/v1/health/ready
 
 هر snapshot شامل `postgres.dump.age`، `objects.tar.gz.age` و `manifest.json.age` است. `age` احراز اصالت رمزنگاری را فراهم می‌کند؛ manifest checksum را تأیید می‌کند؛ و off-site retention قفل WORM دارد. مسیر کامل incident، key rotation، restore، tenant isolation و deletion در `docs/ops/RUNBOOK.md` است.
 
-## ۵. مشاهده‌پذیری
+## ۵. پیام‌رسانی ایران
+
+ماتریس کانال‌های قابل‌اجرا (Kavenegar اجباری؛ مسنجرها تا موج ۲ stub و fail-closed): `ops/iran-messaging-matrix.md`.
+
+## ۶. مشاهده‌پذیری
 
 - `/api/v1/health` فقط liveness است؛ `/api/v1/health/ready` آماده‌به‌کاری Postgres را بررسی می‌کند و Redis را advisory گزارش می‌کند.
 - `/api/v1/metrics` بدون `METRICS_TOKEN` فعال نمی‌شود.

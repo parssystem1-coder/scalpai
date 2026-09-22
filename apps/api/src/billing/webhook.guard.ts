@@ -1,8 +1,10 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { CanActivate, ExecutionContext, Injectable, SetMetadata, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { errors } from "@scalpai/shared";
 import { DbService, findActiveProvider } from "@scalpai/db";
 import type { FastifyRequest } from "fastify";
+import { StateStore } from "../common/state/state.store.js";
 import { TenantScope } from "../tenancy/tenant.scope.js";
 
 const WEBHOOK_PROVIDER = "webhook-provider";
@@ -27,6 +29,8 @@ const PROVIDER_SIGNATURE_HEADERS: Readonly<Record<string, string>> = {
  * شناسایی باشد.
  */
 const WEBHOOK_SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001";
+/** Replay window for a signed body. Durable webhook_events is wave 5. */
+export const WEBHOOK_REPLAY_TTL_MS = 10 * 60 * 1000;
 
 /** Verifies provider HMAC signatures before any webhook payload reaches business logic. */
 @Injectable()
@@ -34,6 +38,7 @@ export class WebhookGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly db: DbService,
+    private readonly state: StateStore,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -56,6 +61,12 @@ export class WebhookGuard implements CanActivate {
       throw new UnauthorizedException("Invalid webhook signature");
     }
 
+    const replayKey = this.state.key("webhook", "replay", provider, bodyDigest(rawBody));
+    const seen = await this.state.hit(replayKey, WEBHOOK_REPLAY_TTL_MS);
+    if (seen > 1) {
+      throw errors.conflict("webhook replay rejected");
+    }
+
     // B1: tenant context binding — lookup provider → clinicId
     const record = await this.db.withClient((tx) =>
       findActiveProvider(tx, provider),
@@ -74,6 +85,10 @@ export class WebhookGuard implements CanActivate {
 
     return true;
   }
+}
+
+export function bodyDigest(body: Buffer): string {
+  return createHash("sha256").update(body).digest("hex");
 }
 
 export function verifySignature(body: Buffer, supplied: string, secret: string): boolean {

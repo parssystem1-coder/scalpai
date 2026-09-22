@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   errors,
+  sanitizeMessageError,
   type AftercareEnrollmentCreateDto,
   type AftercareSequenceCreateDto,
   type AftercareSequenceUpdateDto,
@@ -15,12 +16,12 @@ import {
   type Tx,
 } from "@scalpai/db";
 import {
-  getAdapter,
   previewBody,
   redactRecipient,
   redactVars,
   renderTemplate,
   routeChannel,
+  sendWithChannelFailover,
 } from "@scalpai/notify";
 import { metrics } from "../common/metrics.js";
 import { MeteringService } from "../metering/metering.service.js";
@@ -57,6 +58,7 @@ interface PendingSend {
   attempts: number;
   channel: MessagingChannel;
   recipient: string;
+  optedIn: MessagingChannel[];
   body: string;
   locale: "fa" | "en";
   idempotencyKey: string;
@@ -260,21 +262,22 @@ export class AftercareService {
     // گام ۲ — بیرون از هر تراکنشی.
     const results = await Promise.all(
       pending.map(async (job) => {
-        try {
-          const adapter = getAdapter(job.channel);
-          const result = await adapter.send({
-            channel: job.channel,
+        const failover = await sendWithChannelFailover({
+          request: {
+            preferred: job.channel,
+            recipient: { optedIn: job.optedIn, hasMobile: job.recipient.length > 0 },
+            env: process.env,
+          },
+          message: {
             to: job.recipient,
             body: job.body,
             locale: job.locale,
             idempotencyKey: job.idempotencyKey,
             meta: { templateKey: job.templateKey },
-          });
-          return { job, result } as const;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          return { job, result: { outcome: "rejected", provider: job.channel, reason: message, retryable: false } } as const;
-        }
+          },
+          initial: job.channel,
+        });
+        return { job: { ...job, channel: failover.channel }, result: failover.result } as const;
       }),
     );
 
@@ -290,7 +293,7 @@ export class AftercareService {
           await this.repo.markSentInTx(tx, ctx.clinicId, job.messageId, result.provider, result.providerMessageId);
           await this.repo.advanceInTx(tx, ctx.clinicId, job.enrollmentId);
         } else {
-          await this.repo.markFailedInTx(tx, ctx.clinicId, job.messageId, result.reason ?? "send failed");
+          await this.repo.markFailedInTx(tx, ctx.clinicId, job.messageId, sanitizeMessageError(result.reason));
           // پیامی که نرفت، سهمیه را نباید بسوزاند
           await this.metering.refund(tx, ctx.clinicId, "messages_sent");
           await this.repo.deferInTx(tx, ctx.clinicId, job.enrollmentId, job.attempts);
@@ -397,6 +400,7 @@ export class AftercareService {
       attempts: job.attempts,
       channel: decision.channel,
       recipient,
+      optedIn,
       body: rendered.body,
       locale,
       idempotencyKey,

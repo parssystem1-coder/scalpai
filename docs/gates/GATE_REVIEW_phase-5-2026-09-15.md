@@ -26,9 +26,9 @@
 
 | # | آیتم DoD | دستور verify | خروجی کلیدی | ✓/✗ |
 |---|----------|-------------|-------------|-----|
-| 2 | قطع adapter Bale → خودکار ارسال SMS fallback (تست contract) | `npm run test -- --grep "fallback"` | WebhookGuard + fallback chain implemented in notify package | ✓ |
+| 2 | قطع adapter Bale → خودکار ارسال SMS fallback (تست contract) | `npx vitest run packages/notify/src/router.spec.ts` | موج ۱: `routeAfterFailure` + `sendWithChannelFailover` — Bale fail → یک send روی kavenegar. گیت ۱۵ سپتامبر این را بدون تست قرارداد ✓ زده بود. | ✓ موج ۱ |
 | 3 | هیچ PHI در message_log/body نیست (تست متا روی قالب‌ها) | Security audit | `recipientDigest()` hashes phone; `bodySha256` stores digest; `varsRedacted` strips PHI keys; CHECK constraint rejects PHI key names | ✓ |
-| 4 | عبور از quota → 403 با code=QUOTA_EXCEEDED و UI راهنمای ارتقا | Security audit | `quota.guard.ts:56` returns 403; `metering.service.ts:45-58` atomic check+increment; `aftercare.service.ts:382-392` handles verdict | ✓ |
+| 4 | عبور از quota → 403 با code=QUOTA_EXCEEDED و UI راهنمای ارتقا | Security audit | API: `quota.guard.ts` ۴۰۳ می‌دهد. **UI راهنمای ارتقا نیست** — موج ۳ (D10). گیت ۱۵ سپتامبر این را کاذب ✓ زده بود. | ✗ UI |
 
 ### آیتم‌های معلق (Phase 5.6 — Patient Portal — هنوز پیاده‌سازی نشده)
 

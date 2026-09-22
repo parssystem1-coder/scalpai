@@ -87,7 +87,7 @@
 
 ### Phase 5a ✅ (PR #73 merged)
 - [x] Aftercare Engine: sequences + enrollments + delivery worker (packages/db + apps/api)
-- [x] Messaging Gateway: 5 stub adapters (Kavenegar/Bale/Eitaa/Telegram/WhatsApp) + channel router (packages/notify)
+- [x] Messaging Gateway: Kavenegar واقعی + ۴ stub fail-closed (Bale/Eitaa/Telegram/WhatsApp) + channel router (packages/notify)
 - [x] Billing: products, invoices, invoice_items, payment with state machines
 - [x] Metering: usage_counters + MeteringService
 - [x] Phase 5a seed data (1 sequence, 2 products, 1 enrollment, 1 draft invoice)
@@ -101,6 +101,13 @@
 - [x] Inbound webhook controller (Kavenegar + Zarinpal callbacks)
 - [x] Inbox UI (InboxPage, MessageCard, MessageThread)
 - [x] 14 unit tests (payment, inbound, webhook guard)
+
+### Wave 1 — صداقت گیت + SMS-first (D01–D06)
+- [x] D01 ماتریس ایران: `ops/iran-messaging-matrix.md`
+- [x] D02/D03 `routeAfterFailure` + همان-tick failover Bale→Kavenegar (`packages/notify/src/router.spec.ts`)
+- [x] D04 replay وب‌هوک: digest بدن + TTL روی StateStore (بدون migration)
+- [x] D05 `lastError` فقط کد محدود — متن پروایدر/شماره ذخیره نمی‌شود
+- [ ] D10 UI راهنمای ارتقا پس از quota — موج ۳ (DoD پلی‌بوک #4 هنوز ناقص است)
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning

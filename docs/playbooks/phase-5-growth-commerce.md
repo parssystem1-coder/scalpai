@@ -15,7 +15,7 @@ DESIGN-V2 §6.2 · §9.1 · §13 (PHI-safe messaging) · §18 Tier-A · ADR-12/1
 
 ### 5.2 Messaging Gateway (packages/notify)
 - Interface واحد + adapter ها به ترتیب: Kavenegar/SMS.ir ← Bale ← Eitaa ← Telegram ← WhatsApp Cloud API
-- ماتریس «کانال‌های قابل‌اجرا داخل ایران» در ops/ مستند شود — SMS/Bale/Eitaa اول؛ Telegram/WhatsApp فقط با دسترسی خودِ کلینیک
+- ماتریس «کانال‌های قابل‌اجرا داخل ایران» در `ops/iran-messaging-matrix.md` — SMS/Bale/Eitaa اول؛ Telegram/WhatsApp فقط با دسترسی خودِ کلینیک
 - قالب‌های SMS خدماتی: static و عمومی (متغیر فقط نام/تاریخ/لینک) — سازگار با pre-approval اپراتور
 - fallback زنجیره‌ای خودکار + retry با backoff + message_log کامل
 - PHI-safe template engine: فقط متن عمومی + لینک توکن‌دار منقضی‌شونده

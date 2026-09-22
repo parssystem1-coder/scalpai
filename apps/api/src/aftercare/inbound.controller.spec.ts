@@ -6,6 +6,7 @@ import { Reflector } from "@nestjs/core";
 import { InboundController } from "./inbound.controller.js";
 import { WebhookGuard } from "../billing/webhook.guard.js";
 import { TenantScope } from "../tenancy/tenant.scope.js";
+import { StateStore } from "../common/state/state.store.js";
 
 const body = { channel: "kavenegar", from: "09120000000", body: "سلام", receivedAt: "2026-09-15T10:00:00.000Z" };
 function signature(payload: unknown, secret: string): string { return createHmac("sha256", secret).update(Buffer.from(JSON.stringify(payload))).digest("hex"); }
@@ -17,10 +18,10 @@ function executionContext(handler: object, request: Record<string, unknown>) {
   } as never;
 }
 
-/** WebhookGuard now needs DbService + TenantScope ALS store. */
-function newGuard(dbOverrides?: { withClient: ReturnType<typeof vi.fn> }) {
+/** WebhookGuard now needs DbService + StateStore (replay) + TenantScope ALS. */
+function newGuard(dbOverrides?: { withClient: ReturnType<typeof vi.fn> }, state?: StateStore) {
   const db = dbOverrides ?? { withClient: vi.fn().mockResolvedValue(undefined) };
-  return new WebhookGuard(new Reflector(), db as never);
+  return new WebhookGuard(new Reflector(), db as never, state ?? new StateStore());
 }
 
 describe("InboundController webhook security", () => {
@@ -99,5 +100,21 @@ describe("InboundController webhook security", () => {
     const metadataKey = "rate_limit";
     expect(Reflect.getMetadata(metadataKey, InboundController.prototype.ingestKavenegar)).toMatchObject({ name: "webhook-kavenegar", max: 600 });
     expect(Reflect.getMetadata(metadataKey, InboundController.prototype.ingestZarinpal)).toMatchObject({ name: "webhook-zarinpal", max: 600 });
+  });
+
+  it("rejects a replay of the same signed body with 409", async () => {
+    process.env.KAVENEGAR_WEBHOOK_SECRET = "k-secret";
+    const clinicId = "11111111-1111-1111-1111-111111111111";
+    const db = { withClient: vi.fn().mockResolvedValue({ clinicId, active: true }) };
+    const state = new StateStore();
+    const guard = newGuard(db, state);
+    const handler = InboundController.prototype.ingestKavenegar;
+    const request = { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-webhook-signature": signature(body, "k-secret") } };
+
+    await TenantScope.run(() => guard.canActivate(executionContext(handler, request)));
+    await expect(TenantScope.run(() => guard.canActivate(executionContext(handler, request)))).rejects.toMatchObject({
+      status: 409,
+      body: { code: "CONFLICT" },
+    });
   });
 });

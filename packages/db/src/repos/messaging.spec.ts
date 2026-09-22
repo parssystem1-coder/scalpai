@@ -164,6 +164,19 @@ describe("messaging DB functions (smoke)", () => {
     expect(result).toBe(false);
   });
 
+  it("does not persist provider text or a phone number in lastError", async () => {
+    const returning = vi.fn().mockResolvedValue([{ id: "m1" }]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    const tx = { update: vi.fn().mockReturnValue({ set }) } as any;
+    const { markMessageFailed } = await import("./messaging.repo.js");
+    await markMessageFailed(tx, "c1", "m1", "Kavenegar 500 receptor=09121234567 body=STOP");
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ lastError: "send-failed" }));
+    const stored = String(set.mock.calls[0]?.[0].lastError);
+    expect(stored).not.toMatch(/0912/);
+    expect(stored).not.toMatch(/Kavenegar/i);
+  });
+
   it("markMessageSuppressed returns false for no match", async () => {
     const tx = mockTx([]);
     const { markMessageSuppressed } = await import("./messaging.repo.js");
