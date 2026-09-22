@@ -611,12 +611,23 @@ jobs:
 
       - name: The release runbook refuses an out-of-order path (negative proof)
         run: |
-          if bash tools/ci/release-runbook.sh deploy "ci-${GITHUB_SHA::12}" 2>runbook.err; then
+          # ci-* and staging-* were attested two steps ago, so deploying either
+          # cannot prove the fail-closed path (CI run 35730525315 failed here
+          # with "unexpected runbook failure": compose then tried ops/prod.env).
+          # Seed a promote-only ledger line - the same fixture the unit spec uses.
+          UNATTESTED_TAG="unattested-${GITHUB_SHA::12}"
+          printf '{"ts":"%s","kind":"promote","commit":"%s","tag":"%s","registry":"local","api":"local/scalpai-api@sha256:%s","web":"local/scalpai-web@sha256:%s"}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_SHA" "$UNATTESTED_TAG" \
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+            >> docs/releases/releases-ledger.jsonl
+          if bash tools/ci/release-runbook.sh deploy "$UNATTESTED_TAG" 2>runbook.err; then
             echo "::error::runbook deployed without attestation gating"; cat runbook.err; exit 1
           fi
           grep -q "not attested" runbook.err || { echo "::error::unexpected runbook failure"; cat runbook.err; exit 1; }
+          # Latest promote is now the unattested tag; roll back to the ci (prod) tag.
           bash tools/ci/run-gate.sh release-runbook \
-            bash tools/ci/release-runbook.sh rollback "staging-${GITHUB_SHA::12}"
+            bash tools/ci/release-runbook.sh rollback "ci-${GITHUB_SHA::12}"
 
       - name: Upload the release ledger + attestations
         if: always()

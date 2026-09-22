@@ -73,6 +73,18 @@ describe("ADR-0050 - the release path exists as four named gates plus a runbook"
     expect(job).toContain("release-drill");
   });
 
+  it("negative-proofs the runbook against a promote-only tag, not the attested ci-* tag", () => {
+    const job = ci.slice(ci.indexOf("\n  deployment:"), ci.indexOf("\n  gate:"));
+    expect(job, "negative proof must seed an unattested tag").toContain("unattested-");
+    expect(job).toContain("not attested");
+    expect(job, "deploying the already-attested ci-* tag cannot prove fail-closed").not.toMatch(
+      /release-runbook\.sh deploy "ci-\$/,
+    );
+    expect(job, "rollback target must not be the latest (unattested) promote").toContain(
+      'release-runbook.sh rollback "ci-',
+    );
+  });
+
   it("re-runs the full drill nightly, so rollback cannot silently rot", () => {
     expect(code(nightly)).toContain("run-gate.sh release-drill");
     expect(code(nightly)).toContain("release-rollback-drill.sh");
