@@ -16,7 +16,10 @@ set -euo pipefail
 
 registry="${SCALPAI_RELEASE_REGISTRY:-}" tag="" commit="${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 evidence_dir="${CI_EVIDENCE_DIR:-ci-evidence}"
-compose_env="${COMPOSE_ENV_FILE:-ci.env}"
+# ops/ci.env is where CI materializes the compose env (working-directory: ops
+# for the earlier gates); the repo-root default keeps a manual repo-root run
+# pointing at the same file.
+compose_env="${COMPOSE_ENV_FILE:-ops/ci.env}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -42,15 +45,12 @@ if grep -q '"tag":"'"$tag"'"' "$LEDGER"; then
 fi
 
 echo "release-promote: building api+web (build once, promote the digest)"
-cache_flag=""
-[ "${RELEASE_NO_CACHE:-0}" = "1" ] && cache_flag="--no-cache"
 channel="prod"
-if [ -n "${SCALPAI_RELEASE_CHANNEL:-}" ]; then
-  channel="$SCALPAI_RELEASE_CHANNEL"
-fi
+[ -n "${SCALPAI_RELEASE_CHANNEL:-}" ] && channel="$SCALPAI_RELEASE_CHANNEL"
+build_args=(--build-arg "RELEASE_CHANNEL=$channel")
+[ "${RELEASE_NO_CACHE:-0}" = "1" ] && build_args+=(--no-cache)
 docker compose -f ops/prod.yml --env-file "$compose_env" \
-  $( [ -n "$cache_flag" ] && printf '%s' "$cache_flag" ) \
-  build --build-arg RELEASE_CHANNEL="$channel" api web
+  build "${build_args[@]}" api web
 
 push_digest() {
   local image="$1"
