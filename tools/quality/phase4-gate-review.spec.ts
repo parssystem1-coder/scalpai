@@ -50,6 +50,22 @@ describe("phase4-gate-review (C13)", () => {
     expect(result.missingUrls).toEqual([]);
   });
 
+  it("rejects a host-spoofed Actions URL that is not github.com", () => {
+    const spoofed = [
+      "https://evil.com/github.com/parssystem1-coder/scalpai/actions/runs/1",
+      "https://github.com.evil.com/parssystem1-coder/scalpai/actions/runs/1",
+      "http://github.com/parssystem1-coder/scalpai/actions/runs/1",
+    ];
+    for (const url of spoofed) {
+      const root = review(
+        `---\nverdict: PASS\n---\n\nF01: no criterion may be signed off on a source-text grep.\n\n| # | Criterion | Status | Evidence |\n${[...Array(13).keys()].map((i) => `| ${i + 1} | criterion ${i + 1} | PASS | ${url} |`).join("\n")}\n`,
+      );
+      const result = auditPhase4GateReview(root);
+      expect(result.ok).toBe(false);
+      expect(result.missingUrls).toHaveLength(13);
+    }
+  });
+
   it("accepts the committed Phase 4 GATE_REVIEW on this tree", () => {
     const result = auditPhase4GateReview(REPO_ROOT);
     expect(result.errors).toEqual([]);

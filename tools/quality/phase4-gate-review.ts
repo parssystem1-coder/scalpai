@@ -15,10 +15,33 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-const GATES_DIR = join(ROOT, "docs", "gates");
 const FILE_RE = /^GATE_REVIEW_phase-4-(\d{4}-\d{2}-\d{2})\.md$/;
-const CI_URL_RE = /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/actions\/runs\/\d+/;
 const CRITERION_RE = /^\|\s*(\d{1,2})\s*\|/;
+const GITHUB_ACTIONS_HOST = "github.com";
+const ACTIONS_RUN_PATH = /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/\d+$/;
+
+function isGithubActionsRunUrl(token: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(token);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === "https:" &&
+    parsed.hostname === GITHUB_ACTIONS_HOST &&
+    parsed.port === "" &&
+    parsed.username === "" &&
+    parsed.password === "" &&
+    parsed.search === "" &&
+    parsed.hash === "" &&
+    ACTIONS_RUN_PATH.test(parsed.pathname)
+  );
+}
+
+function hasActionsRunUrl(line: string): boolean {
+  return line.split(/[\s|]+/).some(isGithubActionsRunUrl);
+}
 
 export interface GateReviewAudit {
   ok: boolean;
@@ -91,7 +114,7 @@ export function auditPhase4GateReview(root = ROOT): GateReviewAudit {
   }
   const missingCriteria = [...Array(13).keys()].map((i) => i + 1).filter((n) => !seen.has(n));
   const missingUrls = [...seen.entries()]
-    .filter(([, line]) => !CI_URL_RE.test(line))
+    .filter(([, line]) => !hasActionsRunUrl(line))
     .map(([n]) => n);
   if (missingCriteria.length > 0) errors.push(`missing criterion rows: ${missingCriteria.join(", ")}`);
   if (missingUrls.length > 0) errors.push(`criterion rows without a GitHub Actions run URL: ${missingUrls.join(", ")}`);
