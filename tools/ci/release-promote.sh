@@ -70,10 +70,42 @@ push_digest() {
   printf '%s@%s\n' "${image%:*}" "$digest"
 }
 
+# Resolve a service's image from the compose config JSON. `config --images <svc>`
+# does NOT filter by service on the compose version CI ships - it prints every
+# service's image in randomized map order, so `head -n1` once promoted the
+# redis image as the api digest and another run the minio image (CI runs
+# 35711383690 / 35719441086 / 35728585510). Parse the JSON instead.
+image_for() {
+  local svc="$1" img
+  img=$(docker compose -f ops/prod.yml --env-file "$compose_env" config --format json 2>/dev/null \
+    | node -e '
+        let raw = "";
+        process.stdin.on("data", (c) => { raw += c; });
+        process.stdin.on("end", () => {
+          const cfg = JSON.parse(raw.slice(raw.indexOf("{")));
+          const svc = cfg.services && cfg.services[process.argv[1]];
+          const img = svc && svc.image;
+          if (!img) { console.error("release-promote: no image for service " + process.argv[1]); process.exit(1); }
+          console.log(img);
+        });
+      ' "$svc") || img=""
+  if [ -z "$img" ]; then
+    echo "::error::release-promote: could not resolve the image of service '$svc' from ops/prod.yml" >&2
+    exit 1
+  fi
+  printf '%s\n' "$img"
+}
+
 api_image="${registry%/}/scalpai-api:$tag"
 web_image="${registry%/}/scalpai-web:$tag"
-docker tag "$(docker compose -f ops/prod.yml --env-file "$compose_env" config --images api | head -n1)" "$api_image"
-docker tag "$(docker compose -f ops/prod.yml --env-file "$compose_env" config --images web | head -n1)" "$web_image"
+api_src="$(image_for api)"
+web_src="$(image_for web)"
+if [ "$api_src" = "$web_src" ]; then
+  echo "::error::release-promote: api and web resolve to the same image ($api_src)" >&2
+  exit 1
+fi
+docker tag "$api_src" "$api_image"
+docker tag "$web_src" "$web_image"
 
 api_digest=$(push_digest "$api_image")
 web_digest=$(push_digest "$web_image")
