@@ -8,7 +8,7 @@ COPY . .
 RUN npm ci --legacy-peer-deps
 RUN npm exec -- turbo run build --filter=@scalpai/app-web...
 
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.31-alpine AS runner
 # ADR-0050: release channel label (see apps/api/Dockerfile).
 ARG RELEASE_CHANNEL=prod
 LABEL org.opencontainers.image.version="$RELEASE_CHANNEL"
