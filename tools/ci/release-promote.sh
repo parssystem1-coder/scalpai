@@ -53,15 +53,21 @@ docker compose -f ops/prod.yml --env-file "$compose_env" \
   build "${build_args[@]}" api web
 
 push_digest() {
+  # The pushed digest comes from the registry's own response (the final
+  # `<tag>: digest: sha256:...` line of docker push), never from
+  # `docker image inspect .RepoDigests`: on the containerd image store that
+  # list is unordered and can carry digests from unrelated repositories
+  # (CI run 35711383690 recorded redis's digest for the api image).
   local image="$1"
-  local digest
-  digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image" 2>/dev/null | head -n1 || true)
-  if [ -z "$digest" ]; then
-    # freshly built images carry no RepoDigests entry yet: push, then re-read
-    docker push "$image"
-    digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image" | head -n1)
+  local out digest
+  out=$(docker push "$image" 2>&1)
+  printf '%s\n' "$out" >&2
+  digest=$(printf '%s\n' "$out" | sed -n 's/.*: digest: \(sha256:[0-9a-f]\{64\}\).*/\1/p' | tail -n1)
+  if ! printf '%s' "$digest" | grep -qE '^sha256:[0-9a-f]{64}$'; then
+    echo "::error::release-promote: push of $image did not return a sha256 digest" >&2
+    return 1
   fi
-  printf '%s\n' "$digest"
+  printf '%s@%s\n' "${image%:*}" "$digest"
 }
 
 api_image="${registry%/}/scalpai-api:$tag"
@@ -71,8 +77,22 @@ docker tag "$(docker compose -f ops/prod.yml --env-file "$compose_env" config --
 
 api_digest=$(push_digest "$api_image")
 web_digest=$(push_digest "$web_image")
-case "$api_digest$web_digest" in *@sha256:*@sha256:*) ;; *)
-  echo "::error::release-promote: registry did not return digest refs" >&2
+for ref in "$api_digest" "$web_digest"; do
+  case "$ref" in *@sha256:*) ;; *)
+    echo "::error::release-promote: registry did not return digest refs ($ref)" >&2
+    exit 1 ;;
+  esac
+  if ! printf '%s' "$ref" | grep -qE '/[a-z0-9._-]+@sha256:[0-9a-f]{64}$'; then
+    echo "::error::release-promote: digest ref '$ref' is not <repo>@sha256:<64hex> - refusing to write the ledger" >&2
+    exit 1
+  fi
+done
+case "$api_digest" in "${api_image%:*}"@*) ;; *)
+  echo "::error::release-promote: api digest ref does not match the pushed api repository" >&2
+  exit 1 ;;
+esac
+case "$web_digest" in "${web_image%:*}"@*) ;; *)
+  echo "::error::release-promote: web digest ref does not match the pushed web repository" >&2
   exit 1 ;;
 esac
 
