@@ -107,14 +107,19 @@
 - [x] D02/D03 `routeAfterFailure` + همان-tick failover Bale→Kavenegar (`packages/notify/src/router.spec.ts`)
 - [x] D04 replay وب‌هوک: digest بدن + TTL روی StateStore (بدون migration)
 - [x] D05 `lastError` فقط کد محدود — متن پروایدر/شماره ذخیره نمی‌شود
-- [ ] D10 UI راهنمای ارتقا پس از quota — موج ۳ (DoD پلی‌بوک #4 هنوز ناقص است)
+- [x] D10 UI راهنمای ارتقا پس از quota — موج ۳ (صفحه‌ی `/usage` + CTA ارتقا)
 
 ### Wave 2 — آداپتورهای واقعی ایران (D07–D09)
 - [x] D07 آداپتور واقعی SMS.ir + کانال ششم در `MESSAGING_CHANNELS` (ADR-0052 + migration 0022 با بازشدن سه قفل enum در 0017)
 - [x] D08 آداپتور واقعی Bale Bot API روی `HttpClientPort` (+opt-in) — Eitaa واقعی به موج بعد (تنها استثنای باقی‌مانده)
 - [x] D09 ADR-0053: Telegram/WhatsApp خارج از محدوده‌ی ایران تا تقاضای کلینیک — stub و fail-closed می‌مانند
 - [x] تست قرارداد `bale.spec.ts` / `smsir.spec.ts` (الگوی کاوه‌نگار؛ اولویت وضعیت HTTP بر بدنه؛ PHI-safe)
-- [ ] D10 UI مصرف/ارتقا — همچنان موج ۳
+
+### Wave 3 — سطح کلینیک: مصرف، سهمیه، inbox (D10/D11/D14)
+- [x] D10 `GET /metering/usage` فقط owner (سه متریک فاز ۵a با سقف موثر پلن) + صفحه‌ی `/usage` با نوار مصرف و CTA ارتقا روی `QUOTA_EXCEEDED` (DoD پلی‌بوک #4)
+- [x] D11 `@Quota("messages")` روی enroll/actions (متریک messages در QUOTA_SPECS؛ همان شمارنده/کلیدهای metering فاز ۵a) + تست integration: سقف پر → ۴۰۳ یکنواخت؛ ورکر همچنان suppress می‌کند
+- [x] D14 ADR-0054: inbox = «رسیدگی شد» بدون متن آزاد؛ composer دروغینی که متن را دور می‌ریخت حذف شد
+- [ ] D12/D13 UI aftercare و UI فاکتور — باقی‌مانده‌ی موج ۳
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning

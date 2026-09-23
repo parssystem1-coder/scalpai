@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import {
   bytesToMeteredMb,
   meterUsage,
-  peekUsage,
+  peekMetered,
   releaseUsage,
   resolveMeteredLimit,
   type MeterVerdict,
@@ -68,12 +68,12 @@ export class MeteringService {
     tx: Tx,
     clinicId: string,
     metric: MeteredMetricName,
-  ): Promise<{ metric: MeteredMetricName; used: number; limit: number | null }> {
-    const [used, limit] = await Promise.all([
-      peekUsage(tx, clinicId, metric),
+  ): Promise<{ metric: MeteredMetricName; used: number; limit: number | null; periodStart: string }> {
+    const [snap, limit] = await Promise.all([
+      peekMetered(tx, clinicId, metric),
       this.limitFor(clinicId, metric),
     ]);
-    return { metric, used, limit };
+    return { metric, used: snap.used, limit, periodStart: snap.periodStart };
   }
 
   /**

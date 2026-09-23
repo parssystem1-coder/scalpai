@@ -133,8 +133,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       body = { code: "VALIDATION_ERROR", message: ERROR_MESSAGES[locale].validation, details: exception.issues };
     } else if (isPgError(exception)) {
       // M19: isPgError is a type predicate now, so `exception` is narrowed to
-      // { code: string } here — no cast, and no unsafe member access.
-      const code = exception.code;
+      // { code: string } here — no cast, and no unsafe member access. For a
+      // drizzle-wrapped error the `code` lives on `exception.cause`.
+      const code = exception.code ?? (exception as { cause?: { code?: string } }).cause?.code ?? "";
       if (code === "23505") {
         status = 409;
         body = { code: "CONFLICT", message: ERROR_MESSAGES[locale].conflict };
@@ -160,7 +161,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
       code: body.code,
       // Scrubbed and truncated by the logger — driver messages quote values.
-      message: exception instanceof Error ? exception.message : "unknown",
+      // `cause` is narrowed to Error; PG's code rides on it in the driver, so
+      // read it through a local with the extra shape only where needed.
+      message: exception instanceof Error && exception.cause instanceof Error
+        ? (() => {
+            const cause = exception.cause as Error & { code?: string; detail?: string };
+            return `pg[${cause.code ?? "-"} ${cause.message}] << ${String(cause.detail ?? "")}`;
+          })()
+        : exception instanceof Error ? exception.message : "unknown",
     });
 
     if (status === 404 && isSpaShellCandidate(req.method, req.url)) {
@@ -176,5 +184,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 }
 
 function isPgError(e: unknown): e is { code: string } {
-  return typeof e === "object" && e !== null && "code" in e && typeof (e as { code?: unknown }).code === "string";
+  if (typeof e !== "object" || e === null) return false;
+  if ("code" in e && typeof (e as { code?: unknown }).code === "string") return true;
+  // Drizzle wraps the raw pg error in DrizzleQueryError (message/query/params +
+  // cause). The wrapper carries no `code`, so without this unwrap every
+  // constraint violation came out as 500 INTERNAL instead of 409/400 — and the
+  // log line quoted the wrapper, not the cause (wave 3 finding).
+  const cause = (e as { cause?: unknown }).cause;
+  return typeof cause === "object" && cause !== null && "code" in cause && typeof (cause as { code?: unknown }).code === "string";
 }

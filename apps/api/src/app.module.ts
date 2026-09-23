@@ -35,6 +35,7 @@ import { LicenseService } from "./licensing/license.service.js";
 import { GalleryController } from "./media/gallery.controller.js";
 import { MockStorageController, registerMockStorageParsers } from "./media/mock-storage.controller.js";
 import { isMockStorageEnabled, StorageService } from "./media/storage.service.js";
+import { MeteringController } from "./metering/metering.controller.js";
 import { MeteringService } from "./metering/metering.service.js";
 import { OpsController } from "./ops/ops.controller.js";
 import { installObservability } from "./ops/observability.js";
@@ -54,6 +55,7 @@ const aftercareWorker = AftercareWorker.isEnabled();
   controllers: [
     AuthController, CoreController, PlansController, GalleryController, AnalysesController, SyncController, PrivacyController,
     LicenseController, OpsController, AftercareController, InboundController, BillingController, PaymentController,
+    MeteringController,
     ...(mockStorage ? [MockStorageController] : []),
   ],
   providers: [

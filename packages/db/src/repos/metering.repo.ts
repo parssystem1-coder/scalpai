@@ -166,6 +166,42 @@ export async function peekUsage(tx: Tx, clinicId: string, metric: MeteredMetricN
 }
 
 /**
+ * snapshot صفحه مصرف (موج ۳ / D10): مصرف دوره‌ی جاری + سقف موثر در یک پرش.
+ * خواندنی صرف است — شمارنده را نمی‌نویسد و قفل نمی‌گیرد.
+ */
+export interface MeteredSnapshot {
+  metric: MeteredMetricName;
+  used: number;
+  limit: number | null;
+  periodStart: string;
+}
+
+export async function peekMetered(
+  tx: Tx,
+  clinicId: string,
+  metric: MeteredMetricName,
+): Promise<MeteredSnapshot> {
+  const spec = METERING_SPECS[metric];
+  const period = await tx.execute(
+    sql`SELECT fn_clinic_period_start(${clinicId}::uuid)::text AS period_start`,
+  );
+  const periodStart = rowsOf<{ period_start: string }>(period)[0]?.period_start;
+  if (!periodStart) throw new MeteringError("metering period could not be resolved for this clinic");
+  const rows = await tx
+    .select({ value: usageCounters.value })
+    .from(usageCounters)
+    .where(
+      and(
+        eq(usageCounters.clinicId, clinicId),
+        eq(usageCounters.metric, spec.metric),
+        eq(usageCounters.periodStart, periodStart),
+      ),
+    )
+    .limit(1);
+  return { metric, used: rows[0]?.value ?? 0, limit: null, periodStart };
+}
+
+/**
  * تبدیل بایت به مگابایت، با گرد کردن به بالا و حداقل ۱.
  *
  * گرد کردن به بالا عمدی است: با Math.floor، هر فایل زیر یک مگابایت صفر متر

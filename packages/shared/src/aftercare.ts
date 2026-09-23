@@ -518,3 +518,10 @@ export const UsageSnapshot = z.object({
   periodStart: z.string(),
 });
 export type UsageSnapshotDto = z.infer<typeof UsageSnapshot>;
+
+/** موج ۳ (D10) — کل بدنه‌ی `GET /metering/usage`: یک ردیف برای هر متریک فاز ۵a. */
+export const UsageReport = z.object({
+  periodStart: z.string(),
+  usage: z.array(UsageSnapshot),
+});
+export type UsageReportDto = z.infer<typeof UsageReport>;

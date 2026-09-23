@@ -28,4 +28,22 @@ describe("InboxPage", () => {
     fireEvent.click(await screen.findByText("hash-b"));
     expect(await screen.findByText("full body")).toBeTruthy();
   });
+
+  // موج ۳ (D14 / ADR-0054): کنش inbox «رسیدگی شد» است، نه ارسال متن آزاد.
+  it("marks a message handled without any free-text composer", async () => {
+    apiFetch.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+      if (path.includes("/body")) return { body: "full body" };
+      if (init?.method === "PATCH") {
+        expect(JSON.parse(init.body ?? "{}")).toEqual({ state: "replied" });
+        return { updated: true };
+      }
+      return { items: [{ id: "m3", channel: "kavenegar", senderHash: "hash-c", bodyPreview: "preview", receivedAt: "2026-01-01T00:00:00Z", state: "new" }] };
+    });
+    render(<InboxPage />);
+    fireEvent.click(await screen.findByText("hash-c"));
+    const button = await screen.findByText("inbox.markHandled");
+    expect(screen.queryByText("inbox.replyLabel")).toBeNull(); // composer دروغین حذف شده
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.getByText("inbox.handled")).toBeTruthy());
+  });
 });
