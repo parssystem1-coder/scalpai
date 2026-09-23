@@ -98,6 +98,20 @@
 
 **Exit:** e2e یا integration: عبور از سهمیه → ۴۰۳ + UI ارتقا رندر می‌شود. Inbox دیگر متن را می‌گیرد و دور می‌ریزد.
 
+> **برنامهٔ موج پایانی UI (2026-09-23) — بستن D12/D13:** دو صفحهٔ مستقل، دو PR کوچک، هیچ migration ای.
+>
+> **PR الف — D13 UI فاکتور (`/billing`):**
+> ۱. `InvoiceListPage`: جدول فاکتورها از `GET /billing/invoices` (پوشهٔ state از `INVOICE_STATES`، فیلتر state/بازهٔ زمانی، ستون‌های number/state/total/paidAmount/issuedAt) + دکمهٔ صدور پیش‌فاکتور از کاتالوگ `GET /billing/products` (InvoiceItemInput با productId — قیمت از کاتالوگ، کاربر فقط تعداد/تخفیف می‌دهد) + اکشن‌های issue/pay/void از همان endpointهای موجود.
+> ۲. role-aware: اکشن‌های `void` فقط برای `useAuth().role === "owner"` (ماتریس @Roles سرور را آینه می‌کند)؛ خطای ۴۰۳ سرور همیشه محترم است.
+> ۳. تست: UI spec صفحه (لیست/فیلتر/صدور) + i18n fa/en با الگوی `usage.i18n.ts`.
+>
+> **PR ب — D12 UI aftercare (`/aftercare`):**
+> ۱. `AftercarePage`: دو پنل — دنباله‌ها (لیست `GET /aftercare/sequences` + ساخت با `AftercareSequenceCreate`؛ انتخابگر templateKey از `MESSAGE_TEMPLATES` notify، کانال از `MESSAGING_CHANNELS`، trigger=session_completed → پیکر services از `GET /services`) و ثبت‌نام‌ها (لیست `GET /aftercare/enrollments` + enroll با انتخابگر بیمار از `GET /patients` و اکشن‌های pause/resume/cancel از `AftercareEnrollmentAction`).
+> ۲. حداقل یک sequence پیش‌ساخته برای دموی فاز ۵a در seed (`seed()` — keyهای template موجود را نشان می‌دهد؛ برای موج ۴ شرط «حداقل یک کلینیک sequence واقعی دارد» را هم برطرف می‌کند).
+> ۳. تست: UI spec دو پنل + integration سبز موجود enroll/actions دست‌نخورده.
+>
+> **ترتیب:** اول PR الف (D13) چون billing فاقد `@RequireFeature` است و برای همهٔ کلینیک‌ها مفید است؛ بعد PR ب (D12). هیچ‌کدام migration ندارند — ریسک صفر روی الگوی expand→migrate→contract.
+
 ---
 
 ## موج ۴ — موتور Aftercare مطابق §6.2 (P2)
