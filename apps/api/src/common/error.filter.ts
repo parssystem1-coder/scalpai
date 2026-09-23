@@ -161,8 +161,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
       code: body.code,
       // Scrubbed and truncated by the logger — driver messages quote values.
+      // `cause` is narrowed to Error; PG's code rides on it in the driver, so
+      // read it through a local with the extra shape only where needed.
       message: exception instanceof Error && exception.cause instanceof Error
-        ? `pg[${(exception.cause as { code?: string }).code ?? "-"} ${(exception.cause as Error).message}] << ${String((exception.cause as { detail?: string }).detail ?? "")}`
+        ? (() => {
+            const cause = exception.cause as Error & { code?: string; detail?: string };
+            return `pg[${cause.code ?? "-"} ${cause.message}] << ${String(cause.detail ?? "")}`;
+          })()
         : exception instanceof Error ? exception.message : "unknown",
     });
 
