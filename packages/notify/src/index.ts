@@ -23,6 +23,7 @@ export {
   eitaaAdapter,
   getAdapter,
   kavenegarAdapter,
+  smsirAdapter,
   telegramAdapter,
   whatsappAdapter,
 } from "./adapters/index.js";

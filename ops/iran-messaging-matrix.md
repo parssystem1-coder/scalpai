@@ -12,13 +12,13 @@
 | اولویت | کانال | وضعیت در ریپو | داخل ایران | شرط فعال‌سازی |
 |---|---|---|---|---|
 | 1 | SMS — Kavenegar | adapter واقعی | بله | `KAVENEGAR_API_KEY` + `KAVENEGAR_SENDER` |
-| 2 | Bale | stub، در production fail-closed | بله | موج ۲ — `BALE_BOT_TOKEN` به‌تنهایی ارسال نمی‌کند |
-| 3 | Eitaa | stub، در production fail-closed | بله | موج ۲ — `EITAA_TOKEN` |
-| — | SMS.ir | نیست | بله | موج ۲ — failover دوم SMS، نه جایگزین Kavenegar |
-| 4 | Telegram | stub، fail-closed | فقط با دسترسی خودِ کلینیک | موج ۲ + feature flag کلینیک |
-| 5 | WhatsApp Cloud | stub، fail-closed | فقط با دسترسی خودِ کلینیک (Meta) | موج ۲ + feature flag کلینیک |
+| 1.5 | SMS — SMS.ir | adapter واقعی (موج ۲) | بله | `SMSIR_API_KEY` + `SMSIR_SENDER` — failover دوم SMS، نه جایگزین Kavenegar (ADR-0052) |
+| 2 | Bale | adapter واقعی Bot API (موج ۲) | بله | `BALE_BOT_TOKEN` + opt-in بیمار (start ربات) |
+| 3 | Eitaa | stub، در production fail-closed | بله | موج بعد — `EITAA_TOKEN` |
+| 4 | Telegram | stub، fail-closed | فقط با دسترسی خودِ کلینیک | ADR خارج‌از‌محدوده تا تقاضای کلینیک (D09) |
+| 5 | WhatsApp Cloud | stub، fail-closed | فقط با دسترسی خودِ کلینیک (Meta) | ADR خارج‌از‌محدوده تا تقاضای کلینیک (D09) |
 
-Kavenegar تنها کانال تولیدی **اجباری** موج ۱ است. مسنجر پیکربندی‌شده اگر هنوز stub باشد انتخاب می‌شود، ارسال را رد می‌کند، و **همان tick** به SMS می‌افتد — defer خاموش ممنوع است.
+Kavenegar و SMS.ir کانال‌های تولیدی بدون opt-in هستند (پیامک). Bale واقعی شده ولی فقط برای مخاطب opt-in شده انتخاب می‌شود. مسنجر پیکربندی‌شده اگر هنوز stub باشد انتخاب می‌شود، ارسال را رد می‌کند، و **همان tick** به SMS می‌افتد — defer خاموش ممنوع است.
 
 ## قواعد fail-closed
 
@@ -29,4 +29,4 @@ Kavenegar تنها کانال تولیدی **اجباری** موج ۱ است. م
 
 ## Fallback
 
-ترجیح گام دنباله اول است. شکست **ارسال** (نه فقط «پیکربندی نیست») زنجیره را همان tick جلو می‌برد. ترتیب پیش‌فرض کد: Kavenegar سپس مسنجرها. جزئیات: `routeAfterFailure` در `packages/notify`.
+ترجیح گام دنباله اول است. شکست **ارسال** (نه فقط «پیکربندی نیست») زنجیره را همان tick جلو می‌برد. ترتیب پیش‌فرض کد: Kavenegar، SMS.ir، سپس مسنجرها. جزئیات: `routeAfterFailure` در `packages/notify`.

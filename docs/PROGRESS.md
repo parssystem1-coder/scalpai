@@ -109,6 +109,13 @@
 - [x] D05 `lastError` فقط کد محدود — متن پروایدر/شماره ذخیره نمی‌شود
 - [ ] D10 UI راهنمای ارتقا پس از quota — موج ۳ (DoD پلی‌بوک #4 هنوز ناقص است)
 
+### Wave 2 — آداپتورهای واقعی ایران (D07–D09)
+- [x] D07 آداپتور واقعی SMS.ir + کانال ششم در `MESSAGING_CHANNELS` (ADR-0052 + migration 0022 با بازشدن سه قفل enum در 0017)
+- [x] D08 آداپتور واقعی Bale Bot API روی `HttpClientPort` (+opt-in) — Eitaa واقعی به موج بعد (تنها استثنای باقی‌مانده)
+- [x] D09 ADR-0053: Telegram/WhatsApp خارج از محدوده‌ی ایران تا تقاضای کلینیک — stub و fail-closed می‌مانند
+- [x] تست قرارداد `bale.spec.ts` / `smsir.spec.ts` (الگوی کاوه‌نگار؛ اولویت وضعیت HTTP بر بدنه؛ PHI-safe)
+- [ ] D10 UI مصرف/ارتقا — همچنان موج ۳
+
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
 - [ ] Grad-CAM overlay در نتایج

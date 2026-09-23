@@ -24,9 +24,9 @@
 | D04 | B2 replay وب‌هوک (timestamp/nonce / event id) | DONE (StateStore TTL؛ جدول موج ۵) | 1 |
 | D05 | `lastError` متن خام پروایدر (High #4) | DONE | 1 |
 | D06 | PROGRESS/گیت صادق نیستند (۵ stub vs Kavenegar واقعی؛ UI ارتقا) | DONE | 1 |
-| D07 | SMS.ir adapter | MISSING | 2 |
-| D08 | Bale/Eitaa واقعی (نه stub تولیدی) | STUB | 2 |
-| D09 | Telegram/WhatsApp واقعی | STUB | 2 |
+| D07 | SMS.ir adapter | DONE (موج ۲؛ ADR-0052 + migration 0022) | 2 |
+| D08 | Bale واقعی — Bot API روی HttpClientPort | DONE (موج ۲) · Eitaa واقعی → موج بعد | 2 |
+| D09 | Telegram/WhatsApp واقعی | OUT-OF-SCOPE (ADR-0053 تا تقاضای کلینیک) | 2 |
 | D10 | صفحه مصرف پلن owner + UI ارتقا | MISSING | 3 |
 | D11 | `@Quota` روی مسیر پیام / ۴۰۳ یکنواخت | PARTIAL | 3 |
 | D12 | UI کلینیک aftercare (sequences/enrollments) | MISSING | 3 |
@@ -69,6 +69,8 @@
 ## موج ۲ — آداپتورهای واقعی ایران (P1)
 
 **پیشنهاد:** اول Bale واقعی (بازار هدف)، بعد Eitaa. Telegram/WhatsApp پشت feature flag کلینیک بمانند تا ماتریس ایران نقض نشود. SMS.ir به‌عنوان failover دوم SMS نه جایگزینی Kavenegar.
+
+> **بسته‌شدن موج ۲ (2026-09-23):** D07 و D08 انجام شد — آداپتورهای واقعی SMS.ir و Bale روی `HttpClientPort` + migration 0022 (بازشدن مجموعه‌ی بسته‌ی کانال) + ADR-0052. Eitaa واقعی به موج بعد سپرده شد (تنها استثنای باقی‌مانده‌ی D08) و D09 با ADR-0053 بسته شد («خارج از محدوده‌ی ایران تا تقاضای کلینیک»). Exit موج ۲ در production برقرار است: کانال پیکربندی‌شده دیگر `AdapterNotImplementedError` نمی‌دهد (Kavenegar، SMS.ir، Bale) و کانال پیکربندی‌نشده انتخاب نمی‌شود (`isConfigured`).
 
 | آیتم | کار |
 |---|---|
@@ -159,3 +161,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 |---|---|
 | 2026-09-22 | ایجاد سند؛ موج ۱ انتخاب‌شده برای اجرا |
 | 2026-09-22 | موج ۱ بسته شد: D01–D06 DONE؛ UI ارتقا همچنان D10 موج ۳ |
+| 2026-09-23 | موج ۲ بسته شد: D07/D08 DONE (SMS.ir + Bale واقعی؛ Eitaa → موج بعد)، D09 OUT-OF-SCOPE (ADR-0053) |
