@@ -1,0 +1,88 @@
+import i18n from "../i18n.js";
+
+/**
+ * رشته‌های صفحه فاکتور (موج ۴ / D13) — deep-merge روی همان namespace تا
+ * i18n.ts دست نخورد (همان الگوی usage.i18n.ts).
+ */
+const fa = {
+  title: "فاکتورها",
+  subtitle: "صورتحساب کلینیک: پیش‌فاکتور بدهید، پرداخت ثبت کنید.",
+  loading: "در حال بارگذاری…",
+  loadFailed: "دریافت فاکتورها ناموفق بود",
+  actionFailed: "انجام عملیات ناموفق بود",
+  quotaExceeded: "سقف پلن اجازه‌ی این کار را نمی‌دهد؛ پلن را ارتقا دهید.",
+  empty: "فاکتوری با این فیلتر پیدا نشد.",
+  filterLabel: "فیلتر وضعیت",
+  filterAll: "همه‌ی وضعیت‌ها",
+  newInvoice: "فاکتور جدید",
+  cancel: "بستن",
+  patient: "بیمار",
+  product: "محصول/خدمت (از کاتالوگ)",
+  pick: "انتخاب کنید…",
+  quantity: "تعداد",
+  discount: "تخفیف (ریال)",
+  catalogNote: "قیمت، شرح و مالیات از کاتالوگ می‌آید؛ شما فقط تعداد و تخفیف را تعیین می‌کنید.",
+  saving: "در حال ذخیره…",
+  createDraft: "صدور پیش‌فاکتور",
+  colNumber: "شماره",
+  colState: "وضعیت",
+  colTotal: "مبلغ کل",
+  colPaid: "پرداخت‌شده",
+  colActions: "عملیات",
+  issue: "صدور نهایی",
+  payFull: "ثبت پرداخت کامل",
+  void: "ابطال",
+  voidPrompt: "دلیل ابطال (حداقل ۴ نویسه):",
+  usageLink: "مصرف پلن",
+  state: {
+    draft: "پیش‌فاکتور",
+    issued: "صادرشده",
+    paid: "تسویه‌شده",
+    partially_paid: "تسویه‌ی جزئی",
+    void: "ابطال‌شده",
+    refunded: "برگشتی",
+  },
+};
+
+const en = {
+  title: "Invoices",
+  subtitle: "Clinic billing: issue drafts, record payments.",
+  loading: "Loading…",
+  loadFailed: "Could not load invoices",
+  actionFailed: "Action failed",
+  quotaExceeded: "The plan ceiling refuses this action; upgrade the plan.",
+  empty: "No invoices match this filter.",
+  filterLabel: "State filter",
+  filterAll: "All states",
+  newInvoice: "New invoice",
+  cancel: "Close",
+  patient: "Patient",
+  product: "Product/service (from catalog)",
+  pick: "Pick…",
+  quantity: "Quantity",
+  discount: "Discount (IRR)",
+  catalogNote: "Price, description and tax come from the catalog; you only set quantity and discount.",
+  saving: "Saving…",
+  createDraft: "Create draft",
+  colNumber: "Number",
+  colState: "State",
+  colTotal: "Total",
+  colPaid: "Paid",
+  colActions: "Actions",
+  issue: "Issue",
+  payFull: "Record full payment",
+  void: "Void",
+  voidPrompt: "Void reason (min 4 chars):",
+  usageLink: "Plan usage",
+  state: {
+    draft: "Draft",
+    issued: "Issued",
+    paid: "Paid",
+    partially_paid: "Partially paid",
+    void: "Voided",
+    refunded: "Refunded",
+  },
+};
+
+i18n.addResourceBundle("fa", "translation", { invoice: fa }, true, true);
+i18n.addResourceBundle("en", "translation", { invoice: en }, true, true);

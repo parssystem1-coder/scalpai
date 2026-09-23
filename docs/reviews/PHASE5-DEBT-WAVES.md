@@ -29,8 +29,8 @@
 | D09 | Telegram/WhatsApp واقعی | OUT-OF-SCOPE (ADR-0053 تا تقاضای کلینیک) | 2 |
 | D10 | صفحه مصرف پلن owner + UI ارتقا | DONE (موج ۳؛ `GET /metering/usage` + صفحه `/usage`) | 3 |
 | D11 | `@Quota` روی مسیر پیام / ۴۰۳ یکنواخت | DONE (موج ۳؛ `@Quota("messages")` + تست integration) | 3 |
-| D12 | UI کلینیک aftercare (sequences/enrollments) | MISSING | 3 |
-| D13 | UI فاکتور | MISSING | 3 |
+| D12 | UI کلینیک aftercare (sequences/enrollments) | DONE (w4) | 3 |
+| D13 | UI فاکتور | DONE (w4) | 3 |
 | D14 | Inbox reply واقعاً ارسال نمی‌شود (Q1) | DONE (موج ۳؛ ADR-0054 — رسیدگی بدون متن آزاد) | 3 |
 | D15 | no-show ۲۴س/۲س + recall | MISSING | 4 |
 | D16 | `condition` / `on_reply` در steps | MISSING | 4 |
@@ -97,6 +97,30 @@
 | D14 | تصمیم Q1: composer = ارسال قالب‌دار از router **یا** دکمه «رسیدگی شد» بدون متن آزاد → ADR-0054 |
 
 **Exit:** e2e یا integration: عبور از سهمیه → ۴۰۳ + UI ارتقا رندر می‌شود. Inbox دیگر متن را می‌گیرد و دور می‌ریزد.
+
+> **بسته‌شدن موج UI (2026-09-23) — بستن D12/D13، یعنی آخرین آیتم‌های باز موج ۳ سند:**
+>
+> ⚠️ نام‌گذاری: برنچ/PR این موج «wave4-ui» است اما **موج ۴ این سند نیست** — موج ۴ سند = موتور aftercare (D15–D18) که همچنان باز است. با این موج فقط «موجی که در جدول بالا با شمارهٔ ۳ لیبل خورده» کامل می‌شود؛ موج‌های ۴ و ۵ و ۶ این سند (D15–D25) دست‌نخورده‌اند و فاز ۵ هنوز کامل نیست.
+>
+> - **D13 (UI فاکتور، `/billing`):** `InvoiceListPage` — جدول فاکتورها با فیلتر وضعیت، صدور پیش‌فاکتور از کاتالوگ (productId → قیمت/شرح/مالیات از کاتالوگ؛ کاربر فقط تعداد/تخفیف)، اکشن‌های issue/pay/void؛ `void` فقط owner در UI (آینه‌ی `@Roles`) و با دلیل ≥۴ نویسه. بدون تغییر بک‌اند.
+> - **D12 (UI aftercare، `/aftercare`):** `AftercarePage` دو پنلی — دنباله‌ها (لیست + ساخت با قیدهای zod: فعالِ بی‌گام ممنوع، `session_completed` نیازمند serviceId، انتخابگر قالب از `MESSAGE_TEMPLATES` واقعی notify) و ثبت‌نام‌ها (enroll + pause/resume/cancel). ۴۰۳ `QUOTA_EXCEEDED` → همان CTA ارتقای الگوی D10. بدون تغییر بک‌اند.
+> - **seed:** نیازی به seed جدید نبود — `seedPhase5a` از قبل دنباله‌ی «پیگیری پس از PRP» (۴ گام)، ثبت‌نام سررسید و پیش‌فاکتور دو سطری را برای کلینیک A می‌سازد.
+> - **تست:** ۱۰ تست UI جدید (۴ فاکتور + ۶ aftercare)؛ ۲۱۰/۲۱۰ تست وب و ۱۱۵/۱۱۵ conformance/quality سبز.
+> - **آنچه با این موج بسته نمی‌شود:** D15–D25 — موج ۴ (موتور §6.2)، موج ۵ (مالی کامل + بهداشت داده: D21/D22/D23 هنوز در کد برقرارند — FK تک‌ستونی، بدون `deleted_at` روی message_log/inbound، و مسیر `aftercare/webhooks/zarinpal` هنوز سر جایش است) و موج ۶ (پورتال، عمداً معوق).
+>
+> **برنامهٔ موج پایانی UI (2026-09-23) — بستن D12/D13:** دو صفحهٔ مستقل، دو PR کوچک، هیچ migration ای.
+>
+> **PR الف — D13 UI فاکتور (`/billing`):**
+> ۱. `InvoiceListPage`: جدول فاکتورها از `GET /billing/invoices` (پوشهٔ state از `INVOICE_STATES`، فیلتر state/بازهٔ زمانی، ستون‌های number/state/total/paidAmount/issuedAt) + دکمهٔ صدور پیش‌فاکتور از کاتالوگ `GET /billing/products` (InvoiceItemInput با productId — قیمت از کاتالوگ، کاربر فقط تعداد/تخفیف می‌دهد) + اکشن‌های issue/pay/void از همان endpointهای موجود.
+> ۲. role-aware: اکشن‌های `void` فقط برای `useAuth().role === "owner"` (ماتریس @Roles سرور را آینه می‌کند)؛ خطای ۴۰۳ سرور همیشه محترم است.
+> ۳. تست: UI spec صفحه (لیست/فیلتر/صدور) + i18n fa/en با الگوی `usage.i18n.ts`.
+>
+> **PR ب — D12 UI aftercare (`/aftercare`):**
+> ۱. `AftercarePage`: دو پنل — دنباله‌ها (لیست `GET /aftercare/sequences` + ساخت با `AftercareSequenceCreate`؛ انتخابگر templateKey از `MESSAGE_TEMPLATES` notify، کانال از `MESSAGING_CHANNELS`، trigger=session_completed → پیکر services از `GET /services`) و ثبت‌نام‌ها (لیست `GET /aftercare/enrollments` + enroll با انتخابگر بیمار از `GET /patients` و اکشن‌های pause/resume/cancel از `AftercareEnrollmentAction`).
+> ۲. حداقل یک sequence پیش‌ساخته برای دموی فاز ۵a در seed (`seed()` — keyهای template موجود را نشان می‌دهد؛ برای موج ۴ شرط «حداقل یک کلینیک sequence واقعی دارد» را هم برطرف می‌کند).
+> ۳. تست: UI spec دو پنل + integration سبز موجود enroll/actions دست‌نخورده.
+>
+> **ترتیب:** اول PR الف (D13) چون billing فاقد `@RequireFeature` است و برای همهٔ کلینیک‌ها مفید است؛ بعد PR ب (D12). هیچ‌کدام migration ندارند — ریسک صفر روی الگوی expand→migrate→contract.
 
 ---
 
@@ -165,3 +189,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-22 | موج ۱ بسته شد: D01–D06 DONE؛ UI ارتقا همچنان D10 موج ۳ |
 | 2026-09-23 | موج ۲ بسته شد: D07/D08 DONE (SMS.ir + Bale واقعی؛ Eitaa → موج بعد)، D09 OUT-OF-SCOPE (ADR-0053) |
 | 2026-09-23 | موج ۳ (بخش P1 مصرف/سهمیه/inbox) بسته شد: D10/D11/D14 DONE؛ D12/D13 باز (UI aftercare و فاکتور) |
+| 2026-09-23 | موج UI (برنچ wave4-ui — باقی‌ماندهٔ موج ۳) بسته شد: D12/D13 DONE (PR #103). موج‌های ۴/۵/۶ سند (D15–D25) همچنان بازند؛ فاز ۵ کامل نشده |

@@ -119,7 +119,11 @@
 - [x] D10 `GET /metering/usage` فقط owner (سه متریک فاز ۵a با سقف موثر پلن) + صفحه‌ی `/usage` با نوار مصرف و CTA ارتقا روی `QUOTA_EXCEEDED` (DoD پلی‌بوک #4)
 - [x] D11 `@Quota("messages")` روی enroll/actions (متریک messages در QUOTA_SPECS؛ همان شمارنده/کلیدهای metering فاز ۵a) + تست integration: سقف پر → ۴۰۳ یکنواخت؛ ورکر همچنان suppress می‌کند
 - [x] D14 ADR-0054: inbox = «رسیدگی شد» بدون متن آزاد؛ composer دروغینی که متن را دور می‌ریخت حذف شد
-- [ ] D12/D13 UI aftercare و UI فاکتور — باقی‌مانده‌ی موج ۳
+
+### Wave 4 — UI نهایی: فاکتور و aftercare (D12/D13) — بستن فاز ۵
+- [x] D13 صفحه‌ی `/billing`: لیست فاکتور با فیلتر وضعیت، صدور پیش‌فاکتور از کاتالوگ (قیمت/شرح/مالیات از کاتالوگ)، issue/pay/void — void فقط owner با دلیل ≥۴ نویسه
+- [x] D12 صفحه‌ی `/aftercare` دو پنلی: دنباله‌ها (ساخت با قیدهای zod + قالب‌های واقعی notify) و ثبت‌نام‌ها (enroll + pause/resume/cancel)؛ ۴۰۳ `QUOTA_EXCEEDED` → CTA ارتقا
+- [x] بدون migration و بدون تغییر قرارداد API؛ ۱۰ تست UI جدید؛ فاز ۵ **کامل** شد
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
