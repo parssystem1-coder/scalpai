@@ -1,3 +1,5 @@
+# OPERATIONS: Iran messaging channels — which carriers can actually deliver, and the fail-closed rules around them
+
 # ماتریس کانال‌های پیام‌رسانی قابل‌اجرا داخل ایران
 
 > مرجع پلی‌بوک: `docs/playbooks/phase-5-growth-commerce.md` §5.2
