@@ -66,21 +66,23 @@ ALTER TABLE inbound_messages
 -- ── CONTRACT: همان قیدها با مجموعه‌ی شش‌تایی؛ سخت‌گیری کاهش یافته نه افزوده ─
 -- (بالا همین کار انجام شد — این بخش به تعهد expand→contract صادق می‌ماند)
 
--- اثبات زنده‌ی CONTRACT (هر دو باید داخل همین تراکنش رد شوند؛ بسته‌بودن
--- مجموعه برای کانال‌های خارج از آن معنای عملی دارد):
+-- اثبات زنده‌ی CONTRACT (هر دو باید داخل همین تراکنش با check_violation رد شوند؛
+-- بسته‌بودن مجموعه برای کانال‌های خارج از آن معنای عملی دارد). ستون‌های FK عمداً
+-- NULL یا خارج از ارزیابی گذاشته شده‌اند: نقض CHECK حین درج ردیف رخ می‌دهد، پیش
+-- از هر ارزیابی FK — پس پروب هیچ ردیفی هم جا نمی‌گذارد.
 DO $$
 BEGIN
   BEGIN
-    INSERT INTO message_log (clinic_id, patient_id, channel, template_key, locale, body_sha256, body_chars)
-    VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000',
-            'unknown-channel', 'probe', 'fa', repeat('0', 64::int), 0);
+    INSERT INTO message_log (clinic_id, channel, template_key, recipient_hash, body_sha256, body_chars, idempotency_key)
+    VALUES ('00000000-0000-0000-0000-000000000000', 'unknown-channel', 'probe',
+            repeat('0', 64), repeat('0', 64), 0, 'contract-probe-0022');
     RAISE EXCEPTION 'CONTRACT BROKEN: message_log accepted a channel outside the closed set';
   EXCEPTION WHEN check_violation THEN
     NULL; -- مورد انتظار
   END;
   BEGIN
-    INSERT INTO inbound_messages (clinic_id, channel, sender_hash, body_encrypted)
-    VALUES ('00000000-0000-0000-0000-000000000000', 'unknown-channel', repeat('0', 64::int), ''::bytea);
+    INSERT INTO inbound_messages (clinic_id, channel, sender_hash)
+    VALUES ('00000000-0000-0000-0000-000000000000', 'unknown-channel', repeat('0', 64));
     RAISE EXCEPTION 'CONTRACT BROKEN: inbound_messages accepted a channel outside the closed set';
   EXCEPTION WHEN check_violation THEN
     NULL; -- مورد انتظار
