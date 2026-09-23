@@ -20,7 +20,11 @@ import { z } from "zod";
 
 /* ── مجموعه‌های بسته ────────────────────────────────── */
 
-export const MESSAGING_CHANNELS = ["kavenegar", "bale", "eitaa", "telegram", "whatsapp"] as const;
+/**
+ * کانال‌های پیام‌رسانی. `smsir` با ADR-0052 اضافه شد: کانال SMS دوم برای
+ * failover — نه جایگزین کاوه‌نگار (PHASE5-DEBT-WAVES موج ۲ / D07).
+ */
+export const MESSAGING_CHANNELS = ["kavenegar", "smsir", "bale", "eitaa", "telegram", "whatsapp"] as const;
 export type MessagingChannel = (typeof MESSAGING_CHANNELS)[number];
 
 export const MESSAGE_LOCALES = ["fa", "en"] as const;

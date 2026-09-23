@@ -4,6 +4,7 @@ import type { MessagingAdapter } from "../types.js";
 import { baleAdapter } from "./bale.adapter.js";
 import { eitaaAdapter } from "./eitaa.adapter.js";
 import { kavenegarAdapter } from "./kavenegar.adapter.js";
+import { smsirAdapter } from "./smsir.adapter.js";
 import { telegramAdapter } from "./telegram.adapter.js";
 import { whatsappAdapter } from "./whatsapp.adapter.js";
 
@@ -14,6 +15,7 @@ import { whatsappAdapter } from "./whatsapp.adapter.js";
  */
 export const ADAPTERS = {
   kavenegar: kavenegarAdapter,
+  smsir: smsirAdapter,
   bale: baleAdapter,
   eitaa: eitaaAdapter,
   telegram: telegramAdapter,
@@ -28,4 +30,4 @@ export function allAdapters(): readonly MessagingAdapter[] {
   return MESSAGING_CHANNELS.map((channel) => ADAPTERS[channel]);
 }
 
-export { baleAdapter, eitaaAdapter, kavenegarAdapter, telegramAdapter, whatsappAdapter };
+export { baleAdapter, eitaaAdapter, kavenegarAdapter, smsirAdapter, telegramAdapter, whatsappAdapter };

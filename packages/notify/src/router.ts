@@ -16,11 +16,14 @@ import { AdapterNotImplementedError, type MessagingAdapter, type OutboundMessage
  */
 
 /**
- * ترتیب پیش‌فرض موج ۱ — SMS-first عملیاتی.
- * Kavenegar تنها کانال تولیدی اجباری است؛ مسنجرها تا موج ۲ stub و fail-closedاند.
+ * ترتیب پیش‌فرض — SMS-first عملیاتی (موج ۱)، با زنجیره‌ی SMS دوم از موج ۲.
+ * کاوه‌نگار و SMS.ir تنها کانال‌های تولیدی بدون opt-in هستند؛ Bale/ایتا واقعی
+ * شده‌اند ولی فقط برای مخاطب opt-in شده قابل انتخاب‌اند، و Telegram/WhatsApp
+ * همچنان stub و fail-closedاند (D09 / ADR خارج‌ازمحدوده).
  */
 export const DEFAULT_CHANNEL_ORDER: readonly MessagingChannel[] = [
   "kavenegar",
+  "smsir",
   "bale",
   "eitaa",
   "telegram",
