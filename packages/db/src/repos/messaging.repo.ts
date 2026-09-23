@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { sanitizeMessageError } from "@scalpai/shared";
 import { inboundMessages, messageLog } from "../schema.js";
 import { decryptPhi, encryptPhi, phiCiphertextKid } from "../phi-crypto.js";
 import { newId, type Tx } from "../tenant.js";
@@ -159,7 +160,7 @@ export async function markMessageDelivered(
   return rows.length > 0;
 }
 
-/** دلیل بریده می‌شود: یک پاسخ خطای پروایدر می‌تواند متن پیام را برگرداند. */
+/** دلیل فقط از مجموعهٔ بسته است — متن پروایدر/شماره هرگز در ستون نمی‌نشیند. */
 export async function markMessageFailed(
   tx: Tx,
   clinicId: string,
@@ -172,7 +173,7 @@ export async function markMessageFailed(
       state: "failed",
       failedAt: sql`now()`,
       attempts: sql`${messageLog.attempts} + 1`,
-      lastError: reason.slice(0, 300),
+      lastError: sanitizeMessageError(reason),
     })
     .where(and(eq(messageLog.clinicId, clinicId), eq(messageLog.id, id)))
     .returning({ id: messageLog.id });

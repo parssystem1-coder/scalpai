@@ -21,6 +21,7 @@ export default defineConfig({
       "@scalpai/analysis-core": pkgSrc("analysis-core"),
       "@scalpai/analysis-engine": pkgSrc("analysis-engine"),
       "@scalpai/education": pkgSrc("education"),
+      "@scalpai/notify": pkgSrc("notify"),
       // Phase 10 (M2): the licence suite signs a real token with the licensing
       // package and verifies it through the API service, so it needs the same
       // source-not-dist treatment as every other workspace package.

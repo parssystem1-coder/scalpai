@@ -41,7 +41,11 @@ export {
 export {
   DEFAULT_CHANNEL_ORDER,
   channelChain,
+  routeAfterFailure,
   routeChannel,
+  sendWithChannelFailover,
+  type FailoverSendRequest,
+  type FailoverSendResult,
   type RecipientReachability,
   type RouteDecision,
   type RouteRefusal,

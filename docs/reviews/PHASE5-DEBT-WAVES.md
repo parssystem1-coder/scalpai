@@ -18,12 +18,12 @@
 
 | ID | آیتم پلی‌بوک / بازبینی | وضعیت | موج |
 |---|---|---|---|
-| D01 | ماتریس کانال ایران در `ops/` | MISSING | 1 |
-| D02 | تست قرارداد قطع Bale → SMS | MISSING (گیت false PASS) | 1 |
-| D03 | failover بعد از شکست ارسال (نه فقط انتخاب پیش از send) | MISSING | 1 |
-| D04 | B2 replay وب‌هوک (timestamp/nonce / event id) | OPEN | 1 |
-| D05 | `lastError` متن خام پروایدر (High #4) | OPEN | 1 |
-| D06 | PROGRESS/گیت صادق نیستند (۵ stub vs Kavenegar واقعی؛ UI ارتقا) | OPEN | 1 |
+| D01 | ماتریس کانال ایران در `ops/` | DONE | 1 |
+| D02 | تست قرارداد قطع Bale → SMS | DONE | 1 |
+| D03 | failover بعد از شکست ارسال (نه فقط انتخاب پیش از send) | DONE | 1 |
+| D04 | B2 replay وب‌هوک (timestamp/nonce / event id) | DONE (StateStore TTL؛ جدول موج ۵) | 1 |
+| D05 | `lastError` متن خام پروایدر (High #4) | DONE | 1 |
+| D06 | PROGRESS/گیت صادق نیستند (۵ stub vs Kavenegar واقعی؛ UI ارتقا) | DONE | 1 |
 | D07 | SMS.ir adapter | MISSING | 2 |
 | D08 | Bale/Eitaa واقعی (نه stub تولیدی) | STUB | 2 |
 | D09 | Telegram/WhatsApp واقعی | STUB | 2 |
@@ -158,3 +158,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | Date | Change |
 |---|---|
 | 2026-09-22 | ایجاد سند؛ موج ۱ انتخاب‌شده برای اجرا |
+| 2026-09-22 | موج ۱ بسته شد: D01–D06 DONE؛ UI ارتقا همچنان D10 موج ۳ |

@@ -29,6 +29,42 @@ export type MessageLocale = (typeof MESSAGE_LOCALES)[number];
 export const MESSAGE_STATES = ["queued", "sent", "delivered", "failed", "suppressed"] as const;
 export type MessageState = (typeof MESSAGE_STATES)[number];
 
+/**
+ * Closed set for `message_log.last_error` (Wave 1 / D05).
+ * A provider body, phone number or stack never belongs in this column.
+ */
+export const MESSAGE_ERROR_CODES = [
+  "provider-timeout",
+  "provider-unreachable",
+  "provider-error",
+  "provider-rejected",
+  "adapter-not-implemented",
+  "not-configured",
+  "invalid-request",
+  "insufficient-credit",
+  "blocked-receptor",
+  "rate-limited",
+  "invalid-provider-response",
+  "body-too-long",
+  "send-failed",
+  "quota-exceeded",
+] as const;
+export type MessageErrorCode = (typeof MESSAGE_ERROR_CODES)[number];
+
+const MESSAGE_ERROR_CODE_SET = new Set<string>(MESSAGE_ERROR_CODES);
+
+/** Map any thrown / provider string onto the closed set. Unknown → `send-failed`. */
+export function sanitizeMessageError(reason: unknown): MessageErrorCode {
+  const raw = typeof reason === "string" ? reason.trim() : "";
+  if (MESSAGE_ERROR_CODE_SET.has(raw)) return raw as MessageErrorCode;
+  const lower = raw.toLowerCase();
+  if (lower.includes("adapter-not-implemented") || lower.includes("is a stub")) {
+    return "adapter-not-implemented";
+  }
+  if (lower.includes("timeout") || lower.includes("aborted")) return "provider-timeout";
+  return "send-failed";
+}
+
 export const INBOUND_STATES = ["new", "read", "replied", "archived"] as const;
 export type InboundState = (typeof INBOUND_STATES)[number];
 
