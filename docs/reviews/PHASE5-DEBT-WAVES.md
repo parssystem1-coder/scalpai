@@ -29,8 +29,8 @@
 | D09 | Telegram/WhatsApp واقعی | OUT-OF-SCOPE (ADR-0053 تا تقاضای کلینیک) | 2 |
 | D10 | صفحه مصرف پلن owner + UI ارتقا | DONE (موج ۳؛ `GET /metering/usage` + صفحه `/usage`) | 3 |
 | D11 | `@Quota` روی مسیر پیام / ۴۰۳ یکنواخت | DONE (موج ۳؛ `@Quota("messages")` + تست integration) | 3 |
-| D12 | UI کلینیک aftercare (sequences/enrollments) | MISSING | 3 |
-| D13 | UI فاکتور | MISSING | 3 |
+| D12 | UI کلینیک aftercare (sequences/enrollments) | DONE (w4) | 3 |
+| D13 | UI فاکتور | DONE (w4) | 3 |
 | D14 | Inbox reply واقعاً ارسال نمی‌شود (Q1) | DONE (موج ۳؛ ADR-0054 — رسیدگی بدون متن آزاد) | 3 |
 | D15 | no-show ۲۴س/۲س + recall | MISSING | 4 |
 | D16 | `condition` / `on_reply` در steps | MISSING | 4 |
@@ -98,6 +98,13 @@
 
 **Exit:** e2e یا integration: عبور از سهمیه → ۴۰۳ + UI ارتقا رندر می‌شود. Inbox دیگر متن را می‌گیرد و دور می‌ریزد.
 
+> **بسته‌شدن موج ۴ (2026-09-23) — بستن D12/D13 و پایان فاز ۵:**
+>
+> - **D13 (UI فاکتور، `/billing`):** `InvoiceListPage` — جدول فاکتورها با فیلتر وضعیت، صدور پیش‌فاکتور از کاتالوگ (productId → قیمت/شرح/مالیات از کاتالوگ؛ کاربر فقط تعداد/تخفیف)، اکشن‌های issue/pay/void؛ `void` فقط owner در UI (آینه‌ی `@Roles`) و با دلیل ≥۴ نویسه. بدون تغییر بک‌اند.
+> - **D12 (UI aftercare، `/aftercare`):** `AftercarePage` دو پنلی — دنباله‌ها (لیست + ساخت با قیدهای zod: فعالِ بی‌گام ممنوع، `session_completed` نیازمند serviceId، انتخابگر قالب از `MESSAGE_TEMPLATES` واقعی notify) و ثبت‌نام‌ها (enroll + pause/resume/cancel). ۴۰۳ `QUOTA_EXCEEDED` → همان CTA ارتقای الگوی D10. بدون تغییر بک‌اند.
+> - **seed:** نیازی به seed جدید نبود — `seedPhase5a` از قبل دنباله‌ی «پیگیری پس از PRP» (۴ گام)، ثبت‌نام سررسید و پیش‌فاکتور دو سطری را برای کلینیک A می‌سازد.
+> - **تست:** ۱۰ تست UI جدید (۴ فاکتور + ۶ aftercare)؛ ۲۱۰/۲۱۰ تست وب و ۱۱۵/۱۱۵ conformance/quality سبز. فاز ۵ با این موج **کامل** است.
+>
 > **برنامهٔ موج پایانی UI (2026-09-23) — بستن D12/D13:** دو صفحهٔ مستقل، دو PR کوچک، هیچ migration ای.
 >
 > **PR الف — D13 UI فاکتور (`/billing`):**
