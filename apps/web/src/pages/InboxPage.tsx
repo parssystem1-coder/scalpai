@@ -19,7 +19,6 @@ export const InboxPage: React.FC = () => {
   const [query, setQuery] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,10 +86,15 @@ export const InboxPage: React.FC = () => {
     [messages, query],
   );
 
-  const sendReply = async () => {
-    if (!selected || !reply.trim()) return;
+  /**
+   * موج ۳ (D14 / ADR-0054): کنش «رسیدگی شد» — فقط state به replied می‌رود.
+   * textarea قبلی متنی می‌گرفت که endpoint ارسال نداشت؛ متن دور ریخته می‌شد
+   * و کاربر فکر می‌کرد پیامش رفته. اینجا دیگر متنی نیست که دور بیفتد.
+   */
+  const markHandled = async () => {
+    if (!selected || selected.state === "replied") return;
     // بازگردانی باید به حالت قبلی برگردد، نه به "new": یک پیام خوانده‌شده که
-    // ارسال پاسخش شکست خورده، دوباره خوانده‌نشده نمی‌شود.
+    // ثبت رسیدگی‌اش شکست خورد، دوباره خوانده‌نشده نمی‌شود.
     const previousState = selected.state;
     setSending(true);
     setError(null);
@@ -103,16 +107,10 @@ export const InboxPage: React.FC = () => {
     );
 
     try {
-      // TODO(phase-5b): این درخواست فقط حالت پیام را عوض می‌کند و متن `reply`
-      // را هیچ‌جا نمی‌فرستد — قرارداد InboundMessageUpdate فقط {state,intent}
-      // را می‌پذیرد و endpoint ارسال پاسخ وجود ندارد. تا روشن شدن قرارداد،
-      // این دکمه «ثبت پاسخ» است نه «ارسال پیام».
-      // docs/reviews/PHASE-5AB-REVIEW.md — پرسش باز ۱.
       await apiFetch(`/aftercare/inbox/${selected.id}`, {
         method: "PATCH",
         body: JSON.stringify({ state: "replied" }),
       });
-      setReply(""); // Clear reply field on success
     } catch {
       // Rollback on error
       setMessages((current) =>
@@ -120,7 +118,7 @@ export const InboxPage: React.FC = () => {
           msg.id === selected.id ? { ...msg, state: previousState } : msg,
         ),
       );
-      setError(t("inbox.replyFailed"));
+      setError(t("inbox.handledFailed"));
     } finally {
       setSending(false);
     }
@@ -210,10 +208,9 @@ export const InboxPage: React.FC = () => {
               message={selected}
               body={body}
               bodyStatus={bodyStatus}
-              reply={reply}
-              onReplyChange={setReply}
-              onReply={() => void sendReply()}
-              sending={sending}
+              onHandled={() => void markHandled()}
+              handling={sending}
+              alreadyReplied={selected?.state === "replied"}
             />
           </div>
         </div>

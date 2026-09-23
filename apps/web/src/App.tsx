@@ -32,6 +32,7 @@ const PatientsPage = lazy(() => import("./pages/PatientsPage.js"));
 const PatientGalleryPage = lazy(() => import("./pages/PatientGalleryPage.js"));
 const AnalysisPage = lazy(() => import("./pages/AnalysisPage.js"));
 const InboxPage = lazy(() => import("./pages/InboxPage.js"));
+const UsagePage = lazy(() => import("./pages/UsagePage.js"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +133,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <AnalysisPage onLoggedOut={handleLogout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/usage"
+            element={
+              <ProtectedRoute>
+                <UsagePage />
               </ProtectedRoute>
             }
           />

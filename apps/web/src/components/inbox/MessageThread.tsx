@@ -5,9 +5,17 @@ import type { InboxMessage } from "./MessageCard.js";
 /** وضعیت دریافت متن پیام. `null` بودن body دو معنی داشت: «در حال بارگذاری» و «نشد». */
 export type BodyStatus = "idle" | "loading" | "loaded" | "error";
 
-interface Props { message: InboxMessage | null; body: string | null; bodyStatus?: BodyStatus; reply: string; onReplyChange: (value: string) => void; onReply: () => void; sending?: boolean; }
-/** Conversation detail panel. The full inbound body is supplied only after explicit selection. */
-export const MessageThread: React.FC<Props> = ({ message, body, bodyStatus = "idle", reply, onReplyChange, onReply, sending = false }) => {
+interface Props { message: InboxMessage | null; body: string | null; bodyStatus?: BodyStatus; onHandled: () => void; handling?: boolean; alreadyReplied?: boolean; }
+/**
+ * Conversation detail panel. The full inbound body is supplied only after explicit selection.
+ *
+ * موج ۳ (D14 / ADR-0054): بدون composer متن آزاد. قبلاً یک textarea «پاسخ»
+ * بود که دکمه‌ی ارسالش متن را هیچ‌جا نمی‌فرستاد — همان گرفتنی که سند بدهی
+ * دور می‌ریخت. الان فقط یک کنش صادق هست: «رسیدگی شد» که state را با
+ * `PATCH /aftercare/inbox/:id` به replied می‌برد. پاسخِ واقعیِ قالب‌دار مسیر
+ * خودش را از موتور aftercare دارد، نه از اینجا.
+ */
+export const MessageThread: React.FC<Props> = ({ message, body, bodyStatus = "idle", onHandled, handling = false, alreadyReplied = false }) => {
   const { t } = useTranslation();
   if (!message) return <section className="grid min-h-[420px] place-items-center p-8 text-sm opacity-60" aria-label={t("inbox.emptySelection")}>{t("inbox.selectConversation")}</section>;
   return (
@@ -36,30 +44,21 @@ export const MessageThread: React.FC<Props> = ({ message, body, bodyStatus = "id
         )}
       </div>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          onReply();
-        }}
-        className="flex gap-3 border-t border-black/10 pt-4"
-      >
-        <textarea
-          aria-label={t("inbox.replyLabel")}
-          value={reply}
-          onChange={(event) => onReplyChange(event.target.value)}
-          disabled={sending}
-          rows={2}
-          className="min-h-12 flex-1 rounded-xl border border-black/10 bg-white p-3 text-sm disabled:opacity-50"
-          placeholder={t("inbox.replyPlaceholder")}
-        />
-        <button
-          type="submit"
-          disabled={sending || reply.trim().length === 0}
-          className="self-end rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-40"
-        >
-          {sending ? t("inbox.sending") : t("inbox.send")}
-        </button>
-      </form>
+      <div className="flex items-center justify-between gap-3 border-t border-black/10 pt-4">
+        <p className="text-xs opacity-60">{t("inbox.handledHint")}</p>
+        {alreadyReplied ? (
+          <span className="rounded-xl bg-white/70 px-4 py-3 text-sm font-bold opacity-60">{t("inbox.handled")}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={onHandled}
+            disabled={handling}
+            className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-40"
+          >
+            {handling ? t("inbox.handling") : t("inbox.markHandled")}
+          </button>
+        )}
+      </div>
     </section>
   );
 };

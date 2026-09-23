@@ -27,11 +27,11 @@
 | D07 | SMS.ir adapter | DONE (موج ۲؛ ADR-0052 + migration 0022) | 2 |
 | D08 | Bale واقعی — Bot API روی HttpClientPort | DONE (موج ۲) · Eitaa واقعی → موج بعد | 2 |
 | D09 | Telegram/WhatsApp واقعی | OUT-OF-SCOPE (ADR-0053 تا تقاضای کلینیک) | 2 |
-| D10 | صفحه مصرف پلن owner + UI ارتقا | MISSING | 3 |
-| D11 | `@Quota` روی مسیر پیام / ۴۰۳ یکنواخت | PARTIAL | 3 |
+| D10 | صفحه مصرف پلن owner + UI ارتقا | DONE (موج ۳؛ `GET /metering/usage` + صفحه `/usage`) | 3 |
+| D11 | `@Quota` روی مسیر پیام / ۴۰۳ یکنواخت | DONE (موج ۳؛ `@Quota("messages")` + تست integration) | 3 |
 | D12 | UI کلینیک aftercare (sequences/enrollments) | MISSING | 3 |
 | D13 | UI فاکتور | MISSING | 3 |
-| D14 | Inbox reply واقعاً ارسال نمی‌شود (Q1) | OPEN | 3 |
+| D14 | Inbox reply واقعاً ارسال نمی‌شود (Q1) | DONE (موج ۳؛ ADR-0054 — رسیدگی بدون متن آزاد) | 3 |
 | D15 | no-show ۲۴س/۲س + recall | MISSING | 4 |
 | D16 | `condition` / `on_reply` در steps | MISSING | 4 |
 | D17 | `offset_days` مطابق DESIGN-V2 §6.2 | DRIFT (`offsetHours`) | 4 |
@@ -86,13 +86,15 @@
 
 **پیشنهاد:** صفحهٔ مصرف پلن را قبل از UI aftercare بساز — بدون آن سهمیه برای owner نامرئی است و DoD #4 همچنان دروغ است.
 
+> **بسته‌شدن موج ۳ (2026-09-23):** D10 و D11 و D14 انجام شد. D10: `GET /metering/usage` (فقط owner، سه متریک فاز ۵a با سقف موثر) + صفحه‌ی `/usage` با نوار مصرف و CTA ارتقا روی `QUOTA_EXCEEDED`. D11: متریک `messages` در `QUOTA_SPECS` (همان شمارنده/کلیدهای metering فاز ۵a) + `@Quota("messages")` روی enroll/actions؛ ورکر همچنان suppress می‌کند نه ۴۰۳ (تست integration: سقف پر → enroll ۴۰۳ یکنواخت + snapshot owner همان سقف را نشان می‌دهد). D14: با ADR-0054 بسته شد — «رسیدگی شد» بدون متن آزاد؛ composer دروغین حذف شد. D12 و D13 (UI aftercare و UI فاکتور) به‌عنوان تنها آیتم‌های باز موج ۳ باقی‌اند.
+
 | آیتم | کار |
 |---|---|
 | D10 | `GET` snapshot متریک + صفحه owner + CTA ارتقا وقتی `QUOTA_EXCEEDED` |
 | D11 | `@Quota("messages")` یا معادل HTTP روی مسیرهای محدود؛ ورکر همچنان suppress می‌کند نه ۴۰۳ |
 | D12 | لیست/ساخت sequence و enrollment در وب (آینهٔ golden path بیماران) |
 | D13 | لیست فاکتور + صدور از کاتالوگ (POS دکمه نیست؛ فاکتور هست) |
-| D14 | تصمیم Q1: composer = ارسال قالب‌دار از router **یا** دکمه «رسیدگی شد» بدون متن آزاد |
+| D14 | تصمیم Q1: composer = ارسال قالب‌دار از router **یا** دکمه «رسیدگی شد» بدون متن آزاد → ADR-0054 |
 
 **Exit:** e2e یا integration: عبور از سهمیه → ۴۰۳ + UI ارتقا رندر می‌شود. Inbox دیگر متن را می‌گیرد و دور می‌ریزد.
 
@@ -162,3 +164,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-22 | ایجاد سند؛ موج ۱ انتخاب‌شده برای اجرا |
 | 2026-09-22 | موج ۱ بسته شد: D01–D06 DONE؛ UI ارتقا همچنان D10 موج ۳ |
 | 2026-09-23 | موج ۲ بسته شد: D07/D08 DONE (SMS.ir + Bale واقعی؛ Eitaa → موج بعد)، D09 OUT-OF-SCOPE (ADR-0053) |
+| 2026-09-23 | موج ۳ (بخش P1 مصرف/سهمیه/inbox) بسته شد: D10/D11/D14 DONE؛ D12/D13 باز (UI aftercare و فاکتور) |

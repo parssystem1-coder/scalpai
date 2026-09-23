@@ -19,6 +19,7 @@ import {
   type InboxQueryDto,
 } from "@scalpai/shared";
 import { RequireFeature } from "../common/feature.guard.js";
+import { Quota } from "../common/quota.guard.js";
 import { RateLimit } from "../common/rate-limit.guard.js";
 import { Roles } from "../common/roles.guard.js";
 import { ZodBodyPipe } from "../common/zod.pipe.js";
@@ -100,9 +101,16 @@ export class AftercareController {
     return this.aftercare.listEnrollments(q);
   }
 
+  /**
+   * موج ۳ (D11): ثبت‌نام آگاهانه‌ی مسیر ارسال پیام است، پس دروازه‌ی سهمیه‌ی پیام
+   * را هم دارد. گارد فقط پیش‌چک ارزان است؛ حکم اتمیک همچنان meterUsage داخل
+   * تراکنش ورکر است و ورکر به‌جای ۴۰۳، پیام را suppress می‌کند — ۴۰۳ یکنواخت
+   * فقط برای درخواست‌های انسانی است.
+   */
   @Post("enrollments")
   @Roles("owner", "trichologist", "receptionist")
   @RequireFeature("aftercare")
+  @Quota("messages")
   @RateLimit("aftercare-write", 120)
   @HttpCode(HttpStatus.CREATED)
   enroll(@Body(new ZodBodyPipe(AftercareEnrollmentCreate)) dto: AftercareEnrollmentCreateDto) {
@@ -120,6 +128,7 @@ export class AftercareController {
   @Post("enrollments/:id/actions")
   @Roles("owner", "trichologist", "receptionist")
   @RequireFeature("aftercare")
+  @Quota("messages")
   @RateLimit("aftercare-write", 120)
   @HttpCode(HttpStatus.OK)
   act(

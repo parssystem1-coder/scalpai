@@ -13,18 +13,26 @@ const fa = {
   loadingBody: "در حال بارگذاری متن پیام…",
   loadFailed: "دریافت صندوق ورودی ناموفق بود",
   bodyFailed: "متن پیام دریافت نشد؛ نمایش نسخه محافظت‌شده",
-  replyFailed: "ارسال پاسخ ناموفق بود",
+  handledFailed: "ثبت رسیدگی ناموفق بود",
   dismissError: "بستن پیام خطا",
   retry: "تلاش دوباره",
+  markHandled: "رسیدگی شد",
+  handling: "در حال ثبت…",
+  handled: "رسیدگی ثبت شده",
+  handledHint: "ثبت رسیدگی وضعیت پیام را به‌روز می‌کند؛ ارسال پاسخِ جدید از موتور پیگیری انجام می‌شود.",
 };
 
 const en = {
   loadingBody: "Loading message body…",
   loadFailed: "Could not load the inbox",
   bodyFailed: "Message body unavailable; showing the protected preview",
-  replyFailed: "Could not send the reply",
+  handledFailed: "Could not mark as handled",
   dismissError: "Dismiss error",
   retry: "Try again",
+  markHandled: "Mark handled",
+  handling: "Recording…",
+  handled: "Marked as handled",
+  handledHint: "Marking updates the message state; new follow-ups are sent by the aftercare engine.",
 };
 
 i18n.addResourceBundle("fa", "translation", { inbox: fa }, true, true);

@@ -6,6 +6,7 @@ import {
   bytesToMeteredMb,
   isMeteredMetricName,
   meterUsage,
+  peekMetered,
   peekUsage,
   releaseUsage,
   resolveMeteredLimit,
@@ -151,6 +152,30 @@ describe("releaseUsage", () => {
     const tx = mockTx([{ value: "8" }]);
     const result = await releaseUsage(tx as any, "c1", "upload_mb", 2);
     expect(result).toBe(8);
+  });
+});
+
+describe("peekMetered", () => {
+  it("returns used, limit=null placeholder and periodStart in one shot", async () => {
+    const tx = {
+      execute: vi.fn().mockResolvedValue({ rows: [{ period_start: "2026-09-01" }] }),
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ value: 42 }]),
+          }),
+        }),
+      }),
+    } as any;
+    const snap = await peekMetered(tx, "c1", "messages_sent");
+    expect(snap).toEqual({ metric: "messages_sent", used: 42, limit: null, periodStart: "2026-09-01" });
+  });
+
+  it("throws MeteringError when the clinic period cannot be resolved", async () => {
+    const tx = {
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    } as any;
+    await expect(peekMetered(tx, "c1", "upload_mb")).rejects.toThrow(MeteringError);
   });
 });
 

@@ -72,6 +72,8 @@ export async function resetAll(migrateUrl: string): Promise<void> {
   await withPool(migrateUrl, (pool) =>
     pool.query(`TRUNCATE audit_log, consents, analyses, upload_sessions, gallery_items, sessions,
       patients, services, storage_usage, usage_counters, entitlements, plan_features, plans,
+      aftercare_sequences, aftercare_enrollments, message_log, inbound_messages,
+      products, invoices, invoice_items, webhook_providers, payment_attempts,
       refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`),
   );
 }

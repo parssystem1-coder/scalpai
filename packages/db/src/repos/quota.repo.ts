@@ -72,6 +72,20 @@ export const QUOTA_SPECS = {
     kind: "flow",
     limits: [{ key: "monthly_sessions", scale: 1 }],
   },
+  // فاز ۵ موج ۳ (D11) — مسیر پیام هم مثل بقیه‌ی مسیرها یک متریک دروازه‌دار است.
+  // متریک شمارنده همان `messages_sent` متر کردن فاز ۵a است (ADR-0046) و کلیدهای
+  // پلن همان‌هایی که metering.repo می‌خواند — اگر یکی عوض شود و دیگری نه،
+  // گارد و شمارنده در دو سقف متفاوت حکم می‌دهند. گارد فقط پیش‌چک ارزان است؛
+  // حکم اتمیک همچنان meterUsage داخل تراکنش ورکر است و ورکر به‌جای ۴۰۳،
+  // suppress می‌کند (D11).
+  messages: {
+    metric: "messages_sent",
+    kind: "flow",
+    limits: [
+      { key: "messages_per_month", scale: 1 },
+      { key: "messages_sent", scale: 1 },
+    ],
+  },
   storage: {
     metric: "storage_bytes",
     kind: "storage",
