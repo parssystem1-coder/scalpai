@@ -1,5 +1,5 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { aftercareEnrollments, aftercareSequences } from "../schema.js";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { aftercareEnrollments, aftercareSequences, inboundMessages, messageLog, sessions } from "../schema.js";
 import type { Tx } from "../tenant.js";
 
 /**
@@ -31,6 +31,15 @@ export interface AftercareStepRow {
   channel: string;
   templateKey: string;
   vars?: Record<string, string>;
+  /** موج ۴ (D16) — دروازه‌ی اجرای گام. شکل با migration 0023 بسته شده. */
+  condition?: { sessionStatus?: string; patientTag?: string };
+  /** موج ۴ (D16) — مسیر جایگزین وقتی بیمار پاسخ داد. */
+  on_reply?: {
+    intent: "confirm" | "reschedule" | "question" | "stop" | "unknown";
+    action: "switch_to" | "pause_enrollment";
+    switchTo?: { channel?: string; templateKey?: string };
+    skipSteps?: number[];
+  };
 }
 
 export interface SequenceRow {
@@ -415,6 +424,20 @@ export const AFTERCARE_CLAIM_LIMIT_MAX = 500;
  * `fn_aftercare_claim_due`. هر پیاده‌سازی دومرحله‌ای (بخوان → بنویس) دو worker را
  * روی همان ردیف می‌نشاند و بیمار دو پیام می‌گیرد.
  */
+/**
+ * وضعیت فعلی یک جلسه — شرط condition.sessionStatus گام (موج ۴ / D16).
+ * در packages/db است چون drizzle-orm همینجا وابستگی مستقیم است؛ apps/api
+ * نسخه‌ی دوم drizzle ندارد و هر کوئری مستقیم روی جدول‌ها از این خطا می‌خورد.
+ */
+export async function getSessionStatus(tx: Tx, clinicId: string, sessionId: string): Promise<string | null> {
+  const rows = await tx
+    .select({ status: sessions.status })
+    .from(sessions)
+    .where(and(eq(sessions.clinicId, clinicId), eq(sessions.id, sessionId)))
+    .limit(1);
+  return rows[0]?.status ?? null;
+}
+
 export async function claimDueEnrollments(tx: Tx, clinicId: string, limit: number): Promise<ClaimedEnrollment[]> {
   if (!Number.isInteger(limit) || limit < 1 || limit > AFTERCARE_CLAIM_LIMIT_MAX) {
     throw new AftercareError(`claim limit must be between 1 and ${AFTERCARE_CLAIM_LIMIT_MAX}`);
@@ -506,6 +529,178 @@ export async function deferEnrollment(
         eq(aftercareEnrollments.state, "active"),
       ),
     )
+    .returning(enrollmentColumns);
+  const row = rows[0];
+  return row ? hydrate(row) : null;
+}
+
+/* ══ موج ۴ (D16) — مسیر پاسخ بیمار (on_reply) ══════════════════════ */
+
+export interface ReplyContext {
+  enrollmentId: string;
+  /** ایندکس گامی که پیامش پاسخ داده شده — یا -۱ اگر پیامِ خارج از ثبت‌نام است. */
+  stepIndex: number;
+  /** گامِ پاسخ‌خورده؛ برای خواندن on_reply. */
+  step: AftercareStepRow | null;
+}
+
+/**
+ * ثبت‌نامِ فعالِ پاسخ‌دهنده را از روی hash فرستنده پیدا می‌کند.
+ *
+ * مسیر اتصال عمداً hash است نه شماره: پیام ورودی hash فرستنده دارد، پیام
+ * خروجی hash گیرنده — و هیچ لحظه‌ای شماره‌ی خام در پرسش ظاهر نمی‌شود.
+ * پیام‌های همین دنباله (enrollment_id ثبت‌شده در message_log) اولویت دارند؛
+ * اگر هیچ پیام دنباله‌ای به این مخاطب نرفته بود، ثبت‌نامِ فعالِ همان بیمار
+ * (از روی patient_id پیام ورودی) جست‌وجو می‌شود.
+ *
+ * موج ۴ (D16): خودِ پیام ورودی هم به همان ثبت‌نام لینک می‌شود تا inbox بتواند
+ * پاسخ‌های یک دنباله را کنار هم ببیند. دو کار در یک کوئری، بدون شماره‌ی خام.
+ */
+export async function findActiveEnrollmentForSender(
+  tx: Tx,
+  clinicId: string,
+  inboundId: string,
+): Promise<ReplyContext | null> {
+  const rows = await tx
+    .select({ senderHash: inboundMessages.senderHash, patientId: inboundMessages.patientId })
+    .from(inboundMessages)
+    .where(and(eq(inboundMessages.clinicId, clinicId), eq(inboundMessages.id, inboundId)))
+    .limit(1);
+  const inbound = rows[0];
+  if (!inbound) return null;
+  const senderHash = inbound.senderHash;
+  const patientId = inbound.patientId;
+
+  if (!/^[0-9a-f]{64}$/.test(senderHash)) throw new AftercareError("sender hash must be sha256 hex");
+
+  // آخرین پیام خروجی دنباله‌دار به این مخاطب (یا به این بیمار)
+  const viaMessage = await tx
+    .select({
+      enrollmentId: messageLog.enrollmentId,
+      stepIndex: messageLog.stepIndex,
+      patientId: messageLog.patientId,
+    })
+    .from(messageLog)
+    .where(
+      and(
+        eq(messageLog.clinicId, clinicId),
+        eq(messageLog.recipientHash, senderHash),
+        isNotNull(messageLog.enrollmentId),
+      ),
+    )
+    .orderBy(desc(messageLog.queuedAt))
+    .limit(1);
+  const last = viaMessage[0];
+  if (last?.enrollmentId) {
+    const enrollment = await getEnrollment(tx, clinicId, last.enrollmentId);
+    if (enrollment && enrollment.state === "active") {
+      const step = enrollment.stepsSnapshot[last.stepIndex ?? -1] ?? null;
+      return { enrollmentId: enrollment.id, stepIndex: last.stepIndex ?? -1, step };
+    }
+  }
+
+  if (!patientId) return null;
+  const byPatient = await tx
+    .select(enrollmentColumns)
+    .from(aftercareEnrollments)
+    .where(
+      and(
+        eq(aftercareEnrollments.clinicId, clinicId),
+        eq(aftercareEnrollments.patientId, patientId),
+        eq(aftercareEnrollments.state, "active"),
+      ),
+    )
+    .orderBy(desc(aftercareEnrollments.createdAt))
+    .limit(1);
+  const enrollment = byPatient[0];
+  if (!enrollment) return null;
+  // پیام ورودی به بیمار وصل است نه به پیام خروجی — گامِ جاری همان گامِ فعال است.
+  // on_reply همین گام اعمال می‌شود (گام‌های skip یا جایگزین از آن ساخته می‌شوند).
+  return {
+    enrollmentId: enrollment.id,
+    stepIndex: enrollment.currentStep,
+    step: asSteps(enrollment.stepsSnapshot)[enrollment.currentStep] ?? null,
+  };
+}
+
+/**
+ * گام جایگزین on_reply.switchTo را بعد از گامِ پاسخ‌خورده درج می‌کند و
+ * `next_run_at` را به همان لحظه گامِ جایگزین می‌برد (بدون تغییر مبدأ).
+ * snapshot درجا به‌روز می‌شود — یعنی تصمیم پاسخ بیمار، برنامه‌ی همین
+ * ثبت‌نام را عوض می‌کند، نه برنامه‌ی دنباله را.
+ */
+export async function insertSwitchStep(
+  tx: Tx,
+  clinicId: string,
+  enrollmentId: string,
+  afterStepIndex: number,
+  switchTo: { channel?: string; templateKey?: string },
+): Promise<EnrollmentRow | null> {
+  const current = await getEnrollment(tx, clinicId, enrollmentId);
+  if (!current) return null;
+  const step = current.stepsSnapshot[afterStepIndex];
+  if (!step) return current;
+
+  const replacement: AftercareStepRow = {
+    offsetHours: step.offsetHours,
+    channel: switchTo.channel ?? step.channel,
+    templateKey: switchTo.templateKey ?? step.templateKey,
+    ...(step.vars ? { vars: step.vars } : {}),
+  };
+  const nextSnapshot = [...current.stepsSnapshot];
+  nextSnapshot[afterStepIndex] = replacement;
+
+  // گامِ جایگزین از همین حالا سررسید است: بیمار جواب داده؛ منتظرِ offset
+  // جدید نمی‌مانیم که پیامِ تکراریِ همان محتوا برود.
+  const rows = await tx
+    .update(aftercareEnrollments)
+    .set({ stepsSnapshot: nextSnapshot, nextRunAt: sql`now()`, attempts: 0 })
+    .where(and(eq(aftercareEnrollments.clinicId, clinicId), eq(aftercareEnrollments.id, enrollmentId)))
+    .returning(enrollmentColumns);
+  const row = rows[0];
+  return row ? hydrate(row) : null;
+}
+
+/**
+ * گام‌های skip (پاسخ بیمار) در snapshot علامت می‌خورند: channel به
+ * `skipped:reply` عوض می‌شود که نه در مجموعه‌ی کانال‌ها است نه در مسیر ارسال،
+ * و next_run_at مستقیماً به گامِ زنده‌ی بعدی می‌پرد. بدون این علامت، گامِ
+ * رد‌شده دوباره سررسید می‌شد و پیامِ ناخواسته می‌رفت.
+ */
+export async function markStepsSkipped(
+  tx: Tx,
+  clinicId: string,
+  enrollmentId: string,
+  stepIndexes: readonly number[],
+): Promise<EnrollmentRow | null> {
+  const current = await getEnrollment(tx, clinicId, enrollmentId);
+  if (!current || stepIndexes.length === 0) return current;
+
+  const nextSnapshot = current.stepsSnapshot.map((step, index) =>
+    stepIndexes.includes(index) && !step.channel.startsWith("skipped:")
+      ? { ...step, channel: `skipped:${index}` }
+      : step,
+  );
+
+  // اولین گامِ زنده‌ی بعد از ایندکس‌های رد‌شده
+  let nextIndex = current.currentStep;
+  while (nextIndex < nextSnapshot.length && nextSnapshot[nextIndex]?.channel.startsWith("skipped:")) {
+    nextIndex += 1;
+  }
+
+  const set: Record<string, unknown> = { stepsSnapshot: nextSnapshot, attempts: 0 };
+  if (nextIndex >= nextSnapshot.length) {
+    set.state = "completed";
+    set.nextRunAt = null;
+    set.completedAt = sql`now()`;
+  } else {
+    set.currentStep = nextIndex;
+    set.nextRunAt = stepRunAt(current.startedAt, nextSnapshot[nextIndex]);
+  }
+  const rows = await tx
+    .update(aftercareEnrollments)
+    .set(set)
+    .where(and(eq(aftercareEnrollments.clinicId, clinicId), eq(aftercareEnrollments.id, enrollmentId)))
     .returning(enrollmentColumns);
   const row = rows[0];
   return row ? hydrate(row) : null;

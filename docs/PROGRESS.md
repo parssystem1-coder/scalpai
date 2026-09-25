@@ -123,7 +123,14 @@
 ### Wave 4 — UI نهایی: فاکتور و aftercare (D12/D13) — بستن فاز ۵
 - [x] D13 صفحه‌ی `/billing`: لیست فاکتور با فیلتر وضعیت، صدور پیش‌فاکتور از کاتالوگ (قیمت/شرح/مالیات از کاتالوگ)، issue/pay/void — void فقط owner با دلیل ≥۴ نویسه
 - [x] D12 صفحه‌ی `/aftercare` دو پنلی: دنباله‌ها (ساخت با قیدهای zod + قالب‌های واقعی notify) و ثبت‌نام‌ها (enroll + pause/resume/cancel)؛ ۴۰۳ `QUOTA_EXCEEDED` → CTA ارتقا
-- [x] بدون migration و بدون تغییر قرارداد API؛ ۱۰ تست UI جدید؛ فاز ۵ **کامل** شد
+- [x] بدون migration و بدون تغییر قرارداد API؛ ۱۰ تست UI جدید
+
+### Wave 5 — موتور Aftercare مطابق §6.2 (D15–D18) — سند بدهی موج ۴
+- [x] D15 یادآوری جلسه از `sessions.start_at` در T−24h/T−2h با قالب `session.reminder` — claim تابع `fn_aftercare_claim_session_reminders` با «INSERT پیام = قفل» (idempotency `sessrem:<session>:<offset>`) + `message_log.session_id` (migration 0023 + rollback)؛ تاریخ شمسی در متن
+- [x] D16 `condition`/`on_reply` روی گام‌ها — قرارداد zod در shared (intent=stop ممنوع) + اعتبارسنجی SQL-side (۸ probe) + شاخه‌ی ورکر روی inbound (switch_to/pause/skip با پیوند senderHash)
+- [x] D17 ADR-0055 — انحراف آگاهانه: `offsetHours` دقیق می‌ماند؛ `offset_days` نمایش مشتق است (بدون breaking change)
+- [x] D18 `renderTemplateLink` — لینک توکن‌دار منقضی‌شونده: فقط allow-list، https اجباری، TTL ≤۳۰ روز (۱۲ تست واحد)
+- [x] گیت‌ها: typecheck ۲۱/۲۱ · apps/api integration ۲۳۱/۲۳۱ · conformance/quality ۱۱۵/۱۱۵ · گارد ساختاری ایزولاسیون DB تست (`lockIsolatedTestDb` در ۱۳ اسپکی — اپِ تست هرگز به DB اصلی وصل نمی‌شود)
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning

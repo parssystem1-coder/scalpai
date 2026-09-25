@@ -4,9 +4,10 @@ vi.hoisted(() => {
   process.env.STORAGE_DRIVER = "mock";
 });
 
-import { loadEnv } from "@scalpai/db";
+import { lockIsolatedTestDb } from "./helpers/integration-env.js";
 
-loadEnv();
+// Isolation guard — refuses main-DB targets before anything can boot (2026-09-24 incident).
+lockIsolatedTestDb();
 
 import { createHash } from "node:crypto";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";

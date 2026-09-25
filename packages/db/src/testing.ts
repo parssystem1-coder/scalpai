@@ -66,6 +66,11 @@ async function withPool<T>(url: string, fn: (pool: Pool) => Promise<T>): Promise
  * Phase 8 adds `upload_sessions` and `storage_usage`: a leftover open session
  * would keep holding a storage reservation across suites and make quota tests
  * order-dependent.
+ *
+ * 2026-09-24 adds `mutations` (H4 sync idempotency ledger) and `storage_orphans`:
+ * a crashed run left fixed clientMutationIds behind and the next full-suite run
+ * answered "duplicate" instead of "applied" — a deterministic re-seed must not
+ * depend on how the previous run died.
  */
 export async function resetAll(migrateUrl: string): Promise<void> {
   assertResettableTarget(migrateUrl);
@@ -74,6 +79,7 @@ export async function resetAll(migrateUrl: string): Promise<void> {
       patients, services, storage_usage, usage_counters, entitlements, plan_features, plans,
       aftercare_sequences, aftercare_enrollments, message_log, inbound_messages,
       products, invoices, invoice_items, webhook_providers, payment_attempts,
+      mutations, storage_orphans,
       refresh_tokens, users, branches, clinics RESTART IDENTITY CASCADE`),
   );
 }

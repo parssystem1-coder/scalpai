@@ -160,6 +160,47 @@ export async function markMessageDelivered(
   return rows.length > 0;
 }
 
+/**
+ * موج ۴ (D15) — پر کردن ردیف یادآوری جلسه که fn_aftercare_claim_session_reminders
+ * (0023) با placeholder ساخته است. claim یعنی INSERT؛ اینجا فقط recipient/body
+ * واقعی جایگزین می‌شود — نه ردیف دوم — تا کلید idempotency ثابت بماند.
+ * فقط ردیف queued پر می‌شود: ردیف sent/delivered هرگز دستکاری نمی‌شود.
+ */
+export async function fillSessionReminder(
+  tx: Tx,
+  clinicId: string,
+  input: {
+    id: string;
+    channel: string;
+    locale: string;
+    recipient: string;
+    body: string;
+    varsRedacted: Record<string, unknown>;
+    provider: string;
+  },
+): Promise<boolean> {
+  const rows = await tx
+    .update(messageLog)
+    .set({
+      channel: input.channel,
+      locale: input.locale,
+      recipientHash: recipientDigest(input.recipient),
+      bodySha256: bodyDigest(input.body),
+      bodyChars: input.body.length,
+      varsRedacted: input.varsRedacted,
+      provider: input.provider,
+    })
+    .where(
+      and(
+        eq(messageLog.clinicId, clinicId),
+        eq(messageLog.id, input.id),
+        eq(messageLog.state, "queued"),
+      ),
+    )
+    .returning({ id: messageLog.id });
+  return rows.length > 0;
+}
+
 /** دلیل فقط از مجموعهٔ بسته است — متن پروایدر/شماره هرگز در ستون نمی‌نشیند. */
 export async function markMessageFailed(
   tx: Tx,

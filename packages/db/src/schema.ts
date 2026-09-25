@@ -437,6 +437,8 @@ export const messageLog = pgTable("message_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   enrollmentId: uuid("enrollment_id"),
+  /** موج ۴ (D15): یادآوری جلسه به دنباله تعلق ندارد — پیوندش با جلسه است. */
+  sessionId: uuid("session_id"),
   patientId: uuid("patient_id"),
   stepIndex: integer("step_index"),
   /** kavenegar | bale | eitaa | telegram | whatsapp */

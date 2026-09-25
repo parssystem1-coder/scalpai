@@ -75,6 +75,14 @@ export type InboundState = (typeof INBOUND_STATES)[number];
 export const INBOUND_INTENTS = ["unknown", "question", "reschedule", "stop", "confirm"] as const;
 export type InboundIntent = (typeof INBOUND_INTENTS)[number];
 
+/**
+ * مجموعه‌ی بسته‌ی وضعیت جلسه — همان CHECK 0001 روی sessions.status.
+ * در موج ۴ (D15/D16) دو مصرف دارد: شرط condition.sessionStatus روی گام و
+ * انتخاب جلسات سررسیدِ یادآوری (فقط booked).
+ */
+export const SESSION_STATUSES = ["booked", "completed", "cancelled", "no_show"] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
+
 export const AFTERCARE_TRIGGERS = ["manual", "session_completed", "analysis_created", "invoice_paid"] as const;
 export type AftercareTrigger = (typeof AFTERCARE_TRIGGERS)[number];
 
@@ -145,14 +153,80 @@ export const TemplateKey = z
 /**
  * یک گام. `offsetHours` فاصله از لحطه ثبت‌نام است، نه از گام قبلی: با فاصله‌ی
  * نسبی، یک تاخیر در گام دوم همه‌ی گام‌های بعد را جابه‌جا می‌کند و «پیام روز
- * هفتم» دیگر روز هفتم نیست.
+ * هفتم» دیگر روز هفتم نیست. واحد ساعت است نه روز — ADR-0055 (D17).
+ *
+ * `condition` و `on_reply` (موج ۴ / D16، مطابق §6.2 طرح) هر دو اختیاری‌اند:
+ *   • `condition` — دروازه‌ی اجرای گام. اگر شرط رد شود گام skip می‌شود نه retry.
+ *   • `on_reply` — اگر پاسخ بیمار با `intent` یکی شد، ورکر مسیر را عوض می‌کند:
+ *     ارسال گام جایگزین (switch_to) یا توقف ثبت‌نام (pause_enrollment) یا رد کردن
+ *     گام‌های مشخص (skipSteps).
+ *
+ * `stop` هرگز در مجموعه‌ی on_reply سوئیچ نیست: خاموشی بیمار فقط از خودش می‌آید.
  */
+export const AftercareStepCondition = z
+  .object({
+    /** فقط وقتی وضعیت جلسه‌ی گره‌خورده این باشد گام اجرا می‌شود. */
+    sessionStatus: z.enum(SESSION_STATUSES).optional(),
+    /** فقط وقتی بیمار این تگ را داشته باشد گام اجرا می‌شود. */
+    patientTag: z.string().trim().min(1).max(40).optional(),
+  })
+  .refine((condition) => Object.values(condition).some((v) => v !== undefined), {
+    message: "دست‌کم یک شرط لازم است — condition خالی یعنی شفاف‌کاری بدون معنا",
+  });
+export type AftercareStepConditionDto = z.infer<typeof AftercareStepCondition>;
+
+export const AftercareStepOnReply = z
+  .object({
+    intent: z.enum(INBOUND_INTENTS),
+    action: z.enum(["switch_to", "pause_enrollment"]),
+    /** فقط برای action=switch_to: جایگزین گام. */
+    switchTo: z
+      .object({
+        channel: z.enum(MESSAGING_CHANNELS).optional(),
+        templateKey: TemplateKey.optional(),
+      })
+      .refine((t) => t.channel !== undefined || t.templateKey !== undefined, {
+        message: "switch_to دست‌کم یکی از channel یا templateKey را لازم دارد",
+      })
+      .optional(),
+    /** ایندکس گام‌هایی که با این پاسخ رد می‌شوند (تا ۴۰ گام). */
+    skipSteps: z.array(z.coerce.number().int().min(0).max(39)).max(AFTERCARE_MAX_STEPS).optional(),
+  })
+  .superRefine((onReply, ctx) => {
+    if (onReply.action === "switch_to" && !onReply.switchTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["switchTo"],
+        message: "action=switch_to بدون switchTo یک گام گم‌شده است",
+      });
+    }
+    if (onReply.action !== "switch_to" && onReply.switchTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["switchTo"],
+        message: "switchTo فقط برای action=switch_to معنا دارد",
+      });
+    }
+    if (onReply.intent === "stop") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["intent"],
+        message: "STOP از مسیر on_reply نیست — opt-out خودکار ورکر همیشه جلوتر از هر on_reply است",
+      });
+    }
+  });
+export type AftercareStepOnReplyDto = z.infer<typeof AftercareStepOnReply>;
+
 export const AftercareStep = z.object({
   offsetHours: z.coerce.number().int().min(0).max(AFTERCARE_MAX_OFFSET_HOURS),
   channel: z.enum(MESSAGING_CHANNELS),
   templateKey: TemplateKey,
   /** جایگزین‌های ثابت قالب (مثلاً نام کلینیک). هرگز PHI. */
   vars: z.record(z.string().min(1).max(40), z.string().max(200)).optional(),
+  /** دروازه‌ی اجرای گام (D16). غایب یعنی همیشه اجرا. */
+  condition: AftercareStepCondition.optional(),
+  /** مسیر جایگزین وقتی بیمار پاسخ داد (D16). غایب یعنی مسیر بدون تغییر. */
+  on_reply: AftercareStepOnReply.optional(),
 });
 export type AftercareStepDto = z.infer<typeof AftercareStep>;
 
