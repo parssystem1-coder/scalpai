@@ -186,6 +186,11 @@ jobs:
 
       - name: Start MinIO with a media bucket and an object-locked off-site bucket
         run: |
+          # 2026-09-25: quay anonymous pulls are rate-limit flaky (this job
+          # failed on main the night before). Pull with backoff + GHCR mirror
+          # fallback (tools/ci/retry.sh, mirror synced by mirror-images.yml).
+          source tools/ci/retry.sh
+          retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
           docker run -d --name scalpai-minio --network host \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin-dev-only \
