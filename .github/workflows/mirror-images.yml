@@ -1,0 +1,69 @@
+# Registry mirror for flaky third-party registries (added 2026-09-25).
+#
+# quay.io has been rate-limiting / blocking anonymous pulls from GitHub
+# runners: three consecutive CI runs (2026-09-25) and a Nightly run on main
+# died with `unauthorized: access to the requested resource is not authorized`
+# while pulling the pinned MinIO image — before any test ran.
+#
+# This workflow makes a server-side copy of the EXACT pinned digests into this
+# repo's GHCR (public, so fork PRs can pull too): quay -> GHCR via
+# `docker buildx imagetools create` (no local pull needed, runs where quay is
+# reachable). tools/ci/retry.sh then uses ghcr.io/<owner>/mirror-minio/... as
+# the fallback source; same tag everywhere = same digest, so the fallback can
+# never serve a different image than the pin (M17 invariant).
+#
+# Run it once manually (workflow_dispatch) after changing a pin, and weekly to
+# keep layers warm. No required gates depend on it.
+name: mirror-images
+on:
+  workflow_dispatch:
+    inputs:
+      minio_image:
+        description: quay.io minio tag to mirror (without registry/repo)
+        required: false
+        default: RELEASE.2025-09-07T16-13-09Z
+      mc_image:
+        description: quay.io mc tag to mirror (without registry/repo)
+        required: false
+        default: RELEASE.2025-08-13T08-35-41Z
+  schedule:
+    # Weekly, Sunday 03:07 UTC — refresh layer copies.
+    - cron: "7 3 * * 0"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Cross-registry, server-side copy of the pinned manifest (with all
+      # platforms). Idempotent: re-running overwrites the same tag with the
+      # same digest.
+      - name: Mirror minio/minio into GHCR
+        env:
+          MINIO_TAG: ${{ inputs.minio_image || 'RELEASE.2025-09-07T16-13-09Z' }}
+        run: |
+          docker buildx imagetools create \
+            -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}" \
+            "quay.io/minio/minio:${MINIO_TAG}"
+          docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}"
+
+      - name: Mirror minio/mc into GHCR
+        env:
+          MC_TAG: ${{ inputs.mc_image || 'RELEASE.2025-08-13T08-35-41Z' }}
+        run: |
+          docker buildx imagetools create \
+            -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}" \
+            "quay.io/minio/mc:${MC_TAG}"
+          docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}"

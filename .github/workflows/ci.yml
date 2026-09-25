@@ -1,5 +1,10 @@
 name: CI
 
+# The retry/mirror helper (tools/ci/retry.sh) falls back to this namespace's
+# GHCR package when quay.io rejects anonymous pulls.
+env:
+  GHCR_MIRROR_OWNER: ${{ github.repository_owner }}
+
 # Phase 5 - CI/CD, tests and real gatekeeping (WEAKNESSES H14/H15/H16/M14/M15/M17/L1).
 # Phase 9 adds the backup/restore gate (C10): the recovery path is executed, not
 # described.
@@ -28,6 +33,9 @@ concurrency:
 
 permissions:
   contents: read
+  # pulls of the private ghcr.io/<owner>/mirror-minio fallback images (synced
+  # by mirror-images.yml; GHCR packages start private)
+  packages: read
 
 jobs:
   lockfile:
@@ -103,8 +111,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to GHCR (private mirror fallback)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2026-09-25: three consecutive runs died here on quay.io anonymous-pull
+      # rate limiting (and Nightly on main hit the same wall). Pull with
+      # backoff + digest-mirror fallback (tools/ci/retry.sh, mirror synced by
+      # mirror-images.yml) instead of a single doomed pull.
       - name: Start MinIO (ADR-0026 - same native-binary pattern as local dev)
         run: |
+          source tools/ci/retry.sh
+          retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
           docker run -d --name scalpai-minio --network host \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin-dev-only \
@@ -564,6 +585,26 @@ jobs:
       - name: Scan the images that were just built (M17)
         working-directory: ops
         run: bash ../tools/ci/run-gate.sh image-scan bash ../tools/ci/image-scan.sh api web
+
+      # 2026-09-25: `up --wait` failed three runs in a row because the MinIO
+      # pull inside `up` is not retried by compose. Warm the local image cache
+      # first with the retry+mirror helper; the `up` below then finds the
+      # image present and never needs the registry.
+      - name: Log in to GHCR (private mirror fallback)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Warm third-party images (MinIO pull is rate-limit flaky)
+        working-directory: ops
+        run: |
+          # minio (compose `up` dep) + mc (backup-cron build's FROM) — both are
+          # quay.io pins that anonymous pulls reject under rate limiting
+          source ../tools/ci/retry.sh
+          retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+          retry_docker_pull quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
 
       - name: Boot from an empty database (migration gate + healthy API)
         working-directory: ops

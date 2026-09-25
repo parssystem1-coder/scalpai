@@ -423,3 +423,69 @@ describe("M14/H15 - npm is the only package manager on executable surfaces", () 
     });
   }
 });
+
+describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () => {
+  const retry = read("tools/ci/retry.sh");
+  const restoreDrill = read(".github/workflows/restore-drill.yml");
+  const mirrorWorkflow = read(".github/workflows/mirror-images.yml");
+
+  it("every quay.io MinIO docker run goes through retry + GHCR digest-mirror fallback", () => {
+    // ci.yml test job + nightly.yml + restore-drill.yml: no bare quay pull may remain
+    for (const [name, wf] of [["ci.yml", ci], ["nightly.yml", nightly], ["restore-drill.yml", restoreDrill]] as const) {
+      expect(wf, `${name} must source the retry helper`).toContain("tools/ci/retry.sh");
+    }
+    // these two boot MinIO with `docker run` — the image must be pulled
+    // through the helper BEFORE that, never touched directly first
+    expect(ci).toContain("retry_docker_pull quay.io/minio/minio:");
+    expect(nightly).toContain("retry_docker_pull quay.io/minio/minio:");
+
+    // ops/prod.yml boots MinIO via compose `up` — the deployment job must warm
+    // the image cache with the helper first (compose up never retries pulls),
+    // including mc, which backup-cron's Dockerfile FROMs.
+    expect(ci).toContain("Warm third-party images (MinIO pull is rate-limit flaky)");
+    expect(ci).toContain("retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z");
+    expect(ci).toContain("retry_docker_pull quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z");
+    // the GHCR fallback is private until the first mirror push → pullers must
+    // log in and name the repo-owner namespace explicitly
+    expect(ci.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
+    expect(nightly.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
+    expect(restoreDrill).toContain("Log in to GHCR");
+    for (const wf of [ci, nightly, restoreDrill]) {
+      expect(wf).toContain("GHCR_MIRROR_OWNER: ${{ github.repository_owner }}");
+      expect(wf).toContain("packages: read");
+    }
+    expect(retry).toContain('GHCR_MIRROR_OWNER="${GHCR_MIRROR_OWNER:-parssystem1-coder}"');
+  });
+
+  it("the retry helper implements backoff AND a mirror chain for the pinned MinIO images", () => {
+    expect(retry).toContain("RETRY_MAX_ATTEMPTS");
+    expect(retry).toContain("delay=$((delay * 2))");
+    expect(retry).toContain("ghcr.io/${GHCR_MIRROR_OWNER}/mirror-minio/minio:");
+    expect(retry).toContain("ghcr.io/${GHCR_MIRROR_OWNER}/mirror-minio/mc:");
+    // tag stays the source of truth; mirrors are same-tag copies
+    expect(retry).toContain("docker tag");
+  });
+
+  it("mc-wrapper resolves MC_IMAGE through retry + mirror, even when installed as /usr/local/bin/mc", () => {
+    const wrapper = read("tools/ci/mc-wrapper.sh");
+    expect(wrapper).toContain("retry_docker_pull");
+    expect(wrapper).toContain("tools/ci/retry.sh");
+  });
+
+  it("a workflow keeps the GHCR mirror in sync with the pinned tags (server-side copy, no local pull)", () => {
+    expect(mirrorWorkflow).toContain("docker buildx imagetools create");
+    expect(mirrorWorkflow).toContain("ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}");
+    expect(mirrorWorkflow).toContain("quay.io/minio/minio:${MINIO_TAG}");
+    expect(mirrorWorkflow).toContain("packages: write");
+  });
+
+  it("no fallback path may serve a different digest than the pin (M17 invariant)", () => {
+    for (const wf of [ci, nightly, read("ops/prod.yml")]) {
+      const pins = wf.match(/(?:quay\.io\/minio\/minio|ghcr\.io\/[A-Za-z0-9_-]+\/mirror-minio\/minio):([A-Za-z0-9.-]+)/g) ?? [];
+      expect(pins.length, "minio pin present").toBeGreaterThan(0);
+      for (const pin of pins) {
+        expect(pin.endsWith(":RELEASE.2025-09-07T16-13-09Z"), `${pin} must be the pinned release`).toBe(true);
+      }
+    }
+  });
+});
