@@ -40,7 +40,7 @@ export interface TemplateLinkInput {
 }
 
 const SAFE_PATH = /^[A-Za-z0-9\-._~/]{0,200}$/;
-const SAFE_TOKEN = /^[A-Za-z2-7_-]{32,128}$/;
+const SAFE_TOKEN_PATTERN = /^[A-Za-z2-7_-]{32,128}$/;
 export const LINK_MAX_TTL_MS = 30 * 24 * 3_600_000;
 
 export function renderTemplateLink(
@@ -57,7 +57,7 @@ export function renderTemplateLink(
       throw new NotifyError(`template '${key}' link path for '${varName}' has unsafe characters`);
     }
   }
-  if (!SAFE_TOKEN.test(link.token)) {
+  if (!SAFE_TOKEN_PATTERN.test(link.token)) {
     throw new NotifyError(`template '${key}' link token for '${varName}' is not a safe random token`);
   }
   const ttl = link.expiresAt.getTime() - Date.now();
