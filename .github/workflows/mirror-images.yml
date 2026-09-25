@@ -27,8 +27,12 @@ on:
         required: false
         default: RELEASE.2025-08-13T08-35-41Z
   schedule:
-    # Weekly, Sunday 03:07 UTC — refresh layer copies.
-    - cron: "7 3 * * 0"
+    # Self-heal: every 2 hours, skip-if-present. While quay is in an outage
+    # window (401s), these runs are cheap no-ops; the moment quay recovers,
+    # the next run populates GHCR and CI turns green with no human in the
+    # loop. Weekly refresh would be enough in a calm world — hourly-style
+    # self-heal exists precisely because it was not.
+    - cron: "23 */2 * * *"
 
 permissions:
   contents: read
@@ -53,8 +57,20 @@ jobs:
       - name: Mirror minio/minio into GHCR
         env:
           MINIO_TAG: ${{ inputs.minio_image || 'RELEASE.2025-09-07T16-13-09Z' }}
+          # quay has outage windows (401s even from GitHub runners); keep
+          # trying for a while before giving up
+          RETRY_MAX_ATTEMPTS: "6"
+          RETRY_BASE_DELAY: "15"
         run: |
-          docker buildx imagetools create \
+          # idempotent: already mirrored (from an earlier run) → cheap skip
+          if docker buildx imagetools inspect \
+            "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}" >/dev/null 2>&1; then
+            echo "minio:${MINIO_TAG} already mirrored — nothing to do"
+            exit 0
+          fi
+          source tools/ci/retry.sh
+          retry_cmd "mirror minio:${MINIO_TAG}" \
+            docker buildx imagetools create \
             -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}" \
             "quay.io/minio/minio:${MINIO_TAG}"
           docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}"
@@ -62,8 +78,17 @@ jobs:
       - name: Mirror minio/mc into GHCR
         env:
           MC_TAG: ${{ inputs.mc_image || 'RELEASE.2025-08-13T08-35-41Z' }}
+          RETRY_MAX_ATTEMPTS: "6"
+          RETRY_BASE_DELAY: "15"
         run: |
-          docker buildx imagetools create \
+          if docker buildx imagetools inspect \
+            "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}" >/dev/null 2>&1; then
+            echo "mc:${MC_TAG} already mirrored — nothing to do"
+            exit 0
+          fi
+          source tools/ci/retry.sh
+          retry_cmd "mirror mc:${MC_TAG}" \
+            docker buildx imagetools create \
             -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}" \
             "quay.io/minio/mc:${MC_TAG}"
           docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}"
