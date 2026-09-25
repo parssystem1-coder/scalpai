@@ -440,9 +440,21 @@ describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () =>
     expect(nightly).toContain("retry_docker_pull quay.io/minio/minio:");
 
     // ops/prod.yml boots MinIO via compose `up` — the deployment job must warm
-    // the image cache with the helper first (compose up never retries pulls).
+    // the image cache with the helper first (compose up never retries pulls),
+    // including mc, which backup-cron's Dockerfile FROMs.
     expect(ci).toContain("Warm third-party images (MinIO pull is rate-limit flaky)");
-    expect(ci).toContain('retry_docker_pull "$(docker compose -f prod.yml');
+    expect(ci).toContain("retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z");
+    expect(ci).toContain("retry_docker_pull quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z");
+    // the GHCR fallback is private until the first mirror push → pullers must
+    // log in and name the repo-owner namespace explicitly
+    expect(ci.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
+    expect(nightly.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
+    expect(restoreDrill).toContain("Log in to GHCR");
+    for (const wf of [ci, nightly, restoreDrill]) {
+      expect(wf).toContain("GHCR_MIRROR_OWNER: ${{ github.repository_owner }}");
+      expect(wf).toContain("packages: read");
+    }
+    expect(retry).toContain('GHCR_MIRROR_OWNER="${GHCR_MIRROR_OWNER:-parssystem1-coder}"');
   });
 
   it("the retry helper implements backoff AND a mirror chain for the pinned MinIO images", () => {

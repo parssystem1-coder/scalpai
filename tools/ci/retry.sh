@@ -31,7 +31,10 @@ set -uo pipefail
 RETRY_MAX_ATTEMPTS="${RETRY_MAX_ATTEMPTS:-4}"
 RETRY_BASE_DELAY="${RETRY_BASE_DELAY:-5}" # seconds; doubles per attempt (5,10,20,40)
 
-GHCR_MIRROR_OWNER="${GHCR_MIRROR_OWNER:-scalpai}"
+# The repo owner (ghcr.io/<owner>/mirror-minio/...). Workflows export
+# GHCR_MIRROR_OWNER=${{ github.repository_owner }} so this default only
+# matters for local/ad-hoc runs.
+GHCR_MIRROR_OWNER="${GHCR_MIRROR_OWNER:-parssystem1-coder}"
 
 # retry_cmd <label> <cmd...> — exponential backoff, then give up loudly.
 retry_cmd() {

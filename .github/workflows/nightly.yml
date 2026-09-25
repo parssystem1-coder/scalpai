@@ -1,5 +1,10 @@
 name: Nightly
 
+# The retry/mirror helper (tools/ci/retry.sh) falls back to this namespace's
+# GHCR package when quay.io rejects anonymous pulls.
+env:
+  GHCR_MIRROR_OWNER: ${{ github.repository_owner }}
+
 # H15: the FULL tagged Playwright suite (@smoke, @offline, @analysis,
 # @upload-big, @perf) is too slow for every PR, so it runs here every night and
 # on demand. Same evidence contract as CI (tools/ci/run-gate.sh) and the same
@@ -22,6 +27,9 @@ concurrency:
 
 permissions:
   contents: read
+  # pulls of the private ghcr.io/<owner>/mirror-minio fallback images (synced
+  # by mirror-images.yml; GHCR packages start private)
+  packages: read
 
 jobs:
   e2e-full:
@@ -167,12 +175,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to GHCR (private mirror fallback)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install age, jq, mc and postgresql-client 17
         run: |
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq age jq postgresql-client-17
+          # bounded retry for the pgdg/apt path (see tools/ci/retry.sh); `mc`
+          # resolves through mc-wrapper.sh's retry + GHCR mirror fallback
+          source tools/ci/retry.sh
+          retry_cmd apt-source-install bash -c '
+            sudo sh -c "echo \"deb http://apt.postgresql.org/pub/repos/apt \$(lsb_release -cs)-pgdg main\" > /etc/apt/sources.list.d/pgdg.list"
+            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq age jq postgresql-client-17
+          '
           install -m 0755 tools/ci/mc-wrapper.sh /usr/local/bin/mc
 
       - name: Generate the age keypair and the drill signing key
@@ -264,6 +284,20 @@ jobs:
       CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR (private mirror fallback)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # the rollback drill boots the full prod stack (`compose up --wait web
+      # api` pulls minio through depends_on) — warm the flaky image first
+      - name: Warm third-party images (MinIO pull is rate-limit flaky)
+        run: |
+          source tools/ci/retry.sh
+          retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
 
       - name: Write a complete secret set (generated on the runner, never committed)
         working-directory: ops
