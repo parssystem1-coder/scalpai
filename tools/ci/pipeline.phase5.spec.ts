@@ -438,6 +438,9 @@ describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () =>
     // through the helper BEFORE that, never touched directly first
     expect(ci).toContain("retry_docker_pull quay.io/minio/minio:");
     expect(nightly).toContain("retry_docker_pull quay.io/minio/minio:");
+    // backup-restore used to `docker run` the pin with no pull helper — that
+    // is the job that died first when quay 401'd (and it never logged in to GHCR).
+    expect(ci).toMatch(/backup-restore:[\s\S]*retry_docker_pull quay\.io\/minio\/minio:/);
 
     // ops/prod.yml boots MinIO via compose `up` — the deployment job must warm
     // the image cache with the helper first (compose up never retries pulls),
@@ -446,8 +449,9 @@ describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () =>
     expect(ci).toContain("retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z");
     expect(ci).toContain("retry_docker_pull quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z");
     // the GHCR fallback is private until the first mirror push → pullers must
-    // log in and name the repo-owner namespace explicitly
-    expect(ci.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
+    // log in and name the repo-owner namespace explicitly. verify +
+    // backup-restore + deployment each log in (backup-restore also pulls mc).
+    expect(ci.match(/Log in to GHCR/g)?.length ?? 0).toBe(3);
     expect(nightly.match(/Log in to GHCR/g)?.length ?? 0).toBe(2);
     expect(restoreDrill).toContain("Log in to GHCR");
     for (const wf of [ci, nightly, restoreDrill]) {
@@ -464,6 +468,20 @@ describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () =>
     expect(retry).toContain("ghcr.io/${GHCR_MIRROR_OWNER}/mirror-minio/mc:");
     // tag stays the source of truth; mirrors are same-tag copies
     expect(retry).toContain("docker tag");
+    // last resort when GHCR is empty AND quay 401s: checksum-verified GitHub binary
+    expect(retry).toContain("materialize_minio_image");
+    expect(retry).toContain("github-binary");
+  });
+
+  it("materializes the pinned GitHub Release binary with a committed sha256 (M17)", () => {
+    expect(existsSync(join(ROOT, "tools/ci/materialize-minio-image.sh"))).toBe(true);
+    const materialize = read("tools/ci/materialize-minio-image.sh");
+    expect(materialize).toContain("sha256sum -c");
+    expect(materialize).toContain("RELEASE.2025-09-07T16-13-09Z");
+    expect(materialize).toContain("RELEASE.2025-08-13T08-35-41Z");
+    expect(materialize).toContain("7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f");
+    expect(materialize).toContain("01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891");
+    expect(materialize).toContain("refusing to materialize");
   });
 
   it("mc-wrapper resolves MC_IMAGE through retry + mirror, even when installed as /usr/local/bin/mc", () => {
@@ -477,6 +495,8 @@ describe("2026-09-25 - CI registry flake hardening (MinIO quay.io pulls)", () =>
     expect(mirrorWorkflow).toContain("ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}");
     expect(mirrorWorkflow).toContain("quay.io/minio/minio:${MINIO_TAG}");
     expect(mirrorWorkflow).toContain("packages: write");
+    // quay 401s cannot block the first populate: GitHub-binary materialize is the fallback
+    expect(mirrorWorkflow).toContain("materialize_minio_image");
   });
 
   it("no fallback path may serve a different digest than the pin (M17 invariant)", () => {

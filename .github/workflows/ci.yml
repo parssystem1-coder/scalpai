@@ -425,12 +425,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to GHCR (private mirror fallback)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install age, jq, mc and postgresql-client 17
         run: |
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq age jq postgresql-client-17
+          source tools/ci/retry.sh
+          retry_cmd apt-source-install bash -c '
+            sudo sh -c "echo \"deb http://apt.postgresql.org/pub/repos/apt \$(lsb_release -cs)-pgdg main\" > /etc/apt/sources.list.d/pgdg.list"
+            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq age jq postgresql-client-17
+          '
+          echo "PATH=/usr/lib/postgresql/17/bin:$PATH" >> "$GITHUB_ENV"
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
           install -m 0755 tools/ci/mc-wrapper.sh /usr/local/bin/mc
           age --version && pg_dump --version && mc --version
 
@@ -447,6 +459,8 @@ jobs:
 
       - name: Start MinIO with a media bucket and an OBJECT-LOCKED off-site bucket
         run: |
+          source tools/ci/retry.sh
+          retry_docker_pull quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
           docker run -d --name scalpai-minio --network host \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin-dev-only \

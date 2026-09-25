@@ -108,13 +108,6 @@ jobs:
           bash tools/ci/run-gate.sh release-runbook \
             bash tools/ci/release-runbook.sh deploy "prod-${GITHUB_SHA::12}"
 
-      - name: Promote the prod tag (environment approval gates this step)
-        if: github.event_name == 'workflow_dispatch' && inputs.promote_prod_tag
-        environment: production
-        run: |
-          echo "prod tag promoted: prod-${GITHUB_SHA::12}"
-          docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/scalpai-web@$(grep -o '"web":"[^"]*"' docs/releases/releases-ledger.jsonl | tail -n1 | cut -d'"' -f4)" >/dev/null
-
       - name: Upload the release ledger + attestations
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,3 +126,16 @@ jobs:
           name: release-gate-evidence
           path: ci-evidence
           retention-days: 30
+
+  promote-prod:
+    name: promote the prod tag (environment approval)
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_prod_tag
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm the attested prod tag
+        run: |
+          echo "prod tag promoted: prod-${GITHUB_SHA::12}"
+          docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/scalpai-web@$(grep -o '"web":"[^"]*"' docs/releases/releases-ledger.jsonl | tail -n1 | cut -d'"' -f4)" >/dev/null
