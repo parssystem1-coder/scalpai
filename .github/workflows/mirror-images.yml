@@ -53,8 +53,14 @@ jobs:
       - name: Mirror minio/minio into GHCR
         env:
           MINIO_TAG: ${{ inputs.minio_image || 'RELEASE.2025-09-07T16-13-09Z' }}
+          # quay has outage windows (401s even from GitHub runners); keep
+          # trying for a while before giving up
+          RETRY_MAX_ATTEMPTS: "6"
+          RETRY_BASE_DELAY: "15"
         run: |
-          docker buildx imagetools create \
+          source tools/ci/retry.sh
+          retry_cmd "mirror minio:${MINIO_TAG}" \
+            docker buildx imagetools create \
             -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}" \
             "quay.io/minio/minio:${MINIO_TAG}"
           docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/minio:${MINIO_TAG}"
@@ -62,8 +68,12 @@ jobs:
       - name: Mirror minio/mc into GHCR
         env:
           MC_TAG: ${{ inputs.mc_image || 'RELEASE.2025-08-13T08-35-41Z' }}
+          RETRY_MAX_ATTEMPTS: "6"
+          RETRY_BASE_DELAY: "15"
         run: |
-          docker buildx imagetools create \
+          source tools/ci/retry.sh
+          retry_cmd "mirror mc:${MC_TAG}" \
+            docker buildx imagetools create \
             -t "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}" \
             "quay.io/minio/mc:${MC_TAG}"
           docker buildx imagetools inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER}/mirror-minio/mc:${MC_TAG}"
