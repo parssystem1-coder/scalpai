@@ -42,7 +42,7 @@ jobs:
     name: lockfile review (npm only, manifest and lock in lockstep)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -109,7 +109,7 @@ jobs:
       S3_FORCE_PATH_STYLE: "true"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to GHCR (private mirror fallback)
         uses: docker/login-action@v3
@@ -217,7 +217,7 @@ jobs:
     name: dependency audit + repository secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -281,7 +281,7 @@ jobs:
       WEB_PORT: "5173"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -423,7 +423,7 @@ jobs:
       DRILL_ENVIRONMENT: ci
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to GHCR (private mirror fallback)
         uses: docker/login-action@v3
@@ -556,7 +556,7 @@ jobs:
     env:
       CI_EVIDENCE_DIR: ${{ github.workspace }}/ci-evidence
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Write a complete secret set (generated on the runner, never committed)
         working-directory: ops
@@ -735,7 +735,7 @@ jobs:
     needs: [lockfile, verify, security, e2e-smoke, backup-restore, deployment]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
