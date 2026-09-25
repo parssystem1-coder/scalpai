@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-lockfile
           path: ci-evidence
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage
@@ -196,7 +196,7 @@ jobs:
       # reproducible from the artifact alone.
       - name: Upload the bundle budget report and the policy it was judged against
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-budget
           path: |
@@ -207,7 +207,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-verify
           path: ci-evidence
@@ -235,7 +235,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-security
           path: ci-evidence
@@ -353,7 +353,7 @@ jobs:
 
       - name: Upload Playwright report and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -363,7 +363,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-e2e-smoke
           path: ci-evidence
@@ -533,7 +533,7 @@ jobs:
 
       - name: Upload the signed drill report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: restore-drill-report
           path: /tmp/scalpai-drills
@@ -541,7 +541,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-backup-restore
           path: ci-evidence
@@ -686,7 +686,7 @@ jobs:
 
       - name: Upload the release ledger + attestations
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-ledger
           path: |
@@ -719,7 +719,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-deployment
           path: ci-evidence
@@ -757,7 +757,7 @@ jobs:
 
       - name: Upload the merged evidence bundle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: evidence-bundle
           path: ci-evidence
