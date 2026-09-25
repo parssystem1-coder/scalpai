@@ -68,17 +68,29 @@ REVOKE DELETE ON webhook_providers FROM scalpai_app;
 -- این seed فقط برای کلینیک‌های موجود اجرا می‌شود.
 -- در محیط production باید از طریق API مدیریت شود.
 
+-- تعارض با partial index webhook_providers_provider_active_uq (یک provider
+-- فعال در کل دیتابیس): روی یک دیتابیس که از قبل بیش از یک کلینیک دارد
+-- (توسعه‌ی لوکال با داده‌ی واقعی)، فعال‌کردن ردیف‌های همه‌ی کلینیک‌ها
+-- unique را می‌شکند. ضمناً findActiveProvider(provider) فقط اولین ردیف را
+-- برمی‌گرداند — tenant اشتباه. پس فقط ردیفِ اولین کلینیک (نامزدهای هم‌سنجه
+-- با created_at, id) برای هر provider فعال می‌ماند؛ بقیه active=false
+-- (گزینه‌ی آماده در UI/ادمین). WebhookGuard امضای env را قبل از lookup
+-- تأیید کرده، پس secret یکسان = همان tenant درست.
 DO $$
 DECLARE
   clinic RECORD;
+  first_kavenegar uuid;
+  first_zarinpal uuid;
 BEGIN
   -- clinics is not a soft-delete table; its current schema has no deleted_at.
+  SELECT id INTO first_kavenegar FROM clinics ORDER BY created_at, id LIMIT 1;
+  SELECT id INTO first_zarinpal FROM clinics ORDER BY created_at, id LIMIT 1;
   FOR clinic IN SELECT id FROM clinics
   LOOP
-    INSERT INTO webhook_providers (provider, clinic_id, webhook_secret, signature_header)
+    INSERT INTO webhook_providers (provider, clinic_id, webhook_secret, signature_header, active)
     VALUES
-      ('kavenegar', clinic.id, COALESCE(current_setting('app.kavenegar_webhook_secret', true), 'placeholder-kavenegar'), 'x-webhook-signature'),
-      ('zarinpal', clinic.id, COALESCE(current_setting('app.zarinpal_webhook_secret', true), 'placeholder-zarinpal'), 'x-zarinpal-signature')
+      ('kavenegar', clinic.id, COALESCE(current_setting('app.kavenegar_webhook_secret', true), 'placeholder-kavenegar'), 'x-webhook-signature', clinic.id = first_kavenegar),
+      ('zarinpal', clinic.id, COALESCE(current_setting('app.zarinpal_webhook_secret', true), 'placeholder-zarinpal'), 'x-zarinpal-signature', clinic.id = first_zarinpal)
     ON CONFLICT (provider, clinic_id) DO NOTHING;
   END LOOP;
 END $$;
