@@ -9,3 +9,6 @@ coverage/
 
 test-results/
 playwright-report/
+
+# Freebuff agent workspace — session-local, never committed
+.freebuff/
