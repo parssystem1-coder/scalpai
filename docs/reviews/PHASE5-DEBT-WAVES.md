@@ -32,10 +32,10 @@
 | D12 | UI کلینیک aftercare (sequences/enrollments) | DONE (w4) | 3 |
 | D13 | UI فاکتور | DONE (w4) | 3 |
 | D14 | Inbox reply واقعاً ارسال نمی‌شود (Q1) | DONE (موج ۳؛ ADR-0054 — رسیدگی بدون متن آزاد) | 3 |
-| D15 | no-show ۲۴س/۲س + recall | MISSING | 4 |
-| D16 | `condition` / `on_reply` در steps | MISSING | 4 |
-| D17 | `offset_days` مطابق DESIGN-V2 §6.2 | DRIFT (`offsetHours`) | 4 |
-| D18 | لینک توکن‌دار منقضی‌شونده (§13) | MISSING (رندرر لینک را رد می‌کند) | 4 |
+| D15 | no-show ۲۴س/۲س + recall | DONE (موج ۴؛ claim تابع + `session.reminder`) | 4 |
+| D16 | `condition` / `on_reply` در steps | DONE (موج ۴؛ zod + migration 0023 + شاخه‌ی ورکر) | 4 |
+| D17 | `offset_days` مطابق DESIGN-V2 §6.2 | DONE (موج ۴؛ ADR-0055 — `offsetHours` می‌ماند، offset_days نمایش مشتق) | 4 |
+| D18 | لینک توکن‌دار منقضی‌شونده (§13) | DONE (موج ۴؛ استثنای کنترل‌شده با allow-list و TTL ≤۳۰ روز) | 4 |
 | D19 | POS + `stock_qty` | MISSING | 5 |
 | D20 | `memberships` | MISSING | 5 |
 | D21 | B4 composite FK | OPEN | 5 |
@@ -137,6 +137,13 @@
 
 **Exit:** تست زمان مجازی (clock تزریقی) برای ۲۴س/۲س · پاسخ inbound مسیر `on_reply` را عوض می‌کند.
 
+> ✅ **بسته شد — 2026-09-24 (migration 0023):**
+> - **D15:** `fn_aftercare_claim_session_reminders(clinic, offsets=[24,2])` — claim با «INSERT پیام = قفل» (idempotency `sessrem:<session>:<offset>`)، پنجره ۲۴h/۲h از `sessions.start_at` با status=booked؛ رندر قالب `session.reminder` در ورکر (`prepareReminder`، تاریخ شمسی `Intl fa-IR-u-ca-persian`). `message_log.session_id` اضافه شد (rollback موجود). تست integration: claim تکراری duplicate=true، جلسه‌ی ۳۰ساعته/کنسل‌شده claim نمی‌شود.
+> - **D16:** قرارداد `AftercareStepCondition`/`AftercareStepOnReply` در shared (intent=stop ممنوع — STOP فقط مسیر صریح) + اعتبارسنجی SQL-side در `fn_aftercare_steps_validate` (۸ probe) + شاخه‌ی ورکر: پاسخ inbound (پیوند senderHash → enrollment فعال) `switch_to`/`pause_enrollment`/skip با `condition` را اجرا می‌کند؛ تست: confirm→paused، condition ملاقات‌نشده→skip، stop→400.
+> - **D17:** ADR-0055 — انحراف آگاهانه: `offsetHours` دقیق نگه داشته می‌شود؛ `offset_days` فقط نمایش مشتق در UI/سند. §6.2 تغییر نکرد؛ breaking change هم نیست.
+> - **D18:** `renderTemplateLink` — فقط کلیدهای allow-list (از settings)، https اجباری، path امن، `exp` ≤۳۰ روز اجباری، query=token&exp؛ ۱۲ تست واحد. متن آزاد همچنان رد می‌شود.
+> - **گیت‌ها:** typecheck ۲۱/۲۱ · eslint سبز · notify/shared/db/web واحد ۳۱۶/۳۱۶ · apps/api integration ۲۳۱/۲۳۱ · conformance/quality ۱۱۵/۱۱۵. گارد ساختاری جدید: helper `lockIsolatedTestDb` در ۱۳ اسپکی AppModule — اپِ تست دیگر هرگز به DB اصلی وصل نمی‌شود (ریشه: `loadEnv` متغیر ست‌شده را override نمی‌کند).
+
 ---
 
 ## موج ۵ — مالی کامل + بهداشت داده (P2)
@@ -190,3 +197,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-23 | موج ۲ بسته شد: D07/D08 DONE (SMS.ir + Bale واقعی؛ Eitaa → موج بعد)، D09 OUT-OF-SCOPE (ADR-0053) |
 | 2026-09-23 | موج ۳ (بخش P1 مصرف/سهمیه/inbox) بسته شد: D10/D11/D14 DONE؛ D12/D13 باز (UI aftercare و فاکتور) |
 | 2026-09-23 | موج UI (برنچ wave4-ui — باقی‌ماندهٔ موج ۳) بسته شد: D12/D13 DONE (PR #103). موج‌های ۴/۵/۶ سند (D15–D25) همچنان بازند؛ فاز ۵ کامل نشده |
+| 2026-09-24 | موج ۴ بسته شد: D15/D16/D17/D18 DONE (migration 0023 + ADR-0055 + گارد ایزولاسیون تست). فقط موج ۵ سند (D19–D24) باز است؛ فاز ۵ هنوز کامل نشده |

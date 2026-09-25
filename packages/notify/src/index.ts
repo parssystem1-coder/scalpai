@@ -30,13 +30,16 @@ export {
 export { ZarinpalAdapter, zarinpalAdapter, type PaymentResult, type ZarinpalHttpClient } from "./adapters/zarinpal.adapter.js";
 
 export {
+  LINK_MAX_TTL_MS,
   MESSAGE_TEMPLATES,
   getTemplate,
   isKnownTemplate,
   renderTemplate,
+  renderTemplateLink,
   type MessageTemplate,
   type RenderOptions,
   type RenderedMessage,
+  type TemplateLinkInput,
 } from "./template.js";
 
 export {

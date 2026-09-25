@@ -1,6 +1,7 @@
-import { loadEnv } from "@scalpai/db";
+import { lockIsolatedTestDb } from "./helpers/integration-env.js";
 
-loadEnv();
+// Isolation guard — refuses main-DB targets before anything can boot (2026-09-24 incident).
+lockIsolatedTestDb();
 
 // Deterministic locks for this suite — must be set before AppModule reads them.
 process.env.AUTH_LOCK_MS = "300";

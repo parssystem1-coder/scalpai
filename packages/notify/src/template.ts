@@ -10,6 +10,66 @@ export interface MessageTemplate {
 }
 
 const PLACEHOLDER = /\{\{\s*([a-zA-Z][a-zA-Z0-9_]{0,39})\s*\}\}/g;
+
+/**
+ * موج ۴ (D18 / §13) — استثنای کنترل‌شده‌ی لینک توکن‌دار منقضی‌شونده.
+ *
+ * قاعده‌ی لینکِ متغیرهای عادی سر جایش است (LINK_LIKE در unsafeValueReason):
+ * هیچ متغیر دلخواهی URL نمی‌گیرد. تنها راه گذاشتن لینک در پیام، جایگاه‌دارِ
+ * مشخص‌شده در خود قالب است که مقدارش از `options.links` می‌آید و هر ورودی آن
+ * از این چهارگاده می‌گذرد:
+ *
+ *   ۱) base باید در allow-list فراخواننده باشد — کلیدِ دقیق، نه پیشوند.
+ *   ۲) مسیر حداکثر ۲۰۰ کاراکتر و فقط کاراکترهای امن URL (بدون query دستی؛
+ *      کوئری فقط از token/query می‌آید تا پارامتر جعلی تزریق نشود).
+ *   ۳) token توکن کدر ۴۳ کاراکتری (base32 بدون padding — پیش‌فرض OTP).
+ *   ۴) expireAt در آینده و حداکثر ۳۰ روز.
+ *
+ * خروجی، لینکِ کاملِ امضا‌شده نیست — فقط string امن؛ ساخت token و ذخیره‌ی
+ * hash آن کار فراخواننده است (همان تفکیکی که رندرر با recipient دارد).
+ */
+export interface TemplateLinkInput {
+  /** کلید base در allow-list. مقدارِ رجیسترشده مثلاً `https://portal.example.ir`. */
+  readonly base: string;
+  /** مسیر نسبی امن: حروف/رقم/`-._~/` — بدون scheme، بدون query، بدون `..`. */
+  readonly path?: string;
+  /** توکن تصادفی سمت سرور (≥۳۲ کاراکتر base32/url-safe). */
+  readonly token: string;
+  /** زمان انقضا — §13 «منقضی‌شونده» اجباری است. */
+  readonly expiresAt: Date;
+}
+
+const SAFE_PATH = /^[A-Za-z0-9\-._~/]{0,200}$/;
+const SAFE_TOKEN = /^[A-Za-z2-7_-]{32,128}$/;
+export const LINK_MAX_TTL_MS = 30 * 24 * 3_600_000;
+
+export function renderTemplateLink(
+  key: string,
+  varName: string,
+  link: TemplateLinkInput,
+  linkBaseAllowlist: ReadonlyMap<string, string>,
+): string {
+  const base = linkBaseAllowlist.get(link.base);
+  if (!base) throw new NotifyError(`template '${key}' link base '${link.base}' is not allow-listed`);
+  if (!base.startsWith("https://")) throw new NotifyError(`template '${key}' link base '${link.base}' must be https`);
+  if (link.path !== undefined) {
+    if (link.path.includes("..") || !SAFE_PATH.test(link.path)) {
+      throw new NotifyError(`template '${key}' link path for '${varName}' has unsafe characters`);
+    }
+  }
+  if (!SAFE_TOKEN.test(link.token)) {
+    throw new NotifyError(`template '${key}' link token for '${varName}' is not a safe random token`);
+  }
+  const ttl = link.expiresAt.getTime() - Date.now();
+  if (!Number.isFinite(ttl) || ttl <= 0) {
+    throw new NotifyError(`template '${key}' link for '${varName}' is already expired`);
+  }
+  if (ttl > LINK_MAX_TTL_MS) {
+    throw new NotifyError(`template '${key}' link for '${varName}' exceeds the ${LINK_MAX_TTL_MS / 3_600_000 / 24}-day expiry limit`);
+  }
+  const query = new URLSearchParams({ token: link.token, exp: String(Math.floor(link.expiresAt.getTime() / 1000)) });
+  return `${base.replace(/\/+$/, "")}/${(link.path ?? "").replace(/^\/+/, "")}?${query.toString()}`;
+}
 function isForbiddenVarName(name: string): boolean {
   const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return ["firstname", "lastname", "fullname", "patientname", "patient", "mobile", "phone", "email", "address", "nationalid"].includes(normalized);
@@ -119,6 +179,10 @@ export interface RenderOptions {
   readonly locale: MessageLocale;
   readonly channel: MessagingChannel;
   readonly maxChars: number;
+  /** D18 — جایگاه‌دارهای لینک (§13). کلید = نام جایگاه‌دار در قالب. */
+  readonly links?: Readonly<Record<string, TemplateLinkInput>>;
+  /** allow-list baseهای مجاز. غایب/خالی یعنی هیچ لینکی مجاز نیست. */
+  readonly linkBaseAllowlist?: ReadonlyMap<string, string>;
 }
 
 export interface RenderedMessage {
@@ -141,6 +205,7 @@ export function renderTemplate(
   if (!source) throw new NotifyError(`template '${key}' has no '${options.locale}' body`);
 
   const allowed = new Set(template.vars);
+  const links = options.links ?? {};
   for (const name of Object.keys(vars)) {
     if (!allowed.has(name)) throw new NotifyError(`template '${key}' does not declare a variable named '${name}'`);
     if (isForbiddenVarName(name)) throw new NotifyError(`template '${key}' cannot interpolate patient identity data`);
@@ -156,9 +221,17 @@ export function renderTemplate(
     }
   }
 
+  // D18 — لینک‌ها قبل از جایگزینی ساخته و اعتبارسنجی می‌شوند؛ هر ورودی نامعتبر
+  // کل رندر را می‌شکند (fail-closed) نه اینکه رشته‌ی خام جایگزین شود.
+  const resolvedVars: Record<string, string | number | boolean> = { ...vars };
+  for (const [name, link] of Object.entries(links)) {
+    if (!allowed.has(name)) throw new NotifyError(`template '${key}' does not declare a variable named '${name}'`);
+    resolvedVars[name] = renderTemplateLink(key, name, link, options.linkBaseAllowlist ?? new Map());
+  }
+
   const missing: string[] = [];
   const body = source.replace(PLACEHOLDER, (_match, name: string) => {
-    const value = vars[name];
+    const value = resolvedVars[name];
     if (value === undefined || value === null || value === "") {
       missing.push(name);
       return "";

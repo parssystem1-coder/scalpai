@@ -257,10 +257,14 @@ export {
   createEnrollment,
   createSequence,
   deferEnrollment,
+  findActiveEnrollmentForSender,
   getEnrollment,
   getSequence,
+  getSessionStatus,
+  insertSwitchStep,
   listEnrollments,
   listSequences,
+  markStepsSkipped,
   setEnrollmentState,
   softDeleteSequence,
   stepRunAt,
@@ -271,6 +275,7 @@ export {
   type EnrollmentCreateInput,
   type EnrollmentFilter,
   type EnrollmentRow,
+  type ReplyContext,
   type SequenceCreateInput,
   type SequencePatch,
   type SequenceRow,
@@ -280,10 +285,17 @@ export {
  * SECURITY DEFINER `fn_aftercare_due_clinics` (0018), which returns clinic
  * identity only. Everything the worker does afterwards runs inside a normal
  * per-clinic RLS transaction.
+ *
+ * Wave 4 (D15): `claimDueSessionReminders` claims T−24h/T−2h reminders derived
+ * from `sessions.start_at` through `fn_aftercare_claim_session_reminders` (0023);
+ * the claim IS the idempotent INSERT of a message_log row.
  */
 export {
   DUE_CLINIC_LIMIT_MAX,
+  SESSION_REMINDER_OFFSETS,
+  claimDueSessionReminders,
   listDueClinics,
+  type ClaimedSessionReminder,
   type DueClinic,
 } from "./repos/aftercare-scheduler.repo.js";
 /**
@@ -295,6 +307,7 @@ export {
   MessagingError,
   bodyDigest,
   enqueueMessage,
+  fillSessionReminder,
   isOptedOut,
   listInbox,
   listMessages,

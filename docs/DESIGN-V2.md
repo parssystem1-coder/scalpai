@@ -265,6 +265,10 @@ intake_forms(id, clinic_id, service_id null, schema jsonb)  -- سازنده فر
 aftercare_sequences(id, clinic_id, service_id, steps jsonb)
 -- step: {offset_days, channel sms|bale|eitaa|telegram|whatsapp,
 --        template_id, condition jsonb null, on_reply jsonb null}
+-- ⚠ پیاده‌سازی فاز ۵a (ADR-0046/ADR-0055): offset_days نمایش روزیِ offsetHours است؛
+--   واحد ذخیره‌شده در steps ساعت است (offset_days = offsetHours / 24) تا یادآوری
+--   T−۲۴h/T−۲h ممکن باشد. condition/on_reply همان‌طور که اینجاست در zod و
+--   تابع پس‌نده‌ی SQL هم بسته شده‌اند (migration 0023).
 aftercare_enrollments(id, clinic_id, patient_id, sequence_id, session_id,
                       started_at, status running|paused|done)
 

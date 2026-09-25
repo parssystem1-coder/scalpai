@@ -38,3 +38,59 @@ export async function listDueClinics(tx: Tx, limit = 200): Promise<DueClinic[]> 
     timezone: row.clinic_timezone,
   }));
 }
+
+/* ══ موج ۴ (D15) — یادآوری جلسه مشتق از sessions.start_at ═══════════════ */
+
+/** نقاط یادآوری پیش‌فرض: T−۲۴ ساعت و T−۲ ساعت. (ADR-0055: واحد ساعت است.) */
+export const SESSION_REMINDER_OFFSETS = [24, 2] as const;
+
+export interface ClaimedSessionReminder {
+  sessionId: string;
+  patientId: string;
+  startAt: Date;
+  offsetHours: number;
+  messageId: string;
+  duplicate: boolean;
+}
+
+/**
+ * برداشتن یادآوری‌های سررسیده جلسه — مستقیم روی `fn_aftercare_claim_session_reminders`
+ * (0023). قفلِ کار، INSERT پیام با کلید یکتاست: دو ورکر هرگز دو پیام نمی‌سازند.
+ *
+ * ردیف‌های duplicate هم برمی‌گردند: پیامِ ساخته‌شده توسط ورکر دیگری که هنوز
+ * queued مانده باید توسط همین tick ارسال شود — وگرنه اگر ورکر اول بعد از ساخت
+ * ردیف مرد، یادآوری هرگز نمی‌رود. ارسالِ duplicate بی‌خطر است: PATCH همان ردیف،
+ * نه ردیف دوم.
+ */
+export async function claimDueSessionReminders(
+  tx: Tx,
+  clinicId: string,
+  offsets: readonly number[] = SESSION_REMINDER_OFFSETS,
+): Promise<ClaimedSessionReminder[]> {
+  if (offsets.length === 0 || offsets.length > 10 || offsets.some((o) => !Number.isInteger(o) || o < 0 || o > 720)) {
+    throw new Error("session reminder offsets must be integers between 0 and 720 (max 10 entries)");
+  }
+  const res = await tx.execute(sql`
+    SELECT session_id, patient_id, start_at, offset_hours, message_id, duplicate
+      FROM fn_aftercare_claim_session_reminders(${clinicId}::uuid, ${sql.raw(`ARRAY[${offsets.join(",")}]::integer[]`)})
+  `);
+  const rows =
+    (res as unknown as {
+      rows?: Array<{
+        session_id: string;
+        patient_id: string;
+        start_at: Date | string;
+        offset_hours: number;
+        message_id: string;
+        duplicate: boolean;
+      }>;
+    }).rows ?? [];
+  return rows.map((row) => ({
+    sessionId: row.session_id,
+    patientId: row.patient_id,
+    startAt: new Date(row.start_at),
+    offsetHours: Number(row.offset_hours),
+    messageId: row.message_id,
+    duplicate: Boolean(row.duplicate),
+  }));
+}

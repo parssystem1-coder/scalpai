@@ -1,6 +1,7 @@
-import { loadEnv } from "@scalpai/db";
+import { lockIsolatedTestDb } from "./helpers/integration-env.js";
 
-loadEnv();
+// Isolation guard — refuses main-DB targets before anything can boot (2026-09-24 incident).
+lockIsolatedTestDb();
 
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { FastifyAdapter } from "@nestjs/platform-fastify";

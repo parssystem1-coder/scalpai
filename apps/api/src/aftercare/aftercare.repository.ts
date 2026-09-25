@@ -9,6 +9,9 @@ import {
   getEnrollment,
   getPatientById,
   getSequence,
+  fillSessionReminder,
+  getSessionStatus,
+  insertSwitchStep,
   isOptedOut,
   listEnrollments,
   listInbox,
@@ -17,6 +20,7 @@ import {
   markMessageFailed,
   markMessageSent,
   markMessageSuppressed,
+  markStepsSkipped,
   readInboundBody,
   recordInbound,
   setEnrollmentState,
@@ -129,6 +133,11 @@ export class AftercareRepository {
     return isOptedOut(tx, clinicId, recipient);
   }
 
+  /** وضعیت فعلی جلسه — شرط condition.sessionStatus گام (موج ۴ / D16). */
+  sessionStatusInTx(tx: Tx, clinicId: string, sessionId: string): Promise<string | null> {
+    return getSessionStatus(tx, clinicId, sessionId);
+  }
+
   enqueueInTx(tx: Tx, clinicId: string, input: MessageEnqueueInput) {
     return enqueueMessage(tx, clinicId, input);
   }
@@ -151,5 +160,38 @@ export class AftercareRepository {
 
   deferInTx(tx: Tx, clinicId: string, id: string, attempts: number) {
     return deferEnrollment(tx, clinicId, id, attempts);
+  }
+
+  /* ── موج ۴ (D16) — مسیر پاسخ بیمار ── */
+
+  insertSwitchStepInTx(
+    tx: Tx,
+    clinicId: string,
+    enrollmentId: string,
+    afterStepIndex: number,
+    switchTo: { channel?: string; templateKey?: string },
+  ) {
+    return insertSwitchStep(tx, clinicId, enrollmentId, afterStepIndex, switchTo);
+  }
+
+  markStepsSkippedInTx(tx: Tx, clinicId: string, enrollmentId: string, stepIndexes: readonly number[]) {
+    return markStepsSkipped(tx, clinicId, enrollmentId, stepIndexes);
+  }
+
+  /** به‌روزرسانی ردیف یادآوری جلسه با مخاطب/متن واقعی (موج ۴ / D15) — در packages/db. */
+  updateReminderInTx(
+    tx: Tx,
+    clinicId: string,
+    input: {
+      id: string;
+      channel: string;
+      locale: string;
+      recipient: string;
+      body: string;
+      varsRedacted: Record<string, unknown>;
+      provider: string;
+    },
+  ): Promise<boolean> {
+    return fillSessionReminder(tx, clinicId, input);
   }
 }
