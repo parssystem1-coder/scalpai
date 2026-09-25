@@ -16,7 +16,7 @@
 #                     failure, fall back to the mirror chain below.
 #
 # Pull order for MinIO images (2026-09-25, after quay 401'd even a GitHub
-# runner during its sync):
+# runner during its sync, AND the GHCR mirror was still empty):
 #   1. ghcr.io/<owner>/mirror-minio/... — OUR copy in this repo's GHCR,
 #     synced from the quay pin by mirror-images.yml (server-side
 #     `imagetools create`: identical layer/config digests, tag written only
@@ -24,8 +24,11 @@
 #     our runners, so it is the PRIMARY source.
 #   2. quay.io/<upstream> — the original pin; fallback for the window before
 #     the mirror is first populated (or if GHCR is unavailable).
-#   3. docker.io/minio/minio — best-effort only: MinIO stopped publishing
-#     there (the 2025-09 tags are absent); kept in case Hub re-syncs.
+#   3. checksum-verified GitHub Release binary — last resort when both
+#     registries 401/404. tools/ci/materialize-minio-image.sh downloads the
+#     SAME tagged linux binary MinIO published, verifies the committed
+#     sha256, and `docker build`s a local image tagged as the pin. Same tag,
+#     same binary (M17); the container is a thin alpine wrapper.
 #
 # The tag stays the source of truth (M17-style pin); mirrors are copy-by-digest
 # from the SAME tag, so a fallback can never yield a different image.
@@ -38,6 +41,11 @@ RETRY_BASE_DELAY="${RETRY_BASE_DELAY:-5}" # seconds; doubles per attempt (5,10,2
 # GHCR_MIRROR_OWNER=${{ github.repository_owner }} so this default only
 # matters for local/ad-hoc runs.
 GHCR_MIRROR_OWNER="${GHCR_MIRROR_OWNER:-parssystem1-coder}"
+
+_materialize_src="$(dirname "${BASH_SOURCE[0]}")/materialize-minio-image.sh"
+[[ -f "$_materialize_src" ]] || _materialize_src="tools/ci/materialize-minio-image.sh"
+# shellcheck source=tools/ci/materialize-minio-image.sh
+source "$_materialize_src"
 
 # retry_cmd <label> <cmd...> — exponential backoff, then give up loudly.
 retry_cmd() {
@@ -78,12 +86,9 @@ __pull_with_mirrors() {
     fi
     # FALLBACK 1: the original pin (works whenever quay is healthy).
     if docker pull "$image"; then return 0; fi
-    # FALLBACK 2: upstream hub archive (best-effort; 2025-09 tags absent).
-    if docker pull "docker.io/minio/minio:${tag}" 2>/dev/null; then
-      docker tag "docker.io/minio/minio:${tag}" "$image"
-      return 0
-    fi
-    echo "::error::all registry sources failed for $image (GHCR mirror, quay, hub)"
+    # FALLBACK 2: checksum-verified GitHub Release binary (quay 401 + empty GHCR).
+    if materialize_minio_image minio "$tag" "$image"; then return 0; fi
+    echo "::error::all registry sources failed for $image (GHCR mirror, quay, github-binary)"
     return 1
     ;;
   quay.io/minio/mc)
@@ -93,7 +98,8 @@ __pull_with_mirrors() {
       return 0
     fi
     if docker pull "$image"; then return 0; fi
-    echo "::error::all registry sources failed for $image (GHCR mirror, quay)"
+    if materialize_minio_image mc "$tag" "$image"; then return 0; fi
+    echo "::error::all registry sources failed for $image (GHCR mirror, quay, github-binary)"
     return 1
     ;;
   *)
