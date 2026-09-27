@@ -25,6 +25,7 @@ import {
   renderTemplate,
   routeChannel,
   sendWithChannelFailover,
+  type RouteDecision,
 } from "@scalpai/notify";
 import { setEnrollmentState } from "@scalpai/db";
 import { metrics } from "../common/metrics.js";
@@ -71,8 +72,38 @@ export function linkBaseAllowlistFromSettings(settings: unknown): Map<string, st
   return out;
 }
 
-interface PendingSend {
+/** خروجی موفقِ prepare/prepareReminder — نام تاریخی PendingSend حفظ شده. */
+type PendingSend = PreparedSend;
+
+interface SkippedStep {
+  enrollmentId: string;
+  attempts: number;
+  messageId?: string;
+  reason: string;
+  /** true یعنی گام را رها کن و جلو برو؛ false یعنی عقب بینداز و دوباره تلاش کن. */
+  advance: boolean;
+}
+
+/**
+ * وضعیت اولیهٔ یک گام: مخاطبِ واقعی، opt-inها و STOP بیمار. هر دو مسیر prepare
+ * (گام دنباله و یادآوری جلسه) همین را می‌سازند — یک SELECT بیمار و حداکثر
+ * یک SELECT opt-out (فقط وقتی شماره‌ای هست که پرسیدن معنا داشته باشد).
+ */
+interface RecipientFacts {
+  recipient: string;
+  optedIn: MessagingChannel[];
+  /** بیمار پیام STOP فرستاده؟ (D05/D16 — بالاتر از هر ترجیح کانال) */
+  optedOut: boolean;
+  /** تگ‌های بیمار — برای condition.patientTag (D16). */
+  tags: string[];
+  /** بیمار حذف‌شده یا غایب — مسیر فراخواننده تصمیم می‌گیرد. */
+  missing: boolean;
+}
+
+/** محاسبهٔ مسیر، رندر و ارسالِ یک کار: خروجی مشترک prepare/prepareReminder. */
+interface PreparedSend {
   messageId: string;
+  /** کلید advance/defer برای مسیر خطا — برای یادآوری همان messageId است. */
   enrollmentId: string;
   attempts: number;
   channel: MessagingChannel;
@@ -84,15 +115,6 @@ interface PendingSend {
   templateKey: string;
 }
 
-interface SkippedStep {
-  enrollmentId: string;
-  attempts: number;
-  messageId?: string;
-  reason: string;
-  /** true یعنی گام را رها کن و جلو برو؛ false یعنی عقب بینداز و دوباره تلاش کن. */
-  advance: boolean;
-}
-
 @Injectable()
 export class AftercareService {
   constructor(
@@ -100,6 +122,60 @@ export class AftercareService {
     private scope: TenantScope,
     private metering: MeteringService,
   ) {}
+
+  /* ══ مشترکِ مسیرهای prepare ══════════════════════════════════════ */
+
+  /**
+   * مخاطبِ واقعی و وضعیت opt-in/out یک بیمار.
+   *
+   * قبلاً این سه قطعه (خواندن بیمار، استخراج tagهای `msg:*`، پرس‌وجوی opt-out)
+   * در prepare و prepareReminder با متن کمی متفاوت تکرار شده بود. تفاوتِ
+   * رفتاری نداشت؛ فقط دو نسخهٔ قابل‌واگرایی می‌ساخت. اینجا یک‌جا سیم شده است.
+   */
+  private async recipientFacts(tx: Tx, clinicId: string, patientId: string): Promise<RecipientFacts> {
+    const patient = await this.repo.patientInTx(tx, clinicId, patientId);
+    if (!patient) return { recipient: "", optedIn: [], optedOut: false, tags: [], missing: true };
+    const recipient = (patient as { phone?: string }).phone ?? "";
+    const tags = (patient as { tags?: string[] | null }).tags ?? [];
+    const optedIn = tags
+      .filter((tag) => tag.startsWith(OPT_IN_TAG_PREFIX))
+      .map((tag) => tag.slice(OPT_IN_TAG_PREFIX.length) as MessagingChannel);
+    const optedOut = recipient ? await this.repo.optedOutInTx(tx, clinicId, recipient) : false;
+    return { recipient, optedIn, optedOut, tags, missing: false };
+  }
+
+  /**
+   * انتخاب کانال + رندر قالب برای یک کار.
+   *
+   * خطای رندر «کارِ قابل‌تلاشِ دوباره» نیست: قالب خراب یا متغیر غایب با retry
+   * درست نمی‌شود، پس گام رها می‌شود (advance) نه عقب‌افتادن. متنِ دلیلی که
+   * فراخواننده می‌سازد همان است که قبلاً در message_log می‌نشست.
+   */
+  private decideAndRender(
+    key: string,
+    preferred: MessagingChannel,
+    facts: RecipientFacts,
+    vars: Readonly<Record<string, string>>,
+    locale: "fa" | "en",
+  ): { ok: true; decision: Extract<RouteDecision, { ok: true }>; body: string; templateKey: string } | { ok: false; reason: string } {
+    const decision = routeChannel({
+      preferred,
+      recipient: { optedIn: facts.optedIn, hasMobile: facts.recipient.length > 0, optedOut: facts.optedOut },
+      requiresReply: false,
+    });
+    if (!decision.ok) return { ok: false, reason: decision.reason };
+    let rendered;
+    try {
+      rendered = renderTemplate(key, vars, {
+        locale,
+        channel: decision.channel,
+        maxChars: decision.adapter.capabilities.maxBodyChars,
+      });
+    } catch (err) {
+      return { ok: false, reason: `template: ${err instanceof Error ? err.message : String(err)}` };
+    }
+    return { ok: true, decision, body: rendered.body, templateKey: rendered.templateKey };
+  }
 
   /* ══ sequences ═════════════════════════════════════════════════ */
 
@@ -407,17 +483,18 @@ export class AftercareService {
       return { enrollmentId: job.enrollmentId, attempts: job.attempts, reason: "step-missing", advance: true };
     }
 
-    const patient = await this.repo.patientInTx(tx, ctx.clinicId, job.patientId);
-    if (!patient) {
+    const facts = await this.recipientFacts(tx, ctx.clinicId, job.patientId);
+    if (facts.missing) {
       // بیمار soft-delete شده — دنباله باید تمام شود، نه تا ابد retry
       return { enrollmentId: job.enrollmentId, attempts: job.attempts, reason: "patient-gone", advance: true };
     }
 
     // D16 — ارزیابی condition. مسیر دیتابیس برای sessionStatus تنها وقتی
     // لازم است که گام واقعاً روی وضعیت جلسه شرط دارد؛ وگرنه یک SELECT صرفه
-    // جویی می‌شود.
+    // جویی می‌شود. patientTag از همان ردیف بیماری خوانده می‌شود که برای
+    // مخاطب خوانده شده (بدون SELECT دوم).
     if (step.condition) {
-      const met = await this.conditionMet(tx, ctx.clinicId, job, step.condition, patient);
+      const met = await this.conditionMet(tx, ctx.clinicId, job, step.condition, facts.tags);
       if (!met) {
         await this.repo.markStepsSkippedInTx(tx, ctx.clinicId, job.enrollmentId, [job.currentStep]);
         return {
@@ -429,40 +506,16 @@ export class AftercareService {
       }
     }
 
-    const recipient = (patient as { phone?: string }).phone ?? "";
-    const tags = (patient as { tags?: string[] | null }).tags ?? [];
-    const optedIn = tags
-      .filter((tag) => tag.startsWith(OPT_IN_TAG_PREFIX))
-      .map((tag) => tag.slice(OPT_IN_TAG_PREFIX.length) as MessagingChannel);
-    const optedOut = recipient ? await this.repo.optedOutInTx(tx, ctx.clinicId, recipient) : false;
-
-    const decision = routeChannel({
-      preferred: step.channel as MessagingChannel,
-      recipient: { optedIn, hasMobile: recipient.length > 0, optedOut },
-      requiresReply: false,
-    });
-    if (!decision.ok) {
-      return { enrollmentId: job.enrollmentId, attempts: job.attempts, reason: decision.reason, advance: true };
+    const outcome = this.decideAndRender(step.templateKey, step.channel as MessagingChannel, facts, {
+      clinicName,
+      ...(step.vars ?? {}),
+    }, job.locale === "en" ? "en" : "fa");
+    if (!outcome.ok) {
+      // مسیر پیام‌رسانی بسته یا قالب خراب/متغیر غایب: retry هر دو را درست
+      // نمی‌کند، پس گام رها می‌شود (advance) نه عقب‌افتادن.
+      return { enrollmentId: job.enrollmentId, attempts: job.attempts, reason: outcome.reason, advance: true };
     }
-
-    const locale = job.locale === "en" ? "en" : "fa";
-    const vars = { clinicName, ...(step.vars ?? {}) };
-    let rendered;
-    try {
-      rendered = renderTemplate(step.templateKey, vars, {
-        locale,
-        channel: decision.channel,
-        maxChars: decision.adapter.capabilities.maxBodyChars,
-      });
-    } catch (err) {
-      // قالب خراب یا متغیر غایب: retry هم درستش نمی‌کند، پس گام رها می‌شود
-      return {
-        enrollmentId: job.enrollmentId,
-        attempts: job.attempts,
-        reason: `template: ${err instanceof Error ? err.message : String(err)}`,
-        advance: true,
-      };
-    }
+    const { decision, body, templateKey } = outcome;
 
     const idempotencyKey = `${job.enrollmentId}:${job.currentStep}`;
     const enqueued = await this.repo.enqueueInTx(tx, ctx.clinicId, {
@@ -470,11 +523,11 @@ export class AftercareService {
       patientId: job.patientId,
       stepIndex: job.currentStep,
       channel: decision.channel,
-      templateKey: rendered.templateKey,
-      locale,
-      recipient,
-      body: rendered.body,
-      varsRedacted: redactVars(vars),
+      templateKey,
+      locale: job.locale === "en" ? "en" : "fa",
+      recipient: facts.recipient,
+      body,
+      varsRedacted: redactVars({ clinicName, ...(step.vars ?? {}) }),
       idempotencyKey,
       provider: decision.adapter.provider,
     });
@@ -500,12 +553,12 @@ export class AftercareService {
       enrollmentId: job.enrollmentId,
       attempts: job.attempts,
       channel: decision.channel,
-      recipient,
-      optedIn,
-      body: rendered.body,
-      locale,
+      recipient: facts.recipient,
+      optedIn: facts.optedIn,
+      body,
+      locale: job.locale === "en" ? "en" : "fa",
       idempotencyKey,
-      templateKey: rendered.templateKey,
+      templateKey,
     };
   }
 
@@ -534,53 +587,33 @@ export class AftercareService {
     reminder: ClaimedSessionReminder,
   ): Promise<PendingSend | SkippedStep> {
     const advanceKey = reminder.messageId;
+    const skipped = (reason: string): SkippedStep => ({
+      enrollmentId: advanceKey,
+      attempts: 0,
+      reason,
+      advance: true,
+      messageId: reminder.messageId,
+    });
     try {
-      const patient = await this.repo.patientInTx(tx, ctx.clinicId, reminder.patientId);
-      if (!patient) {
-        return { enrollmentId: advanceKey, attempts: 0, reason: "patient-gone", advance: true, messageId: reminder.messageId };
-      }
-      const recipient = (patient as { phone?: string }).phone ?? "";
-      const tags = (patient as { tags?: string[] | null }).tags ?? [];
-      const optedIn = tags
-        .filter((tag) => tag.startsWith(OPT_IN_TAG_PREFIX))
-        .map((tag) => tag.slice(OPT_IN_TAG_PREFIX.length) as MessagingChannel);
-      const optedOut = recipient ? await this.repo.optedOutInTx(tx, ctx.clinicId, recipient) : false;
-
-      const decision = routeChannel({
-        preferred: "kavenegar",
-        recipient: { optedIn, hasMobile: recipient.length > 0, optedOut },
-        requiresReply: false,
-      });
-      if (!decision.ok) {
-        return { enrollmentId: advanceKey, attempts: 0, reason: decision.reason, advance: true, messageId: reminder.messageId };
+      const facts = await this.recipientFacts(tx, ctx.clinicId, reminder.patientId);
+      if (facts.missing) {
+        return skipped("patient-gone");
       }
 
-      const locale = "fa";
       const vars = { clinicName, when: formatSessionWhen(reminder.startAt) };
-      let rendered;
-      try {
-        rendered = renderTemplate("session.reminder", vars, {
-          locale,
-          channel: decision.channel,
-          maxChars: decision.adapter.capabilities.maxBodyChars,
-        });
-      } catch (err) {
-        return {
-          enrollmentId: advanceKey,
-          attempts: 0,
-          reason: `template: ${err instanceof Error ? err.message : String(err)}`,
-          advance: true,
-          messageId: reminder.messageId,
-        };
+      const outcome = this.decideAndRender("session.reminder", "kavenegar", facts, vars, "fa");
+      if (!outcome.ok) {
+        return skipped(outcome.reason);
       }
+      const { decision, body, templateKey } = outcome;
 
       // همان ردیف claim‌شده به‌روز می‌شود — نه INSERT دوم (idempotency ثابت می‌ماند)
       const updated = await this.repo.updateReminderInTx(tx, ctx.clinicId, {
         id: reminder.messageId,
         channel: decision.channel,
-        locale,
-        recipient,
-        body: rendered.body,
+        locale: "fa",
+        recipient: facts.recipient,
+        body,
         varsRedacted: redactVars(vars),
         provider: decision.adapter.provider,
       });
@@ -591,7 +624,7 @@ export class AftercareService {
       const verdict = await this.metering.count(tx, ctx.clinicId, "messages_sent");
       if (!verdict.allowed) {
         await this.repo.markSuppressedInTx(tx, ctx.clinicId, reminder.messageId, "quota-exceeded");
-        return { enrollmentId: advanceKey, attempts: 0, reason: "quota-exceeded", advance: true, messageId: reminder.messageId };
+        return skipped("quota-exceeded");
       }
 
       return {
@@ -599,21 +632,15 @@ export class AftercareService {
         enrollmentId: advanceKey,
         attempts: 0,
         channel: decision.channel,
-        recipient,
-        optedIn,
-        body: rendered.body,
-        locale,
+        recipient: facts.recipient,
+        optedIn: facts.optedIn,
+        body,
+        locale: "fa",
         idempotencyKey: `sessrem:${reminder.sessionId}:${reminder.offsetHours}`,
-        templateKey: rendered.templateKey,
+        templateKey,
       };
     } catch (err) {
-      return {
-        enrollmentId: advanceKey,
-        attempts: 0,
-        reason: `reminder: ${err instanceof Error ? err.message : String(err)}`,
-        advance: true,
-        messageId: reminder.messageId,
-      };
+      return skipped(`reminder: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -630,7 +657,7 @@ export class AftercareService {
     clinicId: string,
     job: ClaimedEnrollment,
     condition: { sessionStatus?: string; patientTag?: string },
-    patient: { tags?: string[] | null },
+    tags: readonly string[],
   ): Promise<boolean> {
     if (condition.sessionStatus !== undefined) {
       if (!job.sessionId) return false;
@@ -638,7 +665,7 @@ export class AftercareService {
       if (status !== condition.sessionStatus) return false;
     }
     if (condition.patientTag !== undefined) {
-      if (!(patient.tags ?? []).includes(condition.patientTag)) return false;
+      if (!tags.includes(condition.patientTag)) return false;
     }
     return true;
   }

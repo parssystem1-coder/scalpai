@@ -46,6 +46,19 @@ export class AftercareWorker implements OnApplicationBootstrap, OnApplicationShu
     return envNumber("AFTERCARE_CLINICS_PER_TICK", 200);
   }
 
+  /**
+   * سقف کلینیک‌های همزمان در یک tick (پیش‌فرض ۴).
+   *
+   * قبلاً کلینیک‌ها سریالی اجرا می‌شدند؛ با ده‌ها کلینیکِ فعال، tick آخر به
+   * کارِ آخر خیلی دیر می‌رسید و یادآوری‌ها عقب می‌افتادند. موازی‌سازی کامل
+   * هم درست نیست: هر کلینیک یک تراکنش و چند فراخوانی پروایدر می‌گیرد، پس
+   * بدون سقف، یک tick پرکار pool را می‌بلعد. سقف از ENV می‌آید تا بدون دیپلوی
+   * جدید قابل تنظیم باشد.
+   */
+  private concurrency(): number {
+    return Math.max(1, envNumber("AFTERCARE_CLINIC_CONCURRENCY", 4));
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     if (!AftercareWorker.isEnabled()) return;
     this.queue = resolveQueueDriver(process.env, (err) => this.report("tick", err));
@@ -69,15 +82,26 @@ export class AftercareWorker implements OnApplicationBootstrap, OnApplicationShu
     const clinics = await this.db.withClient((tx) => listDueClinics(tx, this.clinicsPerTick()));
     if (clinics.length === 0) return;
 
+    // موازی با سقف: یک کلینیک خراب فقط خطای خودش را می‌دهد، نه توقف بقیه؛
+    // و ترتیب گزارشِ خطا عوض نمی‌شود چون هر خطا با کلینیکِ خودش لاگ می‌شود.
     let handled = 0;
-    for (const clinic of clinics) {
-      try {
-        handled += await this.runClinic(clinic);
-      } catch (err) {
-        // یک کلینیک خراب، پیگیری بقیه را نباید زمین بزند
-        this.report("clinic", err instanceof Error ? err : new Error(String(err)));
-      }
-    }
+    let cursor = 0;
+    const lanes = Math.min(this.concurrency(), clinics.length);
+    const reportOnce = (err: unknown): void => {
+      this.report("clinic", err instanceof Error ? err : new Error(String(err)));
+    };
+    await Promise.all(
+      Array.from({ length: lanes }, async () => {
+        while (cursor < clinics.length) {
+          const clinic = clinics[cursor++]!;
+          try {
+            handled += await this.runClinic(clinic);
+          } catch (err) {
+            reportOnce(err);
+          }
+        }
+      }),
+    );
     metrics.counter("scalpai_aftercare_ticks_total", { clinics: String(clinics.length) });
     if (handled > 0) metrics.counter("scalpai_aftercare_steps_total", { handled: String(handled) });
   }
