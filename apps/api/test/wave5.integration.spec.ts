@@ -151,12 +151,23 @@ describe("wave 5 — D24 two clinics", () => {
     const clinicB = await seedOtherClinicId(process.env.MIGRATE_DATABASE_URL!);
     const invoiceA = await createIssuedInvoice(clinicA);
 
-    const patientB = await migrateSql<{ id: string }>(
+    // فیکسچرهای خودکفا برای هر دو کلینیک — seed فاز ۵a فقط کلینیک A را
+    // بیمار/کاتالوگ می‌دهد؛ برای نهیِ cross-tenant هر دو طرف باید ردیف داشته باشند.
+    const patientBRows = await migrateSql<{ id: string }>(
       process.env.MIGRATE_DATABASE_URL!,
-      "SELECT id FROM patients WHERE clinic_id = $1 LIMIT 1",
+      `INSERT INTO patients (id, clinic_id, first_name, last_name, phone)
+       VALUES (gen_random_uuid(), $1, 'د۲۴', 'ب', '0936' || lpad((floor(random()*9999999))::text, 7, '0'))
+       RETURNING id`,
       [clinicB],
     );
-    const patientBId = patientB[0]!.id;
+    const patientBId = patientBRows[0]!.id;
+    const prodBRows = await migrateSql<{ id: string }>(
+      process.env.MIGRATE_DATABASE_URL!,
+      `INSERT INTO products (id, clinic_id, sku, name, kind, price)
+       VALUES (gen_random_uuid(), $1, 'D24B-' || substr(gen_random_uuid()::text, 1, 6), 'D24 B probe', 'goods', 5000)
+       RETURNING id`,
+      [clinicB],
+    );
 
     // ۱) ارجاع فاکتورِ کلینیک A به بیمارِ کلینیک B — FK ترکیبی (0024) رد می‌کند
     await expect(
@@ -168,17 +179,12 @@ describe("wave 5 — D24 two clinics", () => {
     ).rejects.toThrow();
 
     // ۲) قلم فاکتورِ کلینیک A روی کاتالوگِ کلینیک B — FK ترکیبی invoice_items رد می‌کند
-    const prodB = await migrateSql<{ id: string }>(
-      process.env.MIGRATE_DATABASE_URL!,
-      "SELECT id FROM products WHERE clinic_id = $1 LIMIT 1",
-      [clinicB],
-    );
     await expect(
       migrateSql(
         process.env.MIGRATE_DATABASE_URL!,
         `INSERT INTO invoice_items (id, clinic_id, invoice_id, invoice_parent_clinic_id, product_id, product_parent_clinic_id, description, unit_price)
          VALUES (gen_random_uuid(), $1, $2, $1, $3, $3, 'cross', 100)`,
-        [clinicA, invoiceA, prodB[0]!.id],
+        [clinicA, invoiceA, prodBRows[0]!.id],
       ),
     ).rejects.toThrow();
 
@@ -208,9 +214,11 @@ describe("wave 5 — D24 payment replay", () => {
     const testApp = await moduleRef.compile();
     const payments = testApp.get(PaymentService);
 
-    // start واقعی داخل scope کلینیک صاحب فاکتور: claim → redirect
+    // start واقعی داخل scope کلینیک صاحب فاکتور: claim → redirect.
+    // userId باید یک UUID معتبر باشد (audit_log.user_id یک uuid است و "" را
+    // PostgreSQL به NULL تبدیل نمی‌کند) — همان WEBHOOK_SYSTEM_USER_ID.
     const started = await TenantScope.runWith(
-      { clinicId: clinicA, userId: "", role: "system" },
+      { clinicId: clinicA, userId: "00000000-0000-0000-0000-000000000001", role: "system" },
       () => payments.start(invoiceId, "https://clinic/callback"),
     );
     if (started.state !== "redirect") throw new Error(`expected redirect, got ${started.state}`);
