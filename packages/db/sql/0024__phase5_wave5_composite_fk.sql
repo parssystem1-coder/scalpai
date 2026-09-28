@@ -280,9 +280,11 @@ ALTER TABLE aftercare_enrollments
 ALTER TABLE message_log
   VALIDATE CONSTRAINT message_log_enrollment_fk;
 
-ALTER TABLE inbound_messages
-  ALTER COLUMN enrollment_parent_clinic_id SET NOT NULL,
-  ALTER COLUMN patient_parent_clinic_id SET NOT NULL;
+-- سایر shadow ستون‌های inbound_messages هم عمداً nullable می‌مانند: ingestInbound
+-- (aftercare.service) ردیف را *قبل* از حل‌شدن ارجاعات ثبت می‌کند — patient_id،
+-- enrollment_id و reply_to_message_id در لحظه‌ی INSERT اغلب NULL هستند و پیوند
+-- بعداً فقط-خواندنی در applyOnReply برقرار می‌شود. NULL/NULL قید ترکیبی را
+-- satisfies می‌کند (MATCH SIMPLE) — همان قاعده‌ی session/reply.
 ALTER TABLE inbound_messages
   VALIDATE CONSTRAINT inbound_messages_enrollment_fk;
 ALTER TABLE inbound_messages
@@ -301,8 +303,9 @@ ALTER TABLE invoice_items
 ALTER TABLE invoice_items
   VALIDATE CONSTRAINT invoice_items_product_fk;
 
--- ستون‌های nullable (session / reply) هم گره ترکیبی می‌گیرند؛ VALIDATE فقط
--- ردیف‌های نال‌ناپذیر را چک می‌کند و ردیف‌های NULL از قید مستثنی می‌مانند.
+-- ستون‌های nullable (شامل همه‌ی shadowهای inbound_messages و session/reply)
+-- هم گره ترکیبی می‌گیرند؛ VALIDATE فقط ردیف‌های نال‌ناپذیر را چک می‌کند و
+-- ردیف‌های NULL از قید مستثنی می‌مانند.
 ALTER TABLE aftercare_enrollments
   VALIDATE CONSTRAINT aftercare_enrollments_session_fk;
 
