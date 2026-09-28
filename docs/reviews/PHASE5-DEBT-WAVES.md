@@ -153,13 +153,17 @@
 > ✅ **D19/D20 بسته شد — 2026-09-28 (ADR-0056):** موج ۳/۴-UI فاکتور را کامل پوشش داد (`/billing`: صدور از کاتالوگ با `resolveItems` + pay/void، درگاه زرین‌پال واقعی از ۵b)؛ پس شاخهٔ «ADR» انتخاب شد: **POS کامل (D19) و memberships (D20) به فاز ۷ سپرده شدند — «عضویت/انبار کامل»؛ تعریف رسمی بسته‌شدن فاز ۵ = «invoice + Zarinpal»**. هیچ جدول/migration/قرارداد جدیدی برای POS/memberships در فاز ۵ نوشته نمی‌شود. باقی‌ماندهٔ موج ۵ فقط D21–D24 است — مستقل از این تصمیم.
 >
 > ✅ **D21 بسته شد — 2026-09-28 (migration 0024):** هر ردیفِ فرزندِ فاز ۵a که به والدِ tenant-owned ارجاع می‌دهد، هویت کلینیکی والد را کنار id نگه می‌دارد و FK زوجِ `(id, clinic_id)` را می‌بندد: `enrollments` (sequence/patient/session)، `message_log` (enrollment/session/patient)، `inbound_messages` (enrollment/patient/reply)، `invoices` (patient/session)، `invoice_items` (invoice/product) — ۱۳ گره ترکیبی. الگوی expand→migrate→contract: ستون‌های shadow (NOT NULL جز جایی که خودِ ستونِ ارجاع nullable است) + unique ترکیبی `(id, clinic_id)` روی ۵ جدول والد (پیش‌نیاز REFERENCES)، FKهای ترکیبی DEFERRABLE INITIALLY IMMEDIATE با NOT VALID و VALIDATE پس از backfill — همه در یک فایل اتمیک؛ و در CONTRACT حذف FKهای تک‌ستونی قدیمی، یعنی رابطهٔ cross-tenant دیگر از دیتابیس عبور نمی‌کند نه فقط از RLS. rollback کامل در `packages/db/sql/rollback/0024__phase5_wave5_composite_fk.down.sql` (FKهای قدیمی بازساخته می‌شوند؛ ستون‌های shadow عمداً می‌مانند تا backfill دوباره لازم نشود). ستون‌های shadow در `schema.ts` هم ثبت شدند تا Drizzle و SQL یک اسکیما را بگویند؛ تست منفی cross-tenant در CI روی Postgres واقعی اجرا می‌شود.
+>
+> ✅ **D22 بسته شد — 2026-09-28 (ADR-0057 + migration 0025):** از دو مسیر مجاز سند (deleted_at یا append-only)، **append-only انتخاب شد**: حذف نرم «قابلیت حذفِ قابل‌انکار» می‌خرد (هیچ‌چیز جلوی `UPDATE ... SET deleted_at` را نمی‌گیرد) و فیلتر live را به ۷+ محل کوئری تزریق می‌کند، درحالی‌که پیام خروجی/ورودی لاگِ حسابداریِ §13 است. migration 0025 تابع گارد `fn_message_no_mutate` + دو trigger می‌سازد: `DELETE` روی هر دو جدول خطاست؛ گذر وضعیت فقط رو به جلو (`message_log`: `queued→sent|failed|suppressed`، `sent→delivered|failed`؛ `inbound_messages`: زنجیره‌ی `new→read→replied→archived`)؛ محتوای پیام پس از فاز placeholder (fill در queued) ثابت است؛ `handled_by/at/intent` به‌عنوان متادیتای رسیدگی آزادند. TRUNCATE عمداً بای‌پس می‌ماند (مسیر تست/بازیابی، خارج از دسترس نقش‌های اپ — همان گاردهای 0012/0017). rollback در `packages/db/sql/rollback/0025__phase5_wave5_message_append_only.down.sql`. سیاست نگه‌داری بعدی (فاز ۶) با ADR تازه می‌آید.
+>
+> ✅ **D23 بسته شد — 2026-09-28:** مسیر `POST aftercare/webhooks/zarinpal` از قرارداد پیام حذف شد — `inbound.controller.ts` فقط `kavenegar` را می‌شناسد، `zarinpal` از allow-list امضا در `webhook.guard.ts` برداشته شد و تست‌های مربوط حذف/ساده شدند. callback پرداخت همان `POST billing/payment/callback` است (پرسش باز ۳ سند `PHASE-5AB-REVIEW.md` بسته شد).
 
 | آیتم | کار |
 |---|---|
 | D21 | composite FK `(clinic_id, id)` با expand→migrate→contract — **DONE (0024)** |
-| D22 | `deleted_at` **یا** ADR append-only برای `message_log` / `inbound_messages` |
-| D23 | حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام؛ callback پرداخت همان `billing/payment/callback` |
-| D24 | integration Postgres: دو کلینیک، replay پرداخت، claim همزمان |
+| D22 | `deleted_at` **یا** ADR append-only برای `message_log` / `inbound_messages` — **DONE (ADR-0057 + 0025)** |
+| D23 | حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام؛ callback پرداخت همان `billing/payment/callback` — **DONE (2026-09-28)** |
+| D24 | integration Postgres: دو کلینیک، replay پرداخت، claim همزمان — **باز (آخرین آیتم موج ۵)** |
 
 **Exit:** تست منفی cross-tenant روی enrollment/invoice · مسیر zarinpal پیام‌رسانی دیگر وجود ندارد.
 
@@ -194,8 +198,7 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 ## Change log
 
 | Date | Change |
-|---|---|
-| 2026-09-22 | ایجاد سند؛ موج ۱ انتخاب‌شده برای اجرا |
+|---|---|| 2026-09-22 | ایجاد سند؛ موج ۱ انتخاب‌شده برای اجرا |
 | 2026-09-22 | موج ۱ بسته شد: D01–D06 DONE؛ UI ارتقا همچنان D10 موج ۳ |
 | 2026-09-23 | موج ۲ بسته شد: D07/D08 DONE (SMS.ir + Bale واقعی؛ Eitaa → موج بعد)، D09 OUT-OF-SCOPE (ADR-0053) |
 | 2026-09-23 | موج ۳ (بخش P1 مصرف/سهمیه/inbox) بسته شد: D10/D11/D14 DONE؛ D12/D13 باز (UI aftercare و فاکتور) |
@@ -204,3 +207,5 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-28 | موج ۵ آغاز شد — ADR-0056: D19 (POS) و D20 (memberships) به فاز ۷ سپرده شدند («عضویت/انبار کامل»؛ تعریف فاز ۵ = invoice+Zarinpal). باقی‌ماندهٔ باز موج ۵: D21/D22/D23/D24 |
 | 2026-09-28 | D21 بسته شد: migration 0024 — FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵a (expand→migrate→contract + rollback کامل). باز: D22/D23/D24 |
 | 2026-09-28 | D21 بسته شد: migration 0024 — FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵ا (expand→migrate→contract + rollback). باز: D22/D23/D24 |
+| 2026-09-28 | D22 بسته شد: ADR-0057 (append-only به‌جای deleted_at — لاگ حسابداری §13 قید دیتابیسی گرفت) + migration 0025: trigger گارد `fn_message_no_mutate` روی `message_log`/`inbound_messages` — DELETE ممنوع، گذر وضعیت فقط رو به جلو، محتوا پس از فاز placeholder ثابت (rollback موجود) |
+| 2026-09-28 | D23 بسته شد: مسیر `POST aftercare/webhooks/zarinpal` از قرارداد پیام حذف شد (کنترلر + تست‌ها + allow-list امضا در `webhook.guard.ts`)؛ callback پرداخت همان `POST billing/payment/callback` است — پرسش باز ۳ سند PHASE-5AB بسته شد. باز: فقط D24 |
