@@ -12,7 +12,9 @@ import { DbService, migrate, seed, claimDueSessionReminders } from "@scalpai/db"
 import { migrateSql, resetAll, seedMarkerClinicId, seedOtherClinicId } from "@scalpai/db/testing";
 import { AppModule } from "../src/app.module.js";
 import { TenantScope } from "../src/tenancy/tenant.scope.js";
-import { PaymentService, ZARINPAL_GATEWAY } from "../src/billing/payment.service.js";
+import { PaymentService } from "../src/billing/payment.service.js";
+import { BillingService } from "../src/billing/billing.service.js";
+import { PaymentAttemptsRepository } from "../src/billing/payment-attempts.repository.js";
 import type { ZarinpalAdapter, PaymentResult } from "@scalpai/notify";
 
 /**
@@ -169,35 +171,49 @@ describe("wave 5 — D24 two clinics", () => {
       [clinicB],
     );
 
-    // ۱) ارجاع فاکتورِ کلینیک A به بیمارِ کلینیک B — FK ترکیبی (0024) رد می‌کند
+    // ۱) نویسنده‌ی کلینیک A فقط patient_id را به بیمارِ کلینیک B عوض می‌کند و
+    //    shadow سر جای خودش (clinic A) می‌ماند — دقیقاً همان باگِ D21: جفتِ
+    //    (patientB، clinicA) وجود ندارد و FK ترکیبی (0024) رد می‌کند.
     await expect(
       migrateSql(
         process.env.MIGRATE_DATABASE_URL!,
-        `UPDATE invoices SET patient_id = $1, patient_parent_clinic_id = $2 WHERE id = $3`,
-        [patientBId, clinicB, invoiceA],
+        `UPDATE invoices SET patient_id = $1 WHERE id = $2`,
+        [patientBId, invoiceA],
       ),
     ).rejects.toThrow();
 
-    // ۲) قلم فاکتورِ کلینیک A روی کاتالوگِ کلینیک B — FK ترکیبی invoice_items رد می‌کند
+    // ۲) قلمِ فاکتورِ کلینیک A به کاتالوگِ کلینیک B — shadowِ invoice روی clinic A
+    //    می‌ماند، پس جفتِ (productB، clinicA) وجود ندارد و FK ترکیبی رد می‌کند.
     await expect(
       migrateSql(
         process.env.MIGRATE_DATABASE_URL!,
         `INSERT INTO invoice_items (id, clinic_id, invoice_id, invoice_parent_clinic_id, product_id, product_parent_clinic_id, description, unit_price)
-         VALUES (gen_random_uuid(), $1, $2, $1, $3, $3, 'cross', 100)`,
+         VALUES (gen_random_uuid(), $1, $2, $1, $3, $1, 'cross', 100)`,
         [clinicA, invoiceA, prodBRows[0]!.id],
       ),
     ).rejects.toThrow();
 
-    // ۳) payment_attempts با جفتِ (clinic_b، فاکتورِ A) — ایندکسِ جزئیِ «یک تلاش
-    //    فعال برای هر فاکتور» (0021) روی invoice_id کل‌گیر است؛ INSERT از کلینیک B
-    //    با 23505 رد می‌شود و تلاشِ خارج از tenant هرگز روی فاکتور نمی‌نشیند.
+    // ۳) تلاشِ دومِ فعال روی همان فاکتور — ایندکسِ جزئیِ «حداکثر یک تلاش فعال
+    //    برای هر فاکتور» (0021) روی invoice_id کل‌گیر است؛ INSERT دوم با 23505
+    //    رد می‌شود و تلاشِ خارج از tenant هرگز کنارِ تلاشِ صاحبِ فاکتور نمی‌نشیند
+    //    (تلاشِ بلااستفاده حذف‌شده را آزاد می‌کند، پس ایندکس دوباره حرف دارد).
     //    اثبات سطح سرویس (start از کلینیک B روی فاکتور A → 404) در تست replay.
     await expect(
       migrateSql(
         process.env.MIGRATE_DATABASE_URL!,
+        `UPDATE payment_attempts
+            SET deleted_at = now()
+          WHERE invoice_id = $1 AND deleted_at IS NULL`,
+        [invoiceA],
+      ),
+    ).resolves.toBeTruthy();
+    await expect(
+      migrateSql(
+        process.env.MIGRATE_DATABASE_URL!,
         `INSERT INTO payment_attempts (clinic_id, invoice_id, authority, amount, status, expires_at)
-         VALUES ($1, $2, 'AUTH-XT', 1000, 'pending', now() + interval '15 minutes')`,
-        [clinicB, invoiceA],
+         VALUES ($1, $2, 'AUTH-XT-SECOND', 1000, 'pending', now() + interval '15 minutes')
+         ,( $1, $2, 'AUTH-XT-THIRD', 2000, 'pending', now() + interval '15 minutes')`,
+        [clinicA, invoiceA],
       ),
     ).rejects.toThrow();
   });
@@ -209,14 +225,19 @@ describe("wave 5 — D24 payment replay", () => {
     const invoiceId = await createIssuedInvoice(clinicA);
 
     const gateway = makeFakeGateway();
-    const moduleRef = Test.createTestingModule({ imports: [AppModule] });
-    moduleRef.overrideProvider(ZARINPAL_GATEWAY).useValue(gateway);
-    const testApp = await moduleRef.compile();
-    const payments = testApp.get(PaymentService);
+    // ZARINPAL_GATEWAY توکنِ provider-نشده است (سرویس @Optional دارد و بدون
+    // توکن آداپتر واقعی می‌سازد)، پس overrideProvider بی‌اثر می‌ماند. سرویس را
+    // با گیت‌وی جعلی دستی می‌سازیم: constructor(service, repo, gateway).
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const payments = new PaymentService(
+      moduleRef.get(BillingService),
+      moduleRef.get(PaymentAttemptsRepository),
+      gateway as unknown as ZarinpalAdapter,
+    );
 
     // start واقعی داخل scope کلینیک صاحب فاکتور: claim → redirect.
     // userId باید یک UUID معتبر باشد (audit_log.user_id یک uuid است و "" را
-    // PostgreSQL به NULL تبدیل نمی‌کند) — همان WEBHOOK_SYSTEM_USER_ID.
+    // PostgreSQL به NULL تبدیل نمی‌کند) — همان PAYMENT_SYSTEM_USER_ID.
     const started = await TenantScope.runWith(
       { clinicId: clinicA, userId: "00000000-0000-0000-0000-000000000001", role: "system" },
       () => payments.start(invoiceId, "https://clinic/callback"),
@@ -254,8 +275,6 @@ describe("wave 5 — D24 payment replay", () => {
         () => payments.start(invoiceId, "https://clinic/callback"),
       ),
     ).rejects.toThrow();
-
-    await testApp.close();
   });
 });
 
