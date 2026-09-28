@@ -39,9 +39,9 @@
 | D19 | POS + `stock_qty` | DEFERRED → فاز ۷ (ADR-0056) | 5 |
 | D20 | `memberships` | DEFERRED → فاز ۷ (ADR-0056) | 5 |
 | D21 | B4 composite FK | DONE (0024؛ ۱۳ گره ترکیبی) | 5 |
-| D22 | B5 `deleted_at` یا ADR append-only | OPEN | 5 |
-| D23 | مسیر zarinpal روی قرارداد inbound پیام (Q3) | WRONG CONTRACT | 5 |
-| D24 | تست ادغامی Postgres واقعی (RLS/claim/pay) | MOCK-ONLY | 5 |
+| D22 | B5 `deleted_at` یا ADR append-only | DONE (ADR-0057 + 0025؛ append-only) | 5 |
+| D23 | مسیر zarinpal روی قرارداد inbound پیام (Q3) | DONE (مسیر حذف شد؛ callback = billing/payment/callback) | 5 |
+| D24 | تست ادغامی Postgres واقعی (RLS/claim/pay) | DONE (wave5.integration.spec.ts روی Postgres واقعی در CI) | 5 |
 | D25 | ۵.۶ Patient Portal + `@portal` e2e + k6 booking | DEFERRED | 6 |
 
 ---
@@ -157,15 +157,17 @@
 > ✅ **D22 بسته شد — 2026-09-28 (ADR-0057 + migration 0025):** از دو مسیر مجاز سند (deleted_at یا append-only)، **append-only انتخاب شد**: حذف نرم «قابلیت حذفِ قابل‌انکار» می‌خرد (هیچ‌چیز جلوی `UPDATE ... SET deleted_at` را نمی‌گیرد) و فیلتر live را به ۷+ محل کوئری تزریق می‌کند، درحالی‌که پیام خروجی/ورودی لاگِ حسابداریِ §13 است. migration 0025 تابع گارد `fn_message_no_mutate` + دو trigger می‌سازد: `DELETE` روی هر دو جدول خطاست؛ گذر وضعیت فقط رو به جلو (`message_log`: `queued→sent|failed|suppressed`، `sent→delivered|failed`؛ `inbound_messages`: زنجیره‌ی `new→read→replied→archived`)؛ محتوای پیام پس از فاز placeholder (fill در queued) ثابت است؛ `handled_by/at/intent` به‌عنوان متادیتای رسیدگی آزادند. TRUNCATE عمداً بای‌پس می‌ماند (مسیر تست/بازیابی، خارج از دسترس نقش‌های اپ — همان گاردهای 0012/0017). rollback در `packages/db/sql/rollback/0025__phase5_wave5_message_append_only.down.sql`. سیاست نگه‌داری بعدی (فاز ۶) با ADR تازه می‌آید.
 >
 > ✅ **D23 بسته شد — 2026-09-28:** مسیر `POST aftercare/webhooks/zarinpal` از قرارداد پیام حذف شد — `inbound.controller.ts` فقط `kavenegar` را می‌شناسد، `zarinpal` از allow-list امضا در `webhook.guard.ts` برداشته شد و تست‌های مربوط حذف/ساده شدند. callback پرداخت همان `POST billing/payment/callback` است (پرسش باز ۳ سند `PHASE-5AB-REVIEW.md` بسته شد).
+>
+> ✅ **D24 بسته شد — 2026-09-28 (wave5.integration.spec.ts):** ادغام واقعی Postgres در CI — (۱) **دو کلینیک**: فاکتور کلینیک A از مسیر HTTP کلینیک B عدد ۴۰۴ است (نه ۴۰۳ که نشت باشد)، در فهرست فاکتورهای B نیست و شمارش خام `invoices WHERE clinic_id = B` صفر است؛ نهی‌های سطح DB هم واقعی‌اند — نویسنده‌ای که ستون منطقی را cross-tenant عوض کند ولی shadow را جا بگذارد (سنگ‌بنای D21) با 23503 از FK ترکیبی 0024 رد می‌شود و دو تلاشِ فعالِ هم‌زمان روی یک فاکتور با 23505 به ایندکسِ جزئی «حداکثر یک تلاش فعال برای هر فاکتور» (0021) می‌خورد؛ (۲) **replay پرداخت**: با گیت‌وی جعلی تزریق‌شده (سرویس دستی با گیت‌وی جعلی — `ZARINPAL_GATEWAY` توکنِ provider-نشده است و `@Optional` بدون آن آداپتر واقعی می‌سازد)، callback تکراری همان authority از ردیف تلاش پاسخ می‌دهد: verify دوم رخ نمی‌دهد، reference یکی است و `paid_amount` دقیقاً یک‌بار جمع شده؛ (۳) **claim همزمان**: دو claim پشت‌سرهمِ `fn_aftercare_claim_session_reminders` — دومی duplicate=true و ردیف پیام یکی است (idempotency `sessrem:`). با این آیتم، **موج ۵ کامل شد و فاز ۵ (invoice + Zarinpal) رسماً بسته است**.
 
 | آیتم | کار |
 |---|---|
 | D21 | composite FK `(clinic_id, id)` با expand→migrate→contract — **DONE (0024)** |
 | D22 | `deleted_at` **یا** ADR append-only برای `message_log` / `inbound_messages` — **DONE (ADR-0057 + 0025)** |
 | D23 | حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام؛ callback پرداخت همان `billing/payment/callback` — **DONE (2026-09-28)** |
-| D24 | integration Postgres: دو کلینیک، replay پرداخت، claim همزمان — **باز (آخرین آیتم موج ۵)** |
+| D24 | integration Postgres: دو کلینیک، replay پرداخت، claim همزمان — **DONE (wave5.integration.spec.ts)** |
 
-**Exit:** تست منفی cross-tenant روی enrollment/invoice · مسیر zarinpal پیام‌رسانی دیگر وجود ندارد.
+**Exit:** تست منفی cross-tenant روی enrollment/invoice · مسیر zarinpal پیام‌رسانی دیگر وجود ندارد. ✅ (2026-09-28 — D24 روی Postgres واقعی سبز شد؛ موج ۵ بسته شد)
 
 ---
 
@@ -209,3 +211,4 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-28 | D21 بسته شد: migration 0024 — FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵ا (expand→migrate→contract + rollback). باز: D22/D23/D24 |
 | 2026-09-28 | D22 بسته شد: ADR-0057 (append-only به‌جای deleted_at — لاگ حسابداری §13 قید دیتابیسی گرفت) + migration 0025: trigger گارد `fn_message_no_mutate` روی `message_log`/`inbound_messages` — DELETE ممنوع، گذر وضعیت فقط رو به جلو، محتوا پس از فاز placeholder ثابت (rollback موجود) |
 | 2026-09-28 | D23 بسته شد: مسیر `POST aftercare/webhooks/zarinpal` از قرارداد پیام حذف شد (کنترلر + تست‌ها + allow-list امضا در `webhook.guard.ts`)؛ callback پرداخت همان `POST billing/payment/callback` است — پرسش باز ۳ سند PHASE-5AB بسته شد. باز: فقط D24 |
+| 2026-09-28 | D24 بسته شد: `wave5.integration.spec.ts` روی Postgres واقعی در CI — دو کلینیک (۴۰۴/فهرست/شمارش خام + نهی‌های DB: FK ترکیبی 0024 و ایندکس یکتای 0021)، replay پرداخت از ردیف تلاش بدون verify دوم، claim همزمان یادآوری. **موج ۵ کامل شد → فاز ۵ (invoice + Zarinpal) رسماً بسته است؛ بعدی: موج ۶ (Patient Portal) عمداً معوق تا بازخورد واقعی کلینیک** |

@@ -132,12 +132,12 @@
 - [x] D18 `renderTemplateLink` — لینک توکن‌دار منقضی‌شونده: فقط allow-list، https اجباری، TTL ≤۳۰ روز (۱۲ تست واحد)
 - [x] گیت‌ها: typecheck ۲۱/۲۱ · apps/api integration ۲۳۱/۲۳۱ · conformance/quality ۱۱۵/۱۱۵ · گارد ساختاری ایزولاسیون DB تست (`lockIsolatedTestDb` در ۱۳ اسپکی — اپِ تست هرگز به DB اصلی وصل نمی‌شود)
 
-### Wave 5 — بدهی مالی/داده (D19–D24) — سند بدهی موج ۵ (در جریان)
+### Wave 5 — بدهی مالی/داده (D19–D24) — سند بدهی موج ۵ (بسته شد)
 - [x] D19/D20 ADR-0056: POS کامل و memberships به فاز ۷ سپرده شدند («عضویت/انبار کامل»)؛ تعریف رسمی فاز ۵ = **invoice + Zarinpal** (کاتالوگ + فاکتور رابطه‌ای §6.3 + درگاه واقعی + UI `/billing`) — هیچ جدول/migration/قرارداد جدیدی برای POS/memberships در فاز ۵ نوشته نمی‌شود
 - [x] D21 migration 0024: FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵a — ستون‌های shadow + unique `(id, clinic_id)` روی ۵ جدول والد، FK ترکیبی با backfill/VALIDATE، حذف FKهای تک‌ستونی قدیمی (رابطهٔ cross-tenant دیگر از دیتابیس عبور نمی‌کند) + rollback کامل
 - [x] D22 ADR-0057 + migration 0025: `message_log`/`inbound_messages` append-only شدند (به‌جای `deleted_at`) — trigger گارد: DELETE ممنوع، گذر وضعیت فقط رو به جلو، محتوا پس از فاز placeholder ثابت + rollback
 - [x] D23 حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام (callback پرداخت = `billing/payment/callback`) — allow-list امضا در `webhook.guard.ts` هم تمیز شد
-- [ ] D24 تست ادغامی Postgres واقعی: دو کلینیک، replay پرداخت، claim همزمان
+- [x] D24 تست ادغامی Postgres واقعی: دو کلینیک (HTTP ۴۰۴ + فهرست + شمارش خام + نهی‌های DB با FK ترکیبی 0024 و ایندکس یکتای 0021)، replay پرداخت از ردیف تلاش بدون verify دوم، claim همزمان با idempotency — **موج ۵ بسته شد؛ فاز ۵ (invoice + Zarinpal) کامل است**
 
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
