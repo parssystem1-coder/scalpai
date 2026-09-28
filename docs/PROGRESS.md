@@ -132,6 +132,13 @@
 - [x] D18 `renderTemplateLink` — لینک توکن‌دار منقضی‌شونده: فقط allow-list، https اجباری، TTL ≤۳۰ روز (۱۲ تست واحد)
 - [x] گیت‌ها: typecheck ۲۱/۲۱ · apps/api integration ۲۳۱/۲۳۱ · conformance/quality ۱۱۵/۱۱۵ · گارد ساختاری ایزولاسیون DB تست (`lockIsolatedTestDb` در ۱۳ اسپکی — اپِ تست هرگز به DB اصلی وصل نمی‌شود)
 
+### Wave 5 — بدهی مالی/داده (D19–D24) — سند بدهی موج ۵ (در جریان)
+- [x] D19/D20 ADR-0056: POS کامل و memberships به فاز ۷ سپرده شدند («عضویت/انبار کامل»)؛ تعریف رسمی فاز ۵ = **invoice + Zarinpal** (کاتالوگ + فاکتور رابطه‌ای §6.3 + درگاه واقعی + UI `/billing`) — هیچ جدول/migration/قرارداد جدیدی برای POS/memberships در فاز ۵ نوشته نمی‌شود
+- [ ] D21 composite FK `(clinic_id, id)` با expand→migrate→contract
+- [ ] D22 `deleted_at` یا ADR append-only برای `message_log`/`inbound_messages`
+- [ ] D23 حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام (callback پرداخت = `billing/payment/callback`)
+- [ ] D24 تست ادغامی Postgres واقعی: دو کلینیک، replay پرداخت، claim همزمان
+
 ## فاز 6 — هوش
 - [ ] Data Lake بی‌نام‌سازی + expert-review UI + صف Active Learning
 - [ ] Grad-CAM overlay در نتایج
