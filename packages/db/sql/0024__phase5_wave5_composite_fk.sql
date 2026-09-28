@@ -37,41 +37,23 @@
 --   FKهای تک‌ستونی قدیمی از روی گره‌های ترکیبی بازساخته می‌شوند.
 
 -- ════════════════════════════════════════════════════════════
--- EXPAND 1 — جدول‌های والد باید composite FK داشته باشند: PK ترکیبی فیک
+-- EXPAND 1 — پیش‌نیاز REFERENCES (id, clinic_id): unique ترکیبی روی والد
 -- ════════════════════════════════════════════════════════════
--- PK فیک، unique سرمقیدِ (id, clinic_id) نمی‌سازد؛ فقط برای اینکه
--- ADD CONSTRAINT ... FOREIGN KEY (x, y) REFERENCES parent (id, clinic_id)
--- بشود، یکتایی ترکیبی لازم است. UNIQUE ترکیبی فیک با NOT VALID/VALIDATE
--- همان قراردادِ expand→contract را می‌گیرد.
-ALTER TABLE aftercare_enrollments
-  ADD CONSTRAINT aftercare_enrollments_id_clinic_key
-  UNIQUE (id, clinic_id) NOT VALID;
-ALTER TABLE aftercare_enrollments
-  VALIDATE CONSTRAINT aftercare_enrollments_id_clinic_key;
-
-ALTER TABLE invoices
-  ADD CONSTRAINT invoices_id_clinic_key
-  UNIQUE (id, clinic_id) NOT VALID;
-ALTER TABLE invoices
-  VALIDATE CONSTRAINT invoices_id_clinic_key;
-
-ALTER TABLE products
-  ADD CONSTRAINT products_id_clinic_key
-  UNIQUE (id, clinic_id) NOT VALID;
-ALTER TABLE products
-  VALIDATE CONSTRAINT products_id_clinic_key;
-
-ALTER TABLE message_log
-  ADD CONSTRAINT message_log_id_clinic_key
-  UNIQUE (id, clinic_id) NOT VALID;
-ALTER TABLE message_log
-  VALIDATE CONSTRAINT message_log_id_clinic_key;
-
-ALTER TABLE aftercare_sequences
-  ADD CONSTRAINT aftercare_sequences_id_clinic_key
-  UNIQUE (id, clinic_id) NOT VALID;
-ALTER TABLE aftercare_sequences
-  VALIDATE CONSTRAINT aftercare_sequences_id_clinic_key;
+-- Postgres اجازه نمی‌دهد UNIQUE constraint با NOT VALID ساخته شود
+-- (NOT VALID فقط برای CHECK و FK است)، و UNIQUE constraint همیشه به یک
+-- ایندکس وابسته است. شکل expand→validate اینجا CREATE UNIQUE INDEX است —
+-- همیشه معتبر و همیشه valid؛ ساختنش روی جداول زنده فقط قفل ACCESS EXCLUSIVE
+-- کوتاه می‌خواهد و درون همین تراکنش اتمیک است.
+CREATE UNIQUE INDEX IF NOT EXISTS aftercare_sequences_id_clinic_key
+  ON aftercare_sequences (id, clinic_id);
+CREATE UNIQUE INDEX IF NOT EXISTS aftercare_enrollments_id_clinic_key
+  ON aftercare_enrollments (id, clinic_id);
+CREATE UNIQUE INDEX IF NOT EXISTS message_log_id_clinic_key
+  ON message_log (id, clinic_id);
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_id_clinic_key
+  ON invoices (id, clinic_id);
+CREATE UNIQUE INDEX IF NOT EXISTS products_id_clinic_key
+  ON products (id, clinic_id);
 
 -- ════════════════════════════════════════════════════════════
 -- EXPAND 2 — ستون‌های shadow روی جدول‌های فرزند (بدون FK؛ فقط نگه‌دارنده)
