@@ -84,7 +84,12 @@ export async function enqueueMessage(
     .values({
       clinicId,
       enrollmentId: input.enrollmentId ?? null,
+      // D21 (0024): composite FKs bind (id, clinic_id) — a referenced parent
+      // inside this clinic carries THIS clinic's id by construction, so the
+      // shadow column mirrors clinicId whenever the reference is set.
+      enrollmentParentClinicId: input.enrollmentId != null ? clinicId : null,
       patientId: input.patientId ?? null,
+      patientParentClinicId: input.patientId != null ? clinicId : null,
       stepIndex: input.stepIndex ?? null,
       channel: input.channel,
       templateKey: input.templateKey,

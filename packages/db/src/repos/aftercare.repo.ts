@@ -304,8 +304,14 @@ export async function createEnrollment(
     .values({
       clinicId,
       sequenceId: sequence.id,
+      // D21 (0024): composite FKs bind (id, clinic_id). The sequence and the
+      // patient are verified/required to live in THIS clinic (getSequence
+      // already scopes by clinicId), so the shadow column is clinicId.
+      sequenceParentClinicId: clinicId,
       patientId: input.patientId,
+      patientParentClinicId: clinicId,
       sessionId: input.sessionId ?? null,
+      sessionParentClinicId: input.sessionId != null ? clinicId : null,
       state: "active",
       currentStep: 0,
       stepsSnapshot: sequence.steps,
