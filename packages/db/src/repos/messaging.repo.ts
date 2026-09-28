@@ -194,6 +194,11 @@ export async function fillSessionReminder(
       bodyChars: input.body.length,
       varsRedacted: input.varsRedacted,
       provider: input.provider,
+      // D21 (0024): the reminder row is updated in place; its session/patient
+      // references belong to this clinic by construction (claim query filters
+      // sessions by clinic_id), so the composite-FK shadows are clinicId.
+      sessionParentClinicId: clinicId,
+      patientParentClinicId: clinicId,
     })
     .where(
       and(

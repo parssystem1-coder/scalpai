@@ -273,8 +273,10 @@ ALTER TABLE aftercare_enrollments
 ALTER TABLE aftercare_enrollments
   VALIDATE CONSTRAINT aftercare_enrollments_session_fk;
 
-ALTER TABLE message_log
-  ALTER COLUMN enrollment_parent_clinic_id SET NOT NULL;
+-- enrollment_parent_clinic_id عمداً nullable می‌ماند: یادآوری جلسه (D15) به
+-- دنباله‌ای تعلق ندارد (0023) و ردیف‌های sessrem: با enrollment_id = NULL
+-- ساخته می‌شوند. NULL/NULL قید ترکیبی را satisfies می‌کند — همان قاعده‌ای
+-- که برای session/reply می‌دانیم.
 ALTER TABLE message_log
   VALIDATE CONSTRAINT message_log_enrollment_fk;
 
