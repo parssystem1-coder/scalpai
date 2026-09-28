@@ -29,8 +29,9 @@
 --            واقعی را می‌گیرد. اگر سازوکارهای قبلی درست کار کرده باشند
 --            صفر سطر تغییر می‌کند؛ وگرنه این گام همان جایی است که
 --            انحراف، نام‌برده و رد می‌شود (کم‌هزینه‌ترین نقطهٔ کشف).
--- CONTRACT — والدِ قدیمی تک‌ستونی DROP می‌شود؛ گرهِ ترکیبی تنها ارجاع
---            باقی می‌ماند و قفلِ کمیِ رابطه هم بسته می‌شود.
+-- CONTRACT — نویسنده‌های سمت SQL به‌روز می‌شوند (fn_aftercare_claim_session_reminders
+--            ستون‌های shadow را پر می‌کند) و سپس والدِ قدیمی تک‌ستونی DROP
+--            می‌شود؛ گرهِ ترکیبی تنها ارجاع باقی می‌ماند.
 --
 -- ROLLBACK: packages/db/sql/rollback/0024__phase5_wave5_composite_fk.down.sql
 --   ستون‌های shadow می‌مانند (خطرناک نیستند؛ فقط فضای ذخیره‌سازی ریز) و
@@ -318,7 +319,94 @@ ALTER TABLE invoice_items
   VALIDATE CONSTRAINT invoice_items_product_fk;
 
 -- ════════════════════════════════════════════════════════════
--- CONTRACT 2 — گره‌های قدیمی تک‌ستونی DROP می‌شوند
+-- CONTRACT 3 — نویسنده‌های سمت SQL به‌روز می‌شوند
+-- ════════════════════════════════════════════════════════════
+-- fn_aftercare_claim_session_reminders (0023) پیامِ یادآوری جلسه را در
+-- message_log درج می‌کند؛ FK ترکیبی حالا enrollment_parent_clinic_id را
+-- هم می‌خواهد (نال = نقض NOT NULL). enrollment_id که از سطرِ جلسه می‌آید،
+-- پس ستونِ shadow همان p_clinic است؛ session و patient هم کلینیکِ همین
+-- تابع‌اند — و patient فقط وقتی ارجاع می‌شود که پنجره جلسه همان کلینیک
+-- را بسته باشد که SQL این را از قبل تضمین می‌کند (session WHERE clinic_id).
+CREATE OR REPLACE FUNCTION fn_aftercare_claim_session_reminders(
+  p_clinic uuid,
+  p_session_offsets integer[] DEFAULT ARRAY[24, 2]
+)
+RETURNS TABLE (
+  session_id uuid,
+  patient_id uuid,
+  start_at timestamptz,
+  offset_hours integer,
+  message_id uuid,
+  duplicate boolean
+) AS $$
+DECLARE
+  r record;
+  off integer;
+  msg uuid;
+  dup boolean;
+  rec record;
+BEGIN
+  IF p_session_offsets IS NULL OR array_length(p_session_offsets, 1) IS NULL THEN
+    RAISE EXCEPTION 'session offsets must be a non-empty array' USING ERRCODE = '22023';
+  END IF;
+
+  FOR off IN SELECT unnest(p_session_offsets)
+  LOOP
+    -- سررسید: جلسه‌ی booked و آینده‌ای که به نقطه‌ی یادآوری رسیده یا گذشته است.
+    -- duplicate=false فقط وقتی است که ردیف واقعا INSERT شده باشد.
+    FOR rec IN
+      WITH candidates AS (
+        SELECT se.id, se.patient_id, se.start_at
+          FROM sessions se
+         WHERE se.clinic_id = p_clinic
+           AND se.status = 'booked'
+           AND se.deleted_at IS NULL
+           AND se.start_at > now()
+           AND se.start_at - make_interval(hours => off) <= now()
+         ORDER BY se.start_at
+         LIMIT 500
+           FOR UPDATE OF se SKIP LOCKED
+      ), ins AS (
+        INSERT INTO message_log (
+          clinic_id, session_id, session_parent_clinic_id, patient_id,
+          patient_parent_clinic_id, step_index, channel, template_key,
+          locale, recipient_hash, body_sha256, body_chars, vars_redacted,
+          state, idempotency_key
+        )
+        SELECT p_clinic, c.id, p_clinic, c.patient_id, p_clinic, off,
+               'kavenegar', 'session.reminder', 'fa',
+               repeat('0', 64), repeat('0', 64), 0, '{}'::jsonb,
+               'queued', 'sessrem:' || c.id::text || ':' || off::text
+          FROM candidates c
+        ON CONFLICT (clinic_id, idempotency_key) DO NOTHING
+        RETURNING id, message_log.session_id AS msg_session_id, message_log.patient_id AS msg_patient_id
+      )
+      SELECT se.id AS sid, se.patient_id AS pid, se.start_at AS sstart,
+             m.id AS mid, (m.id IS NULL) AS isdup,
+             CASE WHEN m.id IS NULL THEN sess.id ELSE m.id END AS effective_mid
+        FROM candidates sess
+        LEFT JOIN ins m ON m.msg_session_id = sess.id
+        JOIN sessions se ON se.id = sess.id
+    LOOP
+      session_id := rec.sid;
+      patient_id := rec.pid;
+      start_at := rec.sstart;
+      offset_hours := off;
+      message_id := rec.effective_mid;
+      duplicate := rec.isdup;
+      IF message_id IS NOT NULL THEN
+        RETURN NEXT;
+      END IF;
+    END LOOP;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION fn_aftercare_claim_session_reminders(uuid, integer[]) IS
+  'Wave 4 (D15) — atomically claims session reminders due at T-24h and T-2h. The INSERT of a message_log row IS the claim: a unique idempotency key (sessrem:<session>:<offset>) makes a double-claim impossible, so no session lock is held beyond the statement. Recipient/body placeholders are zero-hashes; the API worker fills them at render time and resets them before send. Wave 5 (D21/0024): composite FKs need the parent-clinic shadow columns, which this INSERT now supplies (session and patient belong to p_clinic by construction — the candidate query filters sessions by clinic_id).';
+
+-- ════════════════════════════════════════════════════════════
+-- CONTRACT 4 — گره‌های قدیمی تک‌ستونی DROP می‌شوند
 -- رابطهٔ cross-tenant دیگر راهی ندارد. ستون‌های shadow از این لحظه
 -- تنها حامل رابطه‌اند.
 -- ════════════════════════════════════════════════════════════
