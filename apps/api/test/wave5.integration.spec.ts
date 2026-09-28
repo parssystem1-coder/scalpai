@@ -94,8 +94,8 @@ async function createIssuedInvoice(clinicId: string): Promise<string> {
   const rows = await migrateSql<{ id: string }>(
     process.env.MIGRATE_DATABASE_URL!,
     `WITH prod AS (
-       INSERT INTO billing_products (id, clinic_id, kind, name, price)
-       VALUES (gen_random_uuid(), $1, 'service', 'D24 probe', 1250000)
+       INSERT INTO products (id, clinic_id, sku, name, kind, price)
+       VALUES (gen_random_uuid(), $1, 'D24-' || substr(gen_random_uuid()::text, 1, 8), 'D24 probe', 'service', 1250000)
        RETURNING id, price, name
      ), inv AS (
        INSERT INTO invoices (id, clinic_id, patient_id, number, state, total, paid_amount)
@@ -168,7 +168,7 @@ describe("wave 5 — D24 two clinics", () => {
     // ۲) قلم فاکتورِ کلینیک A روی کاتالوگِ کلینیک B — FK ترکیبی invoice_items رد می‌کند
     const prodB = await migrateSql<{ id: string }>(
       process.env.MIGRATE_DATABASE_URL!,
-      "SELECT id FROM billing_products WHERE clinic_id = $1 LIMIT 1",
+      "SELECT id FROM products WHERE clinic_id = $1 LIMIT 1",
       [clinicB],
     );
     await expect(
