@@ -54,6 +54,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS invoices_id_clinic_key
   ON invoices (id, clinic_id);
 CREATE UNIQUE INDEX IF NOT EXISTS products_id_clinic_key
   ON products (id, clinic_id);
+-- patients / sessions فقط مقصدِ ارجاع‌های ترکیبی‌اند (خودشان فرزندِ ترکیبیِ
+-- این موج نیستند)؛ unique ترکیبی برای `REFERENCES patients (id, clinic_id)`
+-- لازم است:
+CREATE UNIQUE INDEX IF NOT EXISTS patients_id_clinic_key
+  ON patients (id, clinic_id);
+CREATE UNIQUE INDEX IF NOT EXISTS sessions_id_clinic_key
+  ON sessions (id, clinic_id);
 
 -- ════════════════════════════════════════════════════════════
 -- EXPAND 2 — ستون‌های shadow روی جدول‌های فرزند (بدون FK؛ فقط نگه‌دارنده)
