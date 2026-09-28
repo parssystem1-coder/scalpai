@@ -98,10 +98,10 @@ async function createIssuedInvoice(clinicId: string): Promise<string> {
        VALUES (gen_random_uuid(), $1, 'D24-' || substr(gen_random_uuid()::text, 1, 8), 'D24 probe', 'service', 1250000)
        RETURNING id, price, name
      ), inv AS (
-       INSERT INTO invoices (id, clinic_id, patient_id, patient_parent_clinic_id, number, state, total, paid_amount)
+       INSERT INTO invoices (id, clinic_id, patient_id, patient_parent_clinic_id, number, state, total, paid_amount, issued_at)
        SELECT gen_random_uuid(), p.clinic_id, p.id, p.clinic_id,
               to_char(now(), 'YYYY') || '-' || lpad((floor(random() * 999999))::text, 6, '0'),
-              'issued', 1250000, 0
+              'issued', 1250000, 0, now()
          FROM (SELECT id, clinic_id FROM patients WHERE clinic_id = $1 LIMIT 1) p
        RETURNING id
      )
