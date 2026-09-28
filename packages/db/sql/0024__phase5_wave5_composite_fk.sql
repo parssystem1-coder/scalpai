@@ -322,11 +322,11 @@ ALTER TABLE invoice_items
 -- CONTRACT 3 — نویسنده‌های سمت SQL به‌روز می‌شوند
 -- ════════════════════════════════════════════════════════════
 -- fn_aftercare_claim_session_reminders (0023) پیامِ یادآوری جلسه را در
--- message_log درج می‌کند؛ FK ترکیبی حالا enrollment_parent_clinic_id را
--- هم می‌خواهد (نال = نقض NOT NULL). enrollment_id که از سطرِ جلسه می‌آید،
--- پس ستونِ shadow همان p_clinic است؛ session و patient هم کلینیکِ همین
--- تابع‌اند — و patient فقط وقتی ارجاع می‌شود که پنجره جلسه همان کلینیک
--- را بسته باشد که SQL این را از قبل تضمین می‌کند (session WHERE clinic_id).
+-- message_log درج می‌کند؛ FK ترکیبی ستون‌های shadow والد را می‌خواهد.
+-- session و patient به p_clinic تعلق دارند (کوئری نامزد session را با
+-- WHERE clinic_id می‌بندد)، پس shadow آنها p_clinic است. enrollment_id
+-- NULL می‌ماند — یادآوری جلسه به دنباله‌ای تعلق ندارد (همان تصمیم 0023)
+-- و NULL/NULL قید ترکیبی را satisfies می‌کند.
 CREATE OR REPLACE FUNCTION fn_aftercare_claim_session_reminders(
   p_clinic uuid,
   p_session_offsets integer[] DEFAULT ARRAY[24, 2]
@@ -369,11 +369,13 @@ BEGIN
       ), ins AS (
         INSERT INTO message_log (
           clinic_id, session_id, session_parent_clinic_id, patient_id,
-          patient_parent_clinic_id, step_index, channel, template_key,
+          patient_parent_clinic_id, enrollment_id, enrollment_parent_clinic_id,
+          step_index, channel, template_key,
           locale, recipient_hash, body_sha256, body_chars, vars_redacted,
           state, idempotency_key
         )
-        SELECT p_clinic, c.id, p_clinic, c.patient_id, p_clinic, off,
+        SELECT p_clinic, c.id, p_clinic, c.patient_id, p_clinic,
+               NULL, NULL, off,
                'kavenegar', 'session.reminder', 'fa',
                repeat('0', 64), repeat('0', 64), 0, '{}'::jsonb,
                'queued', 'sessrem:' || c.id::text || ':' || off::text
@@ -403,7 +405,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION fn_aftercare_claim_session_reminders(uuid, integer[]) IS
-  'Wave 4 (D15) — atomically claims session reminders due at T-24h and T-2h. The INSERT of a message_log row IS the claim: a unique idempotency key (sessrem:<session>:<offset>) makes a double-claim impossible, so no session lock is held beyond the statement. Recipient/body placeholders are zero-hashes; the API worker fills them at render time and resets them before send. Wave 5 (D21/0024): composite FKs need the parent-clinic shadow columns, which this INSERT now supplies (session and patient belong to p_clinic by construction — the candidate query filters sessions by clinic_id).';
+  'Wave 4 (D15) — atomically claims session reminders due at T-24h and T-2h. The INSERT of a message_log row IS the claim: a unique idempotency key (sessrem:<session>:<offset>) makes a double-claim impossible, so no session lock is held beyond the statement. Recipient/body placeholders are zero-hashes; the API worker fills them at render time and resets them before send. Wave 5 (D21/0024): composite FKs need the parent-clinic shadow columns, which this INSERT now supplies — session and patient belong to p_clinic by construction (the candidate query filters sessions by clinic_id); enrollment_id stays NULL because a session reminder belongs to the session, not to a sequence enrollment.';
 
 -- ════════════════════════════════════════════════════════════
 -- CONTRACT 4 — گره‌های قدیمی تک‌ستونی DROP می‌شوند
