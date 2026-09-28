@@ -27,7 +27,6 @@ function newGuard(dbOverrides?: { withClient: ReturnType<typeof vi.fn> }, state?
 describe("InboundController webhook security", () => {
   afterEach(() => {
     delete process.env.KAVENEGAR_WEBHOOK_SECRET;
-    delete process.env.ZARINPAL_WEBHOOK_SECRET;
   });
 
   it("accepts a valid Kavenegar signature and binds tenant context", async () => {
@@ -83,23 +82,12 @@ describe("InboundController webhook security", () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
-  it("uses the provider-specific secret/header for Zarinpal", async () => {
-    process.env.ZARINPAL_WEBHOOK_SECRET = "z-secret";
-    const clinicId = "22222222-2222-2222-2222-222222222222";
-    const db = { withClient: vi.fn().mockResolvedValue({ clinicId, active: true }) };
-    const guard = newGuard(db);
-
-    let result: boolean | undefined;
-    await TenantScope.run(async () => {
-      result = await guard.canActivate(executionContext(InboundController.prototype.ingestZarinpal, { body, rawBody: Buffer.from(JSON.stringify(body)), headers: { "x-zarinpal-signature": signature(body, "z-secret") } }));
-    });
-    expect(result).toBe(true);
-  });
-
-  it("exposes rate-limit metadata for both webhook routes", () => {
+  // D23: مسیر zarinpal از قرارداد پیام حذف شد — callback پرداخت همان
+  // billing/payment/callback است. گاردِ امضا فقط برای کانال‌های پیام‌رسانی
+  // تست می‌شود؛ provider-specific secret مسیرش با خود route است نه env جدا.
+  it("exposes rate-limit metadata for the messaging webhook route", () => {
     const metadataKey = "rate_limit";
     expect(Reflect.getMetadata(metadataKey, InboundController.prototype.ingestKavenegar)).toMatchObject({ name: "webhook-kavenegar", max: 600 });
-    expect(Reflect.getMetadata(metadataKey, InboundController.prototype.ingestZarinpal)).toMatchObject({ name: "webhook-zarinpal", max: 600 });
   });
 
   it("rejects a replay of the same signed body with 409", async () => {

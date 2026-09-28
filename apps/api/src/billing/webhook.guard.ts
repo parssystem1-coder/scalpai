@@ -15,10 +15,13 @@ export const WebhookSignature = (provider: string): MethodDecorator & ClassDecor
  * allow-list on purpose: the previous default sent every unrecognised provider
  * to `x-webhook-signature`, so a typo in a decorator silently verified the
  * wrong header instead of failing closed.
+ *
+ * D23: زرین‌پال از این allow-list حذف شد — کانال پیام‌رسانی نیست و callback
+ * پرداختش (`POST billing/payment/callback`) از گارد امضای پیام عبور نمی‌کند؛
+ * مسیر `aftercare/webhooks/zarinpal` هم از قرارداد پیام برداشته شد.
  */
 const PROVIDER_SIGNATURE_HEADERS: Readonly<Record<string, string>> = {
   kavenegar: "x-webhook-signature",
-  zarinpal: "x-zarinpal-signature",
 };
 
 /**

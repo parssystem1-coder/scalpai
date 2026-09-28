@@ -135,8 +135,8 @@
 ### Wave 5 — بدهی مالی/داده (D19–D24) — سند بدهی موج ۵ (در جریان)
 - [x] D19/D20 ADR-0056: POS کامل و memberships به فاز ۷ سپرده شدند («عضویت/انبار کامل»)؛ تعریف رسمی فاز ۵ = **invoice + Zarinpal** (کاتالوگ + فاکتور رابطه‌ای §6.3 + درگاه واقعی + UI `/billing`) — هیچ جدول/migration/قرارداد جدیدی برای POS/memberships در فاز ۵ نوشته نمی‌شود
 - [x] D21 migration 0024: FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵a — ستون‌های shadow + unique `(id, clinic_id)` روی ۵ جدول والد، FK ترکیبی با backfill/VALIDATE، حذف FKهای تک‌ستونی قدیمی (رابطهٔ cross-tenant دیگر از دیتابیس عبور نمی‌کند) + rollback کامل
-- [ ] D22 `deleted_at` یا ADR append-only برای `message_log`/`inbound_messages`
-- [ ] D23 حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام (callback پرداخت = `billing/payment/callback`)
+- [x] D22 ADR-0057 + migration 0025: `message_log`/`inbound_messages` append-only شدند (به‌جای `deleted_at`) — trigger گارد: DELETE ممنوع، گذر وضعیت فقط رو به جلو، محتوا پس از فاز placeholder ثابت + rollback
+- [x] D23 حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام (callback پرداخت = `billing/payment/callback`) — allow-list امضا در `webhook.guard.ts` هم تمیز شد
 - [ ] D24 تست ادغامی Postgres واقعی: دو کلینیک، replay پرداخت، claim همزمان
 
 ## فاز 6 — هوش
