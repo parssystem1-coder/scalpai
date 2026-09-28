@@ -84,7 +84,12 @@ export async function enqueueMessage(
     .values({
       clinicId,
       enrollmentId: input.enrollmentId ?? null,
+      // D21 (0024): composite FKs bind (id, clinic_id) — a referenced parent
+      // inside this clinic carries THIS clinic's id by construction, so the
+      // shadow column mirrors clinicId whenever the reference is set.
+      enrollmentParentClinicId: input.enrollmentId != null ? clinicId : null,
       patientId: input.patientId ?? null,
+      patientParentClinicId: input.patientId != null ? clinicId : null,
       stepIndex: input.stepIndex ?? null,
       channel: input.channel,
       templateKey: input.templateKey,
@@ -189,6 +194,11 @@ export async function fillSessionReminder(
       bodyChars: input.body.length,
       varsRedacted: input.varsRedacted,
       provider: input.provider,
+      // D21 (0024): the reminder row is updated in place; its session/patient
+      // references belong to this clinic by construction (claim query filters
+      // sessions by clinic_id), so the composite-FK shadows are clinicId.
+      sessionParentClinicId: clinicId,
+      patientParentClinicId: clinicId,
     })
     .where(
       and(
@@ -338,8 +348,11 @@ export async function recordInbound(
       providerMessageId: input.providerMessageId ?? null,
       senderHash: recipientDigest(input.from),
       patientId: input.patientId ?? null,
+      patientParentClinicId: input.patientId != null ? clinicId : null,
       enrollmentId: input.enrollmentId ?? null,
+      enrollmentParentClinicId: input.enrollmentId != null ? clinicId : null,
       replyToMessageId: input.replyToMessageId ?? null,
+      replyParentClinicId: input.replyToMessageId != null ? clinicId : null,
       bodyEncrypted: ciphertext,
       bodyKeyId: kid,
       bodySha256: bodyDigest(input.body),

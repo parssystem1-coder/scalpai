@@ -402,6 +402,12 @@ export const aftercareEnrollments = pgTable("aftercare_enrollments", {
   state: text("state").notNull().default("active"),
   currentStep: integer("current_step").notNull().default(0),
   stepsSnapshot: jsonb("steps_snapshot").notNull().default([]),
+  /** D21 (0024): shadow of the referenced sequence's clinic_id. */
+  sequenceParentClinicId: uuid("sequence_parent_clinic_id"),
+  /** D21 (0024): shadow of the referenced patient's clinic_id. */
+  patientParentClinicId: uuid("patient_parent_clinic_id"),
+  /** D21 (0024): shadow of the referenced session's clinic_id. */
+  sessionParentClinicId: uuid("session_parent_clinic_id"),
   locale: text("locale").notNull().default("fa"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   nextRunAt: timestamp("next_run_at", { withTimezone: true }),
@@ -432,14 +438,24 @@ export const aftercareEnrollments = pgTable("aftercare_enrollments", {
  *    `mutations.payload`.
  *  - `idempotencyKey` is unique per clinic. Without it a network retry sends the
  *    patient the same message twice.
+ *
+ *  D21 (migration 0024): the `*ParentClinicId` columns shadow the referenced
+ *  parent's clinic identity so the composite FK binds (id, clinic_id) as a pair
+ *  — the database itself refuses a cross-tenant reference, not just RLS.
  */
 export const messageLog = pgTable("message_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   enrollmentId: uuid("enrollment_id"),
+  /** D21 (0024): shadow of the referenced enrollment's clinic_id. */
+  enrollmentParentClinicId: uuid("enrollment_parent_clinic_id"),
   /** موج ۴ (D15): یادآوری جلسه به دنباله تعلق ندارد — پیوندش با جلسه است. */
   sessionId: uuid("session_id"),
+  /** D21 (0024): shadow of the referenced session's clinic_id. */
+  sessionParentClinicId: uuid("session_parent_clinic_id"),
   patientId: uuid("patient_id"),
+  /** D21 (0024): shadow of the referenced patient's clinic_id. */
+  patientParentClinicId: uuid("patient_parent_clinic_id"),
   stepIndex: integer("step_index"),
   /** kavenegar | bale | eitaa | telegram | whatsapp */
   channel: text("channel").notNull(),
@@ -483,8 +499,14 @@ export const inboundMessages = pgTable("inbound_messages", {
   providerMessageId: text("provider_message_id"),
   senderHash: text("sender_hash").notNull(),
   patientId: uuid("patient_id"),
+  /** D21 (0024): shadow of the referenced patient's clinic_id. */
+  patientParentClinicId: uuid("patient_parent_clinic_id"),
   enrollmentId: uuid("enrollment_id"),
+  /** D21 (0024): shadow of the referenced enrollment's clinic_id. */
+  enrollmentParentClinicId: uuid("enrollment_parent_clinic_id"),
   replyToMessageId: uuid("reply_to_message_id"),
+  /** D21 (0024): shadow of the referenced message_log row's clinic_id. */
+  replyParentClinicId: uuid("reply_parent_clinic_id"),
   bodyEncrypted: text("body_encrypted"),
   bodyKeyId: text("body_key_id"),
   bodySha256: text("body_sha256"),
@@ -549,7 +571,11 @@ export const invoices = pgTable("invoices", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   patientId: uuid("patient_id").notNull(),
+  /** D21 (0024): shadow of the referenced patient's clinic_id. */
+  patientParentClinicId: uuid("patient_parent_clinic_id"),
   sessionId: uuid("session_id"),
+  /** D21 (0024): shadow of the referenced session's clinic_id. */
+  sessionParentClinicId: uuid("session_parent_clinic_id"),
   number: text("number").notNull(),
   /** draft | issued | paid | partially_paid | void | refunded */
   state: text("state").notNull().default("draft"),
@@ -588,7 +614,11 @@ export const invoiceItems = pgTable("invoice_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   clinicId: uuid("clinic_id").notNull(),
   invoiceId: uuid("invoice_id").notNull(),
+  /** D21 (0024): shadow of the referenced invoice's clinic_id. */
+  invoiceParentClinicId: uuid("invoice_parent_clinic_id"),
   productId: uuid("product_id"),
+  /** D21 (0024): shadow of the referenced product's clinic_id. */
+  productParentClinicId: uuid("product_parent_clinic_id"),
   description: text("description").notNull(),
   quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull().default("1"),
   unitPrice: numeric("unit_price", { precision: 12, scale: 0 }).notNull(),

@@ -107,13 +107,17 @@ async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean
       ],
     );
 
-    // ۳) یک ثبت‌نام که گام اولش همین الان سررسید است
+    // ۳) یک ثبت‌نام که گام اولش همین الان سررسید است.
+    // ستون‌های *_parent_clinic_id (D21 / 0024): FK ترکیبی زوجِ (id, clinic_id)
+    // والد را می‌بندد، پس ثبت‌نام باید هویت کلینیکی والدینش را هم بیاورد.
     if (patientId) {
       await client.query(
         `INSERT INTO aftercare_enrollments
-           (clinic_id, sequence_id, patient_id, state, current_step, steps_snapshot, locale,
+           (clinic_id, sequence_id, sequence_parent_clinic_id,
+            patient_id, patient_parent_clinic_id,
+            state, current_step, steps_snapshot, locale,
             started_at, next_run_at)
-         VALUES ($1, $2, $3, 'active', 0, $4::jsonb, 'fa',
+         VALUES ($1, $2, $1, $3, $1, 'active', 0, $4::jsonb, 'fa',
                  now() - interval '25 hours', now() - interval '1 hour')`,
         [clinicA, sequenceId, patientId, JSON.stringify(steps)],
       );
@@ -127,16 +131,17 @@ async function seedPhase5a(client: PoolClient, clinicA: string): Promise<boolean
       if (invoiceNumber) {
         const invoiceId = randomUUID();
         await client.query(
-          `INSERT INTO invoices (id, clinic_id, patient_id, number, state, currency, due_at)
-           VALUES ($1, $2, $3, $4, 'draft', 'IRR', now() + interval '14 days')`,
+          `INSERT INTO invoices (id, clinic_id, patient_id, patient_parent_clinic_id, number, state, currency, due_at)
+           VALUES ($1, $2, $3, $2, $4, 'draft', 'IRR', now() + interval '14 days')`,
           [invoiceId, clinicA, patientId, invoiceNumber],
         );
         await client.query(
           `INSERT INTO invoice_items
-             (clinic_id, invoice_id, product_id, description, quantity, unit_price, tax_rate, position)
+             (clinic_id, invoice_id, invoice_parent_clinic_id, product_id, product_parent_clinic_id,
+              description, quantity, unit_price, tax_rate, position)
            VALUES
-             ($1, $2, $3, $5, 1, '16000000', 0, 0),
-             ($1, $2, $4, $6, 2, '1850000',  9, 1)`,
+             ($1, $2, $1, $3, $1, $5, 1, '16000000', 0, 0),
+             ($1, $2, $1, $4, $1, $6, 2, '1850000',  9, 1)`,
           [
             clinicA,
             invoiceId,

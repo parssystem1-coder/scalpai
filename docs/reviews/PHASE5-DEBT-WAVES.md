@@ -38,7 +38,7 @@
 | D18 | لینک توکن‌دار منقضی‌شونده (§13) | DONE (موج ۴؛ استثنای کنترل‌شده با allow-list و TTL ≤۳۰ روز) | 4 |
 | D19 | POS + `stock_qty` | DEFERRED → فاز ۷ (ADR-0056) | 5 |
 | D20 | `memberships` | DEFERRED → فاز ۷ (ADR-0056) | 5 |
-| D21 | B4 composite FK | OPEN | 5 |
+| D21 | B4 composite FK | DONE (0024؛ ۱۳ گره ترکیبی) | 5 |
 | D22 | B5 `deleted_at` یا ADR append-only | OPEN | 5 |
 | D23 | مسیر zarinpal روی قرارداد inbound پیام (Q3) | WRONG CONTRACT | 5 |
 | D24 | تست ادغامی Postgres واقعی (RLS/claim/pay) | MOCK-ONLY | 5 |
@@ -151,7 +151,12 @@
 **پیشنهاد:** POS و memberships را **با ADR به فاز ۷ بسپار** اگر موج ۳ فاکتور را پوشش داد؛ در غیر این صورت همین موج جداول را با expand→migrate→contract می‌سازد. B4/B5 را مستقل از POS انجام بده — tenant safety عقب نمی‌افتد.
 
 > ✅ **D19/D20 بسته شد — 2026-09-28 (ADR-0056):** موج ۳/۴-UI فاکتور را کامل پوشش داد (`/billing`: صدور از کاتالوگ با `resolveItems` + pay/void، درگاه زرین‌پال واقعی از ۵b)؛ پس شاخهٔ «ADR» انتخاب شد: **POS کامل (D19) و memberships (D20) به فاز ۷ سپرده شدند — «عضویت/انبار کامل»؛ تعریف رسمی بسته‌شدن فاز ۵ = «invoice + Zarinpal»**. هیچ جدول/migration/قرارداد جدیدی برای POS/memberships در فاز ۵ نوشته نمی‌شود. باقی‌ماندهٔ موج ۵ فقط D21–D24 است — مستقل از این تصمیم.
-| D21 | composite FK `(clinic_id, id)` با expand→migrate→contract |
+>
+> ✅ **D21 بسته شد — 2026-09-28 (migration 0024):** هر ردیفِ فرزندِ فاز ۵a که به والدِ tenant-owned ارجاع می‌دهد، هویت کلینیکی والد را کنار id نگه می‌دارد و FK زوجِ `(id, clinic_id)` را می‌بندد: `enrollments` (sequence/patient/session)، `message_log` (enrollment/session/patient)، `inbound_messages` (enrollment/patient/reply)، `invoices` (patient/session)، `invoice_items` (invoice/product) — ۱۳ گره ترکیبی. الگوی expand→migrate→contract: ستون‌های shadow (NOT NULL جز جایی که خودِ ستونِ ارجاع nullable است) + unique ترکیبی `(id, clinic_id)` روی ۵ جدول والد (پیش‌نیاز REFERENCES)، FKهای ترکیبی DEFERRABLE INITIALLY IMMEDIATE با NOT VALID و VALIDATE پس از backfill — همه در یک فایل اتمیک؛ و در CONTRACT حذف FKهای تک‌ستونی قدیمی، یعنی رابطهٔ cross-tenant دیگر از دیتابیس عبور نمی‌کند نه فقط از RLS. rollback کامل در `packages/db/sql/rollback/0024__phase5_wave5_composite_fk.down.sql` (FKهای قدیمی بازساخته می‌شوند؛ ستون‌های shadow عمداً می‌مانند تا backfill دوباره لازم نشود). ستون‌های shadow در `schema.ts` هم ثبت شدند تا Drizzle و SQL یک اسکیما را بگویند؛ تست منفی cross-tenant در CI روی Postgres واقعی اجرا می‌شود.
+
+| آیتم | کار |
+|---|---|
+| D21 | composite FK `(clinic_id, id)` با expand→migrate→contract — **DONE (0024)** |
 | D22 | `deleted_at` **یا** ADR append-only برای `message_log` / `inbound_messages` |
 | D23 | حذف `POST aftercare/webhooks/zarinpal` از قرارداد پیام؛ callback پرداخت همان `billing/payment/callback` |
 | D24 | integration Postgres: دو کلینیک، replay پرداخت، claim همزمان |
@@ -197,3 +202,5 @@ DoD پلی‌بوک #1 و #5 اینجا زنده‌اند، نه در گیت ۵a
 | 2026-09-23 | موج UI (برنچ wave4-ui — باقی‌ماندهٔ موج ۳) بسته شد: D12/D13 DONE (PR #103). موج‌های ۴/۵/۶ سند (D15–D25) همچنان بازند؛ فاز ۵ کامل نشده |
 | 2026-09-24 | موج ۴ بسته شد: D15/D16/D17/D18 DONE (migration 0023 + ADR-0055 + گارد ایزولاسیون تست). فقط موج ۵ سند (D19–D24) باز است؛ فاز ۵ هنوز کامل نشده |
 | 2026-09-28 | موج ۵ آغاز شد — ADR-0056: D19 (POS) و D20 (memberships) به فاز ۷ سپرده شدند («عضویت/انبار کامل»؛ تعریف فاز ۵ = invoice+Zarinpal). باقی‌ماندهٔ باز موج ۵: D21/D22/D23/D24 |
+| 2026-09-28 | D21 بسته شد: migration 0024 — FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵a (expand→migrate→contract + rollback کامل). باز: D22/D23/D24 |
+| 2026-09-28 | D21 بسته شد: migration 0024 — FK ترکیبی `(id, clinic_id)` روی ۱۳ رابطهٔ فاز ۵ا (expand→migrate→contract + rollback). باز: D22/D23/D24 |
