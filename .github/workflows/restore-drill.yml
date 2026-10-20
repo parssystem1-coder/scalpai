@@ -115,7 +115,7 @@ jobs:
       - name: The off-site copy is still immutable
         run: bash tools/ci/run-gate.sh backup-offsite bash tools/ci/offsite-check.sh
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
