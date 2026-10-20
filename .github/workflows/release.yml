@@ -110,7 +110,7 @@ jobs:
 
       - name: Upload the release ledger + attestations
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-ledger
           path: |
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload gate evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-gate-evidence
           path: ci-evidence
